@@ -61,11 +61,18 @@ export function sparkline(series, color = '#e0a33e', w = 84, h = 24) {
   const pts = series
     .map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / span) * (h - 4) - 2).toFixed(1)}`)
     .join(' ');
-  const lastY = h - ((series[series.length - 1] - min) / span) * (h - 4) - 2;
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">
+  /*
+    preserveAspectRatio="none" растягивает линию по ширине колонки — на широком
+    экране график читается заметно лучше. Точку в конце пришлось убрать: при
+    неравномерном масштабе круг превратился бы в эллипс. Потери нет — текущие
+    очки и так стоят числом в соседней колонке.
+    vector-effect держит толщину линии постоянной при любом растяжении.
+  */
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"
+    preserveAspectRatio="none" aria-hidden="true">
     <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"
-      stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
-    <circle cx="${w}" cy="${lastY.toFixed(1)}" r="2.2" fill="${color}"/>
+      stroke-linejoin="round" stroke-linecap="round" opacity="0.9"
+      vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 

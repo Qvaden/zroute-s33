@@ -36,7 +36,18 @@ const PAGES = [
   { id: 'guide', label: 'Малым алам', html: renderGuide(view) },
 ];
 
+/*
+  Какую страницу открыть первой и куда положить результат.
+  Нужно для проверки конкретного экрана:  node scripts/build-preview.mjs ladder
+*/
+const startId = process.argv[2] && PAGES.some((p) => p.id === process.argv[2]) ? process.argv[2] : 'home';
+const outFile = process.argv[3] || 'dist/preview.html';
+const isStart = (p) => p.id === startId;
+
 const css = await readFile('src/styles.css', 'utf8');
+// Скрипт рейтинга написан без import/export именно ради этой строки:
+// его можно вставить дословно, не дублируя логику поиска и сортировки.
+const ladderJs = await readFile('src/ui/ladder-controls.js', 'utf8');
 
 const html = `<!DOCTYPE html>
 <html lang="ru">
@@ -62,13 +73,13 @@ ${css}
       <span class="brand__text"><b>Сервер 33</b><small>Z Route: Redemption</small></span>
     </a>
     <nav class="nav" id="nav">
-      ${PAGES.map((p, i) => `<a href="#" class="nav__link${i === 0 ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n      ')}
+      ${PAGES.map((p) => `<a href="#" class="nav__link${isStart(p) ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n      ')}
     </nav>
   </div>
 </header>
 
 <main class="wrap" id="app">
-  ${PAGES.map((p, i) => `<div class="page${i === 0 ? ' is-active' : ''}" id="page-${p.id}">${p.html}</div>`).join('\n  ')}
+  ${PAGES.map((p) => `<div class="page${isStart(p) ? ' is-active' : ''}" id="page-${p.id}">${p.html}</div>`).join('\n  ')}
 </main>
 
 <footer class="site-foot wrap">
@@ -91,10 +102,13 @@ document.addEventListener('click', function (e) {
   window.scrollTo(0, 0);
 });
 </script>
+<script>
+${ladderJs}
+</script>
 </body>
 </html>
 `;
 
 await mkdir('dist', { recursive: true });
-await writeFile('dist/preview.html', html, 'utf8');
-console.log(`Готово: dist/preview.html (${(html.length / 1024).toFixed(0)} КБ), страниц: ${PAGES.length}`);
+await writeFile(outFile, html, 'utf8');
+console.log(`Готово: ${outFile} (${(html.length / 1024).toFixed(0)} КБ), стартовая страница: ${startId}`);

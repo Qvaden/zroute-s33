@@ -310,34 +310,132 @@ h1,h2,h3,h4 {
 .ch__xtick { text-anchor: middle; }
 .ch__label { font-family: Unbounded, sans-serif; font-size: 11px; font-weight: 700; }
 
-/* ── Таблица рейтинга ───────────────────────────────────────────────────── */
-.table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
-@media (min-width: 760px) { .table-wrap { margin: 0 -24px; padding: 0 24px; } }
+/* ── Рейтинг: панель управления ─────────────────────────────────────────── */
+[hidden] { display: none !important; }
 
-.ladder { width: 100%; border-collapse: collapse; font-size: 14px; }
-.ladder th {
-  text-align: left;
+.ctl {
+  display: flex; flex-wrap: wrap; gap: 9px;
+  margin-bottom: 16px;
+}
+
+.search {
+  position: relative; flex: 1 1 210px; min-width: 0;
+  display: flex; align-items: center;
+}
+.search svg {
+  position: absolute; left: 12px; width: 15px; height: 15px;
+  fill: none; stroke: var(--mute); stroke-width: 2; stroke-linecap: round;
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  font: inherit; font-size: 14px;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 14px 9px 34px;
+  outline: none;
+  transition: border-color .16s var(--ease), background .16s var(--ease);
+}
+.search input::placeholder { color: var(--mute); }
+.search input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--raised-2);
+}
+.search input::-webkit-search-cancel-button { filter: invert(.6); cursor: pointer; }
+
+.seg {
+  display: flex; gap: 2px; flex: none;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+}
+.seg__btn {
+  font: inherit; font-size: 12.5px; font-weight: 500;
+  color: var(--dim);
+  background: none; border: 0; cursor: pointer;
+  padding: 6px 13px; border-radius: 999px;
+  white-space: nowrap;
+  transition: color .15s var(--ease), background .15s var(--ease);
+}
+.seg__btn:hover { color: var(--text); }
+.seg__btn.is-on { color: #14100c; background: var(--accent); font-weight: 600; }
+
+/* ── Рейтинг: строки ────────────────────────────────────────────────────── */
+.lad__head {
+  display: none;
   font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
   color: var(--mute);
-  padding: 0 9px 11px; border-bottom: 1px solid var(--line);
-  white-space: nowrap;
+  padding: 0 8px 10px; border-bottom: 1px solid var(--line);
 }
-.ladder td { padding: 10px 9px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
-.ladder tbody tr { transition: background .14s var(--ease); }
-.ladder tbody tr:hover { background: rgba(255,255,255,.03); }
-.row--inactive { opacity: .4; }
+.ta-r { text-align: right; }
 
-.c-place { width: 68px; white-space: nowrap; }
-.place { font-family: Unbounded, sans-serif; font-size: 15px; font-weight: 700; color: var(--dim); }
-.c-name { min-width: 200px; }
-.c-num { text-align: right; width: 46px; font-family: Unbounded, sans-serif; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lad__row {
+  display: grid;
+  grid-template-columns: 54px auto 1fr auto;
+  grid-template-areas:
+    "place ident ident pts"
+    "place form  wl    pts";
+  gap: 3px 10px;
+  align-items: center;
+  padding: 11px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 2px solid transparent;
+  transition: background .14s var(--ease), border-color .14s var(--ease);
+}
+.lad__row:hover { background: rgba(255,255,255,.032); border-left-color: var(--tag-color); }
+.lad__row--off { opacity: .42; }
+.lad__row--m1 { border-left-color: var(--gold); }
+.lad__row--m2 { border-left-color: #c8cdd6; }
+.lad__row--m3 { border-left-color: #c98a52; }
+
+.lad__place { grid-area: place; display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.lad__place b { font-family: Unbounded, sans-serif; font-size: 15px; font-weight: 700; color: var(--dim); }
+.lad__row--m1 .lad__place b { color: var(--gold); }
+.lad__row--m2 .lad__place b { color: #c8cdd6; }
+.lad__row--m3 .lad__place b { color: #c98a52; }
+
+.lad__ident { grid-area: ident; display: flex; align-items: center; gap: 0; flex-wrap: wrap; min-width: 0; }
+.lad__name { font-weight: 500; }
+.lad__off { font-size: 11px; color: var(--mute); font-style: normal; margin-left: 7px; }
+
+.lad__form { grid-area: form; }
+.lad__wl { grid-area: wl; font-family: Unbounded, sans-serif; font-size: 12.5px; font-weight: 600; }
+.lad__wl b { font-weight: 700; }
+.lad__wl i { color: var(--mute); font-style: normal; margin: 0 3px; opacity: .6; }
 .c-win { color: var(--win); }
 .c-loss { color: var(--loss); }
-.c-points { font-size: 17px; font-weight: 800; }
-.c-points.pos { color: var(--win); }
-.c-points.neg { color: var(--loss); }
-.c-spark { width: 96px; }
-.c-form { width: 78px; }
+
+.lad__pts {
+  grid-area: pts; text-align: right;
+  font-family: Unbounded, sans-serif; font-size: 19px; font-weight: 800;
+  color: var(--dim);
+}
+.lad__pts.pos { color: var(--win); }
+.lad__pts.neg { color: var(--loss); }
+
+.lad__spark { grid-area: spark; display: none; }
+
+.lad__empty { text-align: center; color: var(--mute); padding: 28px 0; font-size: 14px; }
+.lad__count { margin: 14px 0 0; }
+
+@media (min-width: 880px) {
+  .lad__head, .lad__row {
+    /* Имя не должно растягиваться на всю свободную ширину — иначе между ним
+       и данными зияет пустота. Слабину забирает график динамики: там она
+       превращается в пользу, потому что линия становится читаемее. */
+    grid-template-columns: 74px minmax(180px, 22rem) 92px 84px 74px minmax(130px, 1fr);
+    grid-template-areas: "place ident form wl pts spark";
+    gap: 10px;
+  }
+  .lad__head { display: grid; }
+  .lad__row { padding: 10px 8px; }
+  .lad__spark { display: block; }
+  .lad__wl { text-align: left; }
+  .lad__spark svg { width: 100%; height: 28px; }
+}
 
 .tag {
   display: inline-block;

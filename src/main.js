@@ -6,6 +6,8 @@ import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
+// Побочный импорт: вешает делегированные обработчики поиска и сортировки рейтинга.
+import './ui/ladder-controls.js';
 
 const ROUTES = [
   { id: 'home', label: 'Итоги недели', render: renderHome },
@@ -36,6 +38,9 @@ function render() {
   if (!view) return;
   renderNav();
   app.innerHTML = currentRoute().render(view);
+  // Рейтинг нарисован строками — надо сразу применить фильтр и сортировку,
+  // иначе состояние кнопок разойдётся с тем, что видно на экране.
+  if (typeof window.__ladderApply === 'function') window.__ladderApply();
   window.scrollTo(0, 0);
 }
 

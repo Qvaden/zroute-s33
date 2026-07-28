@@ -164,6 +164,47 @@ console.log('\nE. Валидатор контракта');
   check('поймал недопустимый outcome', problems.some((p) => p.includes('недопустимый outcome')));
 }
 
+// ── F. Разметка рейтинга и его скрипт говорят на одном языке ────────────────
+console.log('\nF. Связка рейтинга: разметка ↔ скрипт');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderLadder } = await import('../src/pages/ladder.js');
+  const { computeStandings } = await import('../src/logic/standings.js');
+  const { CONFIG } = await import('../config.js');
+
+  const data = await loadAndValidate(jsonAdapter).then((r) => r.data);
+  const standings = computeStandings(
+    data.alliances, data.weeks, data.results, CONFIG.scoring, CONFIG.formLength
+  );
+  const html = renderLadder({ standings });
+  const script = await readFile('src/ui/ladder-controls.js', 'utf8');
+
+  /*
+    Скрипт ищет элементы по data-ladder-*. Если атрибут в разметке
+    переименуют, поиск и сортировка молча перестанут работать — в браузере
+    ошибки не будет, просто кнопки станут мёртвыми. Поэтому вытаскиваем
+    имена прямо из исходника скрипта и проверяем, что все они есть в HTML.
+  */
+  const hooks = [...new Set(
+    [...script.matchAll(/\[data-(ladder-[a-z]+)\]/g)].map((m) => m[1])
+  )];
+  check('скрипт вообще что-то ищет', hooks.length >= 5, `нашли: ${hooks.join(', ')}`);
+  for (const hook of hooks) {
+    check(`разметка содержит data-${hook}`, html.includes(`data-${hook}`));
+  }
+
+  // Поля, по которым скрипт фильтрует и сортирует.
+  for (const field of ['data-name', 'data-tag', 'data-points', 'data-wins', 'data-form', 'data-place', 'data-active']) {
+    check(`у строк есть ${field}`, html.includes(field));
+  }
+
+  const rowCount = (html.match(/class="lad__row/g) || []).length;
+  equal('отрисованы все 32 альянса', rowCount, 32);
+  check('поиск сравнивает в нижнем регистре', !/data-name="[^"]*[А-ЯЁ]/.test(html));
+  check('сортировки скрипта покрывают кнопки',
+    ['points', 'wins', 'form', 'name'].every((s) => html.includes(`data-ladder-sort="${s}"`)));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
