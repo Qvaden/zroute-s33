@@ -34,8 +34,11 @@ export const CONFIG = {
 
   sheets: {
     /** ID документа из адреса: docs.google.com/spreadsheets/d/<ЭТО>/edit */
-    docId: '',
-    /** Имена вкладок в таблице. */
+    docId: '1syc7ywnmwpVGVOycaGOe-HqsUb75HNXs-cyltGVXaDE',
+    /**
+     * Имена вкладок в таблице. Вкладки с другими именами адаптер не читает —
+     * поэтому в документе спокойно живёт ещё одна, с инструкцией для редактора.
+     */
     tabs: {
       alliances: 'alliances',
       weeks: 'weeks',
