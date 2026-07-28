@@ -54,35 +54,81 @@ console.log(`  событий:     ${data.events.length}`);
 console.log(`  текстов:     ${data.texts.length}\n`);
 
 if (problems.length) {
-  console.log(`✕ Замечаний: ${problems.length}\n`);
+  console.log(`✕ Ошибки в структуре: ${problems.length}\n`);
   for (const p of problems.slice(0, 40)) console.log(`  • ${p}`);
   if (problems.length > 40) console.log(`  … и ещё ${problems.length - 40}`);
   console.log('');
   process.exit(1);
 }
 
-console.log('✓ Замечаний нет, структура в порядке.\n');
+console.log('✓ Структура в порядке, ошибок нет.\n');
+
+/*
+  Структура и готовность — разные вещи, и путать их нельзя.
+  Пустая таблица формально безупречна: ни одной ошибки, все колонки на месте.
+  Но переключить на неё сайт означает показать людям нули.
+  Поэтому дальше отдельная проверка: есть ли чем наполнять страницы.
+*/
+const blockers = [];
+const warnings = [];
+
+if (data.alliances.length === 0) {
+  blockers.push('Ни одного альянса. Заполните tag и name во вкладке alliances — строки с пустыми названиями сайт игнорирует.');
+} else if (data.alliances.length < 4) {
+  warnings.push(`Альянсов всего ${data.alliances.length}. Рейтинг будет выглядеть скудно.`);
+}
+
+if (data.weeks.length === 0) {
+  blockers.push('Ни одной недели во вкладке weeks.');
+}
+
+if (data.results.length === 0) {
+  blockers.push('Ни одного результата. Поставьте П или Х хотя бы за одну неделю во вкладке results.');
+}
+
+if (data.texts.length === 0) {
+  warnings.push('Нет текстов — раздел для малых альянсов будет пустым.');
+}
+if (data.events.length === 0) {
+  warnings.push('Нет событий — хронология будет пустой.');
+}
 
 // Заполненность матрицы: сколько ячеек внесено из возможных.
 const expected = data.alliances.filter((a) => a.active).length * data.weeks.length;
-if (expected) {
+if (expected && data.results.length) {
   const pct = Math.round((data.results.length / expected) * 100);
   console.log(`Заполненность матрицы: ${data.results.length} из ${expected} (${pct}%)`);
-  if (pct < 100) console.log('  Незаполненные ячейки — это нормально: значит результат ещё не внесли.\n');
-  else console.log('');
+  console.log(
+    pct < 100
+      ? '  Незаполненные ячейки — это нормально: значит результат ещё не внесли.\n'
+      : ''
+  );
 }
 
-// Небольшая проверка «на глаз»: если рейтинг считается, данные живые.
-if (data.weeks.length && data.alliances.length) {
+// Если рейтинг считается — данные живые, и это видно глазами.
+if (data.weeks.length && data.alliances.length && data.results.length) {
   const table = computeStandings(
     data.alliances, data.weeks, data.results, CONFIG.scoring, CONFIG.formLength
   );
   console.log('Верх таблицы по этим данным:');
   for (const r of table.slice(0, 5)) {
     const pts = `${r.points > 0 ? '+' : ''}${r.points}`;
-    console.log(`  ${String(r.place).padStart(2)}. ${r.alliance.tag.padEnd(5)} ${r.alliance.name.padEnd(18)} ${pts.padStart(4)}  (${r.wins}-${r.losses})`);
+    console.log(
+      `  ${String(r.place).padStart(2)}. ${r.alliance.tag.padEnd(5)} ` +
+        `${r.alliance.name.padEnd(18)} ${pts.padStart(4)}  (${r.wins}-${r.losses})`
+    );
   }
   console.log('');
 }
 
-console.log('Можно переключать: в config.js поставьте dataSource: \'sheets\' и docId.');
+for (const w of warnings) console.log(`⚠ ${w}`);
+if (warnings.length) console.log('');
+
+if (blockers.length) {
+  console.log('✕ Переключать пока рано:\n');
+  for (const b of blockers) console.log(`  • ${b}`);
+  console.log('\nСтруктура готова, не хватает только данных.');
+  process.exit(1);
+}
+
+console.log("✓ Готово к переключению: в config.js поставьте dataSource: 'sheets'.");
