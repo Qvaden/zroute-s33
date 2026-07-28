@@ -1,0 +1,347 @@
+/*
+  Оформление: тёмный «тактический» регистр под пост-апокалипсис.
+  Сначала телефон — аудитория играет с телефона и заходить будет оттуда же.
+  Никаких зависимостей, только шрифты с Google Fonts.
+*/
+
+:root {
+  --bg:        #101317;
+  --bg-panel:  #171b21;
+  --bg-raised: #1e232b;
+  --line:      #272d36;
+  --line-soft: #1f242c;
+
+  --text:      #e6e9ee;
+  --text-dim:  #98a1ad;
+  --text-mute: #6b7482;
+
+  --accent:    #e0a33e;
+  --win:       #4caf7d;
+  --loss:      #e05a52;
+  --draw:      #7f8b9a;
+
+  --radius: 10px;
+  --wrap: 1080px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(900px 400px at 15% -10%, rgba(224,163,62,0.07), transparent 60%),
+    radial-gradient(700px 400px at 100% 0%, rgba(76,175,125,0.05), transparent 55%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: Oswald, Inter, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.wrap {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 5vw;
+}
+@media (min-width: 720px) { .wrap { padding: 0 32px; } }
+
+.muted { color: var(--text-mute); font-size: 0.87em; }
+
+/* ── Шапка ──────────────────────────────────────────────────────────────── */
+.site-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(16,19,23,0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.site-head__inner {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 5vw;
+}
+@media (min-width: 720px) { .site-head__inner { padding: 0 32px; } }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 10px;
+  text-decoration: none;
+  color: inherit;
+}
+.brand__num {
+  font-family: Oswald, sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  flex: none;
+}
+.brand__text { display: flex; flex-direction: column; line-height: 1.15; }
+.brand__text b { font-family: Oswald, sans-serif; font-size: 17px; font-weight: 500; letter-spacing: 0.02em; }
+.brand__text small { color: var(--text-mute); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+.nav {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.nav::-webkit-scrollbar { display: none; }
+.nav__link {
+  flex: none;
+  padding: 9px 13px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.nav__link:hover { color: var(--text); }
+.nav__link.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Блоки ──────────────────────────────────────────────────────────────── */
+#app { padding-top: 22px; padding-bottom: 40px; }
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.panel__head { margin-bottom: 14px; }
+.panel__head h2 { font-size: 19px; }
+.panel__head p { margin: 3px 0 0; }
+
+.grid-2 { display: grid; gap: 18px; }
+@media (min-width: 800px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+.loading { padding: 60px 0; text-align: center; color: var(--text-mute); }
+.error { border-color: var(--loss); }
+
+/* ── Главная ────────────────────────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(160deg, var(--bg-raised), var(--bg-panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  margin-bottom: 18px;
+}
+.hero__label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+}
+.hero__week h2 { font-size: 30px; margin: 2px 0 2px; }
+.hero__week p { margin: 0 0 16px; }
+
+.hero__split { display: grid; gap: 16px; }
+@media (min-width: 720px) { .hero__split { grid-template-columns: 1fr 1fr; gap: 22px; } }
+
+.hero__col h3 {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 9px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero__col--win h3 { color: var(--win); }
+.hero__col--loss h3 { color: var(--loss); }
+.count {
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 1px 8px;
+  color: var(--text-dim);
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  font-size: 12.5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  border-left: 3px solid var(--tag-color, var(--text-mute));
+}
+.chip b { font-family: Oswald, sans-serif; font-size: 12px; letter-spacing: 0.05em; color: var(--tag-color); }
+.chip--win { box-shadow: inset 0 0 0 1px rgba(76,175,125,0.16); }
+.chip--loss { box-shadow: inset 0 0 0 1px rgba(224,90,82,0.16); }
+
+.podium { list-style: none; margin: 0; padding: 0; }
+.podium__item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.podium__item:last-child { border-bottom: 0; }
+.podium__place {
+  font-family: Oswald, sans-serif; font-size: 18px;
+  width: 24px; color: var(--text-mute);
+}
+.podium__item--1 .podium__place { color: var(--accent); }
+.podium__name { flex: 1; }
+.podium__points { font-family: Oswald, sans-serif; font-size: 17px; color: var(--win); }
+
+.movers { display: grid; gap: 16px; }
+@media (min-width: 500px) { .movers { grid-template-columns: 1fr 1fr; } }
+.movers__title { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 7px; }
+.movers__title--up { color: var(--win); }
+.movers__title--down { color: var(--loss); }
+.movers__list { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
+.movers__list li { padding: 5px 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+
+/* ── Таблица рейтинга ───────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+
+.ladder { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ladder th {
+  text-align: left;
+  font-family: Inter, sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  font-weight: 600;
+  padding: 0 8px 9px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ladder td { padding: 9px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.ladder tbody tr:hover { background: rgba(255,255,255,0.022); }
+.row--inactive { opacity: 0.45; }
+
+.c-place { width: 66px; white-space: nowrap; }
+.place { font-family: Oswald, sans-serif; font-size: 16px; color: var(--text-dim); }
+.c-name { min-width: 190px; }
+.c-num { text-align: right; width: 44px; font-family: Oswald, sans-serif; font-size: 15px; }
+.c-win { color: var(--win); }
+.c-loss { color: var(--loss); }
+.c-points { font-size: 17px; }
+.c-points.pos { color: var(--win); }
+.c-points.neg { color: var(--loss); }
+.c-spark { width: 92px; }
+.c-form { width: 74px; }
+
+.tag {
+  display: inline-block;
+  font-family: Oswald, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--tag-color, var(--text-dim));
+  background: color-mix(in srgb, var(--tag-color, #888) 14%, transparent);
+  margin-right: 7px;
+}
+.name { font-weight: 500; }
+
+.delta { font-size: 10.5px; margin-left: 5px; font-weight: 600; }
+.delta--up { color: var(--win); }
+.delta--down { color: var(--loss); }
+.delta--flat { color: var(--text-mute); opacity: 0.5; }
+
+.form { display: inline-flex; gap: 3px; }
+.dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.dot--win  { background: var(--win); }
+.dot--loss { background: var(--loss); }
+.dot--draw { background: var(--draw); }
+.dot--skip { background: var(--line); }
+
+.streak { font-size: 11px; margin-left: 6px; white-space: nowrap; }
+.streak--win { color: var(--accent); }
+.streak--loss { color: var(--text-mute); }
+
+.spark { display: block; }
+
+/* ── Хронология ─────────────────────────────────────────────────────────── */
+.tl { list-style: none; margin: 0; padding: 0; position: relative; }
+.tl::before {
+  content: '';
+  position: absolute;
+  left: 17px; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--line);
+}
+.tl__item { display: flex; gap: 14px; padding-bottom: 22px; position: relative; }
+.tl__marker {
+  flex: none;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 2px solid var(--line);
+  display: grid; place-items: center;
+  font-family: Oswald, sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  position: relative; z-index: 1;
+}
+.tl__item--server_capture .tl__marker { border-color: var(--accent); color: var(--accent); }
+.tl__item--war .tl__marker { border-color: var(--loss); }
+.tl__body { flex: 1; padding-top: 2px; }
+.tl__meta { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 2px; }
+.tl__type { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.tl__meta time { font-size: 12px; color: var(--text-mute); }
+.tl__body h3 { font-size: 16.5px; margin-bottom: 3px; }
+.tl__body p { margin: 0; color: var(--text-dim); font-size: 14px; }
+.tl__img { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--line); }
+
+/* ── Гайд ───────────────────────────────────────────────────────────────── */
+.compare {
+  display: flex; align-items: center; justify-content: center;
+  gap: 14px; flex-wrap: wrap;
+  background: var(--bg-raised);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+.compare__side { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 120px; }
+.compare__label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mute); }
+.compare__value { font-family: Oswald, sans-serif; font-size: 40px; line-height: 1.1; }
+.compare__side--top .compare__value { color: var(--win); }
+.compare__side--bottom .compare__value { color: var(--loss); }
+.compare__vs { font-size: 12px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.1em; }
+
+.prose { max-width: 62ch; }
+.prose h2 { font-size: 20px; margin: 22px 0 8px; }
+.prose h3 { font-size: 16px; margin: 20px 0 7px; color: var(--accent); }
+.prose h4 { font-size: 14px; margin: 16px 0 6px; }
+.prose p { margin: 0 0 11px; color: var(--text-dim); }
+.prose ul { margin: 0 0 14px; padding-left: 20px; color: var(--text-dim); }
+.prose li { margin-bottom: 5px; }
+
+/* ── Подвал ─────────────────────────────────────────────────────────────── */
+.site-foot {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  padding-bottom: 30px;
+  color: var(--text-mute);
+  font-size: 12.5px;
+}
+.site-foot p { margin: 0; }

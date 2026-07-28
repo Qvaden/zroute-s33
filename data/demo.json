@@ -1,0 +1,2084 @@
+{
+  "alliances": [
+    {
+      "id": "a01",
+      "tag": "STG",
+      "name": "Сталкеры",
+      "color": "#c0392b",
+      "active": true
+    },
+    {
+      "id": "a02",
+      "tag": "VLK",
+      "name": "Волки",
+      "color": "#2980b9",
+      "active": true
+    },
+    {
+      "id": "a03",
+      "tag": "RUS",
+      "name": "Русичи",
+      "color": "#27ae60",
+      "active": true
+    },
+    {
+      "id": "a04",
+      "tag": "BTN",
+      "name": "Бастион",
+      "color": "#8e44ad",
+      "active": true
+    },
+    {
+      "id": "a05",
+      "tag": "PHX",
+      "name": "Феникс",
+      "color": "#d35400",
+      "active": true
+    },
+    {
+      "id": "a06",
+      "tag": "KRK",
+      "name": "Крепость",
+      "color": "#16a085",
+      "active": true
+    },
+    {
+      "id": "a07",
+      "tag": "ORD",
+      "name": "Орда",
+      "color": "#2c3e50",
+      "active": true
+    },
+    {
+      "id": "a08",
+      "tag": "LGN",
+      "name": "Легион",
+      "color": "#c2185b",
+      "active": true
+    },
+    {
+      "id": "a09",
+      "tag": "TRN",
+      "name": "Титаны",
+      "color": "#00838f",
+      "active": true
+    },
+    {
+      "id": "a10",
+      "tag": "SHD",
+      "name": "Тень",
+      "color": "#6d4c41",
+      "active": true
+    },
+    {
+      "id": "a11",
+      "tag": "GRZ",
+      "name": "Гроза",
+      "color": "#455a64",
+      "active": true
+    },
+    {
+      "id": "a12",
+      "tag": "SVR",
+      "name": "Север",
+      "color": "#ad1457",
+      "active": true
+    },
+    {
+      "id": "a13",
+      "tag": "ATL",
+      "name": "Атлант",
+      "color": "#c0392b",
+      "active": true
+    },
+    {
+      "id": "a14",
+      "tag": "KBR",
+      "name": "Кобра",
+      "color": "#2980b9",
+      "active": true
+    },
+    {
+      "id": "a15",
+      "tag": "VYU",
+      "name": "Вьюга",
+      "color": "#27ae60",
+      "active": true
+    },
+    {
+      "id": "a16",
+      "tag": "MDV",
+      "name": "Медведи",
+      "color": "#8e44ad",
+      "active": true
+    },
+    {
+      "id": "a17",
+      "tag": "SKL",
+      "name": "Сокол",
+      "color": "#d35400",
+      "active": true
+    },
+    {
+      "id": "a18",
+      "tag": "PTN",
+      "name": "Патриот",
+      "color": "#16a085",
+      "active": true
+    },
+    {
+      "id": "a19",
+      "tag": "ZRD",
+      "name": "Заря",
+      "color": "#2c3e50",
+      "active": true
+    },
+    {
+      "id": "a20",
+      "tag": "KMT",
+      "name": "Комета",
+      "color": "#c2185b",
+      "active": true
+    },
+    {
+      "id": "a21",
+      "tag": "VTR",
+      "name": "Ветер",
+      "color": "#00838f",
+      "active": true
+    },
+    {
+      "id": "a22",
+      "tag": "GRN",
+      "name": "Гранит",
+      "color": "#6d4c41",
+      "active": true
+    },
+    {
+      "id": "a23",
+      "tag": "ISK",
+      "name": "Искра",
+      "color": "#455a64",
+      "active": true
+    },
+    {
+      "id": "a24",
+      "tag": "NBS",
+      "name": "Небеса",
+      "color": "#ad1457",
+      "active": true
+    },
+    {
+      "id": "a25",
+      "tag": "DRK",
+      "name": "Дракон",
+      "color": "#c0392b",
+      "active": true
+    },
+    {
+      "id": "a26",
+      "tag": "SPT",
+      "name": "Спартак",
+      "color": "#2980b9",
+      "active": true
+    },
+    {
+      "id": "a27",
+      "tag": "VLN",
+      "name": "Волна",
+      "color": "#27ae60",
+      "active": true
+    },
+    {
+      "id": "a28",
+      "tag": "MRK",
+      "name": "Меркурий",
+      "color": "#8e44ad",
+      "active": true
+    },
+    {
+      "id": "a29",
+      "tag": "OSN",
+      "name": "Основа",
+      "color": "#d35400",
+      "active": true
+    },
+    {
+      "id": "a30",
+      "tag": "RFT",
+      "name": "Рифт",
+      "color": "#16a085",
+      "active": true
+    },
+    {
+      "id": "a31",
+      "tag": "CHR",
+      "name": "Черта",
+      "color": "#2c3e50",
+      "active": false
+    },
+    {
+      "id": "a32",
+      "tag": "ANK",
+      "name": "Анклав",
+      "color": "#c2185b",
+      "active": false
+    }
+  ],
+  "weeks": [
+    {
+      "id": "W16",
+      "number": 16,
+      "startDate": "2026-04-06",
+      "endDate": "2026-04-12"
+    },
+    {
+      "id": "W17",
+      "number": 17,
+      "startDate": "2026-04-13",
+      "endDate": "2026-04-19"
+    },
+    {
+      "id": "W18",
+      "number": 18,
+      "startDate": "2026-04-20",
+      "endDate": "2026-04-26"
+    },
+    {
+      "id": "W19",
+      "number": 19,
+      "startDate": "2026-04-27",
+      "endDate": "2026-05-03"
+    },
+    {
+      "id": "W20",
+      "number": 20,
+      "startDate": "2026-05-04",
+      "endDate": "2026-05-10"
+    },
+    {
+      "id": "W21",
+      "number": 21,
+      "startDate": "2026-05-11",
+      "endDate": "2026-05-17"
+    },
+    {
+      "id": "W22",
+      "number": 22,
+      "startDate": "2026-05-18",
+      "endDate": "2026-05-24"
+    },
+    {
+      "id": "W23",
+      "number": 23,
+      "startDate": "2026-05-25",
+      "endDate": "2026-05-31"
+    },
+    {
+      "id": "W24",
+      "number": 24,
+      "startDate": "2026-06-01",
+      "endDate": "2026-06-07"
+    },
+    {
+      "id": "W25",
+      "number": 25,
+      "startDate": "2026-06-08",
+      "endDate": "2026-06-14"
+    },
+    {
+      "id": "W26",
+      "number": 26,
+      "startDate": "2026-06-15",
+      "endDate": "2026-06-21"
+    },
+    {
+      "id": "W27",
+      "number": 27,
+      "startDate": "2026-06-22",
+      "endDate": "2026-06-28"
+    }
+  ],
+  "results": [
+    {
+      "weekId": "W16",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a14",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a21",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a23",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a25",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a26",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a30",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a31",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a05",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a07",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a10",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a12",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a15",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a16",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a17",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a20",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a27",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a29",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a31",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a01",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a02",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a07",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a09",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a10",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a14",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a21",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a25",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a28",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a30",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a31",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a03",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a05",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a07",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a08",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a10",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a15",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a16",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a20",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a21",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a22",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a23",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a24",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a29",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a31",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a03",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a05",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a06",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a07",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a10",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a12",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a14",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a19",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a20",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a21",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a22",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a23",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a26",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a29",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a31",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a05",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a07",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a10",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a17",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a18",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a19",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a21",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a31",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a04",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a07",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a08",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a10",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a12",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a13",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a16",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a22",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a01",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a02",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a05",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a07",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a10",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a11",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a20",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a21",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a26",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a27",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a30",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a04",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a05",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a06",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a10",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a15",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a16",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a21",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a22",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a26",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a02",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a05",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a07",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a08",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a10",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a16",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a18",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a21",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a23",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a24",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a25",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a29",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a02",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a05",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a07",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a09",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a10",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a11",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a13",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a15",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a17",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a20",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a21",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a24",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a30",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a01",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a02",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a05",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a06",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a07",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a08",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a09",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a10",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a11",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a12",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a13",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a16",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a17",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a18",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a19",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a20",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a22",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a24",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a25",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a26",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a27",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a30",
+      "outcome": "П"
+    }
+  ],
+  "events": [
+    {
+      "id": "e1",
+      "date": "2026-04-18",
+      "type": "server_capture",
+      "serverNumber": 47,
+      "title": "Захвачен сервер 47",
+      "body": "Первый выход за пределы своего сервера. Столица взята на третьи сутки штурма."
+    },
+    {
+      "id": "e2",
+      "date": "2026-05-02",
+      "type": "war",
+      "title": "Война за Красную зону",
+      "body": "Две недели непрерывных боёв между верхними альянсами. Формально победителя нет."
+    },
+    {
+      "id": "e3",
+      "date": "2026-05-23",
+      "type": "server_capture",
+      "serverNumber": 61,
+      "title": "Захвачен сервер 61",
+      "body": "Самый быстрый захват в истории сервера — чуть меньше суток."
+    },
+    {
+      "id": "e4",
+      "date": "2026-06-07",
+      "type": "merge",
+      "title": "Слияние: Комета вошла в Легион",
+      "body": "После трёх проигранных VS подряд состав Кометы перешёл в Легион."
+    },
+    {
+      "id": "e5",
+      "date": "2026-06-28",
+      "type": "server_capture",
+      "serverNumber": 12,
+      "title": "Захвачен сервер 12",
+      "body": "Тяжёлая кампания против объединённой обороны. Заняла девять дней."
+    },
+    {
+      "id": "e6",
+      "date": "2026-07-19",
+      "type": "server_capture",
+      "serverNumber": 88,
+      "title": "Захвачен сервер 88",
+      "body": "Четвёртый сервер под контролем. Сопротивление было символическим."
+    }
+  ],
+  "texts": [
+    {
+      "key": "small-alliances",
+      "title": "Малым альянсам",
+      "body": "Раздел пока заполнен черновиком. Здесь будет разбор того, как выглядит\nобразцовое руководство альянсом и что конкретно даёт переход в крупный альянс.\n\n## Что делает руководство работающим\n\n- Понятные роли: кто набирает, кто ведёт VS, кто следит за активностью.\n- Расписание: время сбора на VS известно заранее и не меняется каждую неделю.\n- Разговор с неактивными до исключения, а не вместо него.\n\n## Что даёт большой альянс\n\nУскорение строек, доступ к событиям, защита от фарма более сильными,\nи главное — регулярные победы в VS, которые тянут за собой награды."
+    },
+    {
+      "key": "about",
+      "title": "О сайте",
+      "body": "Неофициальный сайт 33 сервера Z Route: Redemption. Данные вносятся вручную после каждого VS."
+    }
+  ]
+}

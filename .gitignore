@@ -1,0 +1,10 @@
+# Сборка превью — генерируется скриптом, в репозитории не нужна
+dist/
+
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+.vscode/
+.idea/
