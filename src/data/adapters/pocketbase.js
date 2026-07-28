@@ -32,6 +32,11 @@ export const capabilities = {
 /** @type {Map<string, Promise<any[]>>} */
 const cache = new Map();
 
+/** Сбрасывает кэш коллекций, чтобы следующий запрос забрал свежие записи. */
+export function clearCache() {
+  cache.clear();
+}
+
 /**
  * @param {string} collection
  * @param {string} [sort]

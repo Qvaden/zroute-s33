@@ -23,6 +23,11 @@ export const capabilities = {
 /** @type {Promise<any> | null} */
 let cache = null;
 
+/** Сбрасывает кэш, чтобы следующий запрос перечитал файл. */
+export function clearCache() {
+  cache = null;
+}
+
 async function raw() {
   if (cache) return cache;
 

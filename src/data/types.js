@@ -107,6 +107,7 @@
  * @property {() => Promise<Result[]>}    getResults
  * @property {() => Promise<GameEvent[]>} getEvents
  * @property {() => Promise<TextBlock[]>} getTexts
+ * @property {() => void} clearCache  Сбросить кэш и перечитать источник заново.
  */
 
 export {};

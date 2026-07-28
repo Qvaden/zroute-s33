@@ -23,9 +23,11 @@
 Зависимостей нет, сборки нет. Нужен только Node для скриптов и тестов.
 
 ```bash
-node scripts/gen-demo.mjs      # сгенерировать демо-данные
-node tests/contract.test.js    # прогнать тесты
-node scripts/build-preview.mjs # собрать dist/preview.html одним файлом
+node scripts/gen-demo.mjs            # сгенерировать демо-данные
+node tests/contract.test.js          # прогнать тесты
+node scripts/build-preview.mjs       # собрать dist/preview.html одним файлом
+node scripts/make-sheet-template.mjs # собрать шаблон Google Таблицы
+node scripts/check-sheet.mjs <ID>    # проверить живую таблицу перед переключением
 ```
 
 Сам сайт — статика. Локально удобно так:
@@ -59,10 +61,15 @@ dataSource: 'json',   // 'json' | 'sheets' | 'pocketbase'
 config.js                  ← единственное место переключения источника
 index.html
 data/demo.json             демо-данные (генерируются скриптом)
-docs/ARCHITECTURE.md
+docs/
+  ARCHITECTURE.md          решения и обоснования
+  EDITOR-GUIDE.md          инструкция для того, кто вносит данные
 scripts/
   gen-demo.mjs             генератор демо-данных
   build-preview.mjs        сборка в один файл + аварийный экспорт в статику
+  sheet-schema.mjs         описание вкладок таблицы — источник правды
+  make-sheet-template.mjs  генератор шаблона Google Таблицы
+  check-sheet.mjs          проверка живой таблицы
 src/
   main.js                  роутер и загрузка
   styles.css
@@ -96,6 +103,19 @@ tests/contract.test.js
 - [x] Подсчёт очков, мест, формы, серий, динамики, истории мест
 - [x] Главная, рейтинг с поиском и сортировками, карточка альянса, хронология, гайд
 - [x] Тесты: 85 проверок, включая паритет адаптеров и русские склонения
+- [x] Шаблон Google Таблицы + инструкция для редактора + проверка живой таблицы
 - [ ] Реальный список 32 альянсов сервера 33
 - [ ] Подключение настоящей Google Таблицы
 - [ ] Публикация на хостинге и установка иконкой на телефон
+
+## Подключение Google Таблицы
+
+1. `node scripts/make-sheet-template.mjs` — получить CSV пяти вкладок.
+2. Создать таблицу, импортировать каждый CSV в отдельную вкладку с тем же именем.
+3. Открыть документ на просмотр: **Доступ → Все, у кого есть ссылка → Читатель**.
+4. Заполнить теги и названия альянсов во вкладке `alliances`.
+5. `node scripts/check-sheet.mjs <ID>` — убедиться, что замечаний нет.
+6. В `config.js` поставить `dataSource: 'sheets'` и вписать `sheets.docId`.
+
+Инструкция для того, кто будет вносить данные дальше —
+[`docs/EDITOR-GUIDE.md`](./docs/EDITOR-GUIDE.md).

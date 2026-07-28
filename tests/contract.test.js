@@ -233,6 +233,76 @@ console.log('\nF2. Только победа и поражение');
   check('валидатор отвергает ничью', problems.some((p) => p.includes('недопустимый outcome')));
 }
 
+// ── F3. Шаблон таблицы совпадает с тем, что читает адаптер ──────────────────
+console.log('\nF3. Шаблон Google Таблицы ↔ адаптер');
+{
+  const { TABS, toCsv } = await import('../scripts/sheet-schema.mjs');
+  const sheetsAdapter = await import('../src/data/adapters/sheets.js');
+  const { CONFIG: cfg } = await import('../config.js');
+
+  /*
+    Берём сгенерированный шаблон, дописываем в него немного данных — как это
+    сделал бы человек — и прогоняем через настоящий sheets-адаптер.
+
+    Смысл теста: шаблон и код читают одну и ту же структуру. Если однажды
+    переименуют колонку в одном месте и забудут в другом, поиск данных
+    молча вернёт пустоту, а сайт покажет нули без единой ошибки в консоли.
+  */
+  const filled = {};
+  for (const [tab, { headers, rows }] of Object.entries(TABS)) {
+    const copy = rows.map((r) => [...r]);
+
+    if (tab === cfg.sheets.tabs.alliances) {
+      copy[0][1] = 'STG'; copy[0][2] = 'Сталкеры';
+      copy[1][1] = 'VLK'; copy[1][2] = 'Волки';
+      copy[2][1] = 'RUS'; copy[2][2] = 'Русичи';
+      copy[2][4] = 'нет'; // распавшийся
+    }
+    if (tab === cfg.sheets.tabs.results) {
+      // Колонки: allianceId, tag, name, затем недели
+      copy[0][3] = 'П'; copy[0][4] = 'П';
+      copy[1][3] = 'Х'; copy[1][4] = 'П';
+      copy[2][3] = 'Х'; // за вторую неделю у третьего записи нет
+    }
+    filled[tab] = toCsv(headers, copy);
+  }
+
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const tab = new URL(url).searchParams.get('sheet');
+    return { ok: true, status: 200, text: async () => filled[tab] };
+  };
+  cfg.sheets.docId = 'TEMPLATE_TEST';
+  sheetsAdapter.clearCache();
+
+  const { data, problems } = await loadAndValidate(sheetsAdapter);
+  globalThis.fetch = realFetch;
+  sheetsAdapter.clearCache();
+
+  check('заполненный шаблон проходит контракт', problems.length === 0, problems.slice(0, 4).join('\n       '));
+  equal('незаполненные строки альянсов пропущены', data.alliances.length, 3);
+  equal('недели прочитаны', data.weeks.length, Object.values(TABS)[1].rows.length);
+
+  const w1 = data.weeks[0].id;
+  const w2 = data.weeks[1].id;
+  equal('результаты развёрнуты правильно', data.results.length, 5);
+  check('победа первого альянса прочитана',
+    data.results.some((r) => r.allianceId === 'a01' && r.weekId === w1 && r.outcome === 'win'));
+  check('поражение второго прочитано',
+    data.results.some((r) => r.allianceId === 'a02' && r.weekId === w1 && r.outcome === 'loss'));
+  check('невнесённая ячейка записи не создала',
+    !data.results.some((r) => r.allianceId === 'a03' && r.weekId === w2));
+  check('«нет» превратилось в active: false',
+    data.alliances.find((a) => a.id === 'a03').active === false);
+  check('цвета альянсов предзаполнены', data.alliances.every((a) => /^#[0-9a-f]{6}$/i.test(a.color ?? '')));
+
+  const principles = data.texts.find((t) => t.key === 'guide-principles');
+  check('тексты гайда лежат в шаблоне', Boolean(principles));
+  check('escape \\n развёрнут в настоящий перенос строки', principles.body.includes('\n'));
+  check('в тексте не осталось литеральных \\n', !principles.body.includes('\\n'));
+  check('заголовки ## сохранились', principles.body.includes('## '));
+}
+
 // ── G. Русские склонения ────────────────────────────────────────────────────
 console.log('\nG. Склонения по числам');
 {

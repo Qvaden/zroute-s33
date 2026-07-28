@@ -40,6 +40,16 @@ export const capabilities = {
 const cache = new Map();
 
 /**
+ * Сбрасывает кэш вкладок, чтобы следующий запрос забрал свежие данные.
+ * Пригодится для кнопки «обновить» — Google отдаёт опубликованный CSV
+ * с задержкой в несколько минут, и повторный заход в течение сессии
+ * иначе показал бы то же самое.
+ */
+export function clearCache() {
+  cache.clear();
+}
+
+/**
  * @param {string} tab
  * @returns {Promise<Record<string, string>[]>}
  */
@@ -76,7 +86,13 @@ function fetchTab(tab) {
 export async function getAlliances() {
   const rows = await fetchTab(CONFIG.sheets.tabs.alliances);
   return rows
-    .filter((r) => toStr(r.id))
+    /*
+      В шаблоне все 32 строки заранее пронумерованы: ID выдаются один раз
+      и больше не меняются никогда, человеку остаётся вписать тег и название.
+      Пока строка не заполнена, альянса ещё не существует — такие строки
+      пропускаем, иначе сайт показал бы двадцать безымянных участников.
+    */
+    .filter((r) => toStr(r.id) && (toStr(r.tag) || toStr(r.name)))
     .map((r) => ({
       id: toStr(r.id),
       tag: toStr(r.tag),
@@ -103,7 +119,9 @@ export async function getWeeks() {
 
 /**
  * Разворот широкой матрицы в нормализованные строки.
- * Пустая ячейка означает «не участвовал» и записи не порождает вовсе.
+ *
+ * Пустая ячейка записи не порождает вовсе. Это означает «результат ещё
+ * не внесли», а не какой-то третий исход: в VS альянс участвует всегда.
  */
 export async function getResults() {
   const [rows, weeks] = await Promise.all([
@@ -154,6 +172,12 @@ export async function getTexts() {
     .map((r) => ({
       key: toStr(r.key),
       title: toStr(r.title),
-      body: r.body ?? '',
+      /*
+        Внутри ячейки перевод строки можно записать двумя символами \n.
+        Настоящие переносы (Alt+Enter) тоже работают, но многострочная ячейка
+        неудобна в редактировании и рвётся при копировании через буфер.
+        Поэтому поддерживаем оба варианта.
+      */
+      body: String(r.body ?? '').replace(/\\n/g, '\n'),
     }));
 }
