@@ -4,224 +4,224 @@
       "id": "a01",
       "tag": "STG",
       "name": "Сталкеры",
-      "color": "#c0392b",
+      "color": "#d44949",
       "active": true
     },
     {
       "id": "a02",
       "tag": "VLK",
       "name": "Волки",
-      "color": "#2980b9",
+      "color": "#e18651",
       "active": true
     },
     {
       "id": "a03",
       "tag": "RUS",
       "name": "Русичи",
-      "color": "#27ae60",
+      "color": "#ed925a",
       "active": true
     },
     {
       "id": "a04",
       "tag": "BTN",
       "name": "Бастион",
-      "color": "#8e44ad",
+      "color": "#e0c77b",
       "active": true
     },
     {
       "id": "a05",
       "tag": "PHX",
       "name": "Феникс",
-      "color": "#d35400",
+      "color": "#deb73f",
       "active": true
     },
     {
       "id": "a06",
       "tag": "KRK",
       "name": "Крепость",
-      "color": "#16a085",
+      "color": "#d8eb47",
       "active": true
     },
     {
       "id": "a07",
       "tag": "ORD",
       "name": "Орда",
-      "color": "#2c3e50",
+      "color": "#cddc6a",
       "active": true
     },
     {
       "id": "a08",
       "tag": "LGN",
       "name": "Легион",
-      "color": "#c2185b",
+      "color": "#ade773",
       "active": true
     },
     {
       "id": "a09",
       "tag": "TRN",
       "name": "Титаны",
-      "color": "#00838f",
+      "color": "#8fe935",
       "active": true
     },
     {
       "id": "a10",
       "tag": "SHD",
       "name": "Тень",
-      "color": "#6d4c41",
+      "color": "#6bd85a",
       "active": true
     },
     {
       "id": "a11",
       "tag": "GRZ",
       "name": "Гроза",
-      "color": "#455a64",
+      "color": "#71e462",
       "active": true
     },
     {
       "id": "a12",
       "tag": "SVR",
       "name": "Север",
-      "color": "#ad1457",
+      "color": "#6cef8d",
       "active": true
     },
     {
       "id": "a13",
       "tag": "ATL",
       "name": "Атлант",
-      "color": "#c0392b",
+      "color": "#49d46c",
       "active": true
     },
     {
       "id": "a14",
       "tag": "KBR",
       "name": "Кобра",
-      "color": "#2980b9",
+      "color": "#51e1aa",
       "active": true
     },
     {
       "id": "a15",
       "tag": "VYU",
       "name": "Вьюга",
-      "color": "#27ae60",
+      "color": "#5aedb7",
       "active": true
     },
     {
       "id": "a16",
       "tag": "MDV",
       "name": "Медведи",
-      "color": "#8e44ad",
+      "color": "#7be0e0",
       "active": true
     },
     {
       "id": "a17",
       "tag": "SKL",
       "name": "Сокол",
-      "color": "#d35400",
+      "color": "#3fdede",
       "active": true
     },
     {
       "id": "a18",
       "tag": "PTN",
       "name": "Патриот",
-      "color": "#16a085",
+      "color": "#47afeb",
       "active": true
     },
     {
       "id": "a19",
       "tag": "ZRD",
       "name": "Заря",
-      "color": "#2c3e50",
+      "color": "#6ab0dc",
       "active": true
     },
     {
       "id": "a20",
       "tag": "KMT",
       "name": "Комета",
-      "color": "#c2185b",
+      "color": "#7390e7",
       "active": true
     },
     {
       "id": "a21",
       "tag": "VTR",
       "name": "Ветер",
-      "color": "#00838f",
+      "color": "#3562e9",
       "active": true
     },
     {
       "id": "a22",
       "tag": "GRN",
       "name": "Гранит",
-      "color": "#6d4c41",
+      "color": "#695ad8",
       "active": true
     },
     {
       "id": "a23",
       "tag": "ISK",
       "name": "Искра",
-      "color": "#455a64",
+      "color": "#7362e4",
       "active": true
     },
     {
       "id": "a24",
       "tag": "NBS",
       "name": "Небеса",
-      "color": "#ad1457",
+      "color": "#ad6cef",
       "active": true
     },
     {
       "id": "a25",
       "tag": "DRK",
       "name": "Дракон",
-      "color": "#c0392b",
+      "color": "#8f49d4",
       "active": true
     },
     {
       "id": "a26",
       "tag": "SPT",
       "name": "Спартак",
-      "color": "#2980b9",
+      "color": "#ce51e1",
       "active": true
     },
     {
       "id": "a27",
       "tag": "VLN",
       "name": "Волна",
-      "color": "#27ae60",
+      "color": "#dc5aed",
       "active": true
     },
     {
       "id": "a28",
       "tag": "MRK",
       "name": "Меркурий",
-      "color": "#8e44ad",
+      "color": "#e07bc7",
       "active": true
     },
     {
       "id": "a29",
       "tag": "OSN",
       "name": "Основа",
-      "color": "#d35400",
+      "color": "#de3fb7",
       "active": true
     },
     {
       "id": "a30",
       "tag": "RFT",
       "name": "Рифт",
-      "color": "#16a085",
+      "color": "#eb4786",
       "active": true
     },
     {
       "id": "a31",
       "tag": "CHR",
       "name": "Черта",
-      "color": "#2c3e50",
+      "color": "#dc6a94",
       "active": false
     },
     {
       "id": "a32",
       "tag": "ANK",
       "name": "Анклав",
-      "color": "#c2185b",
+      "color": "#e77373",
       "active": false
     }
   ],
