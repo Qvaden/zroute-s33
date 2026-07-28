@@ -85,6 +85,37 @@ export function sparkline(series, color = '#e0a33e', w = 84, h = 24) {
   </svg>`;
 }
 
+/**
+ * Разбивает markdown на секции по заголовкам «## ».
+ *
+ * Нужно, чтобы страница могла разложить текст карточками, а доверенный
+ * человек при этом продолжал править обычный текст в таблице, без вёрстки.
+ * Он пишет «## Заголовок» — на сайте появляется карточка.
+ *
+ * @param {string} md
+ * @returns {{title: string, body: string}[]}
+ */
+export function splitSections(md) {
+  const out = [];
+  let current = null;
+
+  for (const line of String(md ?? '').split('\n')) {
+    const heading = line.match(/^##\s+(.+)$/);
+    if (heading) {
+      current = { title: heading[1].trim(), lines: [] };
+      out.push(current);
+    } else if (current) {
+      current.lines.push(line);
+    } else if (line.trim()) {
+      // Текст до первого заголовка — вступление без названия.
+      current = { title: '', lines: [line] };
+      out.push(current);
+    }
+  }
+
+  return out.map((s) => ({ title: s.title, body: s.lines.join('\n').trim() }));
+}
+
 /** Крошечный markdown: заголовки, списки, жирный, абзацы. Больше и не нужно. */
 export function miniMarkdown(src) {
   const lines = String(src ?? '').split('\n');
