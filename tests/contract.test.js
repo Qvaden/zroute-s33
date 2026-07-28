@@ -42,7 +42,7 @@ console.log('\nA. Контракт json-адаптера');
   check('номера недель — это числа', data.weeks.every((w) => typeof w.number === 'number'));
   check(
     'outcome только из допустимого набора',
-    data.results.every((r) => ['win', 'loss', 'draw', 'skip'].includes(r.outcome))
+    data.results.every((r) => ['win', 'loss'].includes(r.outcome))
   );
 }
 
@@ -65,12 +65,12 @@ console.log('\nB. Подсчёт очков');
     { weekId: 'W3', allianceId: 'x', outcome: 'win' },
     { weekId: 'W1', allianceId: 'y', outcome: 'loss' },
     { weekId: 'W2', allianceId: 'y', outcome: 'win' },
-    // W3 у Y пропущена намеренно
+    // За W3 у Y записи нет: результат ещё не внесли
     { weekId: 'W1', allianceId: 'z', outcome: 'loss' },
     { weekId: 'W2', allianceId: 'z', outcome: 'loss' },
     { weekId: 'W3', allianceId: 'z', outcome: 'loss' },
   ];
-  const scoring = { win: 1, loss: -1, draw: 0, skip: 0 };
+  const scoring = { win: 1, loss: -1 };
   const table = computeStandings(alliances, weeks, results, scoring, 5);
   const byId = Object.fromEntries(table.map((r) => [r.alliance.id, r]));
 
@@ -80,15 +80,17 @@ console.log('\nB. Подсчёт очков');
   equal('X первый', byId.x.place, 1);
   equal('Z последний', byId.z.place, 3);
 
-  check('пропуск недели не штрафует', byId.y.points === 0 && byId.y.played === 2);
+  check('невнесённая неделя не штрафует и не считается сыгранной',
+    byId.y.points === 0 && byId.y.played === 2);
+  equal('очки за невнесённую неделю не меняются', byId.y.series, [-1, 0, 0]);
   equal('серия X — три победы подряд', byId.x.streak, { type: 'win', length: 3 });
   equal('накопленные очки Z по неделям', byId.z.series, [-1, -2, -3]);
-  equal('форма Y учитывает пропуск', byId.y.form, ['loss', 'win', 'skip']);
+  equal('в форме только реальные результаты, без дырок', byId.y.form, ['loss', 'win']);
 
   const summary = computeWeekSummary(alliances, weeks, results);
   equal('в последней неделе один победитель', summary.winners.map((a) => a.id), ['x']);
   equal('в последней неделе один проигравший', summary.losers.map((a) => a.id), ['z']);
-  equal('участвовали двое из трёх', summary.participated, 2);
+  equal('внесено двое из трёх', summary.recorded, 2);
 }
 
 // ── C. ГЛАВНОЕ: sheets-адаптер даёт ту же доменную модель ───────────────────
@@ -203,6 +205,32 @@ console.log('\nF. Связка рейтинга: разметка ↔ скрип
   check('поиск сравнивает в нижнем регистре', !/data-name="[^"]*[А-ЯЁ]/.test(html));
   check('сортировки скрипта покрывают кнопки',
     ['points', 'wins', 'form', 'name'].every((s) => html.includes(`data-ladder-sort="${s}"`)));
+}
+
+// ── F2. Исходов ровно два ───────────────────────────────────────────────────
+console.log('\nF2. Только победа и поражение');
+{
+  const { toOutcome } = await import('../src/data/adapters/_coerce.js');
+
+  equal('«П» — победа', toOutcome('П'), 'win');
+  equal('«Х» русская — поражение', toOutcome('Х'), 'loss');
+  equal('«X» латинская — поражение', toOutcome('X'), 'loss');
+  equal('регистр и пробелы не важны', toOutcome('  победа '), 'win');
+
+  // Третьего исхода не существует: в VS альянс участвует всегда.
+  equal('ничья больше не распознаётся', toOutcome('ничья'), null);
+  equal('«Н» не распознаётся', toOutcome('Н'), null);
+  equal('пустая ячейка — это отсутствие данных', toOutcome(''), null);
+  equal('мусор не превращается в исход', toOutcome('???'), null);
+
+  const { validateDataset } = await import('../src/data/contract.js');
+  const problems = validateDataset({
+    alliances: [{ id: 'a', tag: 'A', name: 'А', active: true }],
+    weeks: [{ id: 'W1', number: 1, startDate: new Date(), endDate: new Date() }],
+    results: [{ weekId: 'W1', allianceId: 'a', outcome: 'draw' }],
+    events: [], texts: [],
+  });
+  check('валидатор отвергает ничью', problems.some((p) => p.includes('недопустимый outcome')));
 }
 
 // ── G. Русские склонения ────────────────────────────────────────────────────

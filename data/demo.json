@@ -303,7 +303,7 @@
     {
       "weekId": "W16",
       "allianceId": "a01",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
@@ -313,11 +313,26 @@
     {
       "weekId": "W16",
       "allianceId": "a03",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
       "allianceId": "a04",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a05",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a06",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a07",
       "outcome": "П"
     },
     {
@@ -328,6 +343,11 @@
     {
       "weekId": "W16",
       "allianceId": "a09",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a10",
       "outcome": "П"
     },
     {
@@ -338,7 +358,7 @@
     {
       "weekId": "W16",
       "allianceId": "a12",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
@@ -348,12 +368,12 @@
     {
       "weekId": "W16",
       "allianceId": "a14",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
       "allianceId": "a15",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W16",
@@ -363,7 +383,7 @@
     {
       "weekId": "W16",
       "allianceId": "a17",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W16",
@@ -372,13 +392,23 @@
     },
     {
       "weekId": "W16",
+      "allianceId": "a19",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
       "allianceId": "a20",
-      "outcome": "П"
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a21",
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
       "allianceId": "a22",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W16",
@@ -388,7 +418,7 @@
     {
       "weekId": "W16",
       "allianceId": "a24",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
@@ -398,11 +428,16 @@
     {
       "weekId": "W16",
       "allianceId": "a26",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
       "allianceId": "a27",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W16",
+      "allianceId": "a28",
       "outcome": "Х"
     },
     {
@@ -413,12 +448,12 @@
     {
       "weekId": "W16",
       "allianceId": "a30",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
       "allianceId": "a31",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W16",
@@ -428,7 +463,7 @@
     {
       "weekId": "W17",
       "allianceId": "a01",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
@@ -458,17 +493,17 @@
     {
       "weekId": "W17",
       "allianceId": "a07",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
       "allianceId": "a08",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
       "allianceId": "a09",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
@@ -483,7 +518,7 @@
     {
       "weekId": "W17",
       "allianceId": "a12",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W17",
@@ -493,32 +528,32 @@
     {
       "weekId": "W17",
       "allianceId": "a14",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
       "allianceId": "a15",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W17",
       "allianceId": "a16",
-      "outcome": "П"
-    },
-    {
-      "weekId": "W17",
-      "allianceId": "a17",
       "outcome": "Х"
     },
     {
       "weekId": "W17",
-      "allianceId": "a18",
+      "allianceId": "a17",
       "outcome": "П"
     },
     {
       "weekId": "W17",
+      "allianceId": "a18",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
       "allianceId": "a19",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
@@ -528,27 +563,32 @@
     {
       "weekId": "W17",
       "allianceId": "a21",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a22",
       "outcome": "Х"
     },
     {
       "weekId": "W17",
       "allianceId": "a23",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W17",
       "allianceId": "a24",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W17",
       "allianceId": "a25",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W17",
       "allianceId": "a26",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W17",
@@ -558,11 +598,26 @@
     {
       "weekId": "W17",
       "allianceId": "a28",
-      "outcome": "П"
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a29",
+      "outcome": "Х"
     },
     {
       "weekId": "W17",
       "allianceId": "a30",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a31",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W17",
+      "allianceId": "a32",
       "outcome": "Х"
     },
     {
@@ -578,7 +633,7 @@
     {
       "weekId": "W18",
       "allianceId": "a03",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W18",
@@ -597,6 +652,16 @@
     },
     {
       "weekId": "W18",
+      "allianceId": "a07",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
       "allianceId": "a09",
       "outcome": "П"
     },
@@ -608,7 +673,7 @@
     {
       "weekId": "W18",
       "allianceId": "a11",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W18",
@@ -623,7 +688,7 @@
     {
       "weekId": "W18",
       "allianceId": "a14",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W18",
@@ -643,12 +708,12 @@
     {
       "weekId": "W18",
       "allianceId": "a18",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W18",
       "allianceId": "a19",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W18",
@@ -658,17 +723,17 @@
     {
       "weekId": "W18",
       "allianceId": "a21",
-      "outcome": "П"
-    },
-    {
-      "weekId": "W18",
-      "allianceId": "a22",
       "outcome": "Х"
     },
     {
       "weekId": "W18",
-      "allianceId": "a23",
+      "allianceId": "a22",
       "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a23",
+      "outcome": "Х"
     },
     {
       "weekId": "W18",
@@ -678,12 +743,17 @@
     {
       "weekId": "W18",
       "allianceId": "a25",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W18",
+      "allianceId": "a26",
       "outcome": "Х"
     },
     {
       "weekId": "W18",
       "allianceId": "a27",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W18",
@@ -706,6 +776,11 @@
       "outcome": "Х"
     },
     {
+      "weekId": "W18",
+      "allianceId": "a32",
+      "outcome": "Х"
+    },
+    {
       "weekId": "W19",
       "allianceId": "a01",
       "outcome": "П"
@@ -723,7 +798,7 @@
     {
       "weekId": "W19",
       "allianceId": "a04",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W19",
@@ -733,12 +808,12 @@
     {
       "weekId": "W19",
       "allianceId": "a06",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W19",
       "allianceId": "a07",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W19",
@@ -763,7 +838,7 @@
     {
       "weekId": "W19",
       "allianceId": "a12",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W19",
@@ -772,13 +847,23 @@
     },
     {
       "weekId": "W19",
-      "allianceId": "a15",
+      "allianceId": "a14",
       "outcome": "П"
     },
     {
       "weekId": "W19",
+      "allianceId": "a15",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a16",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
       "allianceId": "a17",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W19",
@@ -793,12 +878,17 @@
     {
       "weekId": "W19",
       "allianceId": "a20",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W19",
       "allianceId": "a21",
       "outcome": "Х"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a22",
+      "outcome": "П"
     },
     {
       "weekId": "W19",
@@ -808,6 +898,11 @@
     {
       "weekId": "W19",
       "allianceId": "a24",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W19",
+      "allianceId": "a25",
       "outcome": "Х"
     },
     {
@@ -818,7 +913,7 @@
     {
       "weekId": "W19",
       "allianceId": "a27",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W19",
@@ -828,7 +923,7 @@
     {
       "weekId": "W19",
       "allianceId": "a29",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W19",
@@ -843,7 +938,7 @@
     {
       "weekId": "W19",
       "allianceId": "a32",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
@@ -858,7 +953,7 @@
     {
       "weekId": "W20",
       "allianceId": "a03",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
@@ -893,17 +988,22 @@
     {
       "weekId": "W20",
       "allianceId": "a10",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
       "allianceId": "a11",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
       "allianceId": "a12",
       "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a13",
+      "outcome": "Х"
     },
     {
       "weekId": "W20",
@@ -913,6 +1013,11 @@
     {
       "weekId": "W20",
       "allianceId": "a15",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a16",
       "outcome": "Х"
     },
     {
@@ -928,7 +1033,7 @@
     {
       "weekId": "W20",
       "allianceId": "a19",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
@@ -953,11 +1058,16 @@
     {
       "weekId": "W20",
       "allianceId": "a24",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
       "allianceId": "a25",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W20",
+      "allianceId": "a26",
       "outcome": "Х"
     },
     {
@@ -978,12 +1088,12 @@
     {
       "weekId": "W20",
       "allianceId": "a30",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W20",
       "allianceId": "a31",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W20",
@@ -998,7 +1108,7 @@
     {
       "weekId": "W21",
       "allianceId": "a02",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
@@ -1013,7 +1123,7 @@
     {
       "weekId": "W21",
       "allianceId": "a05",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
@@ -1043,7 +1153,7 @@
     {
       "weekId": "W21",
       "allianceId": "a11",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W21",
@@ -1053,27 +1163,32 @@
     {
       "weekId": "W21",
       "allianceId": "a13",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
       "allianceId": "a14",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a15",
       "outcome": "П"
     },
     {
       "weekId": "W21",
       "allianceId": "a16",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
       "allianceId": "a17",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
       "allianceId": "a18",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
@@ -1083,7 +1198,7 @@
     {
       "weekId": "W21",
       "allianceId": "a20",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W21",
@@ -1097,7 +1212,17 @@
     },
     {
       "weekId": "W21",
+      "allianceId": "a23",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
       "allianceId": "a24",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W21",
+      "allianceId": "a25",
       "outcome": "Х"
     },
     {
@@ -1118,7 +1243,7 @@
     {
       "weekId": "W21",
       "allianceId": "a29",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W21",
@@ -1143,12 +1268,12 @@
     {
       "weekId": "W22",
       "allianceId": "a02",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
       "allianceId": "a03",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
@@ -1158,7 +1283,7 @@
     {
       "weekId": "W22",
       "allianceId": "a05",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W22",
@@ -1178,42 +1303,47 @@
     {
       "weekId": "W22",
       "allianceId": "a09",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
       "allianceId": "a10",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W22",
       "allianceId": "a11",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
       "allianceId": "a12",
-      "outcome": "П"
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a13",
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
       "allianceId": "a14",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
       "allianceId": "a15",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W22",
       "allianceId": "a16",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W22",
       "allianceId": "a17",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W22",
@@ -1238,27 +1368,27 @@
     {
       "weekId": "W22",
       "allianceId": "a22",
-      "outcome": "Х"
-    },
-    {
-      "weekId": "W22",
-      "allianceId": "a23",
-      "outcome": "Х"
-    },
-    {
-      "weekId": "W22",
-      "allianceId": "a24",
-      "outcome": "Х"
-    },
-    {
-      "weekId": "W22",
-      "allianceId": "a25",
       "outcome": "П"
     },
     {
       "weekId": "W22",
-      "allianceId": "a26",
+      "allianceId": "a23",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a24",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a25",
       "outcome": "Х"
+    },
+    {
+      "weekId": "W22",
+      "allianceId": "a26",
+      "outcome": "П"
     },
     {
       "weekId": "W22",
@@ -1283,12 +1413,12 @@
     {
       "weekId": "W23",
       "allianceId": "a01",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
       "allianceId": "a02",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
@@ -1303,7 +1433,12 @@
     {
       "weekId": "W23",
       "allianceId": "a05",
-      "outcome": "Х"
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a06",
+      "outcome": "П"
     },
     {
       "weekId": "W23",
@@ -1313,12 +1448,17 @@
     {
       "weekId": "W23",
       "allianceId": "a08",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a09",
       "outcome": "Х"
     },
     {
       "weekId": "W23",
       "allianceId": "a10",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W23",
@@ -1332,22 +1472,32 @@
     },
     {
       "weekId": "W23",
-      "allianceId": "a14",
+      "allianceId": "a13",
       "outcome": "Х"
     },
     {
       "weekId": "W23",
-      "allianceId": "a15",
+      "allianceId": "a14",
       "outcome": "П"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a15",
+      "outcome": "Х"
     },
     {
       "weekId": "W23",
       "allianceId": "a16",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W23",
       "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a18",
       "outcome": "Х"
     },
     {
@@ -1358,27 +1508,32 @@
     {
       "weekId": "W23",
       "allianceId": "a20",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
       "allianceId": "a21",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
       "allianceId": "a22",
-      "outcome": "П"
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W23",
+      "allianceId": "a23",
+      "outcome": "Х"
     },
     {
       "weekId": "W23",
       "allianceId": "a24",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W23",
       "allianceId": "a25",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
@@ -1388,12 +1543,12 @@
     {
       "weekId": "W23",
       "allianceId": "a27",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
       "allianceId": "a28",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W23",
@@ -1403,7 +1558,7 @@
     {
       "weekId": "W23",
       "allianceId": "a30",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W24",
@@ -1448,7 +1603,7 @@
     {
       "weekId": "W24",
       "allianceId": "a09",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W24",
@@ -1463,17 +1618,22 @@
     {
       "weekId": "W24",
       "allianceId": "a12",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a13",
       "outcome": "Х"
     },
     {
       "weekId": "W24",
       "allianceId": "a14",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W24",
       "allianceId": "a15",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W24",
@@ -1483,12 +1643,12 @@
     {
       "weekId": "W24",
       "allianceId": "a17",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W24",
       "allianceId": "a18",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W24",
@@ -1503,7 +1663,7 @@
     {
       "weekId": "W24",
       "allianceId": "a21",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W24",
@@ -1513,12 +1673,12 @@
     {
       "weekId": "W24",
       "allianceId": "a23",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W24",
       "allianceId": "a24",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W24",
@@ -1528,12 +1688,12 @@
     {
       "weekId": "W24",
       "allianceId": "a26",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W24",
       "allianceId": "a27",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W24",
@@ -1543,6 +1703,11 @@
     {
       "weekId": "W24",
       "allianceId": "a29",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W24",
+      "allianceId": "a30",
       "outcome": "Х"
     },
     {
@@ -1557,13 +1722,18 @@
     },
     {
       "weekId": "W25",
+      "allianceId": "a03",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W25",
       "allianceId": "a04",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W25",
       "allianceId": "a05",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W25",
@@ -1573,17 +1743,17 @@
     {
       "weekId": "W25",
       "allianceId": "a07",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W25",
       "allianceId": "a08",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W25",
       "allianceId": "a09",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W25",
@@ -1613,17 +1783,17 @@
     {
       "weekId": "W25",
       "allianceId": "a15",
-      "outcome": "Х"
-    },
-    {
-      "weekId": "W25",
-      "allianceId": "a16",
       "outcome": "П"
     },
     {
       "weekId": "W25",
-      "allianceId": "a17",
+      "allianceId": "a16",
       "outcome": "Х"
+    },
+    {
+      "weekId": "W25",
+      "allianceId": "a17",
+      "outcome": "П"
     },
     {
       "weekId": "W25",
@@ -1643,7 +1813,7 @@
     {
       "weekId": "W25",
       "allianceId": "a21",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W25",
@@ -1668,7 +1838,7 @@
     {
       "weekId": "W25",
       "allianceId": "a26",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W25",
@@ -1688,7 +1858,7 @@
     {
       "weekId": "W25",
       "allianceId": "a30",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
@@ -1702,28 +1872,33 @@
     },
     {
       "weekId": "W26",
+      "allianceId": "a03",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
       "allianceId": "a04",
       "outcome": "Х"
     },
     {
       "weekId": "W26",
       "allianceId": "a05",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
       "allianceId": "a06",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
       "allianceId": "a07",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
       "allianceId": "a08",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W26",
@@ -1742,6 +1917,16 @@
     },
     {
       "weekId": "W26",
+      "allianceId": "a12",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a13",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
       "allianceId": "a14",
       "outcome": "Х"
     },
@@ -1757,18 +1942,28 @@
     },
     {
       "weekId": "W26",
+      "allianceId": "a17",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
       "allianceId": "a18",
       "outcome": "П"
     },
     {
       "weekId": "W26",
+      "allianceId": "a19",
+      "outcome": "П"
+    },
+    {
+      "weekId": "W26",
       "allianceId": "a20",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W26",
       "allianceId": "a21",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
@@ -1788,17 +1983,22 @@
     {
       "weekId": "W26",
       "allianceId": "a25",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
       "allianceId": "a26",
-      "outcome": "П"
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W26",
+      "allianceId": "a27",
+      "outcome": "Х"
     },
     {
       "weekId": "W26",
       "allianceId": "a28",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W26",
@@ -1823,7 +2023,7 @@
     {
       "weekId": "W27",
       "allianceId": "a03",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W27",
@@ -1832,8 +2032,13 @@
     },
     {
       "weekId": "W27",
-      "allianceId": "a06",
+      "allianceId": "a05",
       "outcome": "П"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a06",
+      "outcome": "Х"
     },
     {
       "weekId": "W27",
@@ -1853,12 +2058,17 @@
     {
       "weekId": "W27",
       "allianceId": "a10",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W27",
       "allianceId": "a11",
       "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a12",
+      "outcome": "П"
     },
     {
       "weekId": "W27",
@@ -1868,17 +2078,17 @@
     {
       "weekId": "W27",
       "allianceId": "a14",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W27",
       "allianceId": "a15",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W27",
       "allianceId": "a16",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W27",
@@ -1893,7 +2103,7 @@
     {
       "weekId": "W27",
       "allianceId": "a19",
-      "outcome": "Х"
+      "outcome": "П"
     },
     {
       "weekId": "W27",
@@ -1913,31 +2123,36 @@
     {
       "weekId": "W27",
       "allianceId": "a23",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W27",
       "allianceId": "a24",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W27",
       "allianceId": "a25",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W27",
       "allianceId": "a26",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W27",
       "allianceId": "a27",
-      "outcome": "П"
+      "outcome": "Х"
     },
     {
       "weekId": "W27",
       "allianceId": "a28",
+      "outcome": "Х"
+    },
+    {
+      "weekId": "W27",
+      "allianceId": "a29",
       "outcome": "П"
     },
     {

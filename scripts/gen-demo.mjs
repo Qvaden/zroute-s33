@@ -17,7 +17,7 @@ function rng(seed) {
     return s / 4294967296;
   };
 }
-const rand = rng(3333);
+const rand = rng(7101);
 
 const ALLIANCES = [
   ['STG', 'Сталкеры'],        ['VLK', 'Волки'],          ['RUS', 'Русичи'],
@@ -86,18 +86,12 @@ const weeks = Array.from({ length: WEEK_COUNT }, (_, i) => {
 const results = [];
 for (const week of weeks) {
   alliances.forEach((alliance, i) => {
-    // Неактивные перестают играть во второй половине сезона.
-    if (!alliance.active && week.number > 21) return;
-
     /*
-      Пропуски привязаны к силе альянса. Раньше все пропускали одинаково,
-      и показатель «выходят на VS» в разделе для малых альянсов показывал
-      94% против 93% — то есть выглядел бессмысленным. В жизни всё наоборот:
-      слабые альянсы не выходят на бой заметно чаще, и это одна из причин,
-      почему они слабые.
+      Пропусков не существует: в VS альянс участвует всегда, исход бинарный.
+      Единственная причина, по которой записи может не быть, — альянс к тому
+      моменту уже распался. Это отсутствие данных, а не третий исход.
     */
-    const skipChance = 0.03 + (1 - strength[i]) * 0.22;
-    if (rand() < skipChance) return;
+    if (!alliance.active && week.number > 21) return;
     results.push({
       weekId: week.id,
       allianceId: alliance.id,

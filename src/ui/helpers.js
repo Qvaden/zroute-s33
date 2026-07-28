@@ -47,13 +47,11 @@ export function deltaBadge(delta) {
   return `<span class="delta delta--${dir}">${arrow}${Math.abs(delta)}</span>`;
 }
 
-/** Цветные точки последних результатов. */
+/** Цветные точки последних результатов. Исходов два: победа или поражение. */
 export function formDots(form) {
-  if (!form.length) return '<span class="muted">—</span>';
+  if (!form.length) return '<span class="muted">нет данных</span>';
   return `<span class="form">${form
-    .map((o) => `<i class="dot dot--${o}" title="${
-      { win: 'победа', loss: 'поражение', draw: 'ничья', skip: 'не участвовал' }[o]
-    }"></i>`)
+    .map((o) => `<i class="dot dot--${o}" title="${o === 'win' ? 'победа' : 'поражение'}"></i>`)
     .join('')}</span>`;
 }
 

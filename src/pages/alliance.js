@@ -2,12 +2,15 @@ import { esc, fmtDate, plural, deltaBadge } from '../ui/helpers.js';
 import { areaChart, placeChart } from '../ui/chart.js';
 import { computeAllianceHistory, computeBestStreaks } from '../logic/standings.js';
 
+/*
+  Исходов два. Третья строка — не исход, а отсутствие записи: результат
+  за эту неделю ещё не внесли либо альянса тогда не существовало.
+*/
 const OUTCOME = {
-  win:  { label: 'Победа',        cls: 'win',  sign: '+1' },
-  loss: { label: 'Поражение',     cls: 'loss', sign: '−1' },
-  draw: { label: 'Ничья',         cls: 'draw', sign: '0'  },
-  skip: { label: 'Не участвовал', cls: 'skip', sign: '—'  },
+  win:  { label: 'Победа',    cls: 'win',  sign: '+1' },
+  loss: { label: 'Поражение', cls: 'loss', sign: '−1' },
 };
+const NO_DATA = { label: 'Нет данных', cls: 'none', sign: '—' };
 
 /**
  * Карточка одного альянса: весь его сезон на одном экране.
@@ -103,7 +106,7 @@ export function renderAlliance(view, allianceId) {
       <ol class="vs">
         ${history
           .map((h, i) => {
-            const o = OUTCOME[h.outcome];
+            const o = OUTCOME[h.outcome] ?? NO_DATA;
             const running = row.series[i];
             return `<li class="vs__row vs__row--${o.cls}">
               <span class="vs__week">Н${h.week.number}</span>

@@ -9,7 +9,8 @@
  * Используется и в тестах, и в режиме разработки для быстрой диагностики.
  */
 
-const OUTCOMES = new Set(['win', 'loss', 'draw', 'skip']);
+// Исходов ровно два: в VS альянс либо победил, либо проиграл.
+const OUTCOMES = new Set(['win', 'loss']);
 
 /** @param {unknown} v */
 const isStr = (v) => typeof v === 'string' && v.length > 0;

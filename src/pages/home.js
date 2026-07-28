@@ -11,7 +11,7 @@ export function renderHome({ summary, standings, movers, weeks }) {
     return `<section class="panel"><p class="muted">Пока нет ни одной внесённой недели.</p></section>`;
   }
 
-  const { week, winners, losers, participated } = summary;
+  const { week, winners, losers, recorded } = summary;
   const leader = standings[0];
 
   const tiles = (list) =>
@@ -52,7 +52,7 @@ export function renderHome({ summary, standings, movers, weeks }) {
           <div class="hero__dates">
             ${fmtDate(week.startDate)} — ${fmtDate(week.endDate)}
             <span class="hero__sep">·</span>
-            ${plural(participated, 'альянс вышел на VS', 'альянса вышло на VS', 'альянсов вышло на VS')}
+            ${plural(recorded, 'результат внесён', 'результата внесено', 'результатов внесено')}
           </div>
         </div>
       </div>

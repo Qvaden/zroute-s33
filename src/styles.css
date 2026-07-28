@@ -27,7 +27,6 @@
   --gold:      #ffc93c;
   --win:       #35d07f;
   --loss:      #ff4757;
-  --draw:      #7a8494;
 
   --r-sm: 8px;
   --r:    14px;
@@ -503,7 +502,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .vs__row:last-child { border-bottom: 0; }
 .vs__row--win  { border-left-color: color-mix(in srgb, var(--win) 60%, transparent); }
 .vs__row--loss { border-left-color: color-mix(in srgb, var(--loss) 60%, transparent); }
-.vs__row--skip { opacity: .5; }
+.vs__row--none { opacity: .45; }
 
 .vs__week { grid-area: week; font-family: Unbounded, sans-serif; font-weight: 700; font-size: 13px; color: var(--dim); }
 .vs__dates { grid-area: dates; font-size: 12.5px; color: var(--mute); }
@@ -513,8 +512,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 }
 .vs__badge--win  { color: var(--win);  background: color-mix(in srgb, var(--win) 15%, transparent); }
 .vs__badge--loss { color: var(--loss); background: color-mix(in srgb, var(--loss) 15%, transparent); }
-.vs__badge--draw { color: var(--draw); background: rgba(255,255,255,.07); }
-.vs__badge--skip { color: var(--mute); background: rgba(255,255,255,.05); }
+.vs__badge--none { color: var(--mute); background: rgba(255,255,255,.05); }
 .vs__sign { display: none; }
 .vs__total {
   grid-area: total; text-align: right;
@@ -565,8 +563,6 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
 .dot--win  { background: var(--win); }
 .dot--loss { background: var(--loss); }
-.dot--draw { background: var(--draw); }
-.dot--skip { background: var(--line); }
 
 .streak { font-size: 10.5px; margin-left: 7px; white-space: nowrap; font-weight: 600; }
 .streak--win { color: var(--accent); }

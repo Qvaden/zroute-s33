@@ -7,13 +7,17 @@
  * строгие литералы outcome — никогда сырые строки источника.
  */
 
-/** Как в таблице записывают результат. Регистр и пробелы не важны. */
+/**
+ * Как в таблице записывают результат. Регистр и пробелы не важны.
+ * Исходов ровно два: победа или поражение.
+ */
 const OUTCOME_ALIASES = {
   'п': 'win',
   'победа': 'win',
   'w': 'win',
   'win': 'win',
   '+': 'win',
+  '1': 'win',
 
   'х': 'loss', // русская Х
   'x': 'loss', // латинская X
@@ -21,17 +25,14 @@ const OUTCOME_ALIASES = {
   'l': 'loss',
   'loss': 'loss',
   '-': 'loss',
-
-  'н': 'draw',
-  'ничья': 'draw',
-  'd': 'draw',
-  'draw': 'draw',
-  '=': 'draw',
+  '0': 'loss',
 };
 
 /**
  * @param {unknown} raw
- * @returns {import('../types.js').Outcome | null} null — значит записи нет вовсе (пустая ячейка)
+ * @returns {import('../types.js').Outcome | null}
+ *   null — записи нет: ячейка пустая или в ней что-то непонятное.
+ *   Это означает «данные не внесены», а не какой-то третий исход.
  */
 export function toOutcome(raw) {
   if (raw === null || raw === undefined) return null;
