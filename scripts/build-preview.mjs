@@ -64,9 +64,17 @@ const isStart = (p) => p.id === startId;
 const startNavId = startId.startsWith('alliance-') ? 'ladder' : startId;
 
 const css = await readFile('src/styles.css', 'utf8');
-// Скрипт рейтинга написан без import/export именно ради этой строки:
-// его можно вставить дословно, не дублируя логику поиска и сортировки.
-const ladderJs = await readFile('src/ui/ladder-controls.js', 'utf8');
+
+/*
+  Скрипты фильтров написаны без import и export именно ради этих строк:
+  их можно вставить дословно, не дублируя логику. Собираем все *-controls.js
+  автоматически, чтобы новый фильтр не пришлось вспоминать и дописывать сюда.
+*/
+const { readdir } = await import('node:fs/promises');
+const controlFiles = (await readdir('src/ui')).filter((f) => f.endsWith('-controls.js')).sort();
+const controlsJs = (
+  await Promise.all(controlFiles.map((f) => readFile(`src/ui/${f}`, 'utf8')))
+).join('\n');
 
 const html = `<!DOCTYPE html>
 <html lang="ru">
@@ -137,7 +145,7 @@ document.addEventListener('click', function (e) {
 });
 </script>
 <script>
-${ladderJs}
+${controlsJs}
 </script>
 </body>
 </html>

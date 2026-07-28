@@ -205,6 +205,54 @@ console.log('\nF. Связка рейтинга: разметка ↔ скрип
     ['points', 'wins', 'form', 'name'].every((s) => html.includes(`data-ladder-sort="${s}"`)));
 }
 
+// ── G. Русские склонения ────────────────────────────────────────────────────
+console.log('\nG. Склонения по числам');
+{
+  const { plural, pluralWord } = await import('../src/ui/helpers.js');
+  const day = (n) => pluralWord(n, 'день', 'дня', 'дней');
+
+  equal('1 день', day(1), 'день');
+  equal('2 дня', day(2), 'дня');
+  equal('5 дней', day(5), 'дней');
+  equal('11 дней — исключение', day(11), 'дней');
+  equal('12 дней — исключение', day(12), 'дней');
+  equal('14 дней — исключение', day(14), 'дней');
+  equal('21 день', day(21), 'день');
+  equal('22 дня', day(22), 'дня');
+  equal('25 дней', day(25), 'дней');
+  equal('101 день', day(101), 'день');
+  equal('0 дней', day(0), 'дней');
+
+  equal('plural подставляет число', plural(3, 'победа', 'победы', 'побед'), '3 победы');
+  check('pluralWord число не подставляет', !day(10).includes('10'));
+}
+
+// ── H. Хронология: разметка и её скрипт ─────────────────────────────────────
+console.log('\nH. Связка хронологии: разметка ↔ скрипт');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderTimeline } = await import('../src/pages/timeline.js');
+
+  const events = await jsonAdapter.getEvents();
+  const html = renderTimeline({ events });
+  const script = await readFile('src/ui/timeline-controls.js', 'utf8');
+
+  const hooks = [...new Set([...script.matchAll(/\[data-(tl-[a-z]+)\]/g)].map((m) => m[1]))];
+  check('скрипт что-то ищет', hooks.length >= 3, `нашли: ${hooks.join(', ')}`);
+  for (const hook of hooks) {
+    check(`разметка содержит data-${hook}`, html.includes(`data-${hook}`));
+  }
+
+  const captures = events.filter((e) => e.type === 'server_capture');
+  const trophies = (html.match(/class="trophy"/g) || []).length;
+  equal('трофеев столько же, сколько захватов', trophies, captures.length);
+
+  // Числа в шапке выводятся отдельно от подписей — проверяем, что подпись
+  // не тащит число за собой и не получается «10 · 10 месяцев».
+  check('в подписях статистики нет цифр', !/<span>[^<]*\d/.test(html.split('trophies')[0]));
+  check('годы сгруппированы', html.includes('data-tl-year'));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

@@ -59,11 +59,14 @@
  * @typedef {Object} GameEvent
  * @property {string}  id
  * @property {Date}    date
- * @property {string}  type          'server_capture' | 'war' | 'merge' | 'other'
- * @property {number}  [serverNumber] Номер сервера — для захватов.
+ * @property {string}  type            'server_capture' | 'war' | 'merge' | 'other'
+ * @property {number}  [serverNumber]  Номер сервера — для захватов.
  * @property {string}  title
  * @property {string}  [body]
- * @property {string}  [imageUrl]     В режиме sheets — внешняя ссылка.
+ * @property {string}  [imageUrl]      В режиме sheets — внешняя ссылка.
+ * @property {number}  [durationDays]  Сколько длилась кампания. Необязательно:
+ *                                     заполнять никто не обязан, но если есть —
+ *                                     хронология посчитает по нему статистику.
  */
 
 /**

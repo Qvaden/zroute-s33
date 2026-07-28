@@ -141,6 +141,7 @@ export async function getEvents() {
       title: toStr(r.title),
       body: toStr(r.body) || undefined,
       imageUrl: toStr(r.imageUrl) || undefined,
+      durationDays: toNumber(r.durationDays) ?? undefined,
     }))
     .filter((e) => e.date)
     .sort((a, b) => b.date - a.date);

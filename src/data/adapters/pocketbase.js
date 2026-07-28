@@ -107,6 +107,7 @@ export async function getEvents() {
     serverNumber: toNumber(r.serverNumber) ?? undefined,
     title: toStr(r.title),
     body: toStr(r.body) || undefined,
+    durationDays: toNumber(r.durationDays) ?? undefined,
     // В PocketBase файл хранится как имя — собираем полный адрес.
     imageUrl: r.image
       ? `${CONFIG.pocketbase.url.replace(/\/$/, '')}/api/files/events/${r.id}/${r.image}`

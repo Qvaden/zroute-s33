@@ -21,13 +21,22 @@ export function fmtDateFull(d) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-/** Русские склонения: 1 победа, 2 победы, 5 побед. */
-export function plural(n, one, few, many) {
+/**
+ * Выбирает форму слова по числу: 1 победа, 2 победы, 5 побед.
+ * Само число не подставляет — нужно там, где цифра выводится отдельно
+ * и крупно, иначе она задваивается: «10 · 10 месяцев истории».
+ */
+export function pluralWord(n, one, few, many) {
   const m10 = n % 10;
   const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return `${n} ${one}`;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return `${n} ${few}`;
-  return `${n} ${many}`;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
+/** То же самое, но вместе с числом: «5 побед». */
+export function plural(n, one, few, many) {
+  return `${n} ${pluralWord(n, one, few, many)}`;
 }
 
 /** Значок изменения места: вверх, вниз или без движения. */

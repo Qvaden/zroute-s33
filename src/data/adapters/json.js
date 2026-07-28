@@ -90,6 +90,7 @@ export async function getEvents() {
       title: toStr(e.title),
       body: e.body ? toStr(e.body) : undefined,
       imageUrl: e.imageUrl ? toStr(e.imageUrl) : undefined,
+      durationDays: e.durationDays != null ? Number(e.durationDays) : undefined,
     }))
     .sort((a, b) => b.date - a.date);
 }

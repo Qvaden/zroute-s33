@@ -12,8 +12,9 @@ import { renderLadder } from './pages/ladder.js';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
 import { renderAlliance } from './pages/alliance.js';
-// Побочный импорт: вешает делегированные обработчики поиска и сортировки рейтинга.
+// Побочные импорты: вешают делегированные обработчики фильтров на страницах.
 import './ui/ladder-controls.js';
+import './ui/timeline-controls.js';
 
 const ROUTES = [
   { id: 'home', label: 'Итоги недели', render: renderHome },
@@ -56,9 +57,11 @@ function render() {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
     renderNav(route.id);
     app.innerHTML = route.render(view);
-    // Рейтинг нарисован строками — надо сразу применить фильтр и сортировку,
-    // иначе состояние кнопок разойдётся с тем, что видно на экране.
-    if (typeof window.__ladderApply === 'function') window.__ladderApply();
+    // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
+    // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
+    for (const fn of [window.__ladderApply, window.__timelineApply]) {
+      if (typeof fn === 'function') fn();
+    }
   }
 
   window.scrollTo(0, 0);
