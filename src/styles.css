@@ -421,6 +421,114 @@ h1,h2,h3,h4 {
 .lad__empty { text-align: center; color: var(--mute); padding: 28px 0; font-size: 14px; }
 .lad__count { margin: 14px 0 0; }
 
+/* Строка рейтинга — ссылка на карточку альянса. */
+a.lad__row { color: inherit; text-decoration: none; cursor: pointer; }
+a.lad__row:hover .lad__name { color: var(--tag-color); }
+
+/* ── Карточка альянса ───────────────────────────────────────────────────── */
+.back {
+  display: inline-block; margin-bottom: 14px;
+  font-size: 13px; font-weight: 500; color: var(--dim); text-decoration: none;
+  transition: color .15s var(--ease);
+}
+.back:hover { color: var(--accent); }
+
+.ally {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(620px 260px at 12% -40%, color-mix(in srgb, var(--tag-color) 22%, transparent), transparent 62%),
+    linear-gradient(165deg, var(--raised-2), var(--surface) 64%);
+  padding: 22px 18px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+  animation: rise .5s var(--ease) both;
+}
+@media (min-width: 760px) { .ally { padding: 28px 30px; } }
+
+.ally__head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.ally__tag {
+  flex: none;
+  font-family: Unbounded, sans-serif; font-weight: 800;
+  font-size: clamp(15px, 3.4vw, 20px); letter-spacing: .02em;
+  padding: 10px 14px; border-radius: 12px;
+  color: var(--tag-color);
+  background: color-mix(in srgb, var(--tag-color) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tag-color) 40%, transparent);
+}
+.ally__name { font-size: clamp(25px, 6.4vw, 42px); letter-spacing: -.03em; }
+.ally__sub { margin: 5px 0 0; font-size: 13px; color: var(--dim); }
+
+.ally__stats {
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 22px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+@media (min-width: 620px) { .ally__stats { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .ally__stats { grid-template-columns: repeat(6, 1fr); } }
+
+.stat { background: var(--surface); padding: 13px 14px; display: flex; flex-direction: column; gap: 3px; }
+.stat__label { font-size: 10px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--mute); }
+.stat__value {
+  font-family: Unbounded, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.stat__value.pos { color: var(--win); }
+.stat__value.neg { color: var(--loss); }
+
+.ch--big svg { min-height: 200px; }
+.ch__legend { margin: 8px 0 0; font-size: 12px; color: var(--mute); display: flex; align-items: center; gap: 7px; }
+.ch__dash { display: inline-block; width: 20px; height: 0; border-top: 1.5px dashed var(--mute); }
+
+/* Хроника всех VS */
+.vs { list-style: none; margin: 0; padding: 0; }
+.vs__row {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  grid-template-areas:
+    "week dates  total"
+    "week badge  total";
+  gap: 2px 12px;
+  align-items: center;
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 2px solid transparent;
+}
+.vs__row:last-child { border-bottom: 0; }
+.vs__row--win  { border-left-color: color-mix(in srgb, var(--win) 60%, transparent); }
+.vs__row--loss { border-left-color: color-mix(in srgb, var(--loss) 60%, transparent); }
+.vs__row--skip { opacity: .5; }
+
+.vs__week { grid-area: week; font-family: Unbounded, sans-serif; font-weight: 700; font-size: 13px; color: var(--dim); }
+.vs__dates { grid-area: dates; font-size: 12.5px; color: var(--mute); }
+.vs__badge {
+  grid-area: badge; justify-self: start;
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+}
+.vs__badge--win  { color: var(--win);  background: color-mix(in srgb, var(--win) 15%, transparent); }
+.vs__badge--loss { color: var(--loss); background: color-mix(in srgb, var(--loss) 15%, transparent); }
+.vs__badge--draw { color: var(--draw); background: rgba(255,255,255,.07); }
+.vs__badge--skip { color: var(--mute); background: rgba(255,255,255,.05); }
+.vs__sign { display: none; }
+.vs__total {
+  grid-area: total; text-align: right;
+  font-family: Unbounded, sans-serif; font-weight: 700; font-size: 16px; color: var(--dim);
+}
+
+@media (min-width: 620px) {
+  .vs__row {
+    grid-template-columns: 56px 150px 1fr 44px 70px;
+    grid-template-areas: "week dates badge sign total";
+  }
+  .vs__sign { grid-area: sign; display: block; text-align: right; font-size: 12.5px; color: var(--mute); font-variant-numeric: tabular-nums; }
+}
+
 @media (min-width: 880px) {
   .lad__head, .lad__row {
     /* Имя не должно растягиваться на всю свободную ширину — иначе между ним

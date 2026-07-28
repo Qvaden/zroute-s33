@@ -1,11 +1,17 @@
 import { CONFIG } from '../config.js';
 import { loadAll, capabilities, db } from './data/index.js';
 import { validateDataset } from './data/contract.js';
-import { computeStandings, computeWeekSummary, computeMovers } from './logic/standings.js';
+import {
+  computeStandings,
+  computeWeekSummary,
+  computeMovers,
+  computePlaceHistory,
+} from './logic/standings.js';
 import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
+import { renderAlliance } from './pages/alliance.js';
 // Побочный импорт: вешает делегированные обработчики поиска и сортировки рейтинга.
 import './ui/ladder-controls.js';
 
@@ -22,25 +28,39 @@ const nav = document.getElementById('nav');
 /** @type {any} */
 let view = null;
 
-function currentRoute() {
-  const id = location.hash.replace(/^#\/?/, '') || 'home';
-  return ROUTES.find((r) => r.id === id) ?? ROUTES[0];
+/**
+ * Адрес вида #/ladder или #/alliance/a05.
+ * Второй сегмент — параметр страницы.
+ */
+function parseHash() {
+  const [id, param] = location.hash.replace(/^#\/?/, '').split('/');
+  return { id: id || 'home', param: param || null };
 }
 
-function renderNav() {
-  const active = currentRoute().id;
+function renderNav(activeId) {
   nav.innerHTML = ROUTES.map(
-    (r) => `<a href="#/${r.id}" class="nav__link ${r.id === active ? 'is-active' : ''}">${r.label}</a>`
+    (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}">${r.label}</a>`
   ).join('');
 }
 
 function render() {
   if (!view) return;
-  renderNav();
-  app.innerHTML = currentRoute().render(view);
-  // Рейтинг нарисован строками — надо сразу применить фильтр и сортировку,
-  // иначе состояние кнопок разойдётся с тем, что видно на экране.
-  if (typeof window.__ladderApply === 'function') window.__ladderApply();
+  const { id, param } = parseHash();
+
+  if (id === 'alliance' && param) {
+    // Карточка альянса не своя вкладка, поэтому в меню подсвечиваем рейтинг,
+    // откуда сюда и приходят.
+    renderNav('ladder');
+    app.innerHTML = renderAlliance(view, param);
+  } else {
+    const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
+    renderNav(route.id);
+    app.innerHTML = route.render(view);
+    // Рейтинг нарисован строками — надо сразу применить фильтр и сортировку,
+    // иначе состояние кнопок разойдётся с тем, что видно на экране.
+    if (typeof window.__ladderApply === 'function') window.__ladderApply();
+  }
+
   window.scrollTo(0, 0);
 }
 
@@ -52,16 +72,10 @@ async function boot() {
 
     // В разработке сразу ругаемся на кривые данные, а не показываем пустые клетки.
     const problems = validateDataset(data);
-    if (problems.length) {
-      console.warn('Проблемы в данных:\n' + problems.join('\n'));
-    }
+    if (problems.length) console.warn('Проблемы в данных:\n' + problems.join('\n'));
 
     const standings = computeStandings(
-      data.alliances,
-      data.weeks,
-      data.results,
-      CONFIG.scoring,
-      CONFIG.formLength
+      data.alliances, data.weeks, data.results, CONFIG.scoring, CONFIG.formLength
     );
 
     view = {
@@ -69,6 +83,7 @@ async function boot() {
       standings,
       summary: computeWeekSummary(data.alliances, data.weeks, data.results),
       movers: computeMovers(standings),
+      placeHistory: computePlaceHistory(data.alliances, data.weeks, data.results, CONFIG.scoring),
       problems,
     };
 

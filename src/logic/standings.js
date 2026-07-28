@@ -206,6 +206,67 @@ export function computeWeekSummary(alliances, weeks, results, weekId) {
 }
 
 /**
+ * История мест: какое место занимал каждый альянс после каждой недели.
+ *
+ * Для карточки альянса это интереснее очков. Очки говорят «сколько набрал»,
+ * а место — «кого обошёл». Альянс может набирать очки и при этом падать
+ * в таблице, если соседи набирают быстрее, и вот это как раз видно.
+ *
+ * @param {import('../data/types.js').Alliance[]} alliances
+ * @param {import('../data/types.js').Week[]} weeks
+ * @param {import('../data/types.js').Result[]} results
+ * @param {{win:number,loss:number,draw:number,skip:number}} scoring
+ * @returns {Map<string, number[]>} id альянса → места по неделям
+ */
+export function computePlaceHistory(alliances, weeks, results, scoring) {
+  const index = indexResults(results);
+  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const history = new Map(alliances.map((a) => [a.id, []]));
+
+  for (let i = 0; i < ordered.length; i++) {
+    for (const row of rank(tallyUpTo(alliances, ordered, index, scoring, i))) {
+      history.get(row.alliance.id).push(row.place);
+    }
+  }
+  return history;
+}
+
+/**
+ * Все результаты одного альянса по неделям, включая пропуски.
+ *
+ * @param {string} allianceId
+ * @param {import('../data/types.js').Week[]} weeks
+ * @param {import('../data/types.js').Result[]} results
+ * @returns {{week: import('../data/types.js').Week, outcome: import('../data/types.js').Outcome}[]}
+ */
+export function computeAllianceHistory(allianceId, weeks, results) {
+  const index = indexResults(results);
+  return [...weeks]
+    .sort((a, b) => a.number - b.number)
+    .map((week) => ({ week, outcome: index.get(`${week.id}|${allianceId}`) ?? 'skip' }));
+}
+
+/**
+ * Самая длинная серия побед и самая длинная серия поражений за сезон.
+ * Пропуски серию не обрывают и в неё не входят — как и в текущей серии.
+ *
+ * @param {import('../data/types.js').Outcome[]} outcomes
+ */
+export function computeBestStreaks(outcomes) {
+  const played = outcomes.filter((o) => o === 'win' || o === 'loss');
+  let bestWin = 0;
+  let bestLoss = 0;
+  let run = 0;
+
+  for (let i = 0; i < played.length; i++) {
+    run = i > 0 && played[i] === played[i - 1] ? run + 1 : 1;
+    if (played[i] === 'win') bestWin = Math.max(bestWin, run);
+    else bestLoss = Math.max(bestLoss, run);
+  }
+  return { bestWin, bestLoss };
+}
+
+/**
  * Кто сильнее всех поднялся и упал за последнюю неделю.
  * @param {StandingRow[]} standings
  * @param {number} limit

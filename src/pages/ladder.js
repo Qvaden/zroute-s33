@@ -69,8 +69,14 @@ function rowHtml(r) {
 
   const medal = r.place <= 3 ? ` lad__row--m${r.place}` : '';
 
+  /*
+    Строка — ссылка на карточку альянса. data-go нужен только собранному
+    одним файлом превью: там нет роутера, и клик перехватывается вручную.
+    В настоящем сайте отрабатывает обычный href.
+  */
   return `
-  <div class="lad__row${medal}${a.active ? '' : ' lad__row--off'}"
+  <a class="lad__row${medal}${a.active ? '' : ' lad__row--off'}"
+       href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
        style="--tag-color:${esc(color)}"
        data-name="${esc(a.name.toLowerCase())}"
        data-tag="${esc(a.tag.toLowerCase())}"
@@ -102,5 +108,5 @@ function rowHtml(r) {
     </span>
 
     <span class="lad__spark">${sparkline(r.series, color, 92, 26)}</span>
-  </div>`;
+  </a>`;
 }
