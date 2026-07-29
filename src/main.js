@@ -6,6 +6,7 @@ import {
   computeWeekSummary,
   computeMovers,
   computePlaceHistory,
+  weeksUpToLastData,
 } from './logic/standings.js';
 import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js';
@@ -77,16 +78,25 @@ async function boot() {
     const problems = validateDataset(data);
     if (problems.length) console.warn('Проблемы в данных:\n' + problems.join('\n'));
 
+    /*
+      Недели в таблице заведены заранее, на несколько недель вперёд.
+      Считать и показывать нужно только те, за которые есть результаты,
+      иначе «итогами недели» окажется неделя из будущего.
+    */
+    const weeks = weeksUpToLastData(data.weeks, data.results);
+
     const standings = computeStandings(
-      data.alliances, data.weeks, data.results, CONFIG.scoring, CONFIG.formLength
+      data.alliances, weeks, data.results, CONFIG.scoring, CONFIG.formLength
     );
 
     view = {
       ...data,
+      weeks,
+      allWeeks: data.weeks,
       standings,
-      summary: computeWeekSummary(data.alliances, data.weeks, data.results),
+      summary: computeWeekSummary(data.alliances, weeks, data.results),
       movers: computeMovers(standings),
-      placeHistory: computePlaceHistory(data.alliances, data.weeks, data.results, CONFIG.scoring),
+      placeHistory: computePlaceHistory(data.alliances, weeks, data.results, CONFIG.scoring),
       problems,
     };
 

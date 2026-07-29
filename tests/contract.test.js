@@ -207,6 +207,46 @@ console.log('\nF. Связка рейтинга: разметка ↔ скрип
     ['points', 'wins', 'form', 'name'].every((s) => html.includes(`data-ladder-sort="${s}"`)));
 }
 
+// ── B2. Недели из будущего не считаются текущими ────────────────────────────
+console.log('\nB2. Недели, заведённые заранее');
+{
+  const { weeksUpToLastData } = await import('../src/logic/standings.js');
+  const mkWeek = (n) => ({
+    id: `W${n}`, number: n,
+    startDate: new Date(2026, 0, n), endDate: new Date(2026, 0, n + 6),
+  });
+  const weeks = [31, 32, 33, 34, 35, 36].map(mkWeek);
+
+  equal('без результатов набор пуст', weeksUpToLastData(weeks, []), []);
+
+  const oneWeek = [{ weekId: 'W31', allianceId: 'a01', outcome: 'win' }];
+  equal(
+    'хвост будущих недель отброшен',
+    weeksUpToLastData(weeks, oneWeek).map((w) => w.id),
+    ['W31']
+  );
+
+  const withGap = [
+    { weekId: 'W31', allianceId: 'a01', outcome: 'win' },
+    { weekId: 'W33', allianceId: 'a01', outcome: 'loss' },
+  ];
+  equal(
+    'внутренний пропуск сохранён, чтобы дырка в данных была видна',
+    weeksUpToLastData(weeks, withGap).map((w) => w.id),
+    ['W31', 'W32', 'W33']
+  );
+
+  check('порядок не зависит от порядка строк на входе',
+    weeksUpToLastData([...weeks].reverse(), withGap).map((w) => w.id).join() === 'W31,W32,W33');
+
+  // Главное следствие: «итогами недели» не может стать неделя из будущего.
+  const trimmed = weeksUpToLastData(weeks, oneWeek);
+  const summary = computeWeekSummary(
+    [{ id: 'a01', tag: 'A', name: 'А', active: true }], trimmed, oneWeek
+  );
+  equal('текущая неделя — последняя с данными, а не последняя в списке', summary.week.id, 'W31');
+}
+
 // ── F2. Исходов ровно два ───────────────────────────────────────────────────
 console.log('\nF2. Только победа и поражение');
 {

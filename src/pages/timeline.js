@@ -17,7 +17,16 @@ const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн',
  */
 export function renderTimeline({ events }) {
   if (!events.length) {
-    return `<section class="panel"><p class="muted">Событий пока не внесено.</p></section>`;
+    return `
+      <section class="hero hero--tl">
+        <span class="eyebrow">Хроника завоеваний</span>
+        <h2 class="tl__title">Ещё ни одной записи</h2>
+        <p class="guide__sub">
+          Здесь будут захваченные серверы крупными плитками и лента событий
+          по датам: войны, слияния альянсов, всё, что стоит запомнить.
+          Летопись пишется с этой недели.
+        </p>
+      </section>`;
   }
 
   const sorted = [...events].sort((a, b) => b.date - a.date);

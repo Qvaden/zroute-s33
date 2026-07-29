@@ -1,15 +1,99 @@
-import { esc, fmtDate, deltaBadge, plural } from '../ui/helpers.js';
+import { esc, fmtDate, deltaBadge, plural, pluralWord } from '../ui/helpers.js';
 import { raceChart } from '../ui/chart.js';
+
+/**
+ * Состояние до первого внесённого результата.
+ *
+ * Отсчёт истории начинается с этой недели, поэтому таблица пока пуста
+ * по-настоящему, а не из-за ошибки. Задача экрана — сказать это прямо
+ * и показать, что подготовка сделана: все альянсы на месте, ждём первый VS.
+ */
+function renderPreSeason(standings, allWeeks) {
+  const alliances = standings.map((r) => r.alliance).filter((a) => a.active);
+
+  // Ближайшая неделя, которая ещё не закончилась.
+  const today = new Date();
+  const ordered = [...(allWeeks ?? [])].sort((a, b) => a.number - b.number);
+  const upcoming = ordered.find((w) => w.endDate >= today) ?? ordered[0];
+
+  return `
+    <section class="hero">
+      <div class="hero__top">
+        <span class="eyebrow">Отсчёт начинается</span>
+        <div class="hero__week">
+          <span class="hero__word">Неделя</span>
+          <span class="hero__num num">${upcoming ? upcoming.number : '—'}</span>
+        </div>
+        <div class="hero__dates">
+          ${
+            upcoming
+              ? `${fmtDate(upcoming.startDate)} — ${fmtDate(upcoming.endDate)} · первый VS в истории сайта`
+              : 'Недели ещё не заведены'
+          }
+        </div>
+      </div>
+
+      <div class="preseason">
+        <p class="preseason__lead">
+          Ни одного результата пока не внесено — и это не ошибка.
+          История начинается с этой недели, и дальше она будет только расти:
+          каждая победа и каждое поражение останутся здесь навсегда.
+        </p>
+        <p class="preseason__note muted">
+          Первые итоги появятся, как только закончится VS и результаты внесут в таблицу.
+        </p>
+      </div>
+
+      <div class="split">
+        <div class="split__col">
+          <h3 class="preseason__title">
+            На старте
+            <span class="split__count num">${alliances.length}</span>
+            <i class="split__bar"></i>
+          </h3>
+          <div class="tiles">
+            ${alliances
+              .map(
+                (a) => `<span class="tile" style="--tag-color:${esc(a.color || '#7a8494')}">
+                          <b>${esc(a.tag)}</b>${esc(a.name)}
+                        </span>`
+              )
+              .join('')}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel__head">
+        <span class="eyebrow">Как это будет работать</span>
+        <h2>Победа +1, поражение −1</h2>
+      </header>
+      <div class="prose prose--week">
+        <ul>
+          <li><strong>Каждую неделю</strong> после VS в таблицу заносится результат каждого альянса.</li>
+          <li><strong>Победа даёт +1 очко, поражение −1.</strong> Третьего не бывает: в VS выходят все.</li>
+          <li><strong>Через месяц</strong> станет видно, кто держит форму, а кто просел.</li>
+          <li><strong>Через полгода</strong> здесь будет история сервера, которой больше нигде нет.</li>
+        </ul>
+      </div>
+      <p class="muted">
+        ${plural(alliances.length, 'альянс', 'альянса', 'альянсов')} уже
+        ${pluralWord(alliances.length, 'ждёт', 'ждут', 'ждут')} первой недели.
+      </p>
+    </section>`;
+}
 
 /**
  * Главная — ответ на «зашёл и понял, у кого получается».
  * Всё главное должно читаться за пять секунд: номер недели, лидер сезона,
  * кто победил и кто проиграл. Остальное — ниже, для тех, кому интересно.
  */
-export function renderHome({ summary, standings, movers, weeks }) {
-  if (!summary) {
-    return `<section class="panel"><p class="muted">Пока нет ни одной внесённой недели.</p></section>`;
-  }
+export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
+  // Пока не внесён ни один результат, показывать нечего — но и «пусто» писать
+  // нельзя: в этом состоянии сайт проживёт несколько дней после запуска,
+  // и это первое, что увидят люди.
+  if (!summary) return renderPreSeason(standings, allWeeks ?? weeks);
 
   const { week, winners, losers, recorded } = summary;
   const leader = standings[0];

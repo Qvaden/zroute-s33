@@ -18,6 +18,7 @@ import {
   computeWeekSummary,
   computeMovers,
   computePlaceHistory,
+  weeksUpToLastData,
 } from '../src/logic/standings.js';
 import { renderHome } from '../src/pages/home.js';
 import { renderLadder } from '../src/pages/ladder.js';
@@ -26,15 +27,19 @@ import { renderGuide } from '../src/pages/guide.js';
 import { renderAlliance } from '../src/pages/alliance.js';
 
 const data = await loadAll();
+// Только недели, за которые есть результаты — см. weeksUpToLastData.
+const weeks = weeksUpToLastData(data.weeks, data.results);
 const standings = computeStandings(
-  data.alliances, data.weeks, data.results, CONFIG.scoring, CONFIG.formLength
+  data.alliances, weeks, data.results, CONFIG.scoring, CONFIG.formLength
 );
 const view = {
   ...data,
+  weeks,
+  allWeeks: data.weeks,
   standings,
-  summary: computeWeekSummary(data.alliances, data.weeks, data.results),
+  summary: computeWeekSummary(data.alliances, weeks, data.results),
   movers: computeMovers(standings),
-  placeHistory: computePlaceHistory(data.alliances, data.weeks, data.results, CONFIG.scoring),
+  placeHistory: computePlaceHistory(data.alliances, weeks, data.results, CONFIG.scoring),
 };
 
 const NAV = [
@@ -111,7 +116,7 @@ ${css}
 
 <footer class="site-foot wrap">
   <p>Неофициальный сайт сообщества 33 сервера. Данные вносятся вручную после каждого VS.
-  Демонстрационная сборка на выдуманных данных.</p>
+  Источник данных: <b>${CONFIG.dataSource}</b>${CONFIG.dataSource === 'json' ? ' (выдуманные данные)' : ''}.</p>
 </footer>
 
 <script>

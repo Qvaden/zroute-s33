@@ -8,7 +8,7 @@
  * Всё остальное в проекте про источник данных не знает вообще ничего.
  */
 export const CONFIG = {
-  dataSource: 'json',
+  dataSource: 'sheets',
 
   server: 33,
   siteTitle: 'Сервер 33 · Z Route: Redemption',
