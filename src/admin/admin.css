@@ -142,7 +142,8 @@
   color: var(--mute);
   font-size: 12px;
 }
-.adm-foot a { color: var(--dim); }
+.adm-foot a { color: var(--dim); text-decoration: none; }
+.adm-foot a:hover { color: var(--text); text-decoration: underline; }
 
 .adm-hero { margin-bottom: 22px; }
 .adm-hero--tight { margin-bottom: 16px; }
@@ -373,7 +374,8 @@
 .adm-ev__id { color: var(--mute); }
 .adm-ev__body b { display: block; font-size: 14.5px; }
 .adm-ev__body p { margin: 4px 0 0; font-size: 13.5px; }
-.adm-ev__img { font-size: 12.5px; display: inline-block; margin-top: 6px; }
+.adm-ev__img { font-size: 12.5px; display: inline-block; margin-top: 6px; color: var(--accent); text-decoration: none; }
+.adm-ev__img:hover { text-decoration: underline; }
 
 /* ── Тексты ───────────────────────────────────────────────────────────────── */
 .adm-text { border-bottom: 1px solid var(--line-soft); }
@@ -448,7 +450,18 @@
 .adm-help li { margin-bottom: 6px; }
 .adm-help p { color: var(--dim); font-size: 13.5px; }
 .adm-help code { color: var(--accent); }
-.adm-login__foot { margin: 18px 0 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+.adm-login__foot {
+  margin: 18px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  justify-content: space-between;
+  align-items: baseline;
+}
+/* Ссылки панели не должны выглядеть синим подчёркнутым текстом браузера:
+   в styles.css глобального правила для <a> нет, каждый блок красит свои. */
+.adm-login__foot a, .adm-help a { color: var(--accent); text-decoration: none; }
+.adm-login__foot a:hover, .adm-help a:hover { text-decoration: underline; }
 
 /* ── Шире телефона ────────────────────────────────────────────────────────── */
 @media (min-width: 640px) {

@@ -70,8 +70,13 @@ export function renderLogin({ error } = {}) {
           </p>
         </details>
 
+        <!--
+          Обе половины подвала обёрнуты в span намеренно: в flex-контейнере
+          голый текст становится отдельным элементом, и «Подробнее — в»,
+          путь и точка разъезжаются по строке в разные стороны.
+        -->
         <p class="adm-login__foot muted">
-          Подробнее — в <code class="adm-mono">docs/ADMIN.md</code>.
+          <span>Подробнее — в <code class="adm-mono">docs/ADMIN.md</code></span>
           <a href="./index.html">Вернуться на сайт</a>
         </p>
       </section>
