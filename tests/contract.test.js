@@ -523,6 +523,151 @@ console.log('\nI. Готовность к публикации');
       .every(Boolean));
 }
 
+// ── J. Админ-панель: одинаковый разбор и честная фаза «только чтение» ───────
+console.log('\nJ. Админ-панель');
+{
+  const { readFile, readdir } = await import('node:fs/promises');
+  const path = await import('node:path');
+
+  const { mapDataset } = await import('../src/data/adapters/_map.js');
+  const jsonAdapter = await import('../src/data/adapters/json.js');
+
+  /*
+    ГЛАВНАЯ ПРОВЕРКА РАЗДЕЛА.
+
+    Сайт читает data/live.json с диска, панель — тот же файл через API GitHub.
+    Разбор у них общий (_map.js), и это должно оставаться правдой: стоит
+    кому-то поправить разбор в одном месте, панель начнёт показывать одно,
+    а сайт другое. Расхождение вылезло бы в момент публикации.
+  */
+  // Адаптер в тестах смотрит на демо-данные (см. подмену пути в начале файла),
+  // поэтому сверять надо с ними же — иначе тест поймает не расхождение
+  // разбора, а разные файлы.
+  const rawForParity = JSON.parse(await readFile('data/demo.json', 'utf8'));
+  const viaAdapter = {
+    alliances: await jsonAdapter.getAlliances(),
+    weeks: await jsonAdapter.getWeeks(),
+    results: await jsonAdapter.getResults(),
+    events: await jsonAdapter.getEvents(),
+    texts: await jsonAdapter.getTexts(),
+  };
+  check(
+    'панель и сайт разбирают одни данные одинаково',
+    JSON.stringify(mapDataset(rawForParity)) === JSON.stringify(viaAdapter)
+  );
+
+  // Соберём исходники панели: несколько проверок идут по тексту.
+  async function walkJs(dir, out = []) {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) await walkJs(full, out);
+      else if (e.name.endsWith('.js')) out.push(full);
+    }
+    return out;
+  }
+  const adminFiles = await walkJs('src/admin');
+  /*
+    Комментарии выкидываем: в них слова «console.log» и «POST» встречаются
+    как раз там, где объясняется, почему их нельзя писать в коде. Проверять
+    надо код, а не рассуждения о нём.
+  */
+  const stripComments = (s) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const adminSource = stripComments(
+    (await Promise.all(adminFiles.map((f) => readFile(f, 'utf8')))).join('\n')
+  );
+
+  check(`панель разложена по файлам (${adminFiles.length} шт.)`, adminFiles.length >= 5);
+
+  /*
+    Фаза 1 обещает «панель не может изменить данные». Обещание в комментарии
+    ничего не стоит, поэтому проверяем текстом: ни одного пишущего запроса.
+    Когда придёт вторая фаза, этот тест придётся осознанно переписать —
+    именно так и должно быть, запись не должна появиться незаметно.
+  */
+  check(
+    'в панели нет пишущих запросов — фаза 1 читает и только читает',
+    !/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(adminSource)
+  );
+
+  /*
+    Токен — единственный секрет в проекте. Случайный console.log с ним
+    означает утечку в консоль, скриншот или демонстрацию экрана.
+  */
+  check('в панели нет вывода в консоль — токену там не место', !/console\./.test(adminSource));
+
+  const adminHtml = await readFile('admin.html', 'utf8');
+  check('панель не регистрирует service worker', !/serviceWorker/.test(adminHtml));
+  check('панель не подключает манифест', !adminHtml.includes('rel="manifest"'));
+  check('панель закрыта от поисковиков', /name="robots"[^>]*noindex/.test(adminHtml));
+  check('в admin.html нет абсолютных путей от корня домена', !/(?:src|href)="\/(?!\/)/.test(adminHtml));
+  check('панель переиспользует стили сайта', adminHtml.includes('./src/styles.css'));
+
+  /*
+    Кэш админки опаснее устаревшего сайта: показав прошлую неделю, панель
+    даёт опубликовать правку поверх чужой незаметно для обоих редакторов.
+  */
+  const sw = await readFile('sw.js', 'utf8');
+  check('service worker обходит api.github.com', sw.includes('api.github.com'));
+  check('service worker обходит панель', /admin/.test(sw));
+
+  // Экраны — чистые функции над данными, поэтому проверяются без браузера.
+  const screens = [
+    ['обзор', (await import('../src/admin/screens/overview.js')).renderOverview],
+    ['неделя', (await import('../src/admin/screens/week.js')).renderWeek],
+    ['альянсы', (await import('../src/admin/screens/alliances.js')).renderAlliances],
+    ['хронология', (await import('../src/admin/screens/events.js')).renderEvents],
+    ['тексты', (await import('../src/admin/screens/texts.js')).renderTexts],
+  ];
+
+  const viewFor = (data) => ({
+    user: { login: 'editor' },
+    repo: { fullName: 'Qvaden/zroute-s33', canPush: true, isPrivate: false },
+    file: { path: 'data/live.json', size: 98304, sha: 'abc123' },
+    commit: {
+      sha: 'abc1234',
+      message: 'данные из таблицы',
+      date: new Date('2026-07-29T21:40:00Z'),
+      authorName: 'github-actions[bot]',
+      authorLogin: '',
+    },
+    data,
+    weeks: data.weeks,
+    problems: [],
+  });
+
+  const rawDemo = JSON.parse(await readFile('data/demo.json', 'utf8'));
+  const full = viewFor(mapDataset(rawDemo));
+  /*
+    Пустой набор — не выдуманный случай: ровно так выглядят данные сейчас,
+    до первого внесённого результата. Панель обязана открыться и на них.
+  */
+  const blank = viewFor(mapDataset({}));
+
+  for (const [label, render] of screens) {
+    let onBlank = '';
+    let onFull = '';
+    try { onBlank = render(blank, null); } catch (err) { onBlank = `ПАДАЕТ: ${err.message}`; }
+    try { onFull = render(full, null); } catch (err) { onFull = `ПАДАЕТ: ${err.message}`; }
+
+    check(`экран «${label}» рисуется на пустых данных`, onBlank.startsWith('\n') || onBlank.startsWith('<'), onBlank.slice(0, 90));
+    check(`экран «${label}» рисуется на полных данных`, onFull.length > 300, onFull.slice(0, 90));
+  }
+
+  /*
+    Адрес вида #/week/W24 обязан открывать именно эту неделю, а не последнюю.
+    Номер берём из самих данных: в демо недели свои, и зашитый номер сделал бы
+    тест хрупким без всякой пользы.
+  */
+  const target = full.data.weeks[Math.floor(full.data.weeks.length / 2)];
+  const picked = screens[1][1](full, target.id);
+  check(
+    'экран недели слушается адреса',
+    picked.includes(`Неделя ${target.number}`),
+    `просили ${target.id}`
+  );
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

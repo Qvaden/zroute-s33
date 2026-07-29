@@ -1,0 +1,478 @@
+/*
+  ОФОРМЛЕНИЕ ПАНЕЛИ.
+
+  Своих цветов здесь нет ни одного: все токены взяты из styles.css, который
+  подключён первым. Это не экономия, а требование — панель и сайт должны
+  выглядеть одним продуктом, иначе редактор каждый раз переключает голову.
+
+  Сначала телефон: результаты вносят с телефона сразу после VS, стоя
+  в переписке с альянсом. Поэтому клетки крупные, а не плотные.
+*/
+
+/* Зерно и пятна света из styles.css лежат на z-index 1 — панель поднимаем
+   выше, иначе шум окажется поверх интерфейса. */
+#admin { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Шапка ────────────────────────────────────────────────────────────────── */
+.adm-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 11px 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.adm-top__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text);
+}
+.adm-top__brand b {
+  font-family: Unbounded, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: #0a0b0d;
+  background: var(--accent);
+  border-radius: 7px;
+  padding: 3px 7px;
+  line-height: 1.2;
+}
+.adm-top__brand span {
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.adm-nav {
+  display: flex;
+  gap: 4px;
+  order: 3;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.adm-nav::-webkit-scrollbar { display: none; }
+
+.adm-nav__link {
+  flex: none;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dim);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: color .16s var(--ease), background .16s var(--ease), border-color .16s var(--ease);
+}
+.adm-nav__link:hover { color: var(--text); background: var(--raised); }
+.adm-nav__link.is-active {
+  color: var(--text);
+  background: var(--raised-2);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.adm-top__right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+.adm-badge {
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+  border-radius: 999px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+.adm-who { display: none; align-items: center; gap: 7px; font-size: 12.5px; }
+.adm-who b { font-weight: 600; }
+
+.adm-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dim);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
+}
+.adm-btn:hover { color: var(--text); border-color: var(--mute); }
+.adm-btn:disabled { opacity: .55; cursor: default; }
+.adm-btn--primary {
+  color: #0a0b0d;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.adm-btn--primary:hover { background: var(--accent-dk); border-color: var(--accent-dk); color: #fff; }
+
+/* ── Каркас ───────────────────────────────────────────────────────────────── */
+.adm-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 22px 16px 56px;
+}
+
+.adm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: space-between;
+  max-width: var(--wrap);
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--mute);
+  font-size: 12px;
+}
+.adm-foot a { color: var(--dim); }
+
+.adm-hero { margin-bottom: 22px; }
+.adm-hero--tight { margin-bottom: 16px; }
+.adm-h1 {
+  font-size: clamp(25px, 6vw, 38px);
+  letter-spacing: -.03em;
+  margin: 3px 0 0;
+}
+.adm-lead { color: var(--dim); margin: 8px 0 0; max-width: 62ch; font-size: 14px; }
+.adm-dot { color: var(--mute); margin: 0 5px; }
+.adm-note { margin-top: 14px; }
+.adm-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .88em;
+}
+.adm-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+/* ── Цифры обзора ─────────────────────────────────────────────────────────── */
+.adm-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.adm-stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 13px 14px;
+}
+.adm-stat b {
+  display: block;
+  font-family: Unbounded, sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--gold);
+}
+.adm-stat span { display: block; font-size: 12px; color: var(--dim); margin-top: 5px; line-height: 1.3; }
+.adm-stat i { display: block; font-style: normal; font-size: 11px; margin-top: 3px; }
+
+/* align-items: start — иначе карточки в строке растягиваются до высоты самой
+   высокой и под коротким текстом остаётся пустота на пол-экрана. */
+.adm-grid { display: grid; gap: 16px; align-items: start; }
+
+.adm-kv { display: grid; gap: 9px; }
+.adm-kv > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.adm-kv span { color: var(--mute); font-size: 12.5px; }
+.adm-kv b { font-weight: 600; text-align: right; word-break: break-word; }
+
+.adm-commit {
+  margin: 13px 0 0;
+  padding: 10px 12px;
+  background: var(--raised);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 13.5px;
+  color: var(--dim);
+}
+
+.adm-health b { display: block; font-size: 15px; margin-bottom: 6px; }
+.adm-health--ok b { color: var(--win); }
+.adm-health--bad b { color: var(--loss); }
+.adm-health ul { margin: 0 0 10px; padding-left: 19px; color: var(--dim); font-size: 13.5px; }
+.adm-health li { margin-bottom: 4px; }
+
+.adm-warn { color: var(--gold); font-size: 13.5px; margin: 12px 0 0; }
+.adm-error {
+  color: var(--loss);
+  background: color-mix(in srgb, var(--loss) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--loss) 35%, transparent);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  font-size: 13.5px;
+  margin: 0 0 16px;
+}
+
+.adm-week-now { display: flex; align-items: center; gap: 15px; }
+.adm-week-now__num {
+  font-family: Unbounded, sans-serif;
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--accent);
+}
+.adm-week-now p { margin: 3px 0 0; }
+
+/* ── Экран недели ─────────────────────────────────────────────────────────── */
+.adm-weeks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 15px; }
+.adm-chip {
+  min-width: 40px;
+  text-align: center;
+  padding: 7px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--dim);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.adm-chip:hover { color: var(--text); border-color: var(--mute); }
+.adm-chip.is-on {
+  color: #0a0b0d;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.adm-progress {
+  height: 5px;
+  background: var(--raised-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.adm-progress i { display: block; height: 100%; background: var(--win); border-radius: 999px; transition: width .3s var(--ease); }
+
+.adm-cells {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.adm-cell {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'tag mark' 'name mark';
+  align-items: center;
+  gap: 0 10px;
+  min-height: 62px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--tag-color);
+  border-radius: var(--r-sm);
+}
+.adm-cell__tag {
+  grid-area: tag;
+  font-family: Unbounded, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tag-color);
+}
+.adm-cell__name {
+  grid-area: name;
+  font-size: 12.5px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-cell__mark {
+  grid-area: mark;
+  font-family: Unbounded, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  width: 34px;
+  text-align: center;
+}
+.adm-cell--win .adm-cell__mark { color: var(--win); }
+.adm-cell--loss .adm-cell__mark { color: var(--loss); }
+.adm-cell--empty { border-style: dashed; }
+.adm-cell--empty .adm-cell__mark { color: var(--mute); }
+
+/* ── Альянсы ──────────────────────────────────────────────────────────────── */
+.adm-allies { list-style: none; margin: 0; padding: 0; }
+.adm-ally {
+  display: grid;
+  grid-template-columns: 10px 46px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13.5px;
+}
+.adm-ally--head {
+  color: var(--mute);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.adm-ally__color { width: 10px; height: 10px; border-radius: 3px; }
+/* Шапка повторяет те же классы, что и строки, — иначе на телефоне,
+   где часть колонок скрыта, заголовки разъезжаются с данными. */
+.adm-ally--head .adm-ally__color { background: none; }
+.adm-ally--head span { font-family: Inter, sans-serif; font-size: 10.5px; font-weight: 700; color: var(--mute); }
+.adm-ally__tag { font-family: Unbounded, sans-serif; font-size: 11.5px; font-weight: 700; }
+.adm-ally__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-ally__note, .adm-ally__wins, .adm-ally__id { display: none; }
+.adm-ally__state { font-size: 11.5px; color: var(--mute); white-space: nowrap; }
+.adm-ally.is-gone { opacity: .5; }
+.adm-ally.is-gone .adm-ally__state { color: var(--loss); }
+
+/* ── Хронология ───────────────────────────────────────────────────────────── */
+.adm-evs { list-style: none; margin: 0; padding: 0; }
+.adm-ev { display: flex; gap: 13px; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+.adm-ev:last-child { border-bottom: 0; }
+.adm-ev__mark {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  font-family: Unbounded, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--dim);
+}
+.adm-ev--server_capture .adm-ev__mark {
+  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+  color: var(--gold);
+}
+.adm-ev--war .adm-ev__mark { border-color: color-mix(in srgb, var(--loss) 50%, transparent); color: var(--loss); }
+.adm-ev__body { flex: 1; min-width: 0; }
+.adm-ev__meta { display: flex; flex-wrap: wrap; gap: 4px 11px; align-items: baseline; margin-bottom: 3px; }
+.adm-ev__type {
+  font-size: 10px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent);
+}
+.adm-ev__meta time { font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.adm-ev__id { color: var(--mute); }
+.adm-ev__body b { display: block; font-size: 14.5px; }
+.adm-ev__body p { margin: 4px 0 0; font-size: 13.5px; }
+.adm-ev__img { font-size: 12.5px; display: inline-block; margin-top: 6px; }
+
+/* ── Тексты ───────────────────────────────────────────────────────────────── */
+.adm-text { border-bottom: 1px solid var(--line-soft); }
+.adm-text:last-of-type { border-bottom: 0; }
+.adm-text summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 11px;
+  padding: 12px 2px;
+  cursor: pointer;
+  list-style: none;
+}
+.adm-text summary::-webkit-details-marker { display: none; }
+.adm-text summary::before {
+  content: '▸';
+  color: var(--mute);
+  font-size: 11px;
+  transition: transform .16s var(--ease);
+}
+.adm-text[open] summary::before { transform: rotate(90deg); }
+.adm-text summary code { color: var(--accent); }
+.adm-text summary b { font-weight: 600; font-size: 14px; }
+.adm-text__body { padding: 2px 2px 18px 18px; }
+
+/* ── Вход ─────────────────────────────────────────────────────────────────── */
+.adm-login {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+}
+.adm-login__card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 26px 22px;
+  box-shadow: var(--shadow);
+}
+.adm-login__form { display: flex; flex-direction: column; gap: 12px; margin: 20px 0 6px; }
+
+.adm-field { display: block; }
+.adm-field span {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--mute);
+  margin-bottom: 6px;
+}
+.adm-field input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 12px 13px;
+}
+.adm-field input:focus { outline: none; border-color: var(--accent); }
+
+.adm-help { margin-top: 14px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+.adm-help summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--dim); }
+.adm-help summary:hover { color: var(--text); }
+.adm-help ol { margin: 11px 0; padding-left: 20px; color: var(--dim); font-size: 13.5px; }
+.adm-help li { margin-bottom: 6px; }
+.adm-help p { color: var(--dim); font-size: 13.5px; }
+.adm-help code { color: var(--accent); }
+.adm-login__foot { margin: 18px 0 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+
+/* ── Шире телефона ────────────────────────────────────────────────────────── */
+@media (min-width: 640px) {
+  .adm-stats { grid-template-columns: repeat(3, 1fr); }
+  .adm-cells { grid-template-columns: repeat(3, 1fr); }
+  .adm-ally {
+    grid-template-columns: 10px 54px 1fr 46px 92px 74px;
+  }
+  /* padding-right — иначе число побед прилипает к соседнему id:
+     одно выровнено вправо, другое влево, и между ними остаётся только gap. */
+  .adm-ally__wins { display: block; text-align: right; padding-right: 14px; font-variant-numeric: tabular-nums; }
+  .adm-ally__id { display: block; color: var(--mute); }
+  .adm-login__card { padding: 32px 30px; }
+}
+
+@media (min-width: 900px) {
+  .adm-top { padding: 12px 26px; flex-wrap: nowrap; }
+  .adm-nav { order: 0; width: auto; overflow: visible; margin-left: 12px; }
+  .adm-who { display: flex; }
+  .adm-main { padding: 30px 26px 70px; }
+  .adm-foot { padding: 18px 26px; }
+  .adm-stats { grid-template-columns: repeat(5, 1fr); }
+  .adm-grid { grid-template-columns: 1fr 1fr; }
+  .adm-cells { grid-template-columns: repeat(4, 1fr); }
+  .adm-ally { grid-template-columns: 10px 60px 1fr 1fr 54px 108px 80px; }
+  .adm-ally__note { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

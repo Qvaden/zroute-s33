@@ -7,9 +7,13 @@
  *      а PocketBase окажется неоплачен — выгружаем всё в JSON, меняем
  *      одну строку в конфиге, и сайт снова живой и статический навсегда.
  *      История при этом не теряется.
+ *
+ * Сам разбор вынесен в `_map.js`: у этого файла появился второй читатель —
+ * админ-панель берёт его через API GitHub. Оба обязаны понимать данные
+ * одинаково, поэтому разбор один на всех.
  */
 import { CONFIG } from '../../../config.js';
-import { toDate, toBool, toStr, toOutcome } from './_coerce.js';
+import { mapAlliances, mapWeeks, mapResults, mapEvents, mapTexts } from './_map.js';
 
 export const name = 'json';
 
@@ -47,64 +51,21 @@ async function raw() {
 }
 
 export async function getAlliances() {
-  const d = await raw();
-  return (d.alliances ?? []).map((a) => ({
-    id: toStr(a.id),
-    tag: toStr(a.tag),
-    name: toStr(a.name),
-    color: a.color ? toStr(a.color) : undefined,
-    active: toBool(a.active, true),
-    note: a.note ? toStr(a.note) : undefined,
-  }));
+  return mapAlliances((await raw()).alliances);
 }
 
 export async function getWeeks() {
-  const d = await raw();
-  return (d.weeks ?? [])
-    .map((w) => ({
-      id: toStr(w.id),
-      number: Number(w.number),
-      startDate: toDate(w.startDate),
-      endDate: toDate(w.endDate),
-      note: w.note ? toStr(w.note) : undefined,
-    }))
-    .sort((a, b) => a.number - b.number);
+  return mapWeeks((await raw()).weeks);
 }
 
 export async function getResults() {
-  const d = await raw();
-  return (d.results ?? [])
-    .map((r) => ({
-      weekId: toStr(r.weekId),
-      allianceId: toStr(r.allianceId),
-      outcome: toOutcome(r.outcome),
-      opponent: r.opponent ? toStr(r.opponent) : undefined,
-      comment: r.comment ? toStr(r.comment) : undefined,
-    }))
-    .filter((r) => r.outcome !== null);
+  return mapResults((await raw()).results);
 }
 
 export async function getEvents() {
-  const d = await raw();
-  return (d.events ?? [])
-    .map((e) => ({
-      id: toStr(e.id),
-      date: toDate(e.date),
-      type: toStr(e.type) || 'other',
-      serverNumber: e.serverNumber != null ? Number(e.serverNumber) : undefined,
-      title: toStr(e.title),
-      body: e.body ? toStr(e.body) : undefined,
-      imageUrl: e.imageUrl ? toStr(e.imageUrl) : undefined,
-      durationDays: e.durationDays != null ? Number(e.durationDays) : undefined,
-    }))
-    .sort((a, b) => b.date - a.date);
+  return mapEvents((await raw()).events);
 }
 
 export async function getTexts() {
-  const d = await raw();
-  return (d.texts ?? []).map((t) => ({
-    key: toStr(t.key),
-    title: toStr(t.title),
-    body: typeof t.body === 'string' ? t.body : '',
-  }));
+  return mapTexts((await raw()).texts);
 }
