@@ -3,9 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
   <title>Сервер 33 · Z Route: Redemption</title>
-  <meta name="description" content="Рейтинг альянсов 33 сервера по итогам VS, хронология захвата серверов, гайды для малых альянсов.">
-  <meta name="theme-color" content="#12151a">
+  <meta name="description" content="Рейтинг альянсов 33 сервера по итогам VS: кто побеждает, а кто нет. Хронология захвата серверов и разбор для малых альянсов.">
+
+  <!-- Установка на телефон -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#0a0b0d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Сервер 33">
+  <link rel="icon" type="image/svg+xml" href="./public/icons/icon-32.svg">
+  <!--
+    iOS не принимает SVG в apple-touch-icon, поэтому здесь нужен именно PNG.
+    Файл лежит в public/icons/, но в репозиторий его нужно загрузить вручную:
+    интеграция с GitHub портит бинарные файлы. Подробности в README.
+    Пока файла нет, iOS просто возьмёт скриншот страницы — не идеально,
+    но ничего не ломает.
+  -->
+  <link rel="apple-touch-icon" href="./public/icons/icon-180.png">
+
+  <!--
+    Превью ссылки. Сайт будут кидать в чаты сообщества, и там показывается
+    именно это: картинка, заголовок и описание вместо голого адреса.
+  -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Сервер 33 · Z Route: Redemption">
+  <meta property="og:title" content="Сервер 33 — рейтинг альянсов по итогам VS">
+  <meta property="og:description" content="Победа +1, поражение −1. Видно, у кого из алов получается побеждать, а у кого нет.">
+  <meta property="og:image" content="./public/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ru_RU">
+  <meta name="twitter:card" content="summary_large_image">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,5 +68,22 @@
   </footer>
 
   <script type="module" src="./src/main.js"></script>
+
+  <script>
+    /*
+      Регистрация service worker'а — только ради установки на телефон
+      и работы без связи. Адрес относительный: сайт может лежать
+      в подпапке (например qvaden.github.io/zroute-s33/), и абсолютный
+      путь тогда бы указал в корень домена.
+
+      Ошибку глотаем осознанно: без service worker'а сайт полностью
+      работоспособен, и ронять из-за него страницу незачем.
+    */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

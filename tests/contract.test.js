@@ -391,6 +391,106 @@ console.log('\nH. Связка хронологии: разметка ↔ скр
   check('годы сгруппированы', html.includes('data-tl-year'));
 }
 
+// ── I. Граф импортов и файлы для публикации ─────────────────────────────────
+console.log('\nI. Готовность к публикации');
+{
+  const { readFile, readdir, stat } = await import('node:fs/promises');
+  const path = await import('node:path');
+
+  /*
+    Браузер грузит модули по относительным путям, и опечатка в пути
+    проявляется только после публикации: страница молча остаётся пустой,
+    а в консоли лежит 404, которого никто не видит. Поэтому проходим
+    граф импортов целиком и проверяем, что каждый файл существует.
+  */
+  async function walk(dir, out = []) {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(full, out);
+      else if (e.name.endsWith('.js')) out.push(full);
+    }
+    return out;
+  }
+
+  const files = [...(await walk('src')), 'config.js'];
+  const broken = [];
+  let edges = 0;
+
+  for (const file of files) {
+    const code = await readFile(file, 'utf8');
+    for (const m of code.matchAll(/(?:^|\n)\s*(?:import|export)[^'"\n]*from\s*['"](\.[^'"]+)['"]/g)) {
+      edges++;
+      const target = path.resolve(path.dirname(file), m[1]);
+      try {
+        await stat(target);
+      } catch {
+        broken.push(`${file} → ${m[1]}`);
+      }
+    }
+  }
+
+  check(`граф импортов цел (${edges} связей)`, broken.length === 0, broken.join('\n       '));
+
+  // Файлы, без которых публикация сломается или установка не предложится.
+  for (const f of [
+    'index.html',
+    'manifest.webmanifest',
+    'sw.js',
+    '.nojekyll',
+    'public/icons/icon-32.svg',
+    'public/icons/icon-192.svg',
+    'public/icons/icon-512.svg',
+    'public/icons/maskable-512.svg',
+  ]) {
+    let ok = true;
+    try { await stat(f); } catch { ok = false; }
+    check(`есть ${f}`, ok);
+  }
+
+  /*
+    Иконки манифеста обязаны быть текстовыми файлами.
+    Интеграция с GitHub портит бинарные данные (проверено: base64 сохраняется
+    как текст, сырые байты раздуваются при перекодировке). Поэтому иконки
+    хранятся как SVG с вложенным внутрь точным PNG — текст заливается
+    без потерь, а картинка остаётся пиксель в пиксель.
+
+    Если однажды в манифест впишут .png, установка на Android сломается
+    молча: браузер не найдёт иконку и не предложит установку.
+  */
+  const manifestRaw = JSON.parse(await readFile('manifest.webmanifest', 'utf8'));
+  check(
+    'все иконки манифеста — текстовые (SVG), иначе заливка их испортит',
+    manifestRaw.icons.every((i) => i.src.endsWith('.svg')),
+    manifestRaw.icons.map((i) => i.src).join(', ')
+  );
+
+  /*
+    .nojekyll обязателен именно из-за _coerce.js: GitHub Pages прогоняет
+    сайт через Jekyll, а тот игнорирует всё, что начинается с подчёркивания.
+    Без этого файла адаптеры не загрузятся, и сайт останется пустым.
+  */
+  const underscored = files.filter((f) => path.basename(f).startsWith('_'));
+  check(
+    `файлы с подчёркиванием защищены .nojekyll (${underscored.length} шт.)`,
+    underscored.length === 0 || (await stat('.nojekyll').then(() => true, () => false))
+  );
+
+  const html = await readFile('index.html', 'utf8');
+  check('в index.html нет абсолютных путей от корня домена',
+    !/(?:src|href)="\/(?!\/)/.test(html));
+  check('манифест подключён', html.includes('rel="manifest"'));
+  check('иконка для iOS подключена', html.includes('apple-touch-icon'));
+  check('превью для чатов настроено', html.includes('og:image'));
+
+  const manifest = manifestRaw;
+  check('в манифесте относительный start_url', manifest.start_url.startsWith('./'));
+  check('в манифесте есть maskable-иконка',
+    manifest.icons.some((i) => i.purpose === 'maskable'));
+  check('иконки манифеста существуют',
+    (await Promise.all(manifest.icons.map((i) => stat(i.src).then(() => true, () => false))))
+      .every(Boolean));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

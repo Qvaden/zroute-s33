@@ -1,0 +1,33 @@
+{
+  "name": "Сервер 33 · Z Route: Redemption",
+  "short_name": "Сервер 33",
+  "description": "Рейтинг альянсов 33 сервера по итогам VS, хронология захвата серверов, гайды для малых альянсов.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0b0d",
+  "theme_color": "#0a0b0d",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "public/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "public/icons/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "public/icons/maskable-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Рейтинг альянсов",
+      "short_name": "Рейтинг",
+      "url": "./#/ladder",
+      "icons": [{ "src": "public/icons/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Хронология захватов",
+      "short_name": "Хронология",
+      "url": "./#/timeline",
+      "icons": [{ "src": "public/icons/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}
