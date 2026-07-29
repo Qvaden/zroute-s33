@@ -504,6 +504,16 @@ console.log('\nI. Готовность к публикации');
   check('иконка для iOS подключена', html.includes('apple-touch-icon'));
   check('превью для чатов настроено', html.includes('og:image'));
 
+  /*
+    og:image должен быть абсолютным. Относительный путь отрисуется в браузере,
+    но сборщики превью в мессенджерах его не развернут, и ссылка в чате уйдёт
+    без картинки — а именно через чаты сайт и будут распространять.
+  */
+  const og = html.match(/property="og:image"\s+content="([^"]+)"/);
+  check('og:image — абсолютный адрес', Boolean(og) && /^https?:\/\//.test(og[1]),
+    og ? og[1] : 'тег не найден');
+  check('og:url указан', html.includes('property="og:url"'));
+
   const manifest = manifestRaw;
   check('в манифесте относительный start_url', manifest.start_url.startsWith('./'));
   check('в манифесте есть maskable-иконка',

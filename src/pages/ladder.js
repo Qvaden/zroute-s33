@@ -16,7 +16,7 @@ export function renderLadder({ standings }) {
       <header class="panel__head">
         <span class="eyebrow">Сезон целиком</span>
         <h2>Рейтинг альянсов</h2>
-        <p class="muted">Победа +1 · Поражение −1 · Пропуск недели 0</p>
+        <p class="muted">Победа +1 · Поражение −1 · Третьего не бывает</p>
       </header>
 
       <div class="ctl">

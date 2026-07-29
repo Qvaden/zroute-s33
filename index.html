@@ -32,9 +32,21 @@
   <meta property="og:site_name" content="Сервер 33 · Z Route: Redemption">
   <meta property="og:title" content="Сервер 33 — рейтинг альянсов по итогам VS">
   <meta property="og:description" content="Победа +1, поражение −1. Видно, у кого из алов получается побеждать, а у кого нет.">
-  <meta property="og:image" content="./public/og.png">
+  <!--
+    og:image обязан быть АБСОЛЮТНЫМ адресом. Относительный путь работает
+    в браузере, но сборщики превью в мессенджерах его не разворачивают —
+    ссылка в чате осталась бы без картинки.
+
+    Это единственное место во всём проекте с зашитым адресом сайта.
+    При переезде на другой хостинг строку ниже нужно поправить, всё остальное
+    относительное и переедет само. За абсолютностью следит тест
+    «I. Готовность к публикации».
+  -->
+  <meta property="og:url" content="https://qvaden.github.io/zroute-s33/">
+  <meta property="og:image" content="https://qvaden.github.io/zroute-s33/public/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Сервер 33 — рейтинг альянсов по итогам VS">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
 
