@@ -1,0 +1,56 @@
+name: Выгрузка данных из таблицы
+
+# Читает Google Таблицу на стороне GitHub и складывает результат
+# в data/live.json. Посетители сайта тогда обращаются только к нашему домену,
+# а не к docs.google.com — см. комментарий в config.js.
+
+on:
+  schedule:
+    # Каждые 30 минут. Точность расписания у GitHub плавает на несколько минут,
+    # но для данных, которые меняются раз в неделю, это несущественно.
+    - cron: '*/30 * * * *'
+  # Кнопка «запустить сейчас» на вкладке Actions — когда ждать полчаса не хочется.
+  workflow_dispatch:
+  # После правок кода тоже обновляем: заодно проверяем, что скрипт жив.
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pull-sheet.mjs'
+      - 'src/data/adapters/sheets.js'
+      - 'src/data/adapters/_coerce.js'
+      - 'src/data/contract.js'
+      - 'config.js'
+
+# Два одновременных запуска мешали бы друг другу при коммите.
+concurrency:
+  group: pull-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Прочитать таблицу и обновить data/live.json
+        run: node scripts/pull-sheet.mjs
+
+      - name: Закоммитить, если данные изменились
+        run: |
+          if git diff --quiet -- data/live.json; then
+            echo "Изменений нет, коммит не нужен."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live.json
+          git commit -m "данные из таблицы: $(date -u '+%d.%m.%Y %H:%M UTC')"
+          git push
