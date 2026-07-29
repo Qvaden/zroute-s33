@@ -31,18 +31,37 @@ function writeDrafts(drafts) {
 }
 
 /**
+ * Черновик недели целиком: и отметки альянсов, и итог на уровне сервера.
+ * Заполняют их вместе, одним заходом, поэтому и хранятся они вместе —
+ * иначе половина работы уцелела бы, а половина нет.
+ *
  * @param {string} weekId
- * @returns {Record<string, 'win'|'loss'> | null}
+ * @returns {{marks: Record<string, 'win'|'loss'>, outcome: string|null, serverNumber: number|null} | null}
  */
 export function getDraft(weekId) {
   const entry = loadDrafts()[String(weekId)];
-  return entry?.marks ?? null;
+  if (!entry) return null;
+
+  return {
+    marks: entry.marks ?? {},
+    // Черновики, сохранённые до появления итога недели, этих полей не имеют.
+    outcome: entry.outcome ?? null,
+    serverNumber: entry.serverNumber ?? null,
+  };
 }
 
-/** @param {string} weekId @param {Record<string, 'win'|'loss'>} marks */
-export function saveDraft(weekId, marks) {
+/**
+ * @param {string} weekId
+ * @param {{marks: Record<string, 'win'|'loss'>, outcome?: string|null, serverNumber?: number|null}} draft
+ */
+export function saveDraft(weekId, draft) {
   const drafts = loadDrafts();
-  drafts[String(weekId)] = { marks, savedAt: new Date().toISOString() };
+  drafts[String(weekId)] = {
+    marks: draft.marks ?? {},
+    outcome: draft.outcome ?? null,
+    serverNumber: draft.serverNumber ?? null,
+    savedAt: new Date().toISOString(),
+  };
   writeDrafts(drafts);
 }
 

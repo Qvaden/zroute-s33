@@ -12,6 +12,12 @@
 // Исходов ровно два: в VS альянс либо победил, либо проиграл.
 const OUTCOMES = new Set(['win', 'loss']);
 
+/*
+  Итог недели на уровне сервера: две оси — захват или защита, получилось
+  или нет. Отсюда ровно четыре значения и ни одного больше.
+*/
+const SERVER_OUTCOMES = new Set(['captured', 'not_captured', 'held', 'lost']);
+
 /** @param {unknown} v */
 const isStr = (v) => typeof v === 'string' && v.length > 0;
 const isDate = (v) => v instanceof Date && !Number.isNaN(v.getTime());
@@ -50,6 +56,18 @@ export function validateDataset(data) {
     if (!isDate(w.endDate)) add(`weeks[${i}] (${w.id}): endDate должен быть Date`);
     if (weekIds.has(w.id)) add(`weeks: дубль id «${w.id}»`);
     weekIds.add(w.id);
+
+    /*
+      Итог сервера необязателен: не каждую неделю сервер воюет. Но если он
+      есть, то обязан быть одним из четырёх — иначе опечатка в таблице тихо
+      выбросила бы итог, и человек решил бы, что панель его не сохранила.
+    */
+    if (w.serverOutcome !== undefined && !SERVER_OUTCOMES.has(w.serverOutcome)) {
+      add(`weeks[${i}] (${w.id}): недопустимый serverOutcome «${w.serverOutcome}»`);
+    }
+    if (w.serverNumber !== undefined && !Number.isFinite(w.serverNumber)) {
+      add(`weeks[${i}] (${w.id}): serverNumber должен быть числом`);
+    }
   });
 
   const seen = new Set();

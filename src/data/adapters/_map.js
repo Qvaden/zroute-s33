@@ -10,7 +10,7 @@
  * Расхождение нашлось бы в момент публикации, то есть в худший момент.
  * Поэтому правило простое: разбор ровно один, потребителей сколько угодно.
  */
-import { toDate, toBool, toStr, toOutcome } from './_coerce.js';
+import { toDate, toBool, toStr, toNumber, toOutcome, toServerOutcome } from './_coerce.js';
 
 /** @param {any[]} [rows] */
 export function mapAlliances(rows) {
@@ -33,6 +33,13 @@ export function mapWeeks(rows) {
       startDate: toDate(w.startDate),
       endDate: toDate(w.endDate),
       note: w.note ? toStr(w.note) : undefined,
+      /*
+        Итог недели на уровне сервера: захватили, не захватили, удержали,
+        потеряли. Пустое поле означает «не внесли» либо «на этой неделе
+        сервер не воевал» — и то и другое отсутствие данных, а не пятый исход.
+      */
+      serverOutcome: toServerOutcome(w.serverOutcome) ?? undefined,
+      serverNumber: toNumber(w.serverNumber) ?? undefined,
     }))
     .sort((a, b) => a.number - b.number);
 }

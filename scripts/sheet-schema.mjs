@@ -134,9 +134,23 @@ const TABS = {
     ]),
   },
 
+  /*
+    Кроме дат у недели есть свой итог — на уровне всего сервера, а не альянсов.
+    Одна колонка на четыре значения, а не две («действие» и «успех»): тогда
+    строка вида «защита / захвачено» невозможна физически. В первой строке
+    оставлен пример, чтобы человек увидел, какие слова принимаются.
+  */
   [CONFIG.sheets.tabs.weeks]: {
-    headers: ['id', 'number', 'startDate', 'endDate', 'note'],
-    rows: weeks.map((w) => [w.id, String(w.number), w.startDate, w.endDate, '']),
+    headers: ['id', 'number', 'startDate', 'endDate', 'serverOutcome', 'serverNumber', 'note'],
+    rows: weeks.map((w, i) => [
+      w.id,
+      String(w.number),
+      w.startDate,
+      w.endDate,
+      i === 0 ? 'удержали' : '',
+      '',
+      '',
+    ]),
   },
 
   /*

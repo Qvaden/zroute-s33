@@ -1,5 +1,7 @@
 import { esc, fmtDate, plural } from '../../ui/helpers.js';
-import { diffMarks, countMarks, marksFromRaw } from '../edit.js';
+import { diffMarks, countMarks, marksFromRaw, weekOutcomeOf, outcomeDiffers } from '../edit.js';
+import { SERVER_OUTCOME, SERVER_OUTCOME_ORDER, verdictText } from '../../logic/server-outcome.js';
+import { CONFIG } from '../../../config.js';
 
 /**
  * Неделя — главный экран панели.
@@ -51,6 +53,17 @@ export function renderWeek(view, param) {
   const total = alliances.length;
   const pct = total ? Math.round((filled / total) * 100) : 0;
   const diff = diffMarks(raw, selected.id, current);
+
+  /*
+    Итог сервера берётся оттуда же, откуда отметки: из черновика для текущей
+    недели, из данных — для любой другой. Иначе черновик утёк бы на чужую
+    неделю, а это худший вид ошибки: незаметный.
+  */
+  const onCurrent = selected.id === view.weekId;
+  const server = onCurrent && view.server ? view.server : weekOutcomeOf(raw, selected.id);
+  const serverChanged = onCurrent
+    ? outcomeDiffers(raw, selected.id, server.outcome, server.serverNumber)
+    : false;
 
   const picker = weeks
     .map(
@@ -109,15 +122,17 @@ export function renderWeek(view, param) {
 
       <div class="adm-cells">${cells}</div>
 
+      ${renderServerOutcome(server, canPush)}
+
       <div class="adm-publish" data-publish-bar>
-        <div class="adm-publish__state" data-publish-state>${describe(diff, draftSaved)}</div>
+        <div class="adm-publish__state" data-publish-state>${describe(diff, draftSaved, serverChanged)}</div>
         <div class="adm-publish__actions">
           <button type="button" class="adm-btn" data-preview-toggle
-                  ${diff.total ? '' : 'disabled'}>Предпросмотр</button>
+                  ${diff.total || serverChanged ? '' : 'disabled'}>Предпросмотр</button>
           <button type="button" class="adm-btn" data-draft-reset
-                  ${diff.total ? '' : 'disabled'}>Сбросить</button>
+                  ${diff.total || serverChanged ? '' : 'disabled'}>Сбросить</button>
           <button type="button" class="adm-btn adm-btn--primary" data-publish
-                  ${diff.total && canPush ? '' : 'disabled'}>Опубликовать</button>
+                  ${(diff.total || serverChanged) && canPush ? '' : 'disabled'}>Опубликовать</button>
         </div>
       </div>
 
@@ -127,17 +142,75 @@ export function renderWeek(view, param) {
 }
 
 /**
+ * ИТОГ НЕДЕЛИ НА УРОВНЕ СЕРВЕРА.
+ *
+ * Стоит под клетками, а не отдельным экраном, и это осознанно: заполняют
+ * их за один заход, после одного и того же VS. Отдельный экран означал бы
+ * второй коммит и второй повод забыть.
+ *
+ * Четыре кнопки вместо двух списков «действие» и «успех»: так противоречие
+ * «защита / захвачено» невозможно, а не запрещено инструкцией.
+ */
+function renderServerOutcome(server, canPush) {
+  const chosen = server?.outcome ?? null;
+  const meta = chosen ? SERVER_OUTCOME[chosen] : null;
+
+  const buttons = SERVER_OUTCOME_ORDER.map((id) => {
+    const m = SERVER_OUTCOME[id];
+    return `<button type="button"
+              class="adm-out adm-out--${m.kind} ${chosen === id ? 'is-on' : ''}"
+              data-outcome="${id}" ${canPush ? '' : 'disabled'}>
+              <b>${esc(m.label)}</b>
+              <span>${esc(m.short)}</span>
+            </button>`;
+  }).join('');
+
+  return `
+    <div class="adm-server" data-server-block>
+      <div class="adm-server__head">
+        <h3>Итог недели</h3>
+        <span class="muted">Что сервер делал за неделю целиком. Можно не заполнять — не каждую неделю воюем.</span>
+      </div>
+
+      <div class="adm-outs">${buttons}</div>
+
+      <label class="adm-server__num ${meta ? '' : 'is-off'}">
+        <span>Номер сервера</span>
+        <input type="number" inputmode="numeric" min="1" max="9999"
+               data-server-number
+               value="${server?.serverNumber ?? ''}"
+               placeholder="${meta && meta.action === 'defense' ? String(CONFIG.server) : 'например 74'}"
+               ${canPush && meta ? '' : 'disabled'}>
+        <i class="muted">${
+          meta && meta.action === 'defense'
+            ? `не заполнять — значит свой ${CONFIG.server}`
+            : 'чей сервер брали'
+        }</i>
+      </label>
+
+      <p class="adm-server__verdict ${meta ? `is-${meta.kind}` : 'is-off'}" data-server-verdict>
+        ${
+          meta
+            ? esc(verdictText(chosen, server.serverNumber, CONFIG.server))
+            : 'Итог не внесён — на вкладке «Хронология» этой недели не будет.'
+        }
+      </p>
+    </div>`;
+}
+
+/**
  * Что именно уйдёт в коммит, словами.
  *
  * Удаление показывается отдельно и всегда: это единственное необратимое
  * действие в панели, и промахнуться по клетке легко.
  */
-export function describe(diff, draftSaved) {
-  if (!diff.total) {
+export function describe(diff, draftSaved, serverChanged = false) {
+  if (!diff.total && !serverChanged) {
     return '<span class="muted">Изменений нет — опубликовать нечего.</span>';
   }
 
   const parts = [];
+  if (serverChanged) parts.push('итог недели');
   if (diff.added) parts.push(plural(diff.added, 'новая отметка', 'новые отметки', 'новых отметок'));
   if (diff.changed) parts.push(plural(diff.changed, 'исправление', 'исправления', 'исправлений'));
   if (diff.removed) {

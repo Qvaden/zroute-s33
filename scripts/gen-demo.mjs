@@ -73,13 +73,35 @@ const WEEK_COUNT = 12;
 const FIRST_MONDAY = Date.UTC(2026, 3, 6); // 6 апреля 2026
 const DAY = 86400000;
 
+/*
+  Итоги недель на уровне сервера. Заполнены не все недели намеренно:
+  сервер воюет не каждую неделю, и вкладка «Хронология» обязана нормально
+  выглядеть с дырами в летописи, а не только на идеально полном наборе.
+
+  Набор подобран так, чтобы в демо встретились все четыре состояния —
+  иначе половина вёрстки осталась бы непроверенной глазами.
+*/
+const SERVER_OUTCOMES = {
+  W17: { serverOutcome: 'held' },
+  W18: { serverOutcome: 'captured', serverNumber: 19 },
+  W20: { serverOutcome: 'not_captured', serverNumber: 52 },
+  W21: { serverOutcome: 'held' },
+  W23: { serverOutcome: 'captured', serverNumber: 47 },
+  W24: { serverOutcome: 'lost', serverNumber: 33 },
+  W25: { serverOutcome: 'held' },
+  W26: { serverOutcome: 'captured', serverNumber: 61 },
+  W27: { serverOutcome: 'held' },
+};
+
 const weeks = Array.from({ length: WEEK_COUNT }, (_, i) => {
   const start = FIRST_MONDAY + i * 7 * DAY;
+  const id = `W${16 + i}`;
   return {
-    id: `W${16 + i}`,
+    id,
     number: 16 + i,
     startDate: new Date(start).toISOString().slice(0, 10),
     endDate: new Date(start + 6 * DAY).toISOString().slice(0, 10),
+    ...(SERVER_OUTCOMES[id] ?? {}),
   };
 });
 

@@ -335,6 +335,91 @@
   border-color: var(--loss);
 }
 
+/* ── Итог недели на уровне сервера ────────────────────────────────────────── */
+.adm-server {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.adm-server__head { margin-bottom: 12px; }
+.adm-server__head h3 { font-size: 16px; margin: 0 0 3px; }
+.adm-server__head span { display: block; font-size: 12.5px; max-width: 60ch; }
+
+.adm-outs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.adm-out {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 13px;
+  text-align: left;
+  font-family: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color .14s var(--ease), background .14s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.adm-out b { font-size: 13.5px; font-weight: 600; color: var(--dim); }
+.adm-out span { font-size: 11px; color: var(--mute); }
+.adm-out:hover:not(:disabled) { border-color: var(--mute); }
+.adm-out:disabled { opacity: .45; cursor: default; }
+.adm-out--win.is-on {
+  border-color: var(--win);
+  background: color-mix(in srgb, var(--win) 14%, transparent);
+}
+.adm-out--win.is-on b { color: var(--win); }
+.adm-out--loss.is-on {
+  border-color: var(--loss);
+  background: color-mix(in srgb, var(--loss) 14%, transparent);
+}
+.adm-out--loss.is-on b { color: var(--loss); }
+
+.adm-server__num { display: block; margin-top: 14px; max-width: 260px; }
+.adm-server__num.is-off { opacity: .5; }
+.adm-server__num > span {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--mute);
+  margin-bottom: 6px;
+}
+.adm-server__num input {
+  width: 100%;
+  font-family: Unbounded, sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+.adm-server__num input:focus { outline: none; border-color: var(--accent); }
+.adm-server__num input:disabled { color: var(--mute); }
+.adm-server__num i { display: block; font-style: normal; font-size: 11.5px; margin-top: 5px; }
+
+.adm-server__verdict {
+  margin: 14px 0 0;
+  font-family: Unbounded, sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+}
+.adm-server__verdict.is-win { color: var(--win); }
+.adm-server__verdict.is-loss { color: var(--loss); }
+.adm-server__verdict.is-off {
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--mute);
+}
+
 /* ── Публикация ───────────────────────────────────────────────────────────── */
 .adm-publish {
   display: flex;
@@ -559,6 +644,7 @@
 @media (min-width: 640px) {
   .adm-stats { grid-template-columns: repeat(3, 1fr); }
   .adm-cells { grid-template-columns: repeat(3, 1fr); }
+  .adm-outs { grid-template-columns: repeat(4, 1fr); }
   .adm-ally {
     grid-template-columns: 10px 54px 1fr 46px 92px 74px;
   }

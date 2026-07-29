@@ -620,6 +620,66 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .trophy__date { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
 .trophy__days { font-size: 10px; color: var(--mute); }
 
+/* ── Итог недели ────────────────────────────────────────────────────────────
+   Первое, за чем заходят на вкладку после VS, — поэтому крупно и с цветом
+   исхода. Цвета те же, что у победы и поражения в VS: второй язык цветов
+   человеку учить не нужно.                                                  */
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--mute);
+  border-radius: var(--r);
+}
+.verdict--win { border-left-color: var(--win); }
+.verdict--loss { border-left-color: var(--loss); }
+
+.verdict__week { text-align: center; flex: none; }
+.verdict__week span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.verdict__week b {
+  display: block;
+  font-family: Unbounded, sans-serif;
+  font-weight: 800;
+  font-size: clamp(30px, 8vw, 44px);
+  line-height: 1;
+}
+.verdict--win .verdict__week b { color: var(--win); }
+.verdict--loss .verdict__week b { color: var(--loss); }
+
+.verdict__body { min-width: 0; }
+.verdict__text { font-size: clamp(17px, 4.4vw, 26px); letter-spacing: -.02em; margin: 0; }
+.verdict__dates { margin: 5px 0 0; font-size: 12.5px; color: var(--mute); }
+
+/* Лента прошлых недель: летопись, которую видно одним взглядом. */
+.wks { list-style: none; display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; padding: 0; }
+.wk {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 11px 6px 9px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+.wk__num { font-family: Unbounded, sans-serif; font-weight: 700; font-size: 13px; color: var(--dim); }
+.wk__what { color: var(--mute); }
+.wk__what b { color: var(--dim); }
+.wk--win { border-color: color-mix(in srgb, var(--win) 34%, transparent); }
+.wk--win .wk__num { color: var(--win); }
+.wk--loss { border-color: color-mix(in srgb, var(--loss) 34%, transparent); }
+.wk--loss .wk__num { color: var(--loss); }
+
 .ctl--tl { margin: 18px 0 16px; }
 
 /* ── Хронология: лента ──────────────────────────────────────────────────── */

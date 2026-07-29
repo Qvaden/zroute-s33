@@ -1,4 +1,6 @@
-import { esc, fmtDateFull, plural, pluralWord } from '../ui/helpers.js';
+import { esc, fmtDate, fmtDateFull, plural, pluralWord } from '../ui/helpers.js';
+import { SERVER_OUTCOME, verdictText, weeksWithOutcome } from '../logic/server-outcome.js';
+import { CONFIG } from '../../config.js';
 
 const TYPE = {
   server_capture: { label: 'Захват сервера', short: 'Захваты' },
@@ -15,16 +17,23 @@ const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн',
  * Поэтому главный элемент страницы — не лента, а стена трофеев: крупные
  * номера захваченных серверов. Лента идёт следом, для тех, кому нужны детали.
  */
-export function renderTimeline({ events }) {
-  if (!events.length) {
+export function renderTimeline({ events, allWeeks, weeks }) {
+  /*
+    Недели берём полным списком, а не обрезанным `weeksUpToLastData`.
+    Тот отбрасывает недели без результатов VS — и неделя, где заполнили
+    только серверный итог, исчезла бы со страницы, хотя она внесена.
+  */
+  const outcomes = weeksWithOutcome(allWeeks ?? weeks ?? []);
+
+  if (!events.length && !outcomes.length) {
     return `
       <section class="hero hero--tl">
         <span class="eyebrow">Хроника завоеваний</span>
         <h2 class="tl__title">Ещё ни одной записи</h2>
         <p class="guide__sub">
-          Здесь будут захваченные серверы крупными плитками и лента событий
-          по датам: войны, слияния альянсов, всё, что стоит запомнить.
-          Летопись пишется с этой недели.
+          Здесь будут итоги недель — кого забрали и что удержали, — захваченные
+          серверы крупными плитками и лента событий по датам: войны, слияния
+          альянсов, всё, что стоит запомнить. Летопись пишется с этой недели.
         </p>
       </section>`;
   }
@@ -33,10 +42,77 @@ export function renderTimeline({ events }) {
   const captures = sorted.filter((e) => e.type === 'server_capture');
 
   return `
-    ${renderTrophies(captures, sorted)}
-    ${renderFilters(sorted)}
-    ${renderFeed(sorted)}
+    ${renderVerdict(outcomes)}
+    ${captures.length || sorted.length ? renderTrophies(captures, sorted) : ''}
+    ${sorted.length ? renderFilters(sorted) : ''}
+    ${sorted.length ? renderFeed(sorted) : ''}
     <p class="tl__empty" data-tl-empty hidden>Событий такого типа пока нет.</p>`;
+}
+
+/**
+ * Итог недели — то, за чем на эту вкладку и заходят после VS.
+ *
+ * Сначала одна крупная строка про последнюю неделю: взяли или удержали,
+ * и какой сервер. Ниже лента прошлых недель, чтобы всё вместе читалось
+ * как летопись, а не как таблица.
+ */
+function renderVerdict(outcomes) {
+  if (!outcomes.length) return '';
+
+  const own = CONFIG.server;
+  const [latest, ...past] = outcomes;
+  const meta = SERVER_OUTCOME[latest.serverOutcome];
+
+  const strip = outcomes
+    .map((w) => {
+      const m = SERVER_OUTCOME[w.serverOutcome];
+
+      /*
+        Номер показываем только когда он что-то добавляет. При защите своего
+        сервера он один и тот же каждую неделю, и лента превращалась
+        в «удержали 33 · удержали 33 · удержали 33» — шум, за которым
+        перестают читать смысл. Чужой номер при защите, наоборот, важен:
+        значит держали ранее захваченный.
+      */
+      const num = w.serverNumber ?? null;
+      const worthShowing = num != null && (m.action === 'capture' || num !== own);
+
+      return `<li class="wk wk--${m.kind} wk--${m.action}">
+        <span class="wk__num num">${w.number}</span>
+        <span class="wk__what">${esc(m.short)}${worthShowing ? ` <b class="num">${num}</b>` : ''}</span>
+      </li>`;
+    })
+    .join('');
+
+  return `
+    <section class="hero hero--tl">
+      <span class="eyebrow">Итог недели</span>
+
+      <div class="verdict verdict--${meta.kind}">
+        <div class="verdict__week">
+          <span>Неделя</span>
+          <b class="num">${latest.number}</b>
+        </div>
+        <div class="verdict__body">
+          <h2 class="verdict__text">${esc(verdictText(latest.serverOutcome, latest.serverNumber, own))}</h2>
+          <p class="verdict__dates">
+            ${esc(fmtDate(latest.startDate))} — ${esc(fmtDate(latest.endDate))}
+            ${
+              past.length
+                ? `<span class="hero__sep">·</span> ${plural(
+                    outcomes.length,
+                    'неделя в летописи',
+                    'недели в летописи',
+                    'недель в летописи'
+                  )}`
+                : ''
+            }
+          </p>
+        </div>
+      </div>
+
+      ${past.length ? `<ul class="wks">${strip}</ul>` : ''}
+    </section>`;
 }
 
 /** Стена трофеев: захваченные серверы крупными плитками. */

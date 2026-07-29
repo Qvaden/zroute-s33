@@ -236,13 +236,16 @@
       "id": "W17",
       "number": 17,
       "startDate": "2026-04-13",
-      "endDate": "2026-04-19"
+      "endDate": "2026-04-19",
+      "serverOutcome": "held"
     },
     {
       "id": "W18",
       "number": 18,
       "startDate": "2026-04-20",
-      "endDate": "2026-04-26"
+      "endDate": "2026-04-26",
+      "serverOutcome": "captured",
+      "serverNumber": 19
     },
     {
       "id": "W19",
@@ -254,13 +257,16 @@
       "id": "W20",
       "number": 20,
       "startDate": "2026-05-04",
-      "endDate": "2026-05-10"
+      "endDate": "2026-05-10",
+      "serverOutcome": "not_captured",
+      "serverNumber": 52
     },
     {
       "id": "W21",
       "number": 21,
       "startDate": "2026-05-11",
-      "endDate": "2026-05-17"
+      "endDate": "2026-05-17",
+      "serverOutcome": "held"
     },
     {
       "id": "W22",
@@ -272,31 +278,39 @@
       "id": "W23",
       "number": 23,
       "startDate": "2026-05-25",
-      "endDate": "2026-05-31"
+      "endDate": "2026-05-31",
+      "serverOutcome": "captured",
+      "serverNumber": 47
     },
     {
       "id": "W24",
       "number": 24,
       "startDate": "2026-06-01",
-      "endDate": "2026-06-07"
+      "endDate": "2026-06-07",
+      "serverOutcome": "lost",
+      "serverNumber": 33
     },
     {
       "id": "W25",
       "number": 25,
       "startDate": "2026-06-08",
-      "endDate": "2026-06-14"
+      "endDate": "2026-06-14",
+      "serverOutcome": "held"
     },
     {
       "id": "W26",
       "number": 26,
       "startDate": "2026-06-15",
-      "endDate": "2026-06-21"
+      "endDate": "2026-06-21",
+      "serverOutcome": "captured",
+      "serverNumber": 61
     },
     {
       "id": "W27",
       "number": 27,
       "startDate": "2026-06-22",
-      "endDate": "2026-06-28"
+      "endDate": "2026-06-28",
+      "serverOutcome": "held"
     }
   ],
   "results": [

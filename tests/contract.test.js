@@ -796,6 +796,148 @@ console.log('\nK. Публикация недели');
   );
 }
 
+// ── L. Итог недели на уровне сервера ────────────────────────────────────────
+console.log('\nL. Итог недели: взяли, не взяли, удержали, потеряли');
+{
+  const { toServerOutcome } = await import('../src/data/adapters/_coerce.js');
+  const { SERVER_OUTCOME, SERVER_OUTCOME_ORDER, verdictText, weeksWithOutcome } = await import(
+    '../src/logic/server-outcome.js'
+  );
+  const { applyOutcome, weekOutcomeOf, outcomeDiffers, commitMessage } = await import(
+    '../src/admin/edit.js'
+  );
+  const { renderTimeline } = await import('../src/pages/timeline.js');
+
+  /*
+    Человек в таблице пишет как говорит. Главная ловушка разбора — отрицание:
+    «не захватили» содержит «захватили» целиком, и при неаккуратном сравнении
+    провал превратился бы в победу. Молча.
+  */
+  equal('«взяли» → captured', toServerOutcome('взяли'), 'captured');
+  equal('«захватили» → captured', toServerOutcome('Захватили'), 'captured');
+  equal('«не взяли» → not_captured', toServerOutcome('не взяли'), 'not_captured');
+  equal('«не захватили» → not_captured', toServerOutcome('  НЕ   захватили '), 'not_captured');
+  equal('«удержали» → held', toServerOutcome('удержали'), 'held');
+  equal('«защитили» → held', toServerOutcome('защитили'), 'held');
+  equal('«потеряли» → lost', toServerOutcome('потеряли'), 'lost');
+  equal('«не удержали» → lost', toServerOutcome('не удержали'), 'lost');
+  equal('пустая ячейка — не исход', toServerOutcome(''), null);
+  equal('непонятное слово — не исход', toServerOutcome('наверное победа'), null);
+
+  equal('состояний ровно четыре', SERVER_OUTCOME_ORDER.length, 4);
+  check(
+    'у каждого состояния есть все подписи',
+    SERVER_OUTCOME_ORDER.every((id) => {
+      const m = SERVER_OUTCOME[id];
+      return m && m.label && m.short && m.commit && m.kind && m.action && m.verdict && m.verdictNoNumber;
+    })
+  );
+
+  // Защиту своего сервера номером подписывать не обязательно — он и так известен.
+  equal('вердикт защиты без номера подставляет свой сервер', verdictText('held', undefined, 33), 'Успешно защитили сервер 33');
+  equal('вердикт захвата с номером', verdictText('captured', 74, 33), 'Успешно захватили сервер 74');
+  equal('вердикт захвата без номера не выдумывает номер', verdictText('captured', undefined, 33), 'Успешно захватили сервер');
+
+  /* ── Валидатор ── */
+  const baseWeek = { id: 'W1', number: 1, startDate: new Date(), endDate: new Date() };
+  const dataset = (week) => ({
+    alliances: [{ id: 'a01', tag: 'A', name: 'А', active: true }],
+    weeks: [week],
+    results: [],
+    events: [],
+    texts: [],
+  });
+
+  equal('корректный итог проходит валидатор',
+    validateDataset(dataset({ ...baseWeek, serverOutcome: 'held' })).length, 0);
+  check('опечатка в итоге ловится',
+    validateDataset(dataset({ ...baseWeek, serverOutcome: 'удержали' })).some((p) => /serverOutcome/.test(p)));
+  check('нечисловой номер сервера ловится',
+    validateDataset(dataset({ ...baseWeek, serverOutcome: 'held', serverNumber: 'тридцать три' })).some((p) => /serverNumber/.test(p)));
+
+  /* ── Запись итога ── */
+  const raw = {
+    alliances: [{ id: 'a01' }],
+    weeks: [
+      { id: 'W1', number: 1, note: 'важная заметка' },
+      { id: 'W2', number: 2, serverOutcome: 'captured', serverNumber: 74 },
+    ],
+    results: [],
+    events: [],
+    texts: [],
+  };
+
+  const set = applyOutcome(raw, 'W1', 'held', null);
+  equal('итог записывается', set.weeks[0].serverOutcome, 'held');
+  equal('чужая неделя не тронута', set.weeks[1].serverOutcome, 'captured');
+  equal('остальные поля недели сохраняются', set.weeks[0].note, 'важная заметка');
+  equal('исходные данные не мутируются', raw.weeks[0].serverOutcome, undefined);
+
+  const cleared = applyOutcome(raw, 'W2', null, null);
+  check('снятый итог удаляет поле, а не пишет пустую строку', !('serverOutcome' in cleared.weeks[1]));
+  check('снятый итог убирает и номер сервера', !('serverNumber' in cleared.weeks[1]));
+
+  const withNumber = applyOutcome(raw, 'W1', 'captured', '19');
+  equal('номер сервера приводится к числу', withNumber.weeks[0].serverNumber, 19);
+  check('пустой номер не пишется', !('serverNumber' in applyOutcome(raw, 'W1', 'captured', '').weeks[0]));
+
+  equal('итог читается обратно', weekOutcomeOf(raw, 'W2').outcome, 'captured');
+  check('изменение итога замечено', outcomeDiffers(raw, 'W1', 'held', null));
+  check('отсутствие изменений замечено', !outcomeDiffers(raw, 'W2', 'captured', 74));
+  check('смена только номера тоже изменение', outcomeDiffers(raw, 'W2', 'captured', 75));
+
+  equal(
+    'итог попадает в сообщение коммита',
+    commitMessage({ number: 31 }, { a01: 'win' }, { outcome: 'captured', serverNumber: 74 }),
+    'неделя 31: 1 победа, 0 поражений, взяли сервер 74'
+  );
+
+  /* ── Вкладка «Хронология» ── */
+  const outcomeWeeks = [
+    { id: 'W1', number: 1, startDate: new Date('2026-04-06'), endDate: new Date('2026-04-12'), serverOutcome: 'held' },
+    { id: 'W2', number: 2, startDate: new Date('2026-04-13'), endDate: new Date('2026-04-19'), serverOutcome: 'captured', serverNumber: 74 },
+    { id: 'W3', number: 3, startDate: new Date('2026-04-20'), endDate: new Date('2026-04-26') },
+  ];
+
+  const html = renderTimeline({ events: [], allWeeks: outcomeWeeks });
+  check('вердикт недели показан', html.includes('verdict'));
+  check('вердикт берёт самую свежую неделю', html.includes('Успешно захватили сервер 74'));
+  equal('в ленте недель только недели с итогом', (html.match(/class="wk /g) || []).length, 2);
+  check('исход красится как победа', /verdict--win/.test(html));
+
+  const lostHtml = renderTimeline({
+    events: [],
+    allWeeks: [{ id: 'W9', number: 9, startDate: new Date('2026-06-01'), endDate: new Date('2026-06-07'), serverOutcome: 'lost', serverNumber: 33 }],
+  });
+  check('потеря красится как поражение', /verdict--loss/.test(lostHtml));
+  check('потеря названа прямо', lostHtml.includes('Сервер 33 потерян'));
+
+  /*
+    ЛОВУШКА, ИЗ-ЗА КОТОРОЙ ЭТОТ ТЕСТ И НАПИСАН.
+
+    `weeksUpToLastData` отбрасывает недели без результатов VS. Если хронология
+    возьмёт этот обрезанный список, неделя, где заполнили только серверный
+    итог, исчезнет со страницы — при том что человек её внёс и опубликовал.
+  */
+  check(
+    'неделя с итогом, но без результатов VS, видна',
+    renderTimeline({ events: [], allWeeks: outcomeWeeks, weeks: [] }).includes('Успешно захватили сервер 74')
+  );
+
+  // Пустая летопись: ни событий, ни итогов — экран должен объяснять, а не пустовать.
+  const blank = renderTimeline({ events: [], allWeeks: [] });
+  check('пустая хронология объясняет себя', blank.includes('Ещё ни одной записи'));
+  check('пустая хронология не рисует вердикт', !blank.includes('verdict'));
+
+  // Итоги недель не должны вытеснить события: старая часть страницы на месте.
+  const both = renderTimeline({
+    events: [{ id: 'e1', date: new Date('2026-04-18'), type: 'server_capture', serverNumber: 47, title: 'Захвачен сервер 47' }],
+    allWeeks: outcomeWeeks,
+  });
+  check('вместе с итогами остаётся стена трофеев', both.includes('class="trophy"'));
+  check('вместе с итогами остаётся лента событий', both.includes('data-tl-list'));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
