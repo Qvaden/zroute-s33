@@ -1,4 +1,4 @@
-import { esc, fmtDateFull, plural } from '../../ui/helpers.js';
+import { esc, fmtDateFull, plural, safeUrl } from '../../ui/helpers.js';
 
 const TYPE = {
   server_capture: 'Захват сервера',
@@ -46,7 +46,12 @@ export function renderEvents(view) {
           </div>
           <b>${esc(e.title)}</b>
           ${e.body ? `<p class="muted">${esc(e.body)}</p>` : ''}
-          ${e.imageUrl ? `<a class="adm-ev__img" href="${esc(e.imageUrl)}" target="_blank" rel="noopener noreferrer">картинка</a>` : ''}
+          ${
+            safeUrl(e.imageUrl)
+              ? `<a class="adm-ev__img" href="${esc(safeUrl(e.imageUrl))}"
+                    target="_blank" rel="noopener noreferrer">картинка</a>`
+              : ''
+          }
         </div>
       </li>`
     )

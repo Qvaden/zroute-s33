@@ -65,14 +65,7 @@ export function renderWeek(view, param) {
     ? outcomeDiffers(raw, selected.id, server.outcome, server.serverNumber)
     : false;
 
-  const picker = weeks
-    .map(
-      (w) => `<a href="#/week/${encodeURIComponent(w.id)}"
-                 class="adm-chip ${w.id === selected.id ? 'is-on' : ''}">
-                ${esc(String(w.number))}
-              </a>`
-    )
-    .join('');
+  const picker = renderPicker(weeks, selected);
 
   const cells = alliances
     .map((a) => {
@@ -141,6 +134,66 @@ export function renderWeek(view, param) {
     </section>`;
 }
 
+const MONTH_NAME = [
+  'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',
+];
+
+/**
+ * Выбор недели, сгруппированный по месяцам.
+ *
+ * Плоский ряд номеров работал, пока недель было двенадцать. Через год их
+ * станет больше пятидесяти, и «поправить неделю в начале сентября» превратится
+ * в разглядывание четырёх строк цифр. Месяц — то, чем человек эти недели
+ * помнит, поэтому он и подписан.
+ *
+ * Два свежих месяца открыты, остальное убрано в «раньше»: в девяти случаях
+ * из десяти правят последнюю неделю, и до неё не должно быть прокрутки.
+ */
+function renderPicker(weeks, selected) {
+  const groups = [];
+  for (const w of weeks) {
+    const date = w.startDate;
+    const key = date ? `${date.getUTCFullYear()}-${date.getUTCMonth()}` : 'нет даты';
+    let group = groups.find((g) => g.key === key);
+    if (!group) {
+      group = {
+        key,
+        label: date ? `${MONTH_NAME[date.getUTCMonth()]} ${date.getUTCFullYear()}` : 'без даты',
+        weeks: [],
+      };
+      groups.push(group);
+    }
+    group.weeks.push(w);
+  }
+
+  const chip = (w) => `<a href="#/week/${encodeURIComponent(w.id)}"
+       class="adm-chip ${w.id === selected.id ? 'is-on' : ''}">${esc(String(w.number))}</a>`;
+
+  const block = (g) => `<div class="adm-mon">
+      <span class="adm-mon__label">${esc(g.label)}</span>
+      <div class="adm-mon__row">${g.weeks.map(chip).join('')}</div>
+    </div>`;
+
+  const fresh = groups.slice(0, 2);
+  const older = groups.slice(2);
+
+  // Если выбранная неделя оказалась в «раньше», раскрываем — иначе человек
+  // не увидит, где он находится.
+  const selectedIsOld = older.some((g) => g.weeks.some((w) => w.id === selected.id));
+
+  return `
+    ${fresh.map(block).join('')}
+    ${
+      older.length
+        ? `<details class="adm-older" ${selectedIsOld ? 'open' : ''}>
+             <summary>Раньше · ${older.length === 1 ? 'один месяц' : `${older.length} месяцев`}</summary>
+             ${older.map(block).join('')}
+           </details>`
+        : ''
+    }`;
+}
+
 /**
  * ИТОГ НЕДЕЛИ НА УРОВНЕ СЕРВЕРА.
  *
@@ -178,7 +231,7 @@ function renderServerOutcome(server, canPush) {
         <span>Номер сервера</span>
         <input type="number" inputmode="numeric" min="1" max="9999"
                data-server-number
-               value="${server?.serverNumber ?? ''}"
+               value="${esc(server?.serverNumber ?? '')}"
                placeholder="${meta && meta.action === 'defense' ? String(CONFIG.server) : 'например 74'}"
                ${canPush && meta ? '' : 'disabled'}>
         <i class="muted">${

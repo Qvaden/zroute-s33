@@ -18,6 +18,7 @@
  *    GitHub откажет, и мы объясним — вместо того чтобы затереть чужую работу.
  */
 import { CONFIG } from '../../config.js';
+import { esc, safeUrl } from '../ui/helpers.js';
 import { mapDataset } from '../data/adapters/_map.js';
 import { validateDataset } from '../data/contract.js';
 import {
@@ -153,7 +154,7 @@ function showError(message) {
     <div class="adm-login">
       <section class="adm-login__card">
         <h1 class="adm-h1">Не получилось</h1>
-        <p class="adm-error">${message}</p>
+        <p class="adm-error">${esc(message)}</p>
         <div class="adm-login__form">
           <button type="button" class="adm-btn adm-btn--primary" data-retry>Попробовать снова</button>
           <button type="button" class="adm-btn" data-logout>Выйти</button>
@@ -432,9 +433,14 @@ async function publish() {
     */
     const problems = validateDataset(mapDataset(candidate));
     if (problems.length) {
+      /*
+        Сообщения валидатора экранируем: они собраны ИЗ данных и содержат
+        их куски — «недопустимый serverOutcome «...»». Вставить их в разметку
+        как есть означало бы дать данным исполняться в панели, где живёт токен.
+      */
       showPublishResult(
         `<b>Публикация отменена: данные не проходят проверку.</b>
-         <ul>${problems.slice(0, 8).map((p) => `<li>${p}</li>`).join('')}</ul>
+         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
          <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
         'bad'
       );
@@ -456,9 +462,9 @@ async function publish() {
     showPublishResult(
       `<b>Опубликовано.</b>
        ${
-         result.commitUrl
-           ? `<a href="${result.commitUrl}" target="_blank" rel="noopener noreferrer">Коммит ${result.commitSha}</a>`
-           : `Коммит ${result.commitSha}`
+         safeUrl(result.commitUrl)
+           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
+           : `Коммит ${esc(result.commitSha)}`
        }
        <p class="muted">Сайт обновится в течение минуты — GitHub Pages пересобирает страницы после коммита.</p>`,
       'ok'
@@ -466,7 +472,7 @@ async function publish() {
   } catch (err) {
     const message = String(err?.message ?? err);
     showPublishResult(
-      `<b>Не опубликовано.</b> ${message}`,
+      `<b>Не опубликовано.</b> ${esc(message)}`,
       err?.conflict ? 'warn' : 'bad'
     );
     restore();

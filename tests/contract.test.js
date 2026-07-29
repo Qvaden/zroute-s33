@@ -394,7 +394,23 @@ console.log('\nH. Связка хронологии: разметка ↔ скр
     { id: 'e4', date: new Date('2026-06-28'), type: 'server_capture', serverNumber: 12,
       title: 'Захвачен сервер 12', durationDays: 9 },
   ];
-  const html = renderTimeline({ events });
+
+  /*
+    Недели с итогом нужны здесь по той же причине, что и события: страница
+    должна быть заполненной. Без них не отрисуется календарь, и проверка
+    «скрипт и разметка говорят на одном языке» молча пропустила бы половину
+    крючков, которые скрипт ищет.
+  */
+  const weeks = [
+    { id: 'W16', number: 16, startDate: new Date('2026-04-13'), endDate: new Date('2026-04-19'),
+      serverOutcome: 'captured', serverNumber: 47 },
+    { id: 'W17', number: 17, startDate: new Date('2026-04-20'), endDate: new Date('2026-04-26'),
+      serverOutcome: 'held' },
+    { id: 'W22', number: 22, startDate: new Date('2026-05-25'), endDate: new Date('2026-05-31'),
+      serverOutcome: 'lost', serverNumber: 33 },
+  ];
+
+  const html = renderTimeline({ events, allWeeks: weeks });
   const script = await readFile('src/ui/timeline-controls.js', 'utf8');
 
   const hooks = [...new Set([...script.matchAll(/\[data-(tl-[a-z]+)\]/g)].map((m) => m[1]))];
@@ -604,6 +620,43 @@ console.log('\nJ. Админ-панель');
     означает утечку в консоль, скриншот или демонстрацию экрана.
   */
   check('в панели нет вывода в консоль — токену там не место', !/console\./.test(adminSource));
+
+  /*
+    ЭКРАНИРОВАНИЕ В ПАНЕЛИ.
+
+    Панель — единственное место, где рядом с данными живёт токен. Данные вносит
+    человек руками, а сообщения валидатора собраны ИЗ данных, поэтому вставлять
+    их в разметку как есть нельзя: XSS на своём же домене означает украденный
+    токен, а с ним право писать в репозиторий.
+
+    Проверяем текстом: в панели не должно остаться подстановки в innerHTML
+    без esc() — кроме заведомо своих строк.
+  */
+  /*
+    Проверяем только файлы, которые собирают разметку. В repo.js те же имена
+    встречаются при склейке текста сообщения — это не разметка, и требовать
+    там esc() означало бы экранировать текст ради самого экранирования.
+  */
+  const renderFiles = adminFiles.filter(
+    (f) => /main\.js$/.test(f) || /screens\//.test(f) || /shell\.js$/.test(f) || /login\.js$/.test(f)
+  );
+  const renderSource = stripComments(
+    (await Promise.all(renderFiles.map((f) => readFile(f, 'utf8')))).join('\n')
+  );
+  check(
+    'сообщения валидатора и ошибок экранируются перед вставкой в разметку',
+    !/\$\{(?:problems|message|detail|p)\}/.test(renderSource)
+  );
+
+  const { safeUrl } = await import('../src/ui/helpers.js');
+  equal('javascript-ссылка отбрасывается', safeUrl('javascript:alert(1)'), '');
+  equal('data-ссылка отбрасывается', safeUrl('data:text/html,<script>'), '');
+  equal('обычная ссылка проходит', safeUrl('https://example.com/a.png'), 'https://example.com/a.png');
+  check(
+    'ссылки на картинки проходят через safeUrl, а не только через esc',
+    /safeUrl\(/.test(await readFile('src/admin/screens/events.js', 'utf8')) &&
+      /safeUrl\(/.test(await readFile('src/pages/timeline.js', 'utf8'))
+  );
 
   const adminHtml = await readFile('admin.html', 'utf8');
   check('панель не регистрирует service worker', !/serviceWorker/.test(adminHtml));
@@ -928,6 +981,38 @@ console.log('\nL. Итог недели: взяли, не взяли, удерж
   const blank = renderTimeline({ events: [], allWeeks: [] });
   check('пустая хронология объясняет себя', blank.includes('Ещё ни одной записи'));
   check('пустая хронология не рисует вердикт', !blank.includes('verdict'));
+
+  /* ── Календарь: год → месяц → неделя ── */
+  const calWeeks = [
+    { id: 'W1', number: 1, startDate: new Date('2025-11-03'), endDate: new Date('2025-11-09'), serverOutcome: 'held' },
+    { id: 'W2', number: 2, startDate: new Date('2026-09-07'), endDate: new Date('2026-09-13'), serverOutcome: 'captured', serverNumber: 74 },
+    { id: 'W3', number: 3, startDate: new Date('2026-09-14'), endDate: new Date('2026-09-20'), serverOutcome: 'lost', serverNumber: 12 },
+    { id: 'W4', number: 4, startDate: new Date('2026-10-05'), endDate: new Date('2026-10-11'), serverOutcome: 'held' },
+  ];
+  const cal = renderTimeline({ events: [], allWeeks: calWeeks });
+
+  equal('в календаре год на каждый год с данными', (cal.match(/data-tl-yr="\d{4}"/g) || []).length, 2);
+  equal('в календаре месяц на каждый месяц с данными', (cal.match(/data-tl-mo="/g) || []).length, 3);
+  equal('каждая неделя — своя кнопка', (cal.match(/data-tl-week="/g) || []).length, 4);
+  check('месяц недели подписан в разметке', cal.includes('data-tl-ym="2026-09"'));
+
+  /*
+    Вердиктов отрисовано столько же, сколько недель, но открыт ровно один:
+    скрипт только переключает видимость, поэтому в разметке должно быть
+    именно такое начальное состояние, а не «все открыты» или «все скрыты».
+  */
+  equal('вердикт на каждую неделю', (cal.match(/data-tl-verdict="/g) || []).length, 4);
+  equal('открыт ровно один вердикт', (cal.match(/data-tl-verdict="[^"]*"(?! hidden)/g) || []).length, 1);
+  check('месяцы скрыты до выбора года', /data-tl-months hidden/.test(cal));
+  check('по умолчанию выбрано «за всё время»', /data-tl-yr="all"/.test(cal) && /is-on[^>]*data-tl-yr="all"|data-tl-yr="all"/.test(cal));
+
+  // Календарь должен фильтровать и ленту событий, иначе «сентябрь» показывал
+  // бы недели сентября и события всех времён разом.
+  const feed = renderTimeline({
+    events: [{ id: 'e1', date: new Date('2026-09-19'), type: 'war', title: 'Война' }],
+    allWeeks: calWeeks,
+  });
+  check('у события в ленте указан месяц', feed.includes('data-tl-ym="2026-09"'));
 
   // Итоги недель не должны вытеснить события: старая часть страницы на месте.
   const both = renderTimeline({

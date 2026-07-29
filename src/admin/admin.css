@@ -232,7 +232,33 @@
 .adm-week-now p { margin: 3px 0 0; }
 
 /* ── Экран недели ─────────────────────────────────────────────────────────── */
-.adm-weeks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 15px; }
+.adm-weeks { margin-top: 15px; }
+
+/* Недели сгруппированы по месяцам: через год их станет больше пятидесяти,
+   и плоский ряд цифр перестанет отвечать на «где начало сентября». */
+.adm-mon { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; flex-wrap: wrap; }
+.adm-mon__label {
+  flex: none;
+  min-width: 8.5em;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--mute);
+}
+.adm-mon__row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.adm-older { margin-top: 4px; }
+.adm-older summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--dim);
+  padding: 5px 0;
+  list-style: none;
+}
+.adm-older summary::-webkit-details-marker { display: none; }
+.adm-older summary::before { content: '▸ '; color: var(--mute); }
+.adm-older[open] summary::before { content: '▾ '; }
+.adm-older summary:hover { color: var(--text); }
+.adm-older > .adm-mon:first-of-type { margin-top: 6px; }
 .adm-chip {
   min-width: 40px;
   text-align: center;

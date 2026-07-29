@@ -1,4 +1,4 @@
-import { esc, fmtDate, fmtDateFull, plural, pluralWord } from '../ui/helpers.js';
+import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl } from '../ui/helpers.js';
 import { SERVER_OUTCOME, verdictText, weeksWithOutcome } from '../logic/server-outcome.js';
 import { CONFIG } from '../../config.js';
 
@@ -42,28 +42,72 @@ export function renderTimeline({ events, allWeeks, weeks }) {
   const captures = sorted.filter((e) => e.type === 'server_capture');
 
   return `
-    ${renderVerdict(outcomes)}
+    ${renderWeeksSection(outcomes)}
     ${captures.length || sorted.length ? renderTrophies(captures, sorted) : ''}
     ${sorted.length ? renderFilters(sorted) : ''}
     ${sorted.length ? renderFeed(sorted) : ''}
     <p class="tl__empty" data-tl-empty hidden>Событий такого типа пока нет.</p>`;
 }
 
+/** «2026-09» — ключ месяца, по которому фильтрует скрипт. */
+const ymKey = (date) =>
+  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+const MONTH_NAME = [
+  'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',
+];
+
 /**
  * Итог недели — то, за чем на эту вкладку и заходят после VS.
  *
- * Сначала одна крупная строка про последнюю неделю: взяли или удержали,
- * и какой сервер. Ниже лента прошлых недель, чтобы всё вместе читалось
- * как летопись, а не как таблица.
+ * Устройство: крупный вердикт одной недели, под ним календарь (год → месяц)
+ * и лента недель. Вердикт не приклеен к последней неделе — он показывает ту,
+ * которую выбрали. Через год здесь будет пятьдесят с лишним недель, и без
+ * календаря «посмотреть сентябрь» означало бы листать всё подряд.
+ *
+ * Все вердикты отрисованы сразу и спрятаны, а скрипт только переключает
+ * видимость. Причина не в лени: так страница работает и в собранном одним
+ * файлом превью, где данных для перерисовки нет вовсе.
  */
-function renderVerdict(outcomes) {
+function renderWeeksSection(outcomes) {
   if (!outcomes.length) return '';
 
   const own = CONFIG.server;
-  const [latest, ...past] = outcomes;
-  const meta = SERVER_OUTCOME[latest.serverOutcome];
 
-  const strip = outcomes
+  const cards = outcomes
+    .map((w, i) => {
+      const m = SERVER_OUTCOME[w.serverOutcome];
+      return `
+        <div class="verdict verdict--${m.kind}" data-tl-verdict="${esc(w.id)}" ${i === 0 ? '' : 'hidden'}>
+          <div class="verdict__week">
+            <span>Неделя</span>
+            <b class="num">${w.number}</b>
+          </div>
+          <div class="verdict__body">
+            <h2 class="verdict__text">${esc(verdictText(w.serverOutcome, w.serverNumber, own))}</h2>
+            <p class="verdict__dates">${esc(fmtDate(w.startDate))} — ${esc(fmtDate(w.endDate))}</p>
+          </div>
+        </div>`;
+    })
+    .join('');
+
+  // Годы и месяцы — только те, в которых есть внесённые недели.
+  const years = [...new Set(outcomes.map((w) => w.startDate.getUTCFullYear()))].sort((a, b) => b - a);
+  const months = [...new Set(outcomes.map((w) => ymKey(w.startDate)))].sort().reverse();
+
+  const yearChips = years
+    .map((y) => `<button type="button" class="cal__btn" data-tl-yr="${y}">${y}</button>`)
+    .join('');
+
+  const monthChips = months
+    .map((ym) => {
+      const label = MONTH_NAME[Number(ym.slice(5, 7)) - 1];
+      return `<button type="button" class="cal__btn" data-tl-mo="${ym}" hidden>${esc(label)}</button>`;
+    })
+    .join('');
+
+  const pills = outcomes
     .map((w) => {
       const m = SERVER_OUTCOME[w.serverOutcome];
 
@@ -77,9 +121,12 @@ function renderVerdict(outcomes) {
       const num = w.serverNumber ?? null;
       const worthShowing = num != null && (m.action === 'capture' || num !== own);
 
-      return `<li class="wk wk--${m.kind} wk--${m.action}">
-        <span class="wk__num num">${w.number}</span>
-        <span class="wk__what">${esc(m.short)}${worthShowing ? ` <b class="num">${num}</b>` : ''}</span>
+      return `<li>
+        <button type="button" class="wk wk--${m.kind} wk--${m.action}"
+                data-tl-week="${esc(w.id)}" data-tl-ym="${ymKey(w.startDate)}">
+          <span class="wk__num num">${w.number}</span>
+          <span class="wk__what">${esc(m.short)}${worthShowing ? ` <b class="num">${num}</b>` : ''}</span>
+        </button>
       </li>`;
     })
     .join('');
@@ -88,30 +135,21 @@ function renderVerdict(outcomes) {
     <section class="hero hero--tl">
       <span class="eyebrow">Итог недели</span>
 
-      <div class="verdict verdict--${meta.kind}">
-        <div class="verdict__week">
-          <span>Неделя</span>
-          <b class="num">${latest.number}</b>
+      ${cards}
+
+      <div class="cal">
+        <span class="cal__label">Найти неделю</span>
+        <div class="cal__row">
+          <button type="button" class="cal__btn is-on" data-tl-yr="all">За всё время</button>
+          ${yearChips}
         </div>
-        <div class="verdict__body">
-          <h2 class="verdict__text">${esc(verdictText(latest.serverOutcome, latest.serverNumber, own))}</h2>
-          <p class="verdict__dates">
-            ${esc(fmtDate(latest.startDate))} — ${esc(fmtDate(latest.endDate))}
-            ${
-              past.length
-                ? `<span class="hero__sep">·</span> ${plural(
-                    outcomes.length,
-                    'неделя в летописи',
-                    'недели в летописи',
-                    'недель в летописи'
-                  )}`
-                : ''
-            }
-          </p>
-        </div>
+        <!-- Скрыт до выбора года: иначе до первого запуска скрипта здесь
+             висела бы пустая строка с отступом. -->
+        <div class="cal__row cal__row--mo" data-tl-months hidden>${monthChips}</div>
       </div>
 
-      ${past.length ? `<ul class="wks">${strip}</ul>` : ''}
+      <ul class="wks">${pills}</ul>
+      <p class="wks__empty" data-tl-noweeks hidden>В этом месяце итогов нет.</p>
     </section>`;
 }
 
@@ -207,7 +245,8 @@ function renderFeed(events) {
       const t = TYPE[e.type] ?? TYPE.other;
 
       return `${divider}
-      <li class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}">
+      <li class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}"
+          data-tl-ym="${ymKey(e.date)}">
         <div class="tl__marker">${e.serverNumber != null ? esc(String(e.serverNumber)) : '•'}</div>
         <div class="tl__body">
           <div class="tl__meta">
@@ -217,7 +256,11 @@ function renderFeed(events) {
           </div>
           <h3>${esc(e.title)}</h3>
           ${e.body ? `<p>${esc(e.body)}</p>` : ''}
-          ${e.imageUrl ? `<img class="tl__img" src="${esc(e.imageUrl)}" alt="${esc(e.title)}" loading="lazy">` : ''}
+          ${
+            safeUrl(e.imageUrl)
+              ? `<img class="tl__img" src="${esc(safeUrl(e.imageUrl))}" alt="${esc(e.title)}" loading="lazy">`
+              : ''
+          }
         </div>
       </li>`;
     })

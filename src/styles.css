@@ -660,8 +660,42 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .verdict__text { font-size: clamp(17px, 4.4vw, 26px); letter-spacing: -.02em; margin: 0; }
 .verdict__dates { margin: 5px 0 0; font-size: 12.5px; color: var(--mute); }
 
+/* Календарь: год → месяц. Через год недель станет больше пятидесяти,
+   и «посмотреть сентябрь» без него означало бы листать всё подряд. */
+.cal { margin-top: 18px; }
+.cal__label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: 8px;
+}
+.cal__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal__row--mo { margin-top: 6px; }
+.cal__btn {
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dim);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 13px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: color .14s var(--ease), border-color .14s var(--ease), background .14s var(--ease);
+}
+.cal__btn:hover { color: var(--text); border-color: var(--mute); }
+.cal__btn.is-on {
+  color: #0a0b0d;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Лента прошлых недель: летопись, которую видно одним взглядом. */
 .wks { list-style: none; display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; padding: 0; }
+.wks__empty { color: var(--mute); font-size: 13px; margin: 12px 0 0; }
 .wk {
   display: flex;
   align-items: baseline;
@@ -671,7 +705,15 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   border: 1px solid var(--line);
   border-radius: 999px;
   font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .14s var(--ease), background .14s var(--ease);
 }
+.wk:hover { background: var(--raised-2); }
+/* Выбранная неделя: та, чей вердикт показан крупно выше. */
+.wk.is-sel { background: var(--raised-2); box-shadow: inset 0 0 0 1px currentColor; }
+.wk--win.is-sel { color: var(--win); }
+.wk--loss.is-sel { color: var(--loss); }
 .wk__num { font-family: Unbounded, sans-serif; font-weight: 700; font-size: 13px; color: var(--dim); }
 .wk__what { color: var(--mute); }
 .wk__what b { color: var(--dim); }
