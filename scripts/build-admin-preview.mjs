@@ -12,6 +12,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
+import { marksFromRaw } from '../src/admin/edit.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
 import { renderWeek } from '../src/admin/screens/week.js';
@@ -21,7 +22,11 @@ import { renderTexts } from '../src/admin/screens/texts.js';
 
 const outFile = process.argv[2] || 'dist/admin-preview.html';
 
-const data = mapDataset(JSON.parse(await readFile('data/demo.json', 'utf8')));
+const raw = JSON.parse(await readFile('data/demo.json', 'utf8'));
+const data = mapDataset(raw);
+
+// Самая свежая неделя — её и показываем на экране ввода.
+const latestWeek = [...data.weeks].sort((a, b) => b.number - a.number)[0];
 
 /*
   Правдоподобная обвязка вокруг данных: панель показывает не только сами
@@ -39,9 +44,20 @@ const view = {
     authorName: 'редактор',
     authorLogin: 'редактор',
   },
+  raw,
   data,
   weeks: data.weeks,
   problems: validateDataset(data),
+
+  /*
+    Состояние экрана ввода. В настоящей панели его готовит main.js;
+    здесь подставляем вручную, иначе превью показало бы «тридцать новых
+    отметок» вместо «изменений нет» и предупреждение об отсутствии прав.
+  */
+  weekId: latestWeek?.id ?? null,
+  marks: latestWeek ? marksFromRaw(raw, latestWeek.id) : {},
+  draftSaved: null,
+  canPush: true,
 };
 
 const SCREENS = [

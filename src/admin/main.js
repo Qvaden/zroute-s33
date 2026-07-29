@@ -1,25 +1,40 @@
 /**
- * АДМИН-ПАНЕЛЬ. ФАЗА 1: ТОЛЬКО ЧТЕНИЕ.
+ * АДМИН-ПАНЕЛЬ.
  *
  * Отдельная точка входа, а не раздел сайта. Причины две: посетитель не должен
  * грузить код панели, и попасть в неё случайно из меню тоже не должен.
  *
- * Почему фаза 1 вообще существует отдельно. Всё построение упирается в один
- * непроверенный факт: достанется ли api.github.com из сети редактора. Если нет,
- * весь замысел бесплатной панели рушится — и узнать это надо до того, как
- * написан экран ввода. Поэтому первая фаза сознательно ничего не пишет:
- * она доказывает, что связь есть, и показывает данные так, как их видит сайт.
+ * Фаза 1 доказала главное: api.github.com достаётся из сети редактора, а значит
+ * бесплатная панель без сервера работает. Фаза 2 добавляет ввод недели
+ * и публикацию одним коммитом.
  *
- * Кнопок, меняющих данные, здесь нет физически, а не спрятаны.
+ * ТРИ ПРАВИЛА ПУБЛИКАЦИИ, которые здесь соблюдаются буквально:
+ *
+ * 1. Каждое нажатие сразу в черновик. Кнопки «сохранить» нет, потому что
+ *    забыть её нажать — самый частый способ потерять полчаса работы.
+ * 2. Перед коммитом данные проходят валидатор сайта. Панель физически
+ *    не может опубликовать то, на чём сайт откроется пустым.
+ * 3. Коммит всегда с версией прочитанного файла. Если файл успели изменить,
+ *    GitHub откажет, и мы объясним — вместо того чтобы затереть чужую работу.
  */
+import { CONFIG } from '../../config.js';
 import { mapDataset } from '../data/adapters/_map.js';
 import { validateDataset } from '../data/contract.js';
+import {
+  computeStandings,
+  computeWeekSummary,
+  computeMovers,
+  weeksUpToLastData,
+} from '../logic/standings.js';
+import { renderHome } from '../pages/home.js';
 import { hasToken, clearToken, setToken } from './auth.js';
-import { whoAmI, repoInfo, readDataFile, lastCommit } from './repo.js';
+import { whoAmI, repoInfo, readDataFile, lastCommit, writeDataFile } from './repo.js';
+import { applyMarks, marksFromRaw, diffMarks, commitMessage, serialize } from './edit.js';
+import { getDraft, saveDraft, dropDraft, draftSavedAt } from './draft.js';
 import { renderShell } from './shell.js';
 import { renderLogin } from './login.js';
 import { renderOverview } from './screens/overview.js';
-import { renderWeek } from './screens/week.js';
+import { renderWeek, describe } from './screens/week.js';
 import { renderAlliances } from './screens/alliances.js';
 import { renderEvents } from './screens/events.js';
 import { renderTexts } from './screens/texts.js';
@@ -42,16 +57,52 @@ function parseHash() {
   return { id: id || 'overview', param: param ? decodeURIComponent(param) : null };
 }
 
+/**
+ * Какую неделю показывать.
+ *
+ * По умолчанию не последняя заведённая, а последняя, за которую есть данные
+ * или начатый черновик: недели заводятся на месяц вперёд, и открывать пустую
+ * неделю из будущего бесполезно.
+ */
+function pickWeek(param) {
+  const weeks = [...view.data.weeks].sort((a, b) => b.number - a.number);
+  if (!weeks.length) return null;
+
+  const asked = weeks.find((w) => w.id === param);
+  if (asked) return asked;
+
+  const started = weeks.find(
+    (w) => getDraft(w.id) || view.data.results.some((r) => r.weekId === w.id)
+  );
+  return started ?? weeks[0];
+}
+
+/** Отметки для показа: черновик, если он есть, иначе то, что в данных. */
+function marksFor(weekId) {
+  return getDraft(weekId) ?? marksFromRaw(view.raw, weekId);
+}
+
 function render() {
   if (!view) return;
   const { id, param } = parseHash();
   const screen = SCREENS.find((s) => s.id === id) ?? SCREENS[0];
+
+  // Неделя — единственный экран с состоянием, поэтому оно готовится здесь,
+  // а сам экран остаётся чистой функцией от данных.
+  if (screen.id === 'week') {
+    const week = pickWeek(param);
+    view.weekId = week?.id ?? null;
+    view.marks = week ? marksFor(week.id) : {};
+    view.draftSaved = week ? draftSavedAt(week.id) : null;
+    view.canPush = Boolean(view.repo?.canPush);
+  }
 
   root.innerHTML = renderShell({
     screens: SCREENS,
     activeId: screen.id,
     inner: screen.render(view, param),
     login: view.user?.login ?? '',
+    canPush: Boolean(view.repo?.canPush),
   });
 
   window.scrollTo(0, 0);
@@ -102,6 +153,7 @@ async function load() {
     raw: file.raw,
     data,
     weeks: data.weeks,
+    canPush: Boolean(repo.canPush),
     // Тот же валидатор, которым проверяется сайт: панель не должна судить
     // о данных по своим правилам, иначе «в панели всё хорошо, а сайт пустой».
     problems: validateDataset(data),
@@ -129,6 +181,195 @@ async function boot() {
     }
   }
 }
+
+/* ── Ввод недели ─────────────────────────────────────────────────────────── */
+
+/**
+ * Перерисовываем только то, что изменилось, а не всю страницу.
+ *
+ * Полная перерисовка на каждое нажатие сбрасывала бы прокрутку — а человек
+ * идёт по списку сверху вниз и после каждой отметки оказывался бы снова
+ * в начале. Тридцать два раза за неделю.
+ */
+function paintCell(allianceId) {
+  const cell = root.querySelector(`[data-cell="${CSS.escape(allianceId)}"]`);
+  if (!cell) return;
+
+  const outcome = view.marks[allianceId] ?? null;
+  cell.classList.toggle('adm-cell--win', outcome === 'win');
+  cell.classList.toggle('adm-cell--loss', outcome === 'loss');
+  cell.classList.toggle('adm-cell--empty', outcome === null);
+
+  for (const button of cell.querySelectorAll('[data-mark]')) {
+    button.classList.toggle('is-on', button.dataset.mark === outcome);
+  }
+}
+
+function paintProgress() {
+  const form = root.querySelector('[data-week-form]');
+  if (!form) return;
+
+  const values = Object.values(view.marks).filter((o) => o === 'win' || o === 'loss');
+  const total = form.querySelectorAll('[data-cell]').length;
+  const pct = total ? Math.round((values.length / total) * 100) : 0;
+
+  const filled = form.querySelector('[data-week-filled]');
+  const pctEl = form.querySelector('[data-week-pct]');
+  const bar = form.querySelector('[data-week-bar]');
+  if (filled) filled.textContent = String(values.length);
+  if (pctEl) pctEl.textContent = String(pct);
+  if (bar) bar.style.width = `${pct}%`;
+
+  const diff = diffMarks(view.raw, view.weekId, view.marks);
+  const state = form.querySelector('[data-publish-state]');
+  if (state) state.innerHTML = describe(diff, draftSavedAt(view.weekId));
+
+  for (const selector of ['[data-publish]', '[data-draft-reset]', '[data-preview-toggle]']) {
+    const button = form.querySelector(selector);
+    if (!button) continue;
+    const needsPush = selector === '[data-publish]';
+    button.disabled = !diff.total || (needsPush && !view.canPush);
+  }
+
+  // Открытый предпросмотр после правки устаревает — закрываем, чтобы человек
+  // не смотрел на прошлую версию, думая, что видит новую.
+  const preview = form.querySelector('[data-preview]');
+  if (preview && !preview.hidden) {
+    preview.hidden = true;
+    preview.innerHTML = '';
+  }
+}
+
+/** Нажатие по П или Х. Повторное нажатие снимает отметку. */
+function toggleMark(cell, mark) {
+  const allianceId = cell.dataset.cell;
+  if (!allianceId || !view.canPush) return;
+
+  view.marks = { ...view.marks, [allianceId]: view.marks[allianceId] === mark ? null : mark };
+  if (view.marks[allianceId] === null) delete view.marks[allianceId];
+
+  saveDraft(view.weekId, view.marks);
+  paintCell(allianceId);
+  paintProgress();
+}
+
+/**
+ * Предпросмотр: итоги недели, отрисованные настоящей главной страницей сайта.
+ *
+ * Не «похоже на сайт», а буквально renderHome на черновике — поэтому
+ * расхождение между предпросмотром и результатом невозможно в принципе.
+ */
+function togglePreview() {
+  const box = root.querySelector('[data-preview]');
+  if (!box) return;
+
+  if (!box.hidden) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+
+  const candidate = applyMarks(view.raw, view.weekId, view.marks);
+  const data = mapDataset(candidate);
+  const weeks = weeksUpToLastData(data.weeks, data.results);
+  const standings = computeStandings(
+    data.alliances, weeks, data.results, CONFIG.scoring, CONFIG.formLength
+  );
+
+  box.innerHTML = `
+    <div class="adm-preview__head">
+      <span class="eyebrow">Так это будет выглядеть на сайте</span>
+      <button type="button" class="adm-btn" data-preview-toggle>Закрыть</button>
+    </div>
+    <div class="adm-preview__body">
+      ${renderHome({
+        summary: computeWeekSummary(data.alliances, weeks, data.results),
+        standings,
+        movers: computeMovers(standings),
+        weeks,
+        allWeeks: data.weeks,
+      })}
+    </div>`;
+  box.hidden = false;
+}
+
+function showPublishResult(html, kind) {
+  const box = root.querySelector('[data-publish-result]');
+  if (!box) return;
+  box.className = `adm-result adm-result--${kind}`;
+  box.innerHTML = html;
+  box.hidden = false;
+}
+
+/** Публикация: проверить, закоммитить, перечитать. */
+async function publish() {
+  const week = view.data.weeks.find((w) => w.id === view.weekId);
+  if (!week) return;
+
+  const button = root.querySelector('[data-publish]');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Публикуем…';
+  }
+
+  const restore = () => {
+    if (!button) return;
+    button.textContent = 'Опубликовать';
+    button.disabled = false;
+  };
+
+  try {
+    const candidate = applyMarks(view.raw, week.id, view.marks);
+
+    /*
+      Проверка ровно тем валидатором, которым проверяется сайт. Без неё панель
+      могла бы опубликовать формально корректный JSON, на котором сайт откроется
+      пустым, — и обнаружилось бы это у посетителей, а не здесь.
+    */
+    const problems = validateDataset(mapDataset(candidate));
+    if (problems.length) {
+      showPublishResult(
+        `<b>Публикация отменена: данные не проходят проверку.</b>
+         <ul>${problems.slice(0, 8).map((p) => `<li>${p}</li>`).join('')}</ul>
+         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
+        'bad'
+      );
+      restore();
+      return;
+    }
+
+    const result = await writeDataFile({
+      text: serialize(candidate),
+      sha: view.file.sha,
+      message: commitMessage(week, view.marks),
+    });
+
+    // Опубликовано — черновик больше не нужен, иначе он навсегда останется
+    // «незаконченным вводом» и будет пугать значком в шапке.
+    dropDraft(week.id);
+    await load();
+
+    showPublishResult(
+      `<b>Опубликовано.</b>
+       ${
+         result.commitUrl
+           ? `<a href="${result.commitUrl}" target="_blank" rel="noopener noreferrer">Коммит ${result.commitSha}</a>`
+           : `Коммит ${result.commitSha}`
+       }
+       <p class="muted">Сайт обновится в течение минуты — GitHub Pages пересобирает страницы после коммита.</p>`,
+      'ok'
+    );
+  } catch (err) {
+    const message = String(err?.message ?? err);
+    showPublishResult(
+      `<b>Не опубликовано.</b> ${message}`,
+      err?.conflict ? 'warn' : 'bad'
+    );
+    restore();
+  }
+}
+
+/* ── События ─────────────────────────────────────────────────────────────── */
 
 document.addEventListener('submit', async (e) => {
   const form = e.target.closest('[data-login]');
@@ -171,6 +412,30 @@ document.addEventListener('click', (e) => {
   }
   if (e.target.closest('[data-refresh]') || e.target.closest('[data-retry]')) {
     boot();
+    return;
+  }
+
+  const mark = e.target.closest('[data-mark]');
+  if (mark) {
+    const cell = mark.closest('[data-cell]');
+    if (cell) toggleMark(cell, mark.dataset.mark);
+    return;
+  }
+
+  if (e.target.closest('[data-preview-toggle]')) {
+    togglePreview();
+    return;
+  }
+
+  if (e.target.closest('[data-draft-reset]')) {
+    dropDraft(view.weekId);
+    view.marks = marksFromRaw(view.raw, view.weekId);
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-publish]')) {
+    publish();
   }
 });
 

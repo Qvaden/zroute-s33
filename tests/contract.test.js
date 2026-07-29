@@ -580,15 +580,24 @@ console.log('\nJ. Админ-панель');
   check(`панель разложена по файлам (${adminFiles.length} шт.)`, adminFiles.length >= 5);
 
   /*
-    Фаза 1 обещает «панель не может изменить данные». Обещание в комментарии
-    ничего не стоит, поэтому проверяем текстом: ни одного пишущего запроса.
-    Когда придёт вторая фаза, этот тест придётся осознанно переписать —
-    именно так и должно быть, запись не должна появиться незаметно.
+    ВСЯ СЕТЬ И ВСЯ ЗАПИСЬ — В ОДНОМ ФАЙЛЕ.
+
+    Пока это так, у вопроса «что в панели способно испортить накопленную
+    историю» есть ровно один адрес. Стоит появиться второму fetch в экране
+    или в логике правки — и ответ на этот вопрос перестанет быть коротким.
   */
-  check(
-    'в панели нет пишущих запросов — фаза 1 читает и только читает',
-    !/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(adminSource)
-  );
+  const networkFiles = [];
+  for (const f of adminFiles) {
+    const code = stripComments(await readFile(f, 'utf8'));
+    if (/\bfetch\(/.test(code) || /method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(code)) {
+      networkFiles.push(f);
+    }
+  }
+  equal('сеть и запись живут ровно в одном файле', networkFiles.join(', '), 'src/admin/repo.js');
+
+  const repoCode = stripComments(await readFile('src/admin/repo.js', 'utf8'));
+  check('публикация идёт методом PUT с версией файла', /method:\s*'PUT'/.test(repoCode) && /\bsha,/.test(repoCode));
+  check('без версии файла публикация отказывает', /if\s*\(!sha\)\s*throw/.test(repoCode));
 
   /*
     Токен — единственный секрет в проекте. Случайный console.log с ним
@@ -665,6 +674,125 @@ console.log('\nJ. Админ-панель');
     'экран недели слушается адреса',
     picked.includes(`Неделя ${target.number}`),
     `просили ${target.id}`
+  );
+}
+
+// ── K. Публикация: логика правки данных ─────────────────────────────────────
+console.log('\nK. Публикация недели');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { mapDataset } = await import('../src/data/adapters/_map.js');
+  const { applyMarks, marksFromRaw, diffMarks, commitMessage, serialize } = await import(
+    '../src/admin/edit.js'
+  );
+  const { describe: describeChange } = await import('../src/admin/screens/week.js');
+
+  /*
+    Маленький выдуманный набор вместо демо-данных: здесь проверяется не объём,
+    а поведение на границах — снятая отметка, чужая неделя, лишние поля.
+    На трёх альянсах любое расхождение видно глазами прямо в сообщении теста.
+  */
+  const raw = {
+    pulledAt: '2026-07-29T00:00:00.000Z',
+    source: 'google-sheets:xxx',
+    alliances: [{ id: 'a01' }, { id: 'a02' }, { id: 'a03' }],
+    weeks: [{ id: 'W1', number: 1 }, { id: 'W2', number: 2 }],
+    results: [
+      { weekId: 'W1', allianceId: 'a01', outcome: 'win' },
+      { weekId: 'W1', allianceId: 'a02', outcome: 'loss' },
+      { weekId: 'W2', allianceId: 'a01', outcome: 'loss', opponent: 'кто-то' },
+    ],
+    events: [],
+    texts: [],
+  };
+
+  const out = applyMarks(raw, 'W1', { a01: 'loss', a03: 'win' });
+
+  equal(
+    'результаты другой недели не тронуты',
+    JSON.stringify(out.results.filter((r) => r.weekId === 'W2')),
+    JSON.stringify([{ weekId: 'W2', allianceId: 'a01', outcome: 'loss', opponent: 'кто-то' }])
+  );
+  check(
+    'снятая отметка удаляет запись, а не пишет третий исход',
+    !out.results.some((r) => r.weekId === 'W1' && r.allianceId === 'a02')
+  );
+  equal(
+    'исход исправляется',
+    out.results.find((r) => r.weekId === 'W1' && r.allianceId === 'a01').outcome,
+    'loss'
+  );
+  check(
+    'новая отметка добавляется',
+    out.results.some((r) => r.weekId === 'W1' && r.allianceId === 'a03' && r.outcome === 'win')
+  );
+  equal('исходные данные не мутируются', raw.results.length, 3);
+
+  // Поля, которые панель не показывает, она не имеет права потерять.
+  equal(
+    'opponent сохраняется при правке исхода',
+    applyMarks(raw, 'W2', { a01: 'win' }).results.find((r) => r.weekId === 'W2').opponent,
+    'кто-то'
+  );
+
+  /*
+    Порядок канонический: недели в порядке из weeks, альянсы — из alliances.
+    Без этого правка одной недели тасовала бы весь файл, и в истории гита
+    вместо «изменилась неделя 31» стояло бы «изменилось всё».
+  */
+  equal(
+    'порядок записей: сначала недели, внутри — альянсы',
+    applyMarks(raw, 'W1', { a03: 'win', a01: 'win', a02: 'win' })
+      .results.map((r) => `${r.weekId}/${r.allianceId}`)
+      .join(' '),
+    'W1/a01 W1/a02 W1/a03 W2/a01'
+  );
+
+  // Выгрузка пишет английские слова, генератор демо-данных — русские П и Х.
+  equal(
+    'русская отметка из таблицы понимается',
+    marksFromRaw({ ...raw, results: [{ weekId: 'W1', allianceId: 'a01', outcome: 'П' }] }, 'W1').a01,
+    'win'
+  );
+
+  // Формат обязан совпасть с scripts/pull-sheet.mjs, иначе первый же коммит
+  // панели покажет в истории «изменён весь файл».
+  equal('файл пишется с отступом 2 и переводом строки в конце', serialize({ a: 1 }), '{\n  "a": 1\n}\n');
+
+  const d = diffMarks(raw, 'W1', { a01: 'loss', a03: 'win' });
+  equal('посчитано добавленных', d.added, 1);
+  equal('посчитано исправленных', d.changed, 1);
+  equal('посчитано удаляемых', d.removed, 1);
+
+  check('удаление названо вслух до нажатия', /удалится/.test(describeChange(d, null)));
+  check('без изменений публиковать нечего', /нечего/.test(describeChange(diffMarks(raw, 'W1', marksFromRaw(raw, 'W1')), null)));
+
+  equal(
+    'сообщение коммита человеческое',
+    commitMessage({ number: 31 }, { a01: 'win', a02: 'win', a03: 'loss' }),
+    'неделя 31: 2 победы, 1 поражение'
+  );
+  equal('очистка недели названа отдельно', commitMessage({ number: 5 }, {}), 'неделя 5: результаты убраны');
+
+  /*
+    ГЛАВНАЯ ПРОВЕРКА РАЗДЕЛА: обещание «панель не опубликует то, на чём сайт
+    откроется пустым» должно быть проверяемым, а не написанным в комментарии.
+    Берём настоящие демо-данные, правим неделю и прогоняем результат тем же
+    валидатором, которым проверяется сайт.
+  */
+  const rawDemo = JSON.parse(await readFile('data/demo.json', 'utf8'));
+  const someWeek = rawDemo.weeks[rawDemo.weeks.length - 1].id;
+  const marks = Object.fromEntries(
+    rawDemo.alliances.slice(0, 10).map((a, i) => [a.id, i % 2 ? 'loss' : 'win'])
+  );
+
+  check(
+    'правка недели проходит валидатор сайта',
+    validateDataset(mapDataset(applyMarks(rawDemo, someWeek, marks))).length === 0
+  );
+  check(
+    'валидатор ловит отметку неизвестного альянса — публикация будет отменена',
+    validateDataset(mapDataset(applyMarks(rawDemo, someWeek, { 'нет-такого': 'win' }))).length > 0
   );
 }
 

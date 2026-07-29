@@ -1,5 +1,6 @@
-import { esc } from '../ui/helpers.js';
+import { esc, plural } from '../ui/helpers.js';
 import { maskToken } from './auth.js';
+import { draftWeekIds } from './draft.js';
 
 /**
  * Каркас панели: шапка, меню, подвал.
@@ -16,9 +17,17 @@ import { maskToken } from './auth.js';
  *   inner: string,
  *   login?: string,
  *   token?: string,
+ *   canPush?: boolean,
  * }} opts
  */
-export function renderShell({ screens, activeId, inner, login = '', token }) {
+export function renderShell({ screens, activeId, inner, login = '', token, canPush = true }) {
+  /*
+    Значок незаконченного ввода виден с любого экрана. Черновик живёт
+    в браузере и молча ждёт публикации — без напоминания неделя может
+    просидеть в нём до следующего VS, и никто не поймёт, почему на сайте пусто.
+  */
+  const drafts = draftWeekIds();
+
   return `
     <header class="adm-top">
       <a class="adm-top__brand" href="#/overview">
@@ -32,7 +41,21 @@ export function renderShell({ screens, activeId, inner, login = '', token }) {
           .join('')}
       </nav>
       <div class="adm-top__right">
-        <span class="adm-badge" title="Панель этой версии не может изменить данные">только просмотр</span>
+        ${
+          canPush
+            ? ''
+            : '<span class="adm-badge" title="У токена нет права Contents: Read and write">только чтение</span>'
+        }
+        ${
+          drafts.length
+            ? `<a href="#/week/${encodeURIComponent(drafts[0])}" class="adm-badge adm-badge--draft"
+                  title="Незаконченный ввод ждёт публикации">${
+                    drafts.length === 1
+                      ? 'черновик'
+                      : plural(drafts.length, 'черновик', 'черновика', 'черновиков')
+                  }</a>`
+            : ''
+        }
         <button type="button" class="adm-btn" data-refresh>Обновить</button>
         <span class="adm-who">
           ${login ? `<b>${esc(login)}</b>` : ''}

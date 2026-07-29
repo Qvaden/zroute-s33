@@ -5,9 +5,10 @@
  * есть репозиторий, который у проекта уже был, и его история как журнал
  * правок. Платить нечему, поэтому и умереть от неоплаты нечему.
  *
- * В первой фазе здесь только чтение. Запись (`publish`) добавится второй
- * фазой, и уже сейчас видно, за что она зацепится: `sha` файла возвращается
- * наружу, потому что без сверки версии два редактора затрут друг друга.
+ * Чтение и запись. Записи ровно одна функция — `writeDataFile`, и она всегда
+ * требует `sha` прочитанного файла: без сверки версии два редактора,
+ * заполняющие неделю в один вечер, затрут работу друг друга и оба об этом
+ * не узнают.
  */
 import { CONFIG } from '../../config.js';
 import { authHeaders } from './auth.js';
@@ -24,6 +25,18 @@ function repoBase() {
 }
 
 /**
+ * Конфликт версии: файл изменился между чтением и записью.
+ *
+ * Текст живёт отдельной константой, потому что это единственная ошибка,
+ * после которой у человека есть понятное действие, а не «позовите
+ * разработчика». Черновик при этом цел, поэтому и говорим про «Обновить»,
+ * а не про «начните сначала».
+ */
+export const CONFLICT_MESSAGE =
+  'Файл успели изменить, пока вы заполняли неделю. Черновик сохранён в браузере — ' +
+  'нажмите «Обновить», и он применится к свежим данным.';
+
+/**
  * Человеческое объяснение вместо кода ответа.
  *
  * Панель ведут не программисты, и «404» им ничего не говорит. Хуже того,
@@ -33,37 +46,61 @@ function repoBase() {
  *
  * @param {Response} res
  * @param {any} body
+ * @param {string} method
+ * @returns {{message: string, conflict: boolean}}
  */
-function explain(res, body) {
+function explain(res, body, method) {
   const detail = body && typeof body.message === 'string' ? body.message : '';
   const { owner, repo } = CONFIG.github;
+  const plain = (message) => ({ message, conflict: false });
 
   if (res.status === 401) {
-    return 'Токен не принят. Скорее всего он скопирован не полностью, уже отозван или истёк срок годности. Нужно выйти и вставить новый.';
+    return plain('Токен не принят. Скорее всего он скопирован не полностью, уже отозван или истёк срок годности. Нужно выйти и вставить новый.');
   }
   if (res.status === 403) {
     if (res.headers.get('x-ratelimit-remaining') === '0') {
-      return 'Слишком много запросов к GitHub. Лимит восстанавливается автоматически в течение часа.';
+      return plain('Слишком много запросов к GitHub. Лимит восстанавливается автоматически в течение часа.');
     }
-    return `GitHub отказал в доступе. Проверьте, что у токена есть право «Contents» на запись. ${detail}`.trim();
+    return plain(`GitHub отказал в доступе. Проверьте, что у токена есть право «Contents» на запись. ${detail}`.trim());
   }
   if (res.status === 404) {
-    return `Не найдено: ${owner}/${repo}. Либо в config.js опечатка, либо у токена нет доступа именно к этому репозиторию — GitHub в обоих случаях отвечает одинаково.`;
+    return plain(`Не найдено: ${owner}/${repo}. Либо в config.js опечатка, либо у токена нет доступа именно к этому репозиторию — GitHub в обоих случаях отвечает одинаково.`);
   }
-  if (res.status === 409) {
-    return 'Репозиторий пуст — в нём ещё нет ни одного коммита.';
-  }
-  return `GitHub ответил ошибкой ${res.status}. ${detail}`.trim();
+
+  /*
+    409 у GitHub означает разное в зависимости от запроса: при записи это
+    расхождение версий, при чтении — пустой репозиторий без коммитов.
+    Различаем по методу, иначе редкий случай пустого репозитория показал бы
+    сообщение про чужую правку и отправил человека искать несуществующий конфликт.
+  */
+  const versionClash =
+    (res.status === 409 && method !== 'GET') ||
+    (res.status === 422 && /sha|does not match|fast.?forward/i.test(detail));
+
+  if (versionClash) return { message: CONFLICT_MESSAGE, conflict: true };
+  if (res.status === 409) return plain('Репозиторий пуст — в нём ещё нет ни одного коммита.');
+
+  return plain(`GitHub ответил ошибкой ${res.status}. ${detail}`.trim());
 }
 
 /**
+ * Один запрос к API. Единственное место, где панель выходит в сеть.
+ *
  * @param {string} url
- * @param {string} [token] Токен для проверки при входе, до сохранения.
+ * @param {{method?: string, body?: any, token?: string}} [opts]
  */
-async function get(url, token) {
+async function request(url, { method = 'GET', body, token } = {}) {
   let res;
   try {
-    res = await fetch(url, { headers: authHeaders(token), cache: 'no-store' });
+    res = await fetch(url, {
+      method,
+      headers: {
+        ...authHeaders(token),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+    });
   } catch {
     /*
       Сетевая ошибка, а не ответ сервера. Для российской аудитории это
@@ -73,16 +110,24 @@ async function get(url, token) {
   }
 
   if (!res.ok) {
-    let body = null;
+    let payload = null;
     try {
-      body = await res.json();
+      payload = await res.json();
     } catch {
       /* тело не обязано быть JSON — объясним по одному коду */
     }
-    throw new Error(explain(res, body));
+    const { message, conflict } = explain(res, payload, method);
+    const error = new Error(message);
+    if (conflict) error.conflict = true;
+    throw error;
   }
 
   return res.json();
+}
+
+/** @param {string} url @param {string} [token] */
+function get(url, token) {
+  return request(url, { token });
 }
 
 /**
@@ -97,6 +142,61 @@ export function decodeBase64Utf8(b64) {
   const bin = atob(String(b64).replace(/\s/g, ''));
   const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
   return new TextDecoder('utf-8').decode(bytes);
+}
+
+/**
+ * текст → base64 с кириллицей.
+ *
+ * Обратная сторона декодера, и с той же ловушкой: `btoa` принимает только
+ * байты, поэтому текст сначала кодируется в UTF-8. Байты в строку собираем
+ * куском по 8 килобайт, а не одним `String.fromCharCode(...bytes)`: спред
+ * массива на сотню тысяч элементов кладёт стек, и сломалось бы это не сразу,
+ * а через год, когда данных накопится достаточно.
+ *
+ * @param {string} text
+ */
+export function encodeBase64Utf8(text) {
+  const bytes = new TextEncoder().encode(text);
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * ЗАПИСЬ ФАЙЛА ДАННЫХ — единственное место в панели, которое меняет данные.
+ *
+ * `sha` обязателен и передаётся всегда: это версия файла, которую человек
+ * видел, когда начинал заполнять. Если в репозитории лежит уже другая,
+ * GitHub откажет, и мы покажем понятное объяснение вместо того, чтобы
+ * тихо затереть чужую работу. Именно поэтому параметр не имеет значения
+ * по умолчанию — забыть его нельзя.
+ *
+ * @param {{text: string, sha: string, message: string}} opts
+ */
+export async function writeDataFile({ text, sha, message }) {
+  if (!sha) throw new Error('Внутренняя ошибка: публикация без версии файла запрещена.');
+
+  const { branch, dataPath } = CONFIG.github;
+  const url = `${repoBase()}/contents/${dataPath.split('/').map(encodeURIComponent).join('/')}`;
+
+  const res = await request(url, {
+    method: 'PUT',
+    body: {
+      message,
+      content: encodeBase64Utf8(text),
+      sha,
+      branch,
+    },
+  });
+
+  return {
+    sha: res.content?.sha ?? '',
+    commitSha: String(res.commit?.sha ?? '').slice(0, 7),
+    commitUrl: res.commit?.html_url ?? '',
+  };
 }
 
 /**
