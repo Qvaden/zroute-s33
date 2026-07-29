@@ -7,7 +7,8 @@
  * файл открывается двойным кликом, данные в нём выдуманные, а вёрстка
  * настоящая: те же экраны и тот же каркас, что в admin.html.
  *
- * Запуск:  node scripts/build-admin-preview.mjs [файл]
+ * Запуск:  node scripts/build-admin-preview.mjs [стартовый-экран] [файл]
+ * Пример:  node scripts/build-admin-preview.mjs week dist/panel-week.html
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
@@ -20,7 +21,13 @@ import { renderAlliances } from '../src/admin/screens/alliances.js';
 import { renderEvents } from '../src/admin/screens/events.js';
 import { renderTexts } from '../src/admin/screens/texts.js';
 
-const outFile = process.argv[2] || 'dist/admin-preview.html';
+const SCREEN_IDS = ['overview', 'week', 'alliances', 'events', 'texts'];
+
+// Первый аргумент может быть и экраном, и именем файла — различаем по списку
+// экранов, иначе «week» без второго аргумента стал бы именем выходного файла.
+const startsWithScreen = SCREEN_IDS.includes(process.argv[2]);
+const startId = startsWithScreen ? process.argv[2] : 'overview';
+const outFile = (startsWithScreen ? process.argv[3] : process.argv[2]) || 'dist/admin-preview.html';
 
 const raw = JSON.parse(await readFile('data/demo.json', 'utf8'));
 const data = mapDataset(raw);
@@ -74,7 +81,7 @@ const [siteCss, admCss] = await Promise.all([
 ]);
 
 const inner = SCREENS.map(
-  (s, i) => `<div class="page${i === 0 ? ' is-active' : ''}" id="page-${s.id}">${s.html}</div>`
+  (s) => `<div class="page${s.id === startId ? ' is-active' : ''}" id="page-${s.id}">${s.html}</div>`
 ).join('\n');
 
 const html = `<!DOCTYPE html>
@@ -96,7 +103,7 @@ ${admCss}
 </head>
 <body class="adm">
 <div id="admin">
-${renderShell({ screens: SCREENS, activeId: 'overview', inner, login: view.user.login })}
+${renderShell({ screens: SCREENS, activeId: startId, inner, login: view.user.login, canPush: true })}
 </div>
 
 <script>
