@@ -31,6 +31,15 @@ function equal(label, actual, expected) {
   check(label, a === e, a === e ? '' : `получено: ${a}\n       ожидалось: ${e}`);
 }
 
+/*
+  Тесты обязаны работать с фиксированными данными, а не с тем, на что указывает
+  боевой конфиг. Иначе они начинают падать при каждом изменении реальной
+  таблицы — и падают не потому, что код сломался, а потому что данные другие.
+  Ровно это и случилось, когда сайт перевели с демо-данных на живую выгрузку.
+*/
+CONFIG.json.path = './data/demo.json';
+jsonAdapter.clearCache();
+
 // ── A. json-адаптер отдаёт данные, соответствующие доменной модели ──────────
 console.log('\nA. Контракт json-адаптера');
 {
@@ -371,7 +380,20 @@ console.log('\nH. Связка хронологии: разметка ↔ скр
   const { readFile } = await import('node:fs/promises');
   const { renderTimeline } = await import('../src/pages/timeline.js');
 
-  const events = await jsonAdapter.getEvents();
+  /*
+    Свой набор событий, а не из адаптера: в реальной таблице хронология может
+    быть пустой, и тогда страница показывает состояние «летопись не начата»,
+    в котором проверяемых элементов нет вовсе. Тест должен проверять разметку
+    заполненной страницы независимо от того, что сейчас в данных.
+  */
+  const events = [
+    { id: 'e1', date: new Date('2026-04-18'), type: 'server_capture', serverNumber: 47,
+      title: 'Захвачен сервер 47', durationDays: 3 },
+    { id: 'e2', date: new Date('2026-05-02'), type: 'war', title: 'Война за зону', durationDays: 14 },
+    { id: 'e3', date: new Date('2025-11-22'), type: 'merge', title: 'Слияние альянсов' },
+    { id: 'e4', date: new Date('2026-06-28'), type: 'server_capture', serverNumber: 12,
+      title: 'Захвачен сервер 12', durationDays: 9 },
+  ];
   const html = renderTimeline({ events });
   const script = await readFile('src/ui/timeline-controls.js', 'utf8');
 

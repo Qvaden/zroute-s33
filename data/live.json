@@ -1,0 +1,302 @@
+{
+  "pulledAt": "2026-07-29T00:34:14.719Z",
+  "source": "google-sheets:1syc7ywnmwpVGVOycaGOe-HqsUb75HNXs-cyltGVXaDE",
+  "alliances": [
+    {
+      "id": "a01",
+      "tag": "cccp",
+      "name": "CosmicCoalition",
+      "color": "#d44949",
+      "active": true
+    },
+    {
+      "id": "a02",
+      "tag": "AMGK",
+      "name": "AllMightyGodKillers",
+      "color": "#e18651",
+      "active": true
+    },
+    {
+      "id": "a03",
+      "tag": "KOP",
+      "name": "KingsOfPerfection",
+      "color": "#ed925a",
+      "active": true
+    },
+    {
+      "id": "a04",
+      "tag": "Dnr",
+      "name": "Donetsk",
+      "color": "#e0c77b",
+      "active": true
+    },
+    {
+      "id": "a05",
+      "tag": "BARS",
+      "name": "BloodyLegion",
+      "color": "#deb73f",
+      "active": true
+    },
+    {
+      "id": "a06",
+      "tag": "TWay",
+      "name": "ThatsTheWay",
+      "color": "#d8eb47",
+      "active": true
+    },
+    {
+      "id": "a07",
+      "tag": "SRV",
+      "name": "ShieldRisingVictory",
+      "color": "#cddc6a",
+      "active": true
+    },
+    {
+      "id": "a08",
+      "tag": "КР33",
+      "name": "Кремлёвцы",
+      "color": "#ade773",
+      "active": true
+    },
+    {
+      "id": "a09",
+      "tag": "Gig",
+      "name": "Gigant",
+      "color": "#8fe935",
+      "active": true
+    },
+    {
+      "id": "a10",
+      "tag": "UNGD",
+      "name": "UNDERGROUND",
+      "color": "#6bd85a",
+      "active": true
+    },
+    {
+      "id": "a11",
+      "tag": "FGG",
+      "name": "ForGoodGame",
+      "color": "#71e462",
+      "active": true
+    },
+    {
+      "id": "a12",
+      "tag": "FUCK",
+      "name": "FuryUnderCrownKills",
+      "color": "#6cef8d",
+      "active": true
+    },
+    {
+      "id": "a13",
+      "tag": "AMGB",
+      "name": "AlmightyGodBloodline",
+      "color": "#49d46c",
+      "active": true
+    },
+    {
+      "id": "a14",
+      "tag": "INVI",
+      "name": "FightingKittens",
+      "color": "#51e1aa",
+      "active": true
+    },
+    {
+      "id": "a15",
+      "tag": "BEST",
+      "name": "SteelBrotherhood",
+      "color": "#5aedb7",
+      "active": true
+    },
+    {
+      "id": "a16",
+      "tag": "FFR",
+      "name": "FightForRight",
+      "color": "#7be0e0",
+      "active": true
+    },
+    {
+      "id": "a17",
+      "tag": "amgb",
+      "name": "ARTofWAR",
+      "color": "#3fdede",
+      "active": true
+    },
+    {
+      "id": "a18",
+      "tag": "SRVA",
+      "name": "SRVictoryAcademy",
+      "color": "#47afeb",
+      "active": true
+    },
+    {
+      "id": "a19",
+      "tag": "NKVD",
+      "name": "MilitaryKomissariat",
+      "color": "#6ab0dc",
+      "active": true
+    },
+    {
+      "id": "a20",
+      "tag": "MkL",
+      "name": "MakeL163",
+      "color": "#7390e7",
+      "active": true
+    },
+    {
+      "id": "a21",
+      "tag": "EWSR",
+      "name": "EWSR21",
+      "color": "#3562e9",
+      "active": true
+    },
+    {
+      "id": "a22",
+      "tag": "Adon",
+      "name": "Adskie",
+      "color": "#695ad8",
+      "active": true
+    },
+    {
+      "id": "a23",
+      "tag": "EKFA",
+      "name": "EKFAkademy",
+      "color": "#7362e4",
+      "active": true
+    },
+    {
+      "id": "a24",
+      "tag": "F100",
+      "name": "Fragment100",
+      "color": "#ad6cef",
+      "active": true
+    },
+    {
+      "id": "a25",
+      "tag": "FIX",
+      "name": "Fenixx",
+      "color": "#8f49d4",
+      "active": true
+    },
+    {
+      "id": "a26",
+      "tag": "VAR",
+      "name": "Vargar",
+      "color": "#ce51e1",
+      "active": true
+    },
+    {
+      "id": "a27",
+      "tag": "NEAS",
+      "name": "TheCrimsonVangua",
+      "color": "#dc5aed",
+      "active": true
+    },
+    {
+      "id": "a28",
+      "tag": "Love",
+      "name": "Lovendi",
+      "color": "#e07bc7",
+      "active": true
+    },
+    {
+      "id": "a29",
+      "tag": "EKF",
+      "name": "EliteKombatForce",
+      "color": "#de3fb7",
+      "active": true
+    },
+    {
+      "id": "a30",
+      "tag": "TURS",
+      "name": "TURTLES",
+      "color": "#eb4786",
+      "active": true
+    },
+    {
+      "id": "a31",
+      "tag": "tOp",
+      "name": "TORNAD0",
+      "color": "#dc6a94",
+      "active": true
+    },
+    {
+      "id": "a32",
+      "tag": "Kir",
+      "name": "KirFex",
+      "color": "#e77373",
+      "active": true
+    }
+  ],
+  "weeks": [
+    {
+      "id": "W31",
+      "number": 31,
+      "startDate": "2026-07-27",
+      "endDate": "2026-08-02"
+    },
+    {
+      "id": "W32",
+      "number": 32,
+      "startDate": "2026-08-03",
+      "endDate": "2026-08-09"
+    },
+    {
+      "id": "W33",
+      "number": 33,
+      "startDate": "2026-08-10",
+      "endDate": "2026-08-16"
+    },
+    {
+      "id": "W34",
+      "number": 34,
+      "startDate": "2026-08-17",
+      "endDate": "2026-08-23"
+    },
+    {
+      "id": "W35",
+      "number": 35,
+      "startDate": "2026-08-24",
+      "endDate": "2026-08-30"
+    },
+    {
+      "id": "W36",
+      "number": 36,
+      "startDate": "2026-08-31",
+      "endDate": "2026-09-06"
+    }
+  ],
+  "results": [],
+  "events": [],
+  "texts": [
+    {
+      "key": "guide-intro",
+      "title": "Малым альянсам",
+      "body": "Разница между альянсом, который побеждает, и альянсом, который разваливается, почти никогда не в донате. Она в том, знает ли человек, что от него ждут, и происходит ли обещанное."
+    },
+    {
+      "key": "guide-principles",
+      "title": "Образцовое руководство альянсом",
+      "body": "## Роли вместо героизма\nЛидер, который тянет всё сам, выгорает за месяц, и альянс умирает вместе с его интересом.\nМинимум четыре человека с обязанностями: набор, ведение VS, контроль активности, дипломатия.\n## Расписание, которое не меняется\nВремя сбора на VS объявлено заранее и не переносится. Люди планируют вокруг него вечер.\nОдин перенос «по ситуации» стоит дороже, чем кажется: в следующий раз половина не придёт.\n## Помощь в стройке — обязанность, а не одолжение\nПравило в одну строку: зашёл в игру — нажал помощь всем. Это ничего не стоит.\n## Разговор до исключения, а не вместо него\nПоловина «неактивных» возвращается после одного сообщения. Молчаливый кик убивает доверие.\n## Разбор после VS по фактам\nНе «мы проиграли, все плохие», а конкретно: кто не вышел, где просели, что делаем иначе.\n## Дипломатия — тоже стратегия\nМалому альянсу договорённость с сильным соседом даёт больше, чем три выигранных боя."
+    },
+    {
+      "key": "guide-week",
+      "title": "Ритм недели",
+      "body": "- **Понедельник** — разбор прошлого VS: кто вышел, где просели, что меняем.\n- **Среда** — проверка активности. Написать тем, кто пропал.\n- **Пятница** — напоминание о сборе и составе.\n- **Суббота** — VS. Руководство на связи весь бой.\n- **Воскресенье** — итоги недели, приём новых."
+    },
+    {
+      "key": "guide-donts",
+      "title": "Чего делать не стоит",
+      "body": "- Брать всех подряд ради численности. Двадцать активных сильнее пятидесяти спящих.\n- Кикать молча. Один такой случай обсуждают потом месяц.\n- Менять правила каждую неделю. Непредсказуемое руководство хуже строгого.\n- Воевать со всеми сразу. Малый альянс не переживёт два фронта.\n- Требовать донат. Требовать можно только активность — она бесплатна."
+    },
+    {
+      "key": "guide-benefits",
+      "title": "Что даёт крупный альянс",
+      "body": "- **Стройки идут быстрее.** Помощь от полусотни человек — это часы экономии каждый день.\n- **Награды за события альянса** выше и достаются регулярно.\n- **Защита.** По одиночкам и слабым альянсам фармят. По крупным — думают дважды.\n- **Соперники сильнее.** Проигранный VS сильному даёт больше, чем лёгкая победа.\n- **Мощь растёт быстрее**, а значит открывается вход в ещё более сильные альянсы."
+    },
+    {
+      "key": "about",
+      "title": "О сайте",
+      "body": "Неофициальный сайт 33 сервера Z Route: Redemption. Данные вносятся вручную после каждого VS."
+    }
+  ]
+}
