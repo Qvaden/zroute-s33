@@ -145,6 +145,7 @@ function render() {
     inner: screen.render(view, param),
     login: view.user?.login ?? '',
     canPush: Boolean(view.repo?.canPush),
+    weekIds: view.data.weeks.map((w) => w.id),
   });
 
   window.scrollTo(0, 0);

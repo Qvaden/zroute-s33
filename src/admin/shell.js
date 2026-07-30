@@ -18,15 +18,22 @@ import { draftWeekIds } from './draft.js';
  *   login?: string,
  *   token?: string,
  *   canPush?: boolean,
+ *   weekIds?: string[],
  * }} opts
  */
-export function renderShell({ screens, activeId, inner, login = '', token, canPush = true }) {
+export function renderShell({ screens, activeId, inner, login = '', token, canPush = true, weekIds }) {
   /*
     Значок незаконченного ввода виден с любого экрана. Черновик живёт
     в браузере и молча ждёт публикации — без напоминания неделя может
     просидеть в нём до следующего VS, и никто не поймёт, почему на сайте пусто.
+
+    Показываем только черновики существующих недель. После переномерации
+    недель (W31 → W1) в браузере остаются черновики со старыми ключами:
+    значок вёл бы на неделю, которой больше нет. Сам черновик не удаляем —
+    вдруг это чья-то незаконченная работа, а данные восстановят.
   */
-  const drafts = draftWeekIds();
+  const known = weekIds ? new Set(weekIds) : null;
+  const drafts = draftWeekIds().filter((id) => !known || known.has(id));
 
   return `
     <header class="adm-top">
