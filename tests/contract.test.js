@@ -940,7 +940,7 @@ console.log('\nK. Публикация недели');
 // ── L. Серверные события: захваты и защиты ──────────────────────────────────
 console.log('\nL. Летопись сервера: захватили, защитили, потеряли');
 {
-  const { EVENT_TYPE, EVENT_TYPE_ORDER, SERVER_TYPES, isServerEvent, verdictText, serverEvents } =
+  const { EVENT_TYPE, EVENT_TYPE_ORDER, SERVER_TYPES, isServerEvent, verdictText, pillText, serverEvents } =
     await import('../src/logic/event-types.js');
   const { renderTimeline } = await import('../src/pages/timeline.js');
 
@@ -963,15 +963,45 @@ console.log('\nL. Летопись сервера: захватили, защи�
     EVENT_TYPE_ORDER.every((t) => Boolean(EVENT_TYPE[t].filter))
   );
 
-  // Защиту своего сервера номером подписывать не обязательно — он и так известен.
-  equal('вердикт защиты без номера подставляет свой сервер',
-    verdictText('server_defended', undefined, 33), 'Успешно защитили сервер 33');
-  equal('вердикт захвата с номером',
-    verdictText('server_capture', 74, 33), 'Успешно захватили сервер 74');
-  equal('вердикт захвата без номера не выдумывает номер',
-    verdictText('server_capture', undefined, 33), 'Успешно захватили сервер');
-  equal('потеря названа прямо', verdictText('server_lost', 19, 33), 'Сервер 19 потерян');
-  equal('война вердикта не имеет', verdictText('war', undefined, 33), '');
+  /*
+    НОМЕР ЗНАЧИТ РАЗНОЕ У АТАКИ И У ЗАЩИТЫ.
+
+    При захвате — чей Капитолий берём. При защите — кто на нас шёл: свой
+    Капитолий у сервера один, и «чей» там вопрос без смысла. Раньше при защите
+    подставлялся свой 33, и это была бы тихая ложь — цифра выглядела бы
+    осмысленной, называя нападавшим того, кто никуда не нападал.
+  */
+  equal('захват называет чужой Капитолий',
+    verdictText('server_capture', 74), 'Захватили Капитолий сервера 74');
+  equal('проигранный захват называется прямо',
+    verdictText('capture_failed', 52), 'Проиграли захват Капитолия сервера 52');
+  equal('защита называет нападавшего',
+    verdictText('server_defended', 51), 'Успешно защитили свой Капитолий от сервера 51');
+  equal('потеря называет нападавшего',
+    verdictText('server_lost', 19), 'Не смогли защитить Капитолий от сервера 19');
+
+  equal('без номера захват не выдумывает сервер',
+    verdictText('server_capture', undefined), 'Захватили чужой Капитолий');
+  equal('без номера защита не выдумывает нападавшего',
+    verdictText('server_defended', undefined), 'Успешно защитили свой Капитолий');
+  check('свой номер 33 в защиту не подставляется',
+    !verdictText('server_defended', undefined).includes('33'));
+  equal('война вердикта не имеет', verdictText('war', undefined), '');
+
+  // Плашка летописи: у защиты нужен предлог, иначе «отбились 51» непонятно.
+  equal('плашка захвата', pillText('server_capture', 74), 'взяли 74');
+  equal('плашка защиты с предлогом', pillText('server_defended', 51), 'отбились от 51');
+  equal('плашка потери с предлогом', pillText('server_lost', 19), 'не отбились от 19');
+  equal('плашка без номера', pillText('server_defended', null), 'отбились');
+
+  check(
+    'у каждого серверного типа есть подписи для поля номера',
+    SERVER_TYPES.every((t) => EVENT_TYPE[t].numberLabel && EVENT_TYPE[t].numberHint)
+  );
+  equal('при захвате поле спрашивает чей Капитолий',
+    EVENT_TYPE.server_capture.numberLabel, 'Чей Капитолий');
+  equal('при защите поле спрашивает кто нападал',
+    EVENT_TYPE.server_defended.numberLabel, 'Кто нападал');
 
   const ev = (id, date, type, serverNumber) => ({
     id, type, serverNumber, title: 'т', date: new Date(date),
@@ -995,7 +1025,8 @@ console.log('\nL. Летопись сервера: захватили, защи�
   /* ── Вкладка «Хронология» ── */
   const html = renderTimeline({ events: list });
   check('вердикт показан', html.includes('verdict'));
-  check('вердикт берёт самое свежее серверное событие', html.includes('Сервер 19 потерян'));
+  check('вердикт берёт самое свежее серверное событие',
+    html.includes('Не смогли защитить Капитолий от сервера 19'));
   check('потеря красится как поражение', /verdict--loss/.test(html));
   equal('в летописи столько плашек, сколько серверных событий',
     (html.match(/class="wk /g) || []).length, 3);
@@ -1004,7 +1035,8 @@ console.log('\nL. Летопись сервера: захватили, защи�
 
   const held = renderTimeline({ events: [ev('e9', '2026-06-01', 'server_defended')] });
   check('успешная защита красится как победа', /verdict--win/.test(held));
-  check('защита своего сервера подписана', held.includes('Успешно защитили сервер 33'));
+  check('защита без номера подписана без выдуманного нападавшего',
+    held.includes('Успешно защитили свой Капитолий'));
 
   // Пустая летопись: экран должен объяснять, а не пустовать.
   const blank = renderTimeline({ events: [] });

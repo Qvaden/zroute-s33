@@ -4,8 +4,12 @@ import { EVENT_TYPE, EVENT_TYPE_ORDER, eventsDiff, eventsFromRaw } from '../edit
 /**
  * ХРОНОЛОГИЯ — летопись сервера.
  *
- * Здесь записывается всё, что делал сервер целиком: захватил чужой, удержал
- * свой, не смог взять, потерял. Плюс войны, слияния альянсов и прочее.
+ * Здесь записывается всё, что делал сервер целиком: брал чужие Капитолии
+ * и отбивал свой. Плюс войны, слияния альянсов и прочее.
+ *
+ * Номер сервера в форме значит разное: при захвате — чей Капитолий берём,
+ * при защите — кто на нас шёл. Свой Капитолий у нас один, 33-го сервера,
+ * поэтому «чей» при защите вопрос без смысла.
  *
  * Экран «Неделя» этого не касается вовсе — там только счёт альянсов в VS.
  * Раньше захваты жили в двух местах сразу, и один и тот же сервер можно было
@@ -32,7 +36,7 @@ export function renderEvents(view) {
       <p class="adm-lead">
         ${plural(list.length, 'запись', 'записи', 'записей')}
         <span class="adm-dot">·</span>
-        ${plural(captures.length, 'сервер взят', 'сервера взято', 'серверов взято')}
+        ${plural(captures.length, 'Капитолий взят', 'Капитолия взято', 'Капитолиев взято')}
       </p>
     </section>
 
@@ -74,7 +78,7 @@ export function renderEvents(view) {
 function empty() {
   return `<p class="muted adm-note">
     Записей пока нет — поэтому вкладка «Хронология» на сайте пустая.
-    Добавьте первую: захват сервера, успешную защиту своего, войну
+    Добавьте первую: взятый Капитолий, отбитое нападение, войну
     или слияние альянсов.
   </p>`;
 }
@@ -120,6 +124,14 @@ function renderForm(form, canPush) {
   if (!form || !canPush) return '';
 
   const isNew = !form.id;
+
+  /*
+    Подпись поля с номером зависит от типа, и это не косметика: при захвате
+    там чужой сервер, при защите — тот, кто на нас шёл. Одна общая подпись
+    «Номер сервера» гарантированно приводила бы к путанице в обе стороны.
+  */
+  const meta = EVENT_TYPE[form.type] ?? EVENT_TYPE.other;
+
   const types = EVENT_TYPE_ORDER.map(
     (t) => `<button type="button" class="adm-chip ${form.type === t ? 'is-on' : ''}"
               data-event-type="${t}">${esc(EVENT_TYPE[t].label)}</button>`
@@ -141,17 +153,18 @@ function renderForm(form, canPush) {
           <input type="date" data-event-field="date" value="${esc(form.date)}">
         </label>
         <label class="adm-field">
-          <span>Номер сервера</span>
+          <span>${esc(meta.numberLabel ?? 'Номер сервера')}</span>
           <input type="number" inputmode="numeric" min="1" max="9999"
                  data-event-field="serverNumber" value="${esc(form.serverNumber ?? '')}"
-                 placeholder="например 74">
+                 placeholder="${esc(meta.numberHint ?? 'необязательно')}">
+          ${meta.action ? `<i class="muted">${esc(meta.numberHint ?? '')}</i>` : ''}
         </label>
       </div>
 
       <label class="adm-field">
         <span>Заголовок</span>
         <input type="text" data-event-field="title" value="${esc(form.title)}"
-               placeholder="Захвачен сервер 74">
+               placeholder="${esc(titlePlaceholder(form.type))}">
       </label>
 
       <label class="adm-field">
@@ -175,8 +188,11 @@ function renderForm(form, canPush) {
       </div>
 
       <p class="adm-form__hint muted">
-        Захваты с номером сервера попадают на «стену трофеев», а длительность
-        сама считает самый быстрый и самый долгий захват.
+        ${
+          meta.action === 'defense'
+            ? 'Защищаем мы только свой Капитолий 33 сервера, поэтому здесь номер того, кто нападал, а не свой.'
+            : 'Захваты с номером сервера попадают на «стену трофеев», а длительность сама считает самый быстрый и самый долгий захват.'
+        }
       </p>
 
       <div class="adm-result adm-result--bad" data-event-problems hidden></div>
@@ -192,6 +208,18 @@ function renderForm(form, canPush) {
         </div>
       </div>
     </section>`;
+}
+
+/** Пример заголовка под выбранный тип — чтобы не гадать, что тут писать. */
+function titlePlaceholder(type) {
+  return {
+    server_capture: 'Взят Капитолий сервера 74',
+    capture_failed: 'Не взяли Капитолий сервера 52',
+    server_defended: 'Отбили нападение сервера 51',
+    server_lost: 'Капитолий потерян: напал сервер 19',
+    war: 'Война за Красную зону',
+    merge: 'Слияние: Вьюга вошла в Бастион',
+  }[type] ?? 'Коротко о том, что случилось';
 }
 
 /** Что уйдёт в коммит, словами. Удаление — всегда вслух. */

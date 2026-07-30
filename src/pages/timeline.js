@@ -1,14 +1,14 @@
 import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl } from '../ui/helpers.js';
-import { EVENT_TYPE, EVENT_TYPE_ORDER, serverEvents, verdictText } from '../logic/event-types.js';
-import { CONFIG } from '../../config.js';
+import { EVENT_TYPE, EVENT_TYPE_ORDER, serverEvents, verdictText, pillText } from '../logic/event-types.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
 /**
- * Хронология: «прикольно будет смотреть, когда какой сервер был побеждён».
+ * Хронология: «прикольно будет смотреть, когда какой Капитолий был взят».
  *
- * Поэтому главный элемент страницы — не лента, а стена трофеев: крупные
- * номера захваченных серверов. Лента идёт следом, для тех, кому нужны детали.
+ * Сверху крупно — что делал сервер последним: брал чужой Капитолий или отбивал
+ * свой. Ниже стена трофеев с номерами взятых серверов, а за ней лента событий
+ * для тех, кому нужны детали.
  */
 export function renderTimeline({ events }) {
   /*
@@ -25,9 +25,10 @@ export function renderTimeline({ events }) {
         <span class="eyebrow">Хроника завоеваний</span>
         <h2 class="tl__title">Ещё ни одной записи</h2>
         <p class="guide__sub">
-          Здесь будет летопись сервера: кого забрали и что удержали, захваченные
-          серверы крупными плитками и события по датам — войны, слияния альянсов,
-          всё, что стоит запомнить. Первая запись появится, как только её внесут.
+          Здесь будет летопись сервера: чьи Капитолии забрали и как отбивали свой,
+          взятые Капитолии крупными плитками и события по датам — войны, слияния
+          альянсов, всё, что стоит запомнить. Первая запись появится, как только
+          её внесут.
         </p>
       </section>`;
   }
@@ -66,8 +67,6 @@ const MONTH_NAME = [
 function renderServerSection(list) {
   if (!list.length) return '';
 
-  const own = CONFIG.server;
-
   const cards = list
     .map((e, i) => {
       const m = EVENT_TYPE[e.type];
@@ -78,7 +77,7 @@ function renderServerSection(list) {
             <b class="num">${e.date.getUTCDate()}</b>
           </div>
           <div class="verdict__body">
-            <h2 class="verdict__text">${esc(verdictText(e.type, e.serverNumber, own))}</h2>
+            <h2 class="verdict__text">${esc(verdictText(e.type, e.serverNumber))}</h2>
             <p class="verdict__dates">
               ${esc(fmtDateFull(e.date))}
               ${e.durationDays ? `<span class="hero__sep">·</span> ${plural(e.durationDays, 'день', 'дня', 'дней')}` : ''}
@@ -102,26 +101,19 @@ function renderServerSection(list) {
     })
     .join('');
 
+  /*
+    Подпись плашки собирает словарь: у атаки и у защиты номер значит разное,
+    и «отбились от 51» нельзя склеить теми же кусками, что «взяли 74».
+  */
   const pills = list
     .map((e) => {
       const m = EVENT_TYPE[e.type];
-
-      /*
-        Номер показываем только когда он что-то добавляет. При защите своего
-        сервера он один и тот же каждый раз, и лента превращалась
-        в «удержали 33 · удержали 33 · удержали 33» — шум, за которым
-        перестают читать смысл. Чужой номер при защите, наоборот, важен:
-        значит держали ранее захваченный.
-      */
-      const num = e.serverNumber ?? null;
-      const worthShowing = num != null && (m.action === 'capture' || num !== own);
-
       return `<li>
         <button type="button" class="wk wk--${m.kind} wk--${m.action}"
                 data-tl-week="${esc(e.id)}" data-tl-ym="${ymKey(e.date)}"
                 title="${esc(fmtDateFull(e.date))}">
           <span class="wk__num num">${esc(fmtDate(e.date))}</span>
-          <span class="wk__what">${esc(m.short)}${worthShowing ? ` <b class="num">${num}</b>` : ''}</span>
+          <span class="wk__what">${esc(pillText(e.type, e.serverNumber))}</span>
         </button>
       </li>`;
     })
@@ -166,7 +158,7 @@ function renderTrophies(captures, all) {
   const stats = [
     {
       value: captures.length,
-      label: pluralWord(captures.length, 'сервер взят', 'сервера взято', 'серверов взято'),
+      label: pluralWord(captures.length, 'Капитолий взят', 'Капитолия взято', 'Капитолиев взято'),
     },
     {
       value: months,
@@ -195,7 +187,7 @@ function renderTrophies(captures, all) {
   return `
     <section class="hero hero--tl">
       <span class="eyebrow">Хроника завоеваний</span>
-      <h2 class="tl__title">Кого мы забрали</h2>
+      <h2 class="tl__title">Чьи Капитолии забрали</h2>
 
       <div class="tl__stats">
         ${stats
