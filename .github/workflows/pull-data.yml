@@ -5,21 +5,7 @@ name: Выгрузка данных из таблицы
 # а не к docs.google.com — см. комментарий в config.js.
 
 on:
-  schedule:
-    # Каждые 30 минут. Точность расписания у GitHub плавает на несколько минут,
-    # но для данных, которые меняются раз в неделю, это несущественно.
-    - cron: '*/30 * * * *'
-  # Кнопка «запустить сейчас» на вкладке Actions — когда ждать полчаса не хочется.
   workflow_dispatch:
-  # После правок кода тоже обновляем: заодно проверяем, что скрипт жив.
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/pull-sheet.mjs'
-      - 'src/data/adapters/sheets.js'
-      - 'src/data/adapters/_coerce.js'
-      - 'src/data/contract.js'
-      - 'config.js'
 
 # Два одновременных запуска мешали бы друг другу при коммите.
 concurrency:
