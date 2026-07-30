@@ -236,16 +236,13 @@
       "id": "W17",
       "number": 17,
       "startDate": "2026-04-13",
-      "endDate": "2026-04-19",
-      "serverOutcome": "held"
+      "endDate": "2026-04-19"
     },
     {
       "id": "W18",
       "number": 18,
       "startDate": "2026-04-20",
-      "endDate": "2026-04-26",
-      "serverOutcome": "captured",
-      "serverNumber": 19
+      "endDate": "2026-04-26"
     },
     {
       "id": "W19",
@@ -257,16 +254,13 @@
       "id": "W20",
       "number": 20,
       "startDate": "2026-05-04",
-      "endDate": "2026-05-10",
-      "serverOutcome": "not_captured",
-      "serverNumber": 52
+      "endDate": "2026-05-10"
     },
     {
       "id": "W21",
       "number": 21,
       "startDate": "2026-05-11",
-      "endDate": "2026-05-17",
-      "serverOutcome": "held"
+      "endDate": "2026-05-17"
     },
     {
       "id": "W22",
@@ -278,39 +272,31 @@
       "id": "W23",
       "number": 23,
       "startDate": "2026-05-25",
-      "endDate": "2026-05-31",
-      "serverOutcome": "captured",
-      "serverNumber": 47
+      "endDate": "2026-05-31"
     },
     {
       "id": "W24",
       "number": 24,
       "startDate": "2026-06-01",
-      "endDate": "2026-06-07",
-      "serverOutcome": "lost",
-      "serverNumber": 33
+      "endDate": "2026-06-07"
     },
     {
       "id": "W25",
       "number": 25,
       "startDate": "2026-06-08",
-      "endDate": "2026-06-14",
-      "serverOutcome": "held"
+      "endDate": "2026-06-14"
     },
     {
       "id": "W26",
       "number": 26,
       "startDate": "2026-06-15",
-      "endDate": "2026-06-21",
-      "serverOutcome": "captured",
-      "serverNumber": 61
+      "endDate": "2026-06-21"
     },
     {
       "id": "W27",
       "number": 27,
       "startDate": "2026-06-22",
-      "endDate": "2026-06-28",
-      "serverOutcome": "held"
+      "endDate": "2026-06-28"
     }
   ],
   "results": [
@@ -2273,6 +2259,38 @@
       "title": "Захвачен сервер 88",
       "body": "Шестой сервер под контролем. Сопротивление оказалось символическим.",
       "durationDays": 2
+    },
+    {
+      "id": "e13",
+      "date": "2026-02-21",
+      "type": "server_defended",
+      "title": "Отбили нападение сервера 51",
+      "body": "Двое суток обороны. Держались всем сервером, включая малые альянсы.",
+      "durationDays": 2
+    },
+    {
+      "id": "e14",
+      "date": "2026-04-04",
+      "type": "capture_failed",
+      "serverNumber": 52,
+      "title": "Сервер 52 взять не удалось",
+      "body": "Недооценили оборону: у них оказался договор с соседним сервером.",
+      "durationDays": 5
+    },
+    {
+      "id": "e15",
+      "date": "2026-06-13",
+      "type": "server_defended",
+      "title": "Удержали свой сервер",
+      "body": "Третья попытка соседей за месяц. На этот раз даже без потерь по точкам."
+    },
+    {
+      "id": "e16",
+      "date": "2026-07-05",
+      "type": "server_lost",
+      "serverNumber": 19,
+      "title": "Сервер 19 потерян",
+      "body": "Захваченный в марте сервер отбили обратно. Держать два фронта не вышло."
     }
   ],
   "texts": [

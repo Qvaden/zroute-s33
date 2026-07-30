@@ -20,7 +20,7 @@
  */
 import { CONFIG } from '../../../config.js';
 import { parseCsvObjects } from '../../lib/csv.js';
-import { toDate, toBool, toStr, toNumber, toOutcome, toServerOutcome } from './_coerce.js';
+import { toDate, toBool, toStr, toNumber, toOutcome } from './_coerce.js';
 import { byWeekStart } from '../week-order.js';
 
 export const name = 'sheets';
@@ -114,10 +114,6 @@ export async function getWeeks() {
       startDate: toDate(r.startDate),
       endDate: toDate(r.endDate),
       note: toStr(r.note) || undefined,
-      // Итог недели на уровне сервера. В таблице пишется словами:
-      // взяли · не взяли · удержали · потеряли.
-      serverOutcome: toServerOutcome(r.serverOutcome) ?? undefined,
-      serverNumber: toNumber(r.serverNumber) ?? undefined,
     }))
     .sort(byWeekStart);
 }

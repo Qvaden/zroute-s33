@@ -42,45 +42,6 @@ export function toOutcome(raw) {
 }
 
 /**
- * Как записывают итог недели на уровне сервера.
- *
- * Четыре состояния, две оси: захват или защита, получилось или нет.
- * Синонимов много намеренно — человек в таблице пишет как говорит,
- * а не как удобно программе. Порядок проверки важен: «не захватили»
- * должно разбираться раньше «захватили», иначе отрицание потеряется.
- */
-const SERVER_OUTCOME_ALIASES = {
-  captured: ['captured', 'взяли', 'захватили', 'захват', 'забрали', 'взят', 'захвачен'],
-  not_captured: [
-    'not_captured', 'не взяли', 'не захватили', 'не взят', 'не захвачен',
-    'не смогли захватить', 'провал захвата',
-  ],
-  held: ['held', 'удержали', 'защитили', 'защита', 'отбили', 'удержан', 'защищён', 'защищен'],
-  lost: [
-    'lost', 'потеряли', 'не удержали', 'не защитили', 'потерян', 'сдали',
-  ],
-};
-
-/**
- * @param {unknown} raw
- * @returns {import('../../logic/server-outcome.js').ServerOutcome | null}
- *   null — итог не внесён. Это состояние данных, а не пятый исход:
- *   не каждую неделю сервер вообще воюет.
- */
-export function toServerOutcome(raw) {
-  if (raw === null || raw === undefined) return null;
-
-  const key = String(raw).trim().toLowerCase().replace(/\s+/g, ' ');
-  if (key === '') return null;
-
-  // Отрицания проверяем первыми: иначе «не захватили» совпадёт с «захватили».
-  for (const outcome of ['not_captured', 'lost', 'captured', 'held']) {
-    if (SERVER_OUTCOME_ALIASES[outcome].includes(key)) return outcome;
-  }
-  return null;
-}
-
-/**
  * Понимает ISO (2026-07-14), русский формат (14.07.2026) и Date.
  * @param {unknown} raw
  * @returns {Date | null}

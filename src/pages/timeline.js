@@ -1,13 +1,6 @@
 import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl } from '../ui/helpers.js';
-import { SERVER_OUTCOME, verdictText, weeksWithOutcome } from '../logic/server-outcome.js';
+import { EVENT_TYPE, EVENT_TYPE_ORDER, serverEvents, verdictText } from '../logic/event-types.js';
 import { CONFIG } from '../../config.js';
-
-const TYPE = {
-  server_capture: { label: 'Захват сервера', short: 'Захваты' },
-  war:            { label: 'Война',          short: 'Войны' },
-  merge:          { label: 'Слияние',        short: 'Слияния' },
-  other:          { label: 'Событие',        short: 'Прочее' },
-};
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
@@ -17,23 +10,24 @@ const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн',
  * Поэтому главный элемент страницы — не лента, а стена трофеев: крупные
  * номера захваченных серверов. Лента идёт следом, для тех, кому нужны детали.
  */
-export function renderTimeline({ events, allWeeks, weeks }) {
+export function renderTimeline({ events }) {
   /*
-    Недели берём полным списком, а не обрезанным `weeksUpToLastData`.
-    Тот отбрасывает недели без результатов VS — и неделя, где заполнили
-    только серверный итог, исчезла бы со страницы, хотя она внесена.
+    Серверные события — захваты и защиты — это то, за чем на эту вкладку
+    и заходят. Они живут среди обычных событий, а не у недели: кампания может
+    тянуться через несколько недель, и один и тот же захват не должен
+    записываться в двух местах.
   */
-  const outcomes = weeksWithOutcome(allWeeks ?? weeks ?? []);
+  const server = serverEvents(events ?? []);
 
-  if (!events.length && !outcomes.length) {
+  if (!events.length) {
     return `
       <section class="hero hero--tl">
         <span class="eyebrow">Хроника завоеваний</span>
         <h2 class="tl__title">Ещё ни одной записи</h2>
         <p class="guide__sub">
-          Здесь будут итоги недель — кого забрали и что удержали, — захваченные
-          серверы крупными плитками и лента событий по датам: войны, слияния
-          альянсов, всё, что стоит запомнить. Летопись пишется с этой недели.
+          Здесь будет летопись сервера: кого забрали и что удержали, захваченные
+          серверы крупными плитками и события по датам — войны, слияния альянсов,
+          всё, что стоит запомнить. Первая запись появится, как только её внесут.
         </p>
       </section>`;
   }
@@ -42,7 +36,7 @@ export function renderTimeline({ events, allWeeks, weeks }) {
   const captures = sorted.filter((e) => e.type === 'server_capture');
 
   return `
-    ${renderWeeksSection(outcomes)}
+    ${renderServerSection(server)}
     ${captures.length || sorted.length ? renderTrophies(captures, sorted) : ''}
     ${sorted.length ? renderFilters(sorted) : ''}
     ${sorted.length ? renderFeed(sorted) : ''}
@@ -59,42 +53,43 @@ const MONTH_NAME = [
 ];
 
 /**
- * Итог недели — то, за чем на эту вкладку и заходят после VS.
+ * ЧТО ДЕЛАЛ СЕРВЕР — крупный вердикт и летопись под ним.
  *
- * Устройство: крупный вердикт одной недели, под ним календарь (год → месяц)
- * и лента недель. Вердикт не приклеен к последней неделе — он показывает ту,
- * которую выбрали. Через год здесь будет пятьдесят с лишним недель, и без
- * календаря «посмотреть сентябрь» означало бы листать всё подряд.
+ * Вердикт показывает не обязательно последнее событие: по нажатию на любую
+ * плашку он переключается на неё. Календарь (год → месяц) фильтрует и плашки,
+ * и ленту событий ниже — «сентябрь» означает сентябрь везде.
  *
  * Все вердикты отрисованы сразу и спрятаны, а скрипт только переключает
  * видимость. Причина не в лени: так страница работает и в собранном одним
  * файлом превью, где данных для перерисовки нет вовсе.
  */
-function renderWeeksSection(outcomes) {
-  if (!outcomes.length) return '';
+function renderServerSection(list) {
+  if (!list.length) return '';
 
   const own = CONFIG.server;
 
-  const cards = outcomes
-    .map((w, i) => {
-      const m = SERVER_OUTCOME[w.serverOutcome];
+  const cards = list
+    .map((e, i) => {
+      const m = EVENT_TYPE[e.type];
       return `
-        <div class="verdict verdict--${m.kind}" data-tl-verdict="${esc(w.id)}" ${i === 0 ? '' : 'hidden'}>
+        <div class="verdict verdict--${m.kind}" data-tl-verdict="${esc(e.id)}" ${i === 0 ? '' : 'hidden'}>
           <div class="verdict__week">
-            <span>Неделя</span>
-            <b class="num">${w.number}</b>
+            <span>${esc(MONTH_SHORT[e.date.getUTCMonth()])}</span>
+            <b class="num">${e.date.getUTCDate()}</b>
           </div>
           <div class="verdict__body">
-            <h2 class="verdict__text">${esc(verdictText(w.serverOutcome, w.serverNumber, own))}</h2>
-            <p class="verdict__dates">${esc(fmtDate(w.startDate))} — ${esc(fmtDate(w.endDate))}</p>
+            <h2 class="verdict__text">${esc(verdictText(e.type, e.serverNumber, own))}</h2>
+            <p class="verdict__dates">
+              ${esc(fmtDateFull(e.date))}
+              ${e.durationDays ? `<span class="hero__sep">·</span> ${plural(e.durationDays, 'день', 'дня', 'дней')}` : ''}
+            </p>
           </div>
         </div>`;
     })
     .join('');
 
-  // Годы и месяцы — только те, в которых есть внесённые недели.
-  const years = [...new Set(outcomes.map((w) => w.startDate.getUTCFullYear()))].sort((a, b) => b - a);
-  const months = [...new Set(outcomes.map((w) => ymKey(w.startDate)))].sort().reverse();
+  const years = [...new Set(list.map((e) => e.date.getUTCFullYear()))].sort((a, b) => b - a);
+  const months = [...new Set(list.map((e) => ymKey(e.date)))].sort().reverse();
 
   const yearChips = years
     .map((y) => `<button type="button" class="cal__btn" data-tl-yr="${y}">${y}</button>`)
@@ -107,25 +102,25 @@ function renderWeeksSection(outcomes) {
     })
     .join('');
 
-  const pills = outcomes
-    .map((w) => {
-      const m = SERVER_OUTCOME[w.serverOutcome];
+  const pills = list
+    .map((e) => {
+      const m = EVENT_TYPE[e.type];
 
       /*
         Номер показываем только когда он что-то добавляет. При защите своего
-        сервера он один и тот же каждую неделю, и лента превращалась
+        сервера он один и тот же каждый раз, и лента превращалась
         в «удержали 33 · удержали 33 · удержали 33» — шум, за которым
         перестают читать смысл. Чужой номер при защите, наоборот, важен:
         значит держали ранее захваченный.
       */
-      const num = w.serverNumber ?? null;
+      const num = e.serverNumber ?? null;
       const worthShowing = num != null && (m.action === 'capture' || num !== own);
 
       return `<li>
         <button type="button" class="wk wk--${m.kind} wk--${m.action}"
-                data-tl-week="${esc(w.id)}" data-tl-ym="${ymKey(w.startDate)}"
-                title="${esc(fmtDate(w.startDate))} — ${esc(fmtDate(w.endDate))}">
-          <span class="wk__num num">${w.number}</span>
+                data-tl-week="${esc(e.id)}" data-tl-ym="${ymKey(e.date)}"
+                title="${esc(fmtDateFull(e.date))}">
+          <span class="wk__num num">${esc(fmtDate(e.date))}</span>
           <span class="wk__what">${esc(m.short)}${worthShowing ? ` <b class="num">${num}</b>` : ''}</span>
         </button>
       </li>`;
@@ -134,12 +129,12 @@ function renderWeeksSection(outcomes) {
 
   return `
     <section class="hero hero--tl">
-      <span class="eyebrow">Итог недели</span>
+      <span class="eyebrow">Что делал сервер</span>
 
       ${cards}
 
       <div class="cal">
-        <span class="cal__label">Найти неделю</span>
+        <span class="cal__label">Найти запись</span>
         <div class="cal__row">
           <button type="button" class="cal__btn is-on" data-tl-yr="all">За всё время</button>
           ${yearChips}
@@ -150,7 +145,7 @@ function renderWeeksSection(outcomes) {
       </div>
 
       <ul class="wks">${pills}</ul>
-      <p class="wks__empty" data-tl-noweeks hidden>В этом месяце итогов нет.</p>
+      <p class="wks__empty" data-tl-noweeks hidden>В этом месяце записей нет.</p>
     </section>`;
 }
 
@@ -218,11 +213,10 @@ function renderTrophies(captures, all) {
 
 function renderFilters(events) {
   const present = [...new Set(events.map((e) => e.type))];
-  const order = ['server_capture', 'war', 'merge', 'other'];
-  const buttons = order
+  const buttons = EVENT_TYPE_ORDER
     .filter((t) => present.includes(t))
     .map(
-      (t) => `<button type="button" class="seg__btn" data-tl-filter="${t}">${TYPE[t].short}</button>`
+      (t) => `<button type="button" class="seg__btn" data-tl-filter="${t}">${esc(EVENT_TYPE[t].filter)}</button>`
     )
     .join('');
 
@@ -243,7 +237,7 @@ function renderFeed(events) {
         year !== lastYear ? `<li class="tl__year" data-tl-year="${year}"><span>${year}</span></li>` : '';
       lastYear = year;
 
-      const t = TYPE[e.type] ?? TYPE.other;
+      const t = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
 
       return `${divider}
       <li class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}"

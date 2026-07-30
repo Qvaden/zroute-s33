@@ -4,11 +4,12 @@ import { EVENT_TYPE, EVENT_TYPE_ORDER, eventsDiff, eventsFromRaw } from '../edit
 /**
  * ХРОНОЛОГИЯ — летопись сервера.
  *
- * Не путать с итогом недели. Итог — недельный счёт: взяли, не взяли, удержали,
- * потеряли; он живёт на экране «Неделя» и заполняется одним нажатием. Событие
- * здесь — веха с рассказом: дата, описание, длительность кампании, картинка.
- * Захват сервера может тянуться через несколько недель, поэтому у события своя
- * дата, а не привязка к неделе.
+ * Здесь записывается всё, что делал сервер целиком: захватил чужой, удержал
+ * свой, не смог взять, потерял. Плюс войны, слияния альянсов и прочее.
+ *
+ * Экран «Неделя» этого не касается вовсе — там только счёт альянсов в VS.
+ * Раньше захваты жили в двух местах сразу, и один и тот же сервер можно было
+ * записать дважды; теперь у каждого факта ровно одно место.
  *
  * Устройство экрана: одна форма сверху и список снизу. Форма служит и добавлению,
  * и правке — редактировать двенадцать записей прямо в списке значило бы держать
@@ -72,9 +73,9 @@ export function renderEvents(view) {
 
 function empty() {
   return `<p class="muted adm-note">
-    Записей пока нет — поэтому вкладка «Хронология» на сайте показывает только
-    итоги недель. Добавьте первую: войну, слияние альянсов или захват сервера
-    с рассказом, как он прошёл.
+    Записей пока нет — поэтому вкладка «Хронология» на сайте пустая.
+    Добавьте первую: захват сервера, успешную защиту своего, войну
+    или слияние альянсов.
   </p>`;
 }
 
@@ -84,7 +85,7 @@ function row(e, canPush) {
     <div class="adm-ev__mark">${e.serverNumber != null ? esc(String(e.serverNumber)) : '•'}</div>
     <div class="adm-ev__body">
       <div class="adm-ev__meta">
-        <span class="adm-ev__type">${esc(EVENT_TYPE[e.type] ?? EVENT_TYPE.other)}</span>
+        <span class="adm-ev__type">${esc((EVENT_TYPE[e.type] ?? EVENT_TYPE.other).label)}</span>
         <time>${esc(fmtDateFull(new Date(e.date)))}</time>
         ${e.durationDays ? `<span class="muted">${plural(e.durationDays, 'день', 'дня', 'дней')}</span>` : ''}
         <code class="adm-mono adm-ev__id">${esc(e.id)}</code>
@@ -121,7 +122,7 @@ function renderForm(form, canPush) {
   const isNew = !form.id;
   const types = EVENT_TYPE_ORDER.map(
     (t) => `<button type="button" class="adm-chip ${form.type === t ? 'is-on' : ''}"
-              data-event-type="${t}">${esc(EVENT_TYPE[t])}</button>`
+              data-event-type="${t}">${esc(EVENT_TYPE[t].label)}</button>`
   ).join('');
 
   return `

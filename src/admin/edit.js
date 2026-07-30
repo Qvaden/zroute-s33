@@ -7,8 +7,8 @@
  * единственный код в проекте, который способен испортить накопленную историю.
  */
 import { plural } from '../ui/helpers.js';
-import { SERVER_OUTCOME } from '../logic/server-outcome.js';
 import { toDate } from '../data/adapters/_coerce.js';
+import { EVENT_TYPE, EVENT_TYPE_ORDER } from '../logic/event-types.js';
 
 /**
  * Формат файла обязан совпадать с тем, что пишет scripts/pull-sheet.mjs:
@@ -129,76 +129,14 @@ export function diffMarks(raw, weekId, marks) {
   return { added, changed, removed, total: added + changed + removed };
 }
 
-/**
- * Итог недели на уровне сервера, какой он сейчас в данных.
- * @returns {{outcome: string|null, serverNumber: number|null}}
- */
-export function weekOutcomeOf(raw, weekId) {
-  const week = (raw?.weeks ?? []).find((w) => String(w.id) === String(weekId));
-  return {
-    outcome: week?.serverOutcome ?? null,
-    serverNumber: week?.serverNumber ?? null,
-  };
-}
-
-/**
- * Применяет итог недели и возвращает НОВЫЙ объект.
- *
- * Пустой итог удаляет поля целиком, а не пишет пустую строку: «не воевали»
- * и «не внесли» — это отсутствие данных, и в файле оно должно выглядеть
- * отсутствием, иначе валидатор начнёт спорить с пустой строкой.
- *
- * @param {any} raw
- * @param {string} weekId
- * @param {string|null} outcome 'captured' | 'not_captured' | 'held' | 'lost' | null
- * @param {number|null} [serverNumber]
- */
-export function applyOutcome(raw, weekId, outcome, serverNumber) {
-  const weeks = (raw?.weeks ?? []).map((w) => {
-    if (String(w.id) !== String(weekId)) return w;
-
-    const next = { ...w };
-    delete next.serverOutcome;
-    delete next.serverNumber;
-
-    if (outcome) {
-      next.serverOutcome = outcome;
-      if (Number.isFinite(Number(serverNumber)) && serverNumber !== null && serverNumber !== '') {
-        next.serverNumber = Number(serverNumber);
-      }
-    }
-    return next;
-  });
-
-  return { ...raw, weeks };
-}
-
-/** Изменился ли итог недели по сравнению с тем, что в данных. */
-export function outcomeDiffers(raw, weekId, outcome, serverNumber) {
-  const before = weekOutcomeOf(raw, weekId);
-  const nowNumber =
-    outcome && Number.isFinite(Number(serverNumber)) && serverNumber !== null && serverNumber !== ''
-      ? Number(serverNumber)
-      : null;
-
-  return before.outcome !== (outcome || null) || before.serverNumber !== nowNumber;
-}
-
 /* ── События хронологии ───────────────────────────────────────────────────── */
 
-/**
- * Типы событий. Захват сервера — не то же самое, что итог недели: итог это
- * недельный счёт, а событие — веха с датой, рассказом и длительностью, которая
- * может тянуться через несколько недель.
- */
-export const EVENT_TYPE = {
-  server_capture: 'Захват сервера',
-  war: 'Война',
-  merge: 'Слияние альянсов',
-  other: 'Событие',
-};
-
-export const EVENT_TYPE_ORDER = ['server_capture', 'war', 'merge', 'other'];
+/*
+  Словарь типов событий один на сайт и на панель — он в logic/event-types.js.
+  Здесь только пробрасываем его дальше, чтобы экраны не тянули два импорта
+  ради одного списка.
+*/
+export { EVENT_TYPE, EVENT_TYPE_ORDER };
 
 /** «2026-07-19» — формат, который понимают и файл, и input type=date. */
 function isoDay(value) {
@@ -385,29 +323,17 @@ export function countMarks(marks) {
  *
  * @param {{number: number}} week
  * @param {Record<string, 'win'|'loss'|null>} marks
- * @param {{outcome?: string|null, serverNumber?: number|null}} [server] Итог недели.
  */
-export function commitMessage(week, marks, server) {
+export function commitMessage(week, marks) {
   const { wins, losses } = countMarks(marks);
   const head = `неделя ${week?.number ?? '?'}`;
 
-  const scores =
-    wins === 0 && losses === 0
-      ? 'результаты убраны'
-      : `${plural(wins, 'победа', 'победы', 'побед')}, ${plural(
-          losses,
-          'поражение',
-          'поражения',
-          'поражений'
-        )}`;
+  if (wins === 0 && losses === 0) return `${head}: результаты убраны`;
 
-  /*
-    Итог сервера дописываем в то же сообщение, а не отдельным коммитом:
-    заполняют их вместе, одним нажатием, и в истории они тоже должны
-    стоять рядом.
-  */
-  const tail = server?.outcome ? `, ${SERVER_OUTCOME[server.outcome]?.commit ?? server.outcome}` : '';
-  const target = server?.outcome && server?.serverNumber ? ` ${server.serverNumber}` : '';
-
-  return `${head}: ${scores}${tail}${target}`;
+  return `${head}: ${plural(wins, 'победа', 'победы', 'побед')}, ${plural(
+    losses,
+    'поражение',
+    'поражения',
+    'поражений'
+  )}`;
 }

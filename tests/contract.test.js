@@ -756,7 +756,6 @@ console.log('\nJ. Админ-панель');
 console.log('\nK0. Недели упорядочены по дате, а не по номеру');
 {
   const { mapWeeks } = await import('../src/data/adapters/_map.js');
-  const { weeksWithOutcome } = await import('../src/logic/server-outcome.js');
 
   /*
     ЛОВУШКА, КОТОРУЮ ЭТОТ ТЕСТ ДЕРЖИТ ЗАКРЫТОЙ.
@@ -781,12 +780,11 @@ console.log('\nK0. Недели упорядочены по дате, а не п
     'W31 W52 W01'
   );
 
-  // Тот же порядок обязан соблюдать и обратный список для «Хронологии».
+  // Обратный порядок — тот же календарь, только свежие первыми.
+  const { byWeekStartDesc } = await import('../src/data/week-order.js');
   equal(
-    'в летописи свежая неделя первая даже после нового года',
-    weeksWithOutcome(
-      acrossNewYear.map((w) => ({ ...w, serverOutcome: 'held' }))
-    ).map((w) => w.id).join(' '),
+    'свежая неделя первая даже после нового года',
+    [...acrossNewYear].sort(byWeekStartDesc).map((w) => w.id).join(' '),
     'W01 W52 W31'
   );
 
@@ -939,178 +937,122 @@ console.log('\nK. Публикация недели');
   );
 }
 
-// ── L. Итог недели на уровне сервера ────────────────────────────────────────
-console.log('\nL. Итог недели: взяли, не взяли, удержали, потеряли');
+// ── L. Серверные события: захваты и защиты ──────────────────────────────────
+console.log('\nL. Летопись сервера: захватили, защитили, потеряли');
 {
-  const { toServerOutcome } = await import('../src/data/adapters/_coerce.js');
-  const { SERVER_OUTCOME, SERVER_OUTCOME_ORDER, verdictText, weeksWithOutcome } = await import(
-    '../src/logic/server-outcome.js'
-  );
-  const { applyOutcome, weekOutcomeOf, outcomeDiffers, commitMessage } = await import(
-    '../src/admin/edit.js'
-  );
+  const { EVENT_TYPE, EVENT_TYPE_ORDER, SERVER_TYPES, isServerEvent, verdictText, serverEvents } =
+    await import('../src/logic/event-types.js');
   const { renderTimeline } = await import('../src/pages/timeline.js');
 
   /*
-    Человек в таблице пишет как говорит. Главная ловушка разбора — отрицание:
-    «не захватили» содержит «захватили» целиком, и при неаккуратном сравнении
-    провал превратился бы в победу. Молча.
-  */
-  equal('«взяли» → captured', toServerOutcome('взяли'), 'captured');
-  equal('«захватили» → captured', toServerOutcome('Захватили'), 'captured');
-  equal('«не взяли» → not_captured', toServerOutcome('не взяли'), 'not_captured');
-  equal('«не захватили» → not_captured', toServerOutcome('  НЕ   захватили '), 'not_captured');
-  equal('«удержали» → held', toServerOutcome('удержали'), 'held');
-  equal('«защитили» → held', toServerOutcome('защитили'), 'held');
-  equal('«потеряли» → lost', toServerOutcome('потеряли'), 'lost');
-  equal('«не удержали» → lost', toServerOutcome('не удержали'), 'lost');
-  equal('пустая ячейка — не исход', toServerOutcome(''), null);
-  equal('непонятное слово — не исход', toServerOutcome('наверное победа'), null);
+    РАЗДЕЛЕНИЕ ОБЯЗАННОСТЕЙ, КОТОРОЕ ЭТОТ РАЗДЕЛ ОХРАНЯЕТ.
 
-  equal('состояний ровно четыре', SERVER_OUTCOME_ORDER.length, 4);
+    Неделя считает только альянсы. Что делал сервер целиком — в хронологии.
+    Раньше захваты жили в двух местах, и один сервер попадал на страницу
+    до пяти раз: в вердикте, в ленте, на стене трофеев и в событиях.
+  */
+  check('серверных типов ровно четыре', SERVER_TYPES.length === 4);
+  check('захват — серверное событие', isServerEvent('server_capture'));
+  check('война — не серверное событие', !isServerEvent('war'));
   check(
-    'у каждого состояния есть все подписи',
-    SERVER_OUTCOME_ORDER.every((id) => {
-      const m = SERVER_OUTCOME[id];
-      return m && m.label && m.short && m.commit && m.kind && m.action && m.verdict && m.verdictNoNumber;
-    })
+    'у каждого серверного типа есть исход и направление',
+    SERVER_TYPES.every((t) => EVENT_TYPE[t].kind && EVENT_TYPE[t].action && EVENT_TYPE[t].verdict)
+  );
+  check(
+    'у каждого типа есть подпись для фильтра',
+    EVENT_TYPE_ORDER.every((t) => Boolean(EVENT_TYPE[t].filter))
   );
 
   // Защиту своего сервера номером подписывать не обязательно — он и так известен.
-  equal('вердикт защиты без номера подставляет свой сервер', verdictText('held', undefined, 33), 'Успешно защитили сервер 33');
-  equal('вердикт захвата с номером', verdictText('captured', 74, 33), 'Успешно захватили сервер 74');
-  equal('вердикт захвата без номера не выдумывает номер', verdictText('captured', undefined, 33), 'Успешно захватили сервер');
+  equal('вердикт защиты без номера подставляет свой сервер',
+    verdictText('server_defended', undefined, 33), 'Успешно защитили сервер 33');
+  equal('вердикт захвата с номером',
+    verdictText('server_capture', 74, 33), 'Успешно захватили сервер 74');
+  equal('вердикт захвата без номера не выдумывает номер',
+    verdictText('server_capture', undefined, 33), 'Успешно захватили сервер');
+  equal('потеря названа прямо', verdictText('server_lost', 19, 33), 'Сервер 19 потерян');
+  equal('война вердикта не имеет', verdictText('war', undefined, 33), '');
 
-  /* ── Валидатор ── */
-  const baseWeek = { id: 'W1', number: 1, startDate: new Date(), endDate: new Date() };
-  const dataset = (week) => ({
-    alliances: [{ id: 'a01', tag: 'A', name: 'А', active: true }],
-    weeks: [week],
-    results: [],
-    events: [],
-    texts: [],
+  const ev = (id, date, type, serverNumber) => ({
+    id, type, serverNumber, title: 'т', date: new Date(date),
   });
 
-  equal('корректный итог проходит валидатор',
-    validateDataset(dataset({ ...baseWeek, serverOutcome: 'held' })).length, 0);
-  check('опечатка в итоге ловится',
-    validateDataset(dataset({ ...baseWeek, serverOutcome: 'удержали' })).some((p) => /serverOutcome/.test(p)));
-  check('нечисловой номер сервера ловится',
-    validateDataset(dataset({ ...baseWeek, serverOutcome: 'held', serverNumber: 'тридцать три' })).some((p) => /serverNumber/.test(p)));
-
-  /* ── Запись итога ── */
-  const raw = {
-    alliances: [{ id: 'a01' }],
-    weeks: [
-      { id: 'W1', number: 1, note: 'важная заметка' },
-      { id: 'W2', number: 2, serverOutcome: 'captured', serverNumber: 74 },
-    ],
-    results: [],
-    events: [],
-    texts: [],
-  };
-
-  const set = applyOutcome(raw, 'W1', 'held', null);
-  equal('итог записывается', set.weeks[0].serverOutcome, 'held');
-  equal('чужая неделя не тронута', set.weeks[1].serverOutcome, 'captured');
-  equal('остальные поля недели сохраняются', set.weeks[0].note, 'важная заметка');
-  equal('исходные данные не мутируются', raw.weeks[0].serverOutcome, undefined);
-
-  const cleared = applyOutcome(raw, 'W2', null, null);
-  check('снятый итог удаляет поле, а не пишет пустую строку', !('serverOutcome' in cleared.weeks[1]));
-  check('снятый итог убирает и номер сервера', !('serverNumber' in cleared.weeks[1]));
-
-  const withNumber = applyOutcome(raw, 'W1', 'captured', '19');
-  equal('номер сервера приводится к числу', withNumber.weeks[0].serverNumber, 19);
-  check('пустой номер не пишется', !('serverNumber' in applyOutcome(raw, 'W1', 'captured', '').weeks[0]));
-
-  equal('итог читается обратно', weekOutcomeOf(raw, 'W2').outcome, 'captured');
-  check('изменение итога замечено', outcomeDiffers(raw, 'W1', 'held', null));
-  check('отсутствие изменений замечено', !outcomeDiffers(raw, 'W2', 'captured', 74));
-  check('смена только номера тоже изменение', outcomeDiffers(raw, 'W2', 'captured', 75));
-
-  equal(
-    'итог попадает в сообщение коммита',
-    commitMessage({ number: 31 }, { a01: 'win' }, { outcome: 'captured', serverNumber: 74 }),
-    'неделя 31: 1 победа, 0 поражений, взяли сервер 74'
-  );
-
-  /* ── Вкладка «Хронология» ── */
-  const outcomeWeeks = [
-    { id: 'W1', number: 1, startDate: new Date('2026-04-06'), endDate: new Date('2026-04-12'), serverOutcome: 'held' },
-    { id: 'W2', number: 2, startDate: new Date('2026-04-13'), endDate: new Date('2026-04-19'), serverOutcome: 'captured', serverNumber: 74 },
-    { id: 'W3', number: 3, startDate: new Date('2026-04-20'), endDate: new Date('2026-04-26') },
+  const list = [
+    ev('e1', '2026-04-18', 'server_capture', 47),
+    ev('e2', '2026-05-02', 'war'),
+    ev('e3', '2026-06-13', 'server_defended'),
+    ev('e4', '2026-07-05', 'server_lost', 19),
   ];
 
-  const html = renderTimeline({ events: [], allWeeks: outcomeWeeks });
-  check('вердикт недели показан', html.includes('verdict'));
-  check('вердикт берёт самую свежую неделю', html.includes('Успешно захватили сервер 74'));
-  equal('в ленте недель только недели с итогом', (html.match(/class="wk /g) || []).length, 2);
-  check('исход красится как победа', /verdict--win/.test(html));
-
-  const lostHtml = renderTimeline({
-    events: [],
-    allWeeks: [{ id: 'W9', number: 9, startDate: new Date('2026-06-01'), endDate: new Date('2026-06-07'), serverOutcome: 'lost', serverNumber: 33 }],
-  });
-  check('потеря красится как поражение', /verdict--loss/.test(lostHtml));
-  check('потеря названа прямо', lostHtml.includes('Сервер 33 потерян'));
-
-  /*
-    ЛОВУШКА, ИЗ-ЗА КОТОРОЙ ЭТОТ ТЕСТ И НАПИСАН.
-
-    `weeksUpToLastData` отбрасывает недели без результатов VS. Если хронология
-    возьмёт этот обрезанный список, неделя, где заполнили только серверный
-    итог, исчезнет со страницы — при том что человек её внёс и опубликовал.
-  */
-  check(
-    'неделя с итогом, но без результатов VS, видна',
-    renderTimeline({ events: [], allWeeks: outcomeWeeks, weeks: [] }).includes('Успешно захватили сервер 74')
+  equal(
+    'в летописи только серверные события, свежие сверху',
+    serverEvents(list).map((e) => e.id).join(' '),
+    'e4 e3 e1'
   );
+  equal('событие без даты в летопись не попадает',
+    serverEvents([{ id: 'x', type: 'server_capture', date: null }]).length, 0);
 
-  // Пустая летопись: ни событий, ни итогов — экран должен объяснять, а не пустовать.
-  const blank = renderTimeline({ events: [], allWeeks: [] });
+  /* ── Вкладка «Хронология» ── */
+  const html = renderTimeline({ events: list });
+  check('вердикт показан', html.includes('verdict'));
+  check('вердикт берёт самое свежее серверное событие', html.includes('Сервер 19 потерян'));
+  check('потеря красится как поражение', /verdict--loss/.test(html));
+  equal('в летописи столько плашек, сколько серверных событий',
+    (html.match(/class="wk /g) || []).length, 3);
+  check('война в летопись серверных событий не попала', !/data-tl-week="e2"/.test(html));
+  check('но в ленте событий война осталась', html.includes('data-tl-type="war"'));
+
+  const held = renderTimeline({ events: [ev('e9', '2026-06-01', 'server_defended')] });
+  check('успешная защита красится как победа', /verdict--win/.test(held));
+  check('защита своего сервера подписана', held.includes('Успешно защитили сервер 33'));
+
+  // Пустая летопись: экран должен объяснять, а не пустовать.
+  const blank = renderTimeline({ events: [] });
   check('пустая хронология объясняет себя', blank.includes('Ещё ни одной записи'));
   check('пустая хронология не рисует вердикт', !blank.includes('verdict'));
 
-  /* ── Календарь: год → месяц → неделя ── */
-  const calWeeks = [
-    { id: 'W1', number: 1, startDate: new Date('2025-11-03'), endDate: new Date('2025-11-09'), serverOutcome: 'held' },
-    { id: 'W2', number: 2, startDate: new Date('2026-09-07'), endDate: new Date('2026-09-13'), serverOutcome: 'captured', serverNumber: 74 },
-    { id: 'W3', number: 3, startDate: new Date('2026-09-14'), endDate: new Date('2026-09-20'), serverOutcome: 'lost', serverNumber: 12 },
-    { id: 'W4', number: 4, startDate: new Date('2026-10-05'), endDate: new Date('2026-10-11'), serverOutcome: 'held' },
-  ];
-  const cal = renderTimeline({ events: [], allWeeks: calWeeks });
+  // Только войны и слияния: серверной секции нет, остальная страница на месте.
+  const noServer = renderTimeline({ events: [ev('e2', '2026-05-02', 'war')] });
+  check('без серверных событий вердикта нет', !noServer.includes('data-tl-verdict'));
+  check('но лента событий рисуется', noServer.includes('data-tl-list'));
 
+  /* ── Календарь ── */
+  const cal = renderTimeline({
+    events: [
+      ev('c1', '2025-11-03', 'server_defended'),
+      ev('c2', '2026-09-07', 'server_capture', 74),
+      ev('c3', '2026-09-14', 'server_lost', 12),
+      ev('c4', '2026-10-05', 'server_defended'),
+    ],
+  });
   equal('в календаре год на каждый год с данными', (cal.match(/data-tl-yr="\d{4}"/g) || []).length, 2);
   equal('в календаре месяц на каждый месяц с данными', (cal.match(/data-tl-mo="/g) || []).length, 3);
-  equal('каждая неделя — своя кнопка', (cal.match(/data-tl-week="/g) || []).length, 4);
-  check('месяц недели подписан в разметке', cal.includes('data-tl-ym="2026-09"'));
+  equal('вердикт на каждую запись', (cal.match(/data-tl-verdict="/g) || []).length, 4);
+  equal('открыт ровно один вердикт',
+    (cal.match(/data-tl-verdict="[^"]*"(?! hidden)/g) || []).length, 1);
+  check('месяц записи указан в разметке', cal.includes('data-tl-ym="2026-09"'));
 
-  /*
-    Вердиктов отрисовано столько же, сколько недель, но открыт ровно один:
-    скрипт только переключает видимость, поэтому в разметке должно быть
-    именно такое начальное состояние, а не «все открыты» или «все скрыты».
-  */
-  equal('вердикт на каждую неделю', (cal.match(/data-tl-verdict="/g) || []).length, 4);
-  equal('открыт ровно один вердикт', (cal.match(/data-tl-verdict="[^"]*"(?! hidden)/g) || []).length, 1);
-  check('месяцы скрыты до выбора года', /data-tl-months hidden/.test(cal));
-  check('по умолчанию выбрано «за всё время»', /data-tl-yr="all"/.test(cal) && /is-on[^>]*data-tl-yr="all"|data-tl-yr="all"/.test(cal));
+  /* ── Неделя больше не носит серверный итог ── */
+  const { mapWeeks } = await import('../src/data/adapters/_map.js');
+  const week = mapWeeks([
+    { id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02', serverOutcome: 'held', serverNumber: 33 },
+  ])[0];
+  check('поле итога у недели больше не читается', !('serverOutcome' in week) && !('serverNumber' in week));
 
-  // Календарь должен фильтровать и ленту событий, иначе «сентябрь» показывал
-  // бы недели сентября и события всех времён разом.
-  const feed = renderTimeline({
-    events: [{ id: 'e1', date: new Date('2026-09-19'), type: 'war', title: 'Война' }],
-    allWeeks: calWeeks,
-  });
-  check('у события в ленте указан месяц', feed.includes('data-tl-ym="2026-09"'));
-
-  // Итоги недель не должны вытеснить события: старая часть страницы на месте.
-  const both = renderTimeline({
-    events: [{ id: 'e1', date: new Date('2026-04-18'), type: 'server_capture', serverNumber: 47, title: 'Захвачен сервер 47' }],
-    allWeeks: outcomeWeeks,
-  });
-  check('вместе с итогами остаётся стена трофеев', both.includes('class="trophy"'));
-  check('вместе с итогами остаётся лента событий', both.includes('data-tl-list'));
+  const weekScreen = (await import('../src/admin/screens/week.js')).renderWeek;
+  const weekHtml = weekScreen(
+    {
+      data: { weeks: mapWeeks([{ id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02' }]),
+              alliances: [{ id: 'a01', tag: 'A', name: 'А', active: true }] },
+      raw: { results: [], weeks: [], alliances: [] },
+      canPush: true,
+      weekId: 'W1',
+      marks: {},
+    },
+    null
+  );
+  check('на экране недели нет блока итога', !weekHtml.includes('data-server-block'));
+  check('на экране недели остались клетки альянсов', weekHtml.includes('data-cell='));
 }
 
 // ── M. Правка хронологии ────────────────────────────────────────────────────

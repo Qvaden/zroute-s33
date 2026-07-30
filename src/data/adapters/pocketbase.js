@@ -13,7 +13,7 @@
  * не было ни одной зависимости.
  */
 import { CONFIG } from '../../../config.js';
-import { toDate, toBool, toStr, toNumber, toOutcome, toServerOutcome } from './_coerce.js';
+import { toDate, toBool, toStr, toNumber, toOutcome } from './_coerce.js';
 import { byWeekStart } from '../week-order.js';
 
 export const name = 'pocketbase';
@@ -91,8 +91,6 @@ export async function getWeeks() {
       startDate: toDate(r.startDate),
       endDate: toDate(r.endDate),
       note: toStr(r.note) || undefined,
-      serverOutcome: toServerOutcome(r.serverOutcome) ?? undefined,
-      serverNumber: toNumber(r.serverNumber) ?? undefined,
     }))
     .sort(byWeekStart);
 }

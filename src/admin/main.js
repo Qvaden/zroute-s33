@@ -29,17 +29,13 @@ import {
   weeksUpToLastData,
 } from '../logic/standings.js';
 import { renderHome } from '../pages/home.js';
-import { verdictText } from '../logic/server-outcome.js';
 import { hasToken, clearToken, setToken } from './auth.js';
 import { whoAmI, repoInfo, readDataFile, lastCommit, writeDataFile } from './repo.js';
 import {
   applyMarks,
-  applyOutcome,
   applyEvents,
   marksFromRaw,
-  weekOutcomeOf,
   diffMarks,
-  outcomeDiffers,
   commitMessage,
   eventsFromRaw,
   eventsDiff,
@@ -110,33 +106,6 @@ function pickWeek(param) {
   return findCurrentWeek(weeks) ?? weeks[0];
 }
 
-/**
- * Состояние недели для показа: черновик, если он есть, иначе то, что в данных.
- * Отметки и итог сервера идут вместе — их и заполняют вместе.
- */
-function stateFor(weekId) {
-  const draft = getDraft(weekId);
-  if (draft) {
-    return {
-      marks: draft.marks,
-      server: { outcome: draft.outcome, serverNumber: draft.serverNumber },
-    };
-  }
-  return {
-    marks: marksFromRaw(view.raw, weekId),
-    server: weekOutcomeOf(view.raw, weekId),
-  };
-}
-
-/** Сохранить черновик текущей недели целиком. */
-function persistDraft() {
-  saveDraft(view.weekId, {
-    marks: view.marks,
-    outcome: view.server.outcome,
-    serverNumber: view.server.serverNumber,
-  });
-}
-
 function render() {
   if (!view) return;
   const { id, param } = parseHash();
@@ -146,11 +115,9 @@ function render() {
   // а сам экран остаётся чистой функцией от данных.
   if (screen.id === 'week') {
     const week = pickWeek(param);
-    const state = week ? stateFor(week.id) : { marks: {}, server: { outcome: null, serverNumber: null } };
 
     view.weekId = week?.id ?? null;
-    view.marks = state.marks;
-    view.server = state.server;
+    view.marks = week ? getDraft(week.id) ?? marksFromRaw(view.raw, week.id) : {};
     view.draftSaved = week ? draftSavedAt(week.id) : null;
     view.canPush = Boolean(view.repo?.canPush);
   }
@@ -287,19 +254,15 @@ function paintProgress() {
   if (bar) bar.style.width = `${pct}%`;
 
   const diff = diffMarks(view.raw, view.weekId, view.marks);
-  const serverChanged = outcomeDiffers(
-    view.raw, view.weekId, view.server.outcome, view.server.serverNumber
-  );
 
   const state = form.querySelector('[data-publish-state]');
-  if (state) state.innerHTML = describe(diff, draftSavedAt(view.weekId), serverChanged);
+  if (state) state.innerHTML = describe(diff, draftSavedAt(view.weekId));
 
-  const hasChanges = diff.total > 0 || serverChanged;
   for (const selector of ['[data-publish]', '[data-draft-reset]', '[data-preview-toggle]']) {
     const button = form.querySelector(selector);
     if (!button) continue;
     const needsPush = selector === '[data-publish]';
-    button.disabled = !hasChanges || (needsPush && !view.canPush);
+    button.disabled = !diff.total || (needsPush && !view.canPush);
   }
 
   // Открытый предпросмотр после правки устаревает — закрываем, чтобы человек
@@ -319,61 +282,9 @@ function toggleMark(cell, mark) {
   view.marks = { ...view.marks, [allianceId]: view.marks[allianceId] === mark ? null : mark };
   if (view.marks[allianceId] === null) delete view.marks[allianceId];
 
-  persistDraft();
+  saveDraft(view.weekId, view.marks);
   paintCell(allianceId);
   paintProgress();
-}
-
-/**
- * Нажатие по итогу недели. Повторное нажатие снимает — «не воевали»
- * должно возвращаться так же легко, как ставиться.
- */
-function toggleOutcome(id) {
-  if (!view.canPush) return;
-
-  view.server = {
-    outcome: view.server.outcome === id ? null : id,
-    serverNumber: view.server.serverNumber,
-  };
-  // Снятый итог не должен таскать за собой номер сервера.
-  if (!view.server.outcome) view.server.serverNumber = null;
-
-  persistDraft();
-  // Блок перерисовывается целиком: кнопки, поле номера и строка вердикта
-  // меняются вместе, и собирать это по частям было бы дороже, чем честнее.
-  repaintServerBlock();
-  paintProgress();
-}
-
-function setServerNumber(value) {
-  const trimmed = String(value ?? '').trim();
-  view.server = {
-    outcome: view.server.outcome,
-    serverNumber: trimmed === '' ? null : Number(trimmed),
-  };
-  persistDraft();
-
-  const verdict = root.querySelector('[data-server-verdict]');
-  if (verdict && view.server.outcome) {
-    verdict.textContent = verdictText(view.server.outcome, view.server.serverNumber, CONFIG.server);
-  }
-  paintProgress();
-}
-
-/** Перерисовать блок итога недели, сохранив фокус в поле номера. */
-function repaintServerBlock() {
-  const form = root.querySelector('[data-week-form]');
-  const block = root.querySelector('[data-server-block]');
-  if (!form || !block) return;
-
-  const week = view.data.weeks.find((w) => w.id === view.weekId);
-  if (!week) return;
-
-  const fresh = document.createElement('div');
-  fresh.innerHTML = renderWeek(view, view.weekId);
-
-  const replacement = fresh.querySelector('[data-server-block]');
-  if (replacement) block.replaceWith(replacement);
 }
 
 /**
@@ -416,16 +327,9 @@ function togglePreview() {
   box.hidden = false;
 }
 
-/**
- * Данные, какими они станут после публикации.
- *
- * Отметки и итог сервера применяются вместе и в одном месте: если бы каждая
- * кнопка собирала кандидата по-своему, предпросмотр однажды показал бы одно,
- * а коммит записал другое.
- */
+/** Данные, какими они станут после публикации недели. */
 function candidateRaw() {
-  const withMarks = applyMarks(view.raw, view.weekId, view.marks);
-  return applyOutcome(withMarks, view.weekId, view.server.outcome, view.server.serverNumber);
+  return applyMarks(view.raw, view.weekId, view.marks);
 }
 
 function showPublishResult(html, kind) {
@@ -481,7 +385,7 @@ async function publish() {
     const result = await writeDataFile({
       text: serialize(candidate),
       sha: view.file.sha,
-      message: commitMessage(week, view.marks, view.server),
+      message: commitMessage(week, view.marks),
     });
 
     // Опубликовано — черновик больше не нужен, иначе он навсегда останется
@@ -694,12 +598,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  const outcome = e.target.closest('[data-outcome]');
-  if (outcome) {
-    toggleOutcome(outcome.dataset.outcome);
-    return;
-  }
-
   if (e.target.closest('[data-preview-toggle]')) {
     togglePreview();
     return;
@@ -708,7 +606,6 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[data-draft-reset]')) {
     dropDraft(view.weekId);
     view.marks = marksFromRaw(view.raw, view.weekId);
-    view.server = weekOutcomeOf(view.raw, view.weekId);
     render();
     return;
   }
@@ -773,11 +670,6 @@ document.addEventListener('click', (e) => {
   потому что поле не потеряло фокус.
 */
 document.addEventListener('input', (e) => {
-  if (e.target.matches?.('[data-server-number]')) {
-    setServerNumber(e.target.value);
-    return;
-  }
-
   /*
     Поля формы события пишем в состояние на каждый ввод и НЕ перерисовываем:
     перерисовка на каждую букву уносила бы курсор в конец строки.

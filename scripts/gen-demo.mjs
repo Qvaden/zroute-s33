@@ -73,35 +73,13 @@ const WEEK_COUNT = 12;
 const FIRST_MONDAY = Date.UTC(2026, 3, 6); // 6 апреля 2026
 const DAY = 86400000;
 
-/*
-  Итоги недель на уровне сервера. Заполнены не все недели намеренно:
-  сервер воюет не каждую неделю, и вкладка «Хронология» обязана нормально
-  выглядеть с дырами в летописи, а не только на идеально полном наборе.
-
-  Набор подобран так, чтобы в демо встретились все четыре состояния —
-  иначе половина вёрстки осталась бы непроверенной глазами.
-*/
-const SERVER_OUTCOMES = {
-  W17: { serverOutcome: 'held' },
-  W18: { serverOutcome: 'captured', serverNumber: 19 },
-  W20: { serverOutcome: 'not_captured', serverNumber: 52 },
-  W21: { serverOutcome: 'held' },
-  W23: { serverOutcome: 'captured', serverNumber: 47 },
-  W24: { serverOutcome: 'lost', serverNumber: 33 },
-  W25: { serverOutcome: 'held' },
-  W26: { serverOutcome: 'captured', serverNumber: 61 },
-  W27: { serverOutcome: 'held' },
-};
-
 const weeks = Array.from({ length: WEEK_COUNT }, (_, i) => {
   const start = FIRST_MONDAY + i * 7 * DAY;
-  const id = `W${16 + i}`;
   return {
-    id,
+    id: `W${16 + i}`,
     number: 16 + i,
     startDate: new Date(start).toISOString().slice(0, 10),
     endDate: new Date(start + 6 * DAY).toISOString().slice(0, 10),
-    ...(SERVER_OUTCOMES[id] ?? {}),
   };
 });
 
@@ -173,6 +151,26 @@ const events = [
     title: 'Захвачен сервер 88',
     body: 'Шестой сервер под контролем. Сопротивление оказалось символическим.',
     durationDays: 2 },
+
+  /*
+    Защиты, неудачи и потери — те же серверные события, что и захваты.
+    В демо они есть намеренно: без них половина вёрстки хронологии осталась бы
+    непроверенной глазами, а красный вердикт не увидел бы никто.
+  */
+  { id: 'e13', date: '2026-02-21', type: 'server_defended',
+    title: 'Отбили нападение сервера 51',
+    body: 'Двое суток обороны. Держались всем сервером, включая малые альянсы.',
+    durationDays: 2 },
+  { id: 'e14', date: '2026-04-04', type: 'capture_failed', serverNumber: 52,
+    title: 'Сервер 52 взять не удалось',
+    body: 'Недооценили оборону: у них оказался договор с соседним сервером.',
+    durationDays: 5 },
+  { id: 'e15', date: '2026-06-13', type: 'server_defended',
+    title: 'Удержали свой сервер',
+    body: 'Третья попытка соседей за месяц. На этот раз даже без потерь по точкам.' },
+  { id: 'e16', date: '2026-07-05', type: 'server_lost', serverNumber: 19,
+    title: 'Сервер 19 потерян',
+    body: 'Захваченный в марте сервер отбили обратно. Держать два фронта не вышло.' },
 ];
 
 /*
