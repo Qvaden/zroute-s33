@@ -13,7 +13,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
-import { marksFromRaw } from '../src/admin/edit.js';
+import { marksFromRaw, eventsFromRaw } from '../src/admin/edit.js';
 import { byWeekStartDesc } from '../src/data/week-order.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
@@ -66,6 +66,15 @@ const view = {
   marks: latestWeek ? marksFromRaw(raw, latestWeek.id) : {},
   draftSaved: null,
   canPush: true,
+
+  /*
+    Летопись и открытая форма правки. Форма в настоящей панели появляется
+    по нажатию, но в превью её показываем сразу: иначе главное на этом экране
+    остаётся за кадром.
+  */
+  events: eventsFromRaw(raw),
+  eventDraft: eventsFromRaw(raw)[0] ?? null,
+  eventsSaved: null,
 };
 
 const SCREENS = [

@@ -35,14 +35,30 @@ import { whoAmI, repoInfo, readDataFile, lastCommit, writeDataFile } from './rep
 import {
   applyMarks,
   applyOutcome,
+  applyEvents,
   marksFromRaw,
   weekOutcomeOf,
   diffMarks,
   outcomeDiffers,
   commitMessage,
+  eventsFromRaw,
+  eventsDiff,
+  eventsCommitMessage,
+  eventProblems,
+  blankEvent,
+  nextEventId,
   serialize,
 } from './edit.js';
-import { getDraft, saveDraft, dropDraft, draftSavedAt } from './draft.js';
+import {
+  getDraft,
+  saveDraft,
+  dropDraft,
+  draftSavedAt,
+  getEventsDraft,
+  saveEventsDraft,
+  dropEventsDraft,
+  eventsDraftSavedAt,
+} from './draft.js';
 import { renderShell } from './shell.js';
 import { renderLogin } from './login.js';
 import { renderOverview } from './screens/overview.js';
@@ -136,6 +152,13 @@ function render() {
     view.marks = state.marks;
     view.server = state.server;
     view.draftSaved = week ? draftSavedAt(week.id) : null;
+    view.canPush = Boolean(view.repo?.canPush);
+  }
+
+  if (screen.id === 'events') {
+    // Черновик летописи живёт списком целиком — правят её пачкой, а не по полю.
+    view.events = view.events ?? getEventsDraft() ?? eventsFromRaw(view.raw);
+    view.eventsSaved = eventsDraftSavedAt();
     view.canPush = Boolean(view.repo?.canPush);
   }
 
@@ -486,6 +509,138 @@ async function publish() {
   }
 }
 
+/* ── Хронология ──────────────────────────────────────────────────────────── */
+
+/** Открыть форму: пустую для новой записи или заполненную для правки. */
+function openEventForm(id) {
+  const found = id ? view.events.find((e) => e.id === id) : null;
+  view.eventDraft = found ? { ...found } : blankEvent();
+  render();
+}
+
+function closeEventForm() {
+  view.eventDraft = null;
+  render();
+}
+
+function showEventProblems(problems) {
+  const box = root.querySelector('[data-event-problems]');
+  if (!box) return;
+  box.innerHTML = `<b>Не сохранено.</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
+  box.hidden = false;
+}
+
+/**
+ * Сохранить запись в рабочий список.
+ *
+ * В список, а не на сайт: публикация отдельным действием. Так можно поправить
+ * три записи и отправить их одним коммитом, а не тремя.
+ */
+function saveEventToList() {
+  const form = view.eventDraft;
+  if (!form || !view.canPush) return;
+
+  const problems = eventProblems(form);
+  if (problems.length) {
+    showEventProblems(problems);
+    return;
+  }
+
+  const entry = {
+    ...form,
+    id: form.id ?? nextEventId(view.raw, view.events),
+    title: String(form.title).trim(),
+    body: String(form.body ?? '').trim(),
+    imageUrl: String(form.imageUrl ?? '').trim(),
+    serverNumber: form.serverNumber === '' || form.serverNumber == null ? null : Number(form.serverNumber),
+    durationDays: form.durationDays === '' || form.durationDays == null ? null : Number(form.durationDays),
+  };
+
+  const i = view.events.findIndex((e) => e.id === entry.id);
+  view.events = i >= 0
+    ? view.events.map((e) => (e.id === entry.id ? entry : e))
+    : [entry, ...view.events];
+
+  // Свежие сверху — так же, как их показывает сайт.
+  view.events.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  saveEventsDraft(view.events);
+  view.eventDraft = null;
+  render();
+}
+
+function deleteEventFromList(id) {
+  if (!view.canPush) return;
+  view.events = view.events.filter((e) => e.id !== id);
+  saveEventsDraft(view.events);
+  // Если удалили ту запись, что была открыта в форме, форму тоже закрываем.
+  if (view.eventDraft?.id === id) view.eventDraft = null;
+  render();
+}
+
+function showEventsResult(html, kind) {
+  const box = root.querySelector('[data-events-result]');
+  if (!box) return;
+  box.className = `adm-result adm-result--${kind}`;
+  box.innerHTML = html;
+  box.hidden = false;
+}
+
+/** Публикация летописи — тот же путь, что у недели: проверка, версия, коммит. */
+async function publishEvents() {
+  const button = root.querySelector('[data-events-publish]');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Публикуем…';
+  }
+  const restore = () => {
+    if (!button) return;
+    button.textContent = 'Опубликовать';
+    button.disabled = false;
+  };
+
+  try {
+    const candidate = applyEvents(view.raw, view.events);
+
+    const problems = validateDataset(mapDataset(candidate));
+    if (problems.length) {
+      showEventsResult(
+        `<b>Публикация отменена: данные не проходят проверку.</b>
+         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
+        'bad'
+      );
+      restore();
+      return;
+    }
+
+    const result = await writeDataFile({
+      text: serialize(candidate),
+      sha: view.file.sha,
+      message: eventsCommitMessage(eventsDiff(view.raw, view.events)),
+    });
+
+    dropEventsDraft();
+    view.events = null;
+    view.eventDraft = null;
+    await load();
+
+    showEventsResult(
+      `<b>Опубликовано.</b>
+       ${
+         safeUrl(result.commitUrl)
+           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
+           : `Коммит ${esc(result.commitSha)}`
+       }
+       <p class="muted">Сайт обновится в течение минуты.</p>`,
+      'ok'
+    );
+  } catch (err) {
+    showEventsResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, err?.conflict ? 'warn' : 'bad');
+    restore();
+  }
+}
+
 /* ── События ─────────────────────────────────────────────────────────────── */
 
 document.addEventListener('submit', async (e) => {
@@ -560,6 +715,55 @@ document.addEventListener('click', (e) => {
 
   if (e.target.closest('[data-publish]')) {
     publish();
+    return;
+  }
+
+  /* ── Хронология ── */
+
+  if (e.target.closest('[data-event-new]')) {
+    openEventForm(null);
+    return;
+  }
+
+  const editBtn = e.target.closest('[data-event-edit]');
+  if (editBtn) {
+    openEventForm(editBtn.dataset.eventEdit);
+    return;
+  }
+
+  const delBtn = e.target.closest('[data-event-delete]');
+  if (delBtn) {
+    deleteEventFromList(delBtn.dataset.eventDelete);
+    return;
+  }
+
+  const typeBtn = e.target.closest('[data-event-type]');
+  if (typeBtn && view.eventDraft) {
+    view.eventDraft = { ...view.eventDraft, type: typeBtn.dataset.eventType };
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-event-cancel]')) {
+    closeEventForm();
+    return;
+  }
+
+  if (e.target.closest('[data-event-save]')) {
+    saveEventToList();
+    return;
+  }
+
+  if (e.target.closest('[data-events-reset]')) {
+    dropEventsDraft();
+    view.events = eventsFromRaw(view.raw);
+    view.eventDraft = null;
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-events-publish]')) {
+    publishEvents();
   }
 });
 
@@ -569,8 +773,19 @@ document.addEventListener('click', (e) => {
   потому что поле не потеряло фокус.
 */
 document.addEventListener('input', (e) => {
-  if (!e.target.matches?.('[data-server-number]')) return;
-  setServerNumber(e.target.value);
+  if (e.target.matches?.('[data-server-number]')) {
+    setServerNumber(e.target.value);
+    return;
+  }
+
+  /*
+    Поля формы события пишем в состояние на каждый ввод и НЕ перерисовываем:
+    перерисовка на каждую букву уносила бы курсор в конец строки.
+  */
+  const field = e.target.closest?.('[data-event-field]');
+  if (field && view?.eventDraft) {
+    view.eventDraft = { ...view.eventDraft, [field.dataset.eventField]: e.target.value };
+  }
 });
 
 window.addEventListener('hashchange', render);

@@ -8,6 +8,7 @@
  */
 import { plural } from '../ui/helpers.js';
 import { SERVER_OUTCOME } from '../logic/server-outcome.js';
+import { toDate } from '../data/adapters/_coerce.js';
 
 /**
  * Формат файла обязан совпадать с тем, что пишет scripts/pull-sheet.mjs:
@@ -181,6 +182,190 @@ export function outcomeDiffers(raw, weekId, outcome, serverNumber) {
       : null;
 
   return before.outcome !== (outcome || null) || before.serverNumber !== nowNumber;
+}
+
+/* ── События хронологии ───────────────────────────────────────────────────── */
+
+/**
+ * Типы событий. Захват сервера — не то же самое, что итог недели: итог это
+ * недельный счёт, а событие — веха с датой, рассказом и длительностью, которая
+ * может тянуться через несколько недель.
+ */
+export const EVENT_TYPE = {
+  server_capture: 'Захват сервера',
+  war: 'Война',
+  merge: 'Слияние альянсов',
+  other: 'Событие',
+};
+
+export const EVENT_TYPE_ORDER = ['server_capture', 'war', 'merge', 'other'];
+
+/** «2026-07-19» — формат, который понимают и файл, и input type=date. */
+function isoDay(value) {
+  const d = toDate(value);
+  return d ? d.toISOString().slice(0, 10) : '';
+}
+
+/**
+ * События в виде, удобном для формы: даты строками, числа числами.
+ *
+ * Порядок — свежие сверху, как их читают. В файле порядок обратный,
+ * см. applyEvents.
+ */
+export function eventsFromRaw(raw) {
+  return (raw?.events ?? [])
+    .map((e) => ({
+      id: String(e.id ?? ''),
+      date: isoDay(e.date),
+      type: EVENT_TYPE[String(e.type)] ? String(e.type) : 'other',
+      serverNumber: e.serverNumber != null && e.serverNumber !== '' ? Number(e.serverNumber) : null,
+      title: String(e.title ?? ''),
+      body: String(e.body ?? ''),
+      imageUrl: String(e.imageUrl ?? ''),
+      durationDays: e.durationDays != null && e.durationDays !== '' ? Number(e.durationDays) : null,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** Пустая заготовка события для формы. */
+export function blankEvent() {
+  return {
+    id: null,
+    date: '',
+    type: 'server_capture',
+    serverNumber: null,
+    title: '',
+    body: '',
+    imageUrl: '',
+    durationDays: null,
+  };
+}
+
+/**
+ * Свободный идентификатор события.
+ *
+ * Считаем от максимального занятого номера, а не от количества записей:
+ * после удаления середины счёт по количеству выдал бы уже занятый id,
+ * и валидатор справедливо пожаловался бы на дубль.
+ */
+export function nextEventId(raw, list) {
+  const used = new Set([
+    ...(raw?.events ?? []).map((e) => String(e.id)),
+    ...(list ?? []).map((e) => String(e.id)),
+  ]);
+
+  let max = 0;
+  for (const id of used) {
+    const m = /^e(\d+)$/.exec(id);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+
+  let n = max + 1;
+  while (used.has(`e${n}`)) n++;
+  return `e${n}`;
+}
+
+/**
+ * Человеческие проверки до публикации.
+ *
+ * Валидатор сайта поймает пустой заголовок и битую дату и сам, но скажет это
+ * языком доменной модели — «events[3] (e07): пустой title». Здесь то же самое
+ * говорится про поле, которое человек прямо сейчас видит перед собой.
+ *
+ * @returns {string[]} пустой список — можно сохранять
+ */
+export function eventProblems(ev) {
+  const problems = [];
+
+  if (!isoDay(ev?.date)) problems.push('Не заполнена дата.');
+  if (!String(ev?.title ?? '').trim()) problems.push('Не заполнен заголовок.');
+  if (!EVENT_TYPE[String(ev?.type)]) problems.push('Не выбран тип события.');
+
+  const num = ev?.serverNumber;
+  if (num !== null && num !== '' && num !== undefined && !Number.isFinite(Number(num))) {
+    problems.push('Номер сервера должен быть числом.');
+  }
+
+  const days = ev?.durationDays;
+  if (days !== null && days !== '' && days !== undefined && !(Number(days) > 0)) {
+    problems.push('Длительность должна быть числом больше нуля.');
+  }
+
+  const url = String(ev?.imageUrl ?? '').trim();
+  if (url && !/^https?:\/\//i.test(url)) {
+    problems.push('Ссылка на картинку должна начинаться с http:// или https://');
+  }
+
+  return problems;
+}
+
+/**
+ * Записывает список событий в данные.
+ *
+ * В файле события лежат от старых к новым: летопись так и читается, а новая
+ * запись дописывается в конец и даёт в истории гита одну добавленную строку
+ * вместо перетасованного массива.
+ */
+export function applyEvents(raw, list) {
+  const events = (list ?? [])
+    .map((e) => {
+      const out = {
+        id: String(e.id),
+        date: isoDay(e.date),
+        type: String(e.type),
+        title: String(e.title).trim(),
+      };
+      // Необязательные поля не пишем пустыми: файл читают люди.
+      if (Number.isFinite(Number(e.serverNumber)) && e.serverNumber !== null && e.serverNumber !== '') {
+        out.serverNumber = Number(e.serverNumber);
+      }
+      if (String(e.body ?? '').trim()) out.body = String(e.body).trim();
+      if (String(e.imageUrl ?? '').trim()) out.imageUrl = String(e.imageUrl).trim();
+      if (Number(e.durationDays) > 0) out.durationDays = Number(e.durationDays);
+      return out;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return { ...raw, events };
+}
+
+/** Что изменится в событиях при публикации. */
+export function eventsDiff(raw, list) {
+  const before = new Map(eventsFromRaw(raw).map((e) => [e.id, e]));
+  const after = new Map((list ?? []).map((e) => [String(e.id), e]));
+
+  let added = 0;
+  let changed = 0;
+  let removed = 0;
+
+  for (const [id, ev] of after) {
+    const was = before.get(id);
+    if (!was) {
+      added++;
+      continue;
+    }
+    const same = ['date', 'type', 'title', 'body', 'imageUrl'].every(
+      (k) => String(was[k] ?? '') === String(ev[k] ?? '')
+    );
+    const sameNums =
+      Number(was.serverNumber ?? 0) === Number(ev.serverNumber ?? 0) &&
+      Number(was.durationDays ?? 0) === Number(ev.durationDays ?? 0);
+    if (!same || !sameNums) changed++;
+  }
+
+  for (const id of before.keys()) if (!after.has(id)) removed++;
+
+  return { added, changed, removed, total: added + changed + removed };
+}
+
+/** Сообщение коммита для правки хронологии. */
+export function eventsCommitMessage(diff) {
+  const parts = [];
+  if (diff.added) parts.push(plural(diff.added, 'запись', 'записи', 'записей'));
+  if (diff.changed) parts.push(`${plural(diff.changed, 'правка', 'правки', 'правок')}`);
+  if (diff.removed) parts.push(`удалено ${diff.removed}`);
+
+  return `хронология: ${parts.length ? parts.join(', ') : 'без изменений'}`;
 }
 
 /** Сколько побед и поражений в отметках. */

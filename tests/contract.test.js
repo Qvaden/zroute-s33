@@ -1113,6 +1113,128 @@ console.log('\nL. Итог недели: взяли, не взяли, удерж
   check('вместе с итогами остаётся лента событий', both.includes('data-tl-list'));
 }
 
+// ── M. Правка хронологии ────────────────────────────────────────────────────
+console.log('\nM. Правка хронологии');
+{
+  const { mapDataset } = await import('../src/data/adapters/_map.js');
+  const {
+    eventsFromRaw, applyEvents, eventsDiff, nextEventId, eventProblems,
+    eventsCommitMessage, blankEvent,
+  } = await import('../src/admin/edit.js');
+
+  const raw = {
+    alliances: [{ id: 'a01', tag: 'A', name: 'А', active: true }],
+    weeks: [{ id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02' }],
+    results: [],
+    events: [
+      { id: 'e1', date: '2026-04-18', type: 'server_capture', serverNumber: 47, title: 'Захвачен 47', durationDays: 3 },
+      { id: 'e5', date: '2026-06-01', type: 'war', title: 'Война' },
+    ],
+    texts: [],
+  };
+
+  /* ── Чтение в форму ── */
+  const list = eventsFromRaw(raw);
+  equal('свежие записи первыми', list.map((e) => e.id).join(' '), 'e5 e1');
+  equal('дата приходит в форму как YYYY-MM-DD', list[1].date, '2026-04-18');
+  equal('незаполненное описание — пустая строка, а не undefined', list[0].body, '');
+  equal(
+    'неизвестный тип превращается в «Событие»',
+    eventsFromRaw({ events: [{ id: 'x', date: '2026-01-01', type: 'выдумка', title: 'т' }] })[0].type,
+    'other'
+  );
+
+  /* ── Идентификаторы ── */
+  equal('новый id не занят', nextEventId(raw, list), 'e6');
+  // Счёт по количеству записей выдал бы e3 — уже занятый. Отсюда и тест.
+  equal(
+    'после удаления середины id не переиспользуется',
+    nextEventId({ events: [{ id: 'e1' }, { id: 'e2' }, { id: 'e9' }] }, []),
+    'e10'
+  );
+
+  /* ── Проверки до сохранения ── */
+  check('без даты не сохранить', eventProblems({ ...blankEvent(), title: 'т' }).some((p) => /дата/i.test(p)));
+  check('без заголовка не сохранить', eventProblems({ ...blankEvent(), date: '2026-01-01' }).some((p) => /заголов/i.test(p)));
+  check(
+    'ссылка не на http отвергается',
+    eventProblems({ ...blankEvent(), date: '2026-01-01', title: 'т', imageUrl: 'javascript:alert(1)' })
+      .some((p) => /http/i.test(p))
+  );
+  equal(
+    'заполненная запись проходит',
+    eventProblems({ ...blankEvent(), date: '2026-01-01', title: 'т' }).length,
+    0
+  );
+
+  /* ── Запись в данные ── */
+  const next = applyEvents(raw, [
+    { id: 'e9', date: '2026-02-02', type: 'merge', title: '  Слияние  ', body: '', imageUrl: '', serverNumber: null, durationDays: null },
+    ...list,
+  ]);
+
+  // Ищем по id, а не по позиции: тест не должен ломаться от того, что кто-то
+  // поменял даты в исходных данных выше.
+  const byId = (id) => next.events.find((e) => e.id === id);
+
+  equal(
+    'в файле летопись идёт от старых к новым',
+    next.events.map((e) => e.id).join(' '),
+    'e9 e1 e5' // 2 фев → 18 апр → 1 июн
+  );
+  equal('заголовок обрезается по краям', byId('e9').title, 'Слияние');
+  check(
+    'пустые необязательные поля в файл не пишутся',
+    !('body' in byId('e9')) && !('imageUrl' in byId('e9')) && !('serverNumber' in byId('e9'))
+  );
+  check(
+    'заполненные поля сохраняются',
+    byId('e1').serverNumber === 47 && byId('e1').durationDays === 3
+  );
+  equal('исходные данные не мутируются', raw.events.length, 2);
+
+  /* ── Что уйдёт в коммит ── */
+  const d = eventsDiff(raw, [
+    { ...list[0], title: 'Война за зону' },              // правка
+    { id: 'e7', date: '2026-03-03', type: 'other', title: 'Новое' }, // добавление
+  ]);                                                     // e1 пропал — удаление
+  equal('посчитано добавленных', d.added, 1);
+  equal('посчитано изменённых', d.changed, 1);
+  equal('посчитано удаляемых', d.removed, 1);
+
+  equal(
+    'сообщение коммита человеческое',
+    eventsCommitMessage({ added: 1, changed: 0, removed: 0, total: 1 }),
+    'хронология: 1 запись'
+  );
+
+  /*
+    ГЛАВНОЕ: правка летописи обязана проходить тем же валидатором, которым
+    проверяется сайт, — иначе панель опубликует то, на чём сайт откроется пустым.
+  */
+  check('правка проходит валидатор сайта', validateDataset(mapDataset(next)).length === 0);
+  check(
+    'запись без заголовка валидатор ловит',
+    validateDataset(mapDataset(applyEvents(raw, [{ id: 'e9', date: '2026-02-02', type: 'other', title: '' }]))).length > 0
+  );
+
+  /* ── Экран рисуется и на пустой летописи, и на полной ── */
+  const { renderEvents } = await import('../src/admin/screens/events.js');
+  const viewFor = (over) => ({
+    raw, canPush: true, events: eventsFromRaw(raw), eventsSaved: null, ...over,
+  });
+
+  check('экран показывает кнопку добавления', renderEvents(viewFor({})).includes('data-event-new'));
+  check('у каждой записи есть правка и удаление',
+    (renderEvents(viewFor({}).valueOf()).match(/data-event-edit=/g) || []).length === 2);
+  check('форма появляется только когда что-то правят', !renderEvents(viewFor({})).includes('data-event-form'));
+  check('открытая форма рисуется', renderEvents(viewFor({ eventDraft: blankEvent() })).includes('data-event-form'));
+  check('без права записи кнопок правки нет',
+    !renderEvents(viewFor({ canPush: false })).includes('data-event-edit'));
+  check('пустая летопись объясняет себя',
+    renderEvents(viewFor({ events: [] })).includes('Записей пока нет'));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

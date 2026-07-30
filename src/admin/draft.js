@@ -82,3 +82,32 @@ export function draftSavedAt(weekId) {
 export function draftWeekIds() {
   return Object.keys(loadDrafts());
 }
+
+/* ── Черновик хронологии ──────────────────────────────────────────────────── */
+
+/**
+ * События хранятся отдельным черновиком и целым списком, а не по одному.
+ *
+ * Причина в природе правки: неделю заполняют по клеткам, а летопись правят
+ * пачкой — добавил запись, поправил соседнюю, удалил лишнюю — и публикуют
+ * это одним коммитом. Список целиком совпадает с тем, что уедет в файл.
+ */
+const EVENTS_KEY = 'zr33.admin.events';
+
+export function getEventsDraft() {
+  const parsed = safe(() => JSON.parse(localStorage.getItem(EVENTS_KEY) || 'null'), null);
+  return parsed && Array.isArray(parsed.list) ? parsed.list : null;
+}
+
+export function saveEventsDraft(list) {
+  safe(() => localStorage.setItem(EVENTS_KEY, JSON.stringify({ list, savedAt: new Date().toISOString() })));
+}
+
+export function dropEventsDraft() {
+  safe(() => localStorage.removeItem(EVENTS_KEY));
+}
+
+export function eventsDraftSavedAt() {
+  const at = safe(() => JSON.parse(localStorage.getItem(EVENTS_KEY) || 'null'), null)?.savedAt;
+  return at ? new Date(at) : null;
+}
