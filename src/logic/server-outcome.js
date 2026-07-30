@@ -15,6 +15,7 @@
  *
  * @typedef {'captured'|'not_captured'|'held'|'lost'} ServerOutcome
  */
+import { byWeekStartDesc } from '../data/week-order.js';
 
 /**
  * Как каждый исход называется и подаётся.
@@ -98,5 +99,5 @@ export function verdictText(outcome, serverNumber, ownServer) {
 export function weeksWithOutcome(weeks) {
   return (weeks ?? [])
     .filter((w) => w.serverOutcome && SERVER_OUTCOME[w.serverOutcome])
-    .sort((a, b) => b.number - a.number);
+    .sort(byWeekStartDesc);
 }

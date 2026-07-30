@@ -21,6 +21,7 @@
 import { CONFIG } from '../../../config.js';
 import { parseCsvObjects } from '../../lib/csv.js';
 import { toDate, toBool, toStr, toNumber, toOutcome, toServerOutcome } from './_coerce.js';
+import { byWeekStart } from '../week-order.js';
 
 export const name = 'sheets';
 
@@ -118,7 +119,7 @@ export async function getWeeks() {
       serverOutcome: toServerOutcome(r.serverOutcome) ?? undefined,
       serverNumber: toNumber(r.serverNumber) ?? undefined,
     }))
-    .sort((a, b) => a.number - b.number);
+    .sort(byWeekStart);
 }
 
 /**

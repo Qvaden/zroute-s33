@@ -11,6 +11,7 @@
  * Поэтому правило простое: разбор ровно один, потребителей сколько угодно.
  */
 import { toDate, toBool, toStr, toNumber, toOutcome, toServerOutcome } from './_coerce.js';
+import { byWeekStart } from '../week-order.js';
 
 /** @param {any[]} [rows] */
 export function mapAlliances(rows) {
@@ -41,7 +42,7 @@ export function mapWeeks(rows) {
       serverOutcome: toServerOutcome(w.serverOutcome) ?? undefined,
       serverNumber: toNumber(w.serverNumber) ?? undefined,
     }))
-    .sort((a, b) => a.number - b.number);
+    .sort(byWeekStart);
 }
 
 /**

@@ -14,6 +14,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
 import { marksFromRaw } from '../src/admin/edit.js';
+import { byWeekStartDesc } from '../src/data/week-order.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
 import { renderWeek } from '../src/admin/screens/week.js';
@@ -33,7 +34,7 @@ const raw = JSON.parse(await readFile('data/demo.json', 'utf8'));
 const data = mapDataset(raw);
 
 // Самая свежая неделя — её и показываем на экране ввода.
-const latestWeek = [...data.weeks].sort((a, b) => b.number - a.number)[0];
+const latestWeek = [...data.weeks].sort(byWeekStartDesc)[0];
 
 /*
   Правдоподобная обвязка вокруг данных: панель показывает не только сами

@@ -1,5 +1,6 @@
 import { esc, fmtDate, deltaBadge, plural, pluralWord } from '../ui/helpers.js';
 import { raceChart } from '../ui/chart.js';
+import { byWeekStart } from '../data/week-order.js';
 
 /**
  * Состояние до первого внесённого результата.
@@ -13,7 +14,7 @@ function renderPreSeason(standings, allWeeks) {
 
   // Ближайшая неделя, которая ещё не закончилась.
   const today = new Date();
-  const ordered = [...(allWeeks ?? [])].sort((a, b) => a.number - b.number);
+  const ordered = [...(allWeeks ?? [])].sort(byWeekStart);
   const upcoming = ordered.find((w) => w.endDate >= today) ?? ordered[0];
 
   return `

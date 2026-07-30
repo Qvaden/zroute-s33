@@ -2,6 +2,7 @@ import { esc, fmtDate, plural } from '../../ui/helpers.js';
 import { diffMarks, countMarks, marksFromRaw, weekOutcomeOf, outcomeDiffers } from '../edit.js';
 import { SERVER_OUTCOME, SERVER_OUTCOME_ORDER, verdictText } from '../../logic/server-outcome.js';
 import { CONFIG } from '../../../config.js';
+import { byWeekStartDesc } from '../../data/week-order.js';
 
 /**
  * Неделя — главный экран панели.
@@ -22,7 +23,7 @@ import { CONFIG } from '../../../config.js';
  */
 export function renderWeek(view, param) {
   const { data, raw, marks, canPush, draftSaved } = view;
-  const weeks = [...data.weeks].sort((a, b) => b.number - a.number);
+  const weeks = [...data.weeks].sort(byWeekStartDesc);
 
   if (!weeks.length) {
     return `<section class="panel"><h2>Недели не заведены</h2>

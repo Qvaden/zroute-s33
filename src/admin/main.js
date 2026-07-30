@@ -20,6 +20,7 @@
 import { CONFIG } from '../../config.js';
 import { esc, safeUrl } from '../ui/helpers.js';
 import { mapDataset } from '../data/adapters/_map.js';
+import { byWeekStartDesc } from '../data/week-order.js';
 import { validateDataset } from '../data/contract.js';
 import {
   computeStandings,
@@ -76,7 +77,7 @@ function parseHash() {
  * неделю из будущего бесполезно.
  */
 function pickWeek(param) {
-  const weeks = [...view.data.weeks].sort((a, b) => b.number - a.number);
+  const weeks = [...view.data.weeks].sort(byWeekStartDesc);
   if (!weeks.length) return null;
 
   const asked = weeks.find((w) => w.id === param);

@@ -14,6 +14,7 @@
  */
 import { CONFIG } from '../../../config.js';
 import { toDate, toBool, toStr, toNumber, toOutcome, toServerOutcome } from './_coerce.js';
+import { byWeekStart } from '../week-order.js';
 
 export const name = 'pocketbase';
 
@@ -81,15 +82,19 @@ export async function getAlliances() {
 
 export async function getWeeks() {
   const items = await list('weeks', 'number');
-  return items.map((r) => ({
-    id: toStr(r.id),
-    number: toNumber(r.number) ?? 0,
-    startDate: toDate(r.startDate),
-    endDate: toDate(r.endDate),
-    note: toStr(r.note) || undefined,
-    serverOutcome: toServerOutcome(r.serverOutcome) ?? undefined,
-    serverNumber: toNumber(r.serverNumber) ?? undefined,
-  }));
+  // Сортировку базы перепроверяем на своей стороне: порядок недель определяет
+  // дата, а не номер. Почему — в src/data/week-order.js.
+  return items
+    .map((r) => ({
+      id: toStr(r.id),
+      number: toNumber(r.number) ?? 0,
+      startDate: toDate(r.startDate),
+      endDate: toDate(r.endDate),
+      note: toStr(r.note) || undefined,
+      serverOutcome: toServerOutcome(r.serverOutcome) ?? undefined,
+      serverNumber: toNumber(r.serverNumber) ?? undefined,
+    }))
+    .sort(byWeekStart);
 }
 
 export async function getResults() {
