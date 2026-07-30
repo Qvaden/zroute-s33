@@ -2,7 +2,7 @@ import { esc, fmtDate, plural } from '../../ui/helpers.js';
 import { diffMarks, countMarks, marksFromRaw, weekOutcomeOf, outcomeDiffers } from '../edit.js';
 import { SERVER_OUTCOME, SERVER_OUTCOME_ORDER, verdictText } from '../../logic/server-outcome.js';
 import { CONFIG } from '../../../config.js';
-import { byWeekStartDesc } from '../../data/week-order.js';
+import { byWeekStartDesc, findCurrentWeek } from '../../data/week-order.js';
 
 /**
  * Неделя — главный экран панели.
@@ -152,6 +152,13 @@ const MONTH_NAME = [
  * из десяти правят последнюю неделю, и до неё не должно быть прокрутки.
  */
 function renderPicker(weeks, selected) {
+  /*
+    Текущая неделя подписана словом, а не только цветом: редактор открывает
+    панель после VS и должен видеть, какая неделя «сейчас», не сверяя даты
+    в голове. Это дешевле любой инструкции.
+  */
+  const current = findCurrentWeek(weeks);
+
   const groups = [];
   for (const w of weeks) {
     const date = w.startDate;
@@ -168,8 +175,14 @@ function renderPicker(weeks, selected) {
     group.weeks.push(w);
   }
 
-  const chip = (w) => `<a href="#/week/${encodeURIComponent(w.id)}"
-       class="adm-chip ${w.id === selected.id ? 'is-on' : ''}">${esc(String(w.number))}</a>`;
+  const chip = (w) => {
+    const isNow = current && w.id === current.id;
+    return `<a href="#/week/${encodeURIComponent(w.id)}"
+       class="adm-chip ${w.id === selected.id ? 'is-on' : ''} ${isNow ? 'is-now' : ''}"
+       title="${esc(fmtDate(w.startDate))} — ${esc(fmtDate(w.endDate))}">${esc(String(w.number))}${
+      isNow ? '<i>сейчас</i>' : ''
+    }</a>`;
+  };
 
   const block = (g) => `<div class="adm-mon">
       <span class="adm-mon__label">${esc(g.label)}</span>

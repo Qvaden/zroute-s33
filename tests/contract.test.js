@@ -768,6 +768,28 @@ console.log('\nK0. Недели упорядочены по дате, а не п
     'W01 W52 W31'
   );
 
+  /*
+    «Какая неделя сейчас» — отдельная проверка, потому что здесь была живая
+    ошибка: панель открывалась на последней ЗАВЕДЁННОЙ неделе, а недели заводят
+    на месяц вперёд. Человек вносил результаты в неделю из будущего.
+  */
+  const { findCurrentWeek } = await import('../src/data/week-order.js');
+  const season = mapWeeks([
+    { id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02' },
+    { id: 'W2', number: 2, startDate: '2026-08-03', endDate: '2026-08-09' },
+    { id: 'W3', number: 3, startDate: '2026-08-10', endDate: '2026-08-16' },
+  ]);
+
+  equal('идёт та неделя, в которую попал день',
+    findCurrentWeek(season, new Date('2026-08-05T10:00:00Z'))?.id, 'W2');
+  equal('последний день недели ещё её же',
+    findCurrentWeek(season, new Date('2026-08-09T23:00:00Z'))?.id, 'W2');
+  equal('после всех недель — последняя прошедшая, а не первая',
+    findCurrentWeek(season, new Date('2026-12-01T00:00:00Z'))?.id, 'W3');
+  equal('до старта — первая неделя',
+    findCurrentWeek(season, new Date('2026-07-01T00:00:00Z'))?.id, 'W1');
+  equal('без недель — ничего', findCurrentWeek([], new Date()), null);
+
   // Недели без даты не должны исчезать: данные неполные, но они есть.
   const noDate = mapWeeks([
     { id: 'WX', number: 9 },

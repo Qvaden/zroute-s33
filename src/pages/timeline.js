@@ -123,7 +123,8 @@ function renderWeeksSection(outcomes) {
 
       return `<li>
         <button type="button" class="wk wk--${m.kind} wk--${m.action}"
-                data-tl-week="${esc(w.id)}" data-tl-ym="${ymKey(w.startDate)}">
+                data-tl-week="${esc(w.id)}" data-tl-ym="${ymKey(w.startDate)}"
+                title="${esc(fmtDate(w.startDate))} — ${esc(fmtDate(w.endDate))}">
           <span class="wk__num num">${w.number}</span>
           <span class="wk__what">${esc(m.short)}${worthShowing ? ` <b class="num">${num}</b>` : ''}</span>
         </button>

@@ -52,3 +52,46 @@ export function byWeekStart(a, b) {
 export function byWeekStartDesc(a, b) {
   return byWeekStart(b, a);
 }
+
+/**
+ * Неделя, которая идёт сейчас.
+ *
+ * Нужна против самой обидной путаницы: недели заводятся на месяц вперёд, и без
+ * этой функции панель открывалась на последней ЗАВЕДЁННОЙ неделе — то есть
+ * на той, которая ещё не наступила. Человек вносил результаты в будущее
+ * и не имел ни одного повода это заметить.
+ *
+ * Если сегодня не попало ни в одну неделю, отдаём последнюю прошедшую: сразу
+ * после VS правят её, а не ту, что начнётся в понедельник.
+ *
+ * @param {{startDate?: Date, endDate?: Date}[]} weeks
+ * @param {Date} [now]
+ */
+export function findCurrentWeek(weeks, now = new Date()) {
+  const ordered = [...(weeks ?? [])].sort(byWeekStart);
+  if (!ordered.length) return null;
+
+  const t = now.getTime();
+
+  const inside = ordered.find((w) => {
+    const start = timeOf(w.startDate);
+    const end = timeOf(w.endDate);
+    if (start === null || end === null) return false;
+    /*
+      Конец недели — это дата последнего дня, а не его начало. Без сдвига
+      на сутки воскресенье оказывалось бы «уже не в этой неделе», и в день
+      после VS панель показывала бы не ту неделю.
+    */
+    return t >= start && t < end + 24 * 60 * 60 * 1000;
+  });
+  if (inside) return inside;
+
+  const past = ordered.filter((w) => {
+    const end = timeOf(w.endDate);
+    return end !== null && end < t;
+  });
+  if (past.length) return past[past.length - 1];
+
+  // Всё ещё впереди: сайт только запустили, первая неделя не началась.
+  return ordered[0];
+}

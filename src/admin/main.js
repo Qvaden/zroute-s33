@@ -20,7 +20,7 @@
 import { CONFIG } from '../../config.js';
 import { esc, safeUrl } from '../ui/helpers.js';
 import { mapDataset } from '../data/adapters/_map.js';
-import { byWeekStartDesc } from '../data/week-order.js';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js';
 import { validateDataset } from '../data/contract.js';
 import {
   computeStandings,
@@ -72,9 +72,14 @@ function parseHash() {
 /**
  * Какую неделю показывать.
  *
- * По умолчанию не последняя заведённая, а последняя, за которую есть данные
- * или начатый черновик: недели заводятся на месяц вперёд, и открывать пустую
- * неделю из будущего бесполезно.
+ * Порядок предпочтений выстроен по цене ошибки, а не по удобству кода:
+ *
+ * 1. Неделя из адреса — человек попросил явно.
+ * 2. Неделя с незаконченным черновиком. Потерять начатый ввод хуже всего,
+ *    поэтому он перебивает даже «сегодня».
+ * 3. Неделя, которая идёт сейчас. Раньше здесь стояла последняя ЗАВЕДЁННАЯ,
+ *    и панель открывалась на неделе из будущего: недели заводят на месяц
+ *    вперёд, а человек вносил результаты туда, куда его привели.
  */
 function pickWeek(param) {
   const weeks = [...view.data.weeks].sort(byWeekStartDesc);
@@ -83,10 +88,10 @@ function pickWeek(param) {
   const asked = weeks.find((w) => w.id === param);
   if (asked) return asked;
 
-  const started = weeks.find(
-    (w) => getDraft(w.id) || view.data.results.some((r) => r.weekId === w.id) || w.serverOutcome
-  );
-  return started ?? weeks[0];
+  const withDraft = weeks.find((w) => getDraft(w.id));
+  if (withDraft) return withDraft;
+
+  return findCurrentWeek(weeks) ?? weeks[0];
 }
 
 /**

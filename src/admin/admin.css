@@ -279,6 +279,19 @@
   border-color: var(--accent);
 }
 
+/* Текущая неделя подписана словом: цвета для этого мало, а перепутать неделю
+   при вводе — самая дорогая из бытовых ошибок редактора. */
+.adm-chip.is-now { border-color: color-mix(in srgb, var(--win) 55%, transparent); }
+.adm-chip i {
+  font-style: normal;
+  font-size: 9.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--win);
+  margin-left: 6px;
+}
+.adm-chip.is-on i { color: #0a0b0d; opacity: .75; }
+
 .adm-progress {
   height: 5px;
   background: var(--raised-2);
