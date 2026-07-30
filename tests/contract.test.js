@@ -658,6 +658,28 @@ console.log('\nJ. Админ-панель');
       /safeUrl\(/.test(await readFile('src/pages/timeline.js', 'utf8'))
   );
 
+  /*
+    ОДИН ИСТОЧНИК ПРАВДЫ.
+
+    Данные ведёт панель. Пока выгрузка из таблицы запускалась по расписанию
+    и по каждому push, она затирала работу панели каждые полчаса — правка
+    появлялась и исчезала, и понять причину было невозможно.
+
+    Воркфлоу оставлен как аварийный выход, но только с ручным запуском.
+    Если однажды кто-то вернёт `schedule` или `push`, этот тест упадёт —
+    и вернуть их придётся осознанно.
+  */
+  const workflow = await readFile('.github/workflows/pull-data.yml', 'utf8');
+  check('выгрузка из таблицы не ходит по расписанию', !/^\s*schedule:/m.test(workflow));
+  check('выгрузка из таблицы не запускается по push', !/^\s*push:/m.test(workflow));
+  check('ручной запуск выгрузки остался как аварийный выход', /workflow_dispatch:/.test(workflow));
+
+  const pullScript = await readFile('scripts/pull-sheet.mjs', 'utf8');
+  check(
+    'скрипт выгрузки предупреждает, что затрёт данные панели',
+    /затр[её]т/.test(pullScript)
+  );
+
   const adminHtml = await readFile('admin.html', 'utf8');
   check('панель не регистрирует service worker', !/serviceWorker/.test(adminHtml));
   check('панель не подключает манифест', !adminHtml.includes('rel="manifest"'));
