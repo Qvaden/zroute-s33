@@ -1176,6 +1176,18 @@ console.log('\nM. Правка хронологии');
   equal('посчитано изменённых', d.changed, 1);
   equal('посчитано удаляемых', d.removed, 1);
 
+  /*
+    Картинка, выбранная в форме, но ещё не загруженная в репозиторий (загрузка
+    отложена до «Опубликовать», см. main.js): пока imageUrl не поменялся, обычное
+    сравнение полей не увидело бы изменения вовсе, и кнопка публикации осталась бы
+    выключенной, хотя картинку опубликовать нужно.
+  */
+  equal(
+    'ещё не загруженная картинка тоже считается изменением',
+    eventsDiff(raw, [{ ...list[1], _pendingImage: { blob: {} } }, list[0]]).changed,
+    1
+  );
+
   equal(
     'сообщение коммита человеческое',
     eventsCommitMessage({ added: 1, changed: 0, removed: 0, total: 1 }),
@@ -1207,6 +1219,24 @@ console.log('\nM. Правка хронологии');
     !renderEvents(viewFor({ canPush: false })).includes('data-event-edit'));
   check('пустая летопись объясняет себя',
     renderEvents(viewFor({ events: [] })).includes('Записей пока нет'));
+
+  /* ── Картинка выбирается файлом, а не вводится ссылкой ── */
+  const blankForm = renderEvents(viewFor({ eventDraft: blankEvent() }));
+  check('поля ручной ссылки на картинку больше нет', !blankForm.includes('type="url"'));
+  check('вместо неё — выбор файла', blankForm.includes('data-event-image-input'));
+
+  const pendingForm = renderEvents(
+    viewFor({ eventDraft: { ...blankEvent(), _pendingImage: { previewUrl: 'blob:фейковое-превью' } } })
+  );
+  check('превью невыгруженной картинки показано', pendingForm.includes('blob:фейковое-превью'));
+  check('подписано, что загрузится при публикации', pendingForm.includes('Загрузится при публикации'));
+  check('кнопка «убрать картинку» есть', pendingForm.includes('data-event-image-clear'));
+
+  /* ── Подготовка имени файла под загрузку (src/admin/image.js) ── */
+  const { uploadPath } = await import('../src/admin/image.js');
+  check('путь загрузки лежит в public/uploads', uploadPath('jpg').startsWith('public/uploads/'));
+  check('путь загрузки оканчивается на расширение', uploadPath('jpg').endsWith('.jpg'));
+  check('два вызова дают разные имена', uploadPath('jpg') !== uploadPath('jpg'));
 }
 
 console.log(`\n${'─'.repeat(52)}`);

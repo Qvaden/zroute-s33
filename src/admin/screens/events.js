@@ -115,6 +115,37 @@ function row(e, canPush) {
 }
 
 /**
+ * Поле картинки: выбор файла вместо ручной ссылки.
+ *
+ * Сама загрузка в репозиторий откладывается до «Опубликовать» (main.js) —
+ * поэтому здесь либо превью уже выбранного файла (_pendingImage, картинка
+ * ещё только в браузере), либо превью того, что уже опубликовано (imageUrl),
+ * либо пусто. Обработка (сжатие) и сеть сюда не входят: это чистая разметка
+ * по готовому состоянию формы.
+ */
+function imageField(form) {
+  const previewSrc = form._pendingImage?.previewUrl || safeUrl(form.imageUrl);
+
+  return `
+    <div class="adm-img-field">
+      ${
+        previewSrc
+          ? `<div class="adm-img-preview">
+               <img src="${esc(previewSrc)}" alt="">
+               <div class="adm-img-preview__row">
+                 <span>${form._pendingImage ? 'Загрузится при публикации' : 'Уже на сайте'}</span>
+                 <button type="button" class="adm-btn" data-event-image-clear>Убрать</button>
+               </div>
+             </div>`
+          : ''
+      }
+      <input type="file" accept="image/*" data-event-image-input ${form._imageBusy ? 'disabled' : ''}>
+      ${form._imageBusy ? '<i class="muted">Обрабатываем картинку…</i>' : ''}
+      ${form._imageError ? `<p class="adm-img-field__error">${esc(form._imageError)}</p>` : ''}
+    </div>`;
+}
+
+/**
  * Форма добавления и правки.
  *
  * Появляется только когда что-то правят: пустая форма, висящая всё время,
@@ -181,9 +212,8 @@ function renderForm(form, canPush) {
                  placeholder="необязательно">
         </label>
         <label class="adm-field">
-          <span>Ссылка на картинку</span>
-          <input type="url" data-event-field="imageUrl" value="${esc(form.imageUrl)}"
-                 placeholder="https://…">
+          <span>Картинка</span>
+          ${imageField(form)}
         </label>
       </div>
 

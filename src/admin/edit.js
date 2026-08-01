@@ -267,7 +267,15 @@ export function applyEvents(raw, list) {
   return { ...raw, events };
 }
 
-/** Что изменится в событиях при публикации. */
+/**
+ * Что изменится в событиях при публикации.
+ *
+ * `_pendingImage` — картинка, выбранная в форме, но ещё не загруженная
+ * в репозиторий (загрузка отложена до нажатия «Опубликовать», см. main.js).
+ * Пока она висит, imageUrl в записи ещё старый или пустой, и без этой
+ * проверки правка «поменял только картинку» не считалась бы изменением
+ * вовсе — кнопка публикации осталась бы выключенной.
+ */
 export function eventsDiff(raw, list) {
   const before = new Map(eventsFromRaw(raw).map((e) => [e.id, e]));
   const after = new Map((list ?? []).map((e) => [String(e.id), e]));
@@ -288,7 +296,7 @@ export function eventsDiff(raw, list) {
     const sameNums =
       Number(was.serverNumber ?? 0) === Number(ev.serverNumber ?? 0) &&
       Number(was.durationDays ?? 0) === Number(ev.durationDays ?? 0);
-    if (!same || !sameNums) changed++;
+    if (!same || !sameNums || ev._pendingImage) changed++;
   }
 
   for (const id of before.keys()) if (!after.has(id)) removed++;

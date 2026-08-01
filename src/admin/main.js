@@ -30,7 +30,8 @@ import {
 } from '../logic/standings.js';
 import { renderHome } from '../pages/home.js';
 import { hasToken, clearToken, setToken } from './auth.js';
-import { whoAmI, repoInfo, readDataFile, lastCommit, writeDataFile } from './repo.js';
+import { whoAmI, repoInfo, readDataFile, lastCommit, writeDataFile, uploadImageFile } from './repo.js';
+import { prepareImage, uploadPath } from './image.js';
 import {
   applyMarks,
   applyEvents,
@@ -415,6 +416,27 @@ async function publish() {
 
 /* ── Хронология ──────────────────────────────────────────────────────────── */
 
+/**
+ * Служебные поля формы (_pendingImage, _imageBusy, _imageError) существуют
+ * только в браузере и живут не дольше вкладки — картинка либо ещё
+ * не загружена, либо уже загружена и превратилась в обычный imageUrl.
+ * Класть их в localStorage нельзя: Blob не переживает JSON.stringify
+ * (превратится в бессмысленный «{}»), а после перезагрузки страницы
+ * такой огрызок читался бы как «картинка есть», хотя байтов уже нет.
+ */
+function stripTransient(list) {
+  return (list ?? []).map((e) => {
+    const clean = {};
+    for (const [k, v] of Object.entries(e)) if (!k.startsWith('_')) clean[k] = v;
+    return clean;
+  });
+}
+
+/** Локальный адрес превью (URL.createObjectURL) не освобождён сам — отпускаем руками. */
+function revokePendingImage(ev) {
+  if (ev?._pendingImage?.previewUrl) URL.revokeObjectURL(ev._pendingImage.previewUrl);
+}
+
 /** Открыть форму: пустую для новой записи или заполненную для правки. */
 function openEventForm(id) {
   const found = id ? view.events.find((e) => e.id === id) : null;
@@ -423,6 +445,7 @@ function openEventForm(id) {
 }
 
 function closeEventForm() {
+  revokePendingImage(view.eventDraft);
   view.eventDraft = null;
   render();
 }
@@ -443,6 +466,9 @@ function showEventProblems(problems) {
 function saveEventToList() {
   const form = view.eventDraft;
   if (!form || !view.canPush) return;
+  // Обработка картинки — доли секунды, но лучше не дать сохранить запись
+  // ровно в этот момент, чем потом гадать, донеслась она до списка или нет.
+  if (form._imageBusy) return;
 
   const problems = eventProblems(form);
   if (problems.length) {
@@ -468,15 +494,18 @@ function saveEventToList() {
   // Свежие сверху — так же, как их показывает сайт.
   view.events.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
-  saveEventsDraft(view.events);
+  // В localStorage — без _pendingImage и прочих служебных полей: Blob туда
+  // не кладут, а сама картинка на этом шаге ещё не покидала браузер.
+  saveEventsDraft(stripTransient(view.events));
   view.eventDraft = null;
   render();
 }
 
 function deleteEventFromList(id) {
   if (!view.canPush) return;
+  revokePendingImage(view.events.find((e) => e.id === id));
   view.events = view.events.filter((e) => e.id !== id);
-  saveEventsDraft(view.events);
+  saveEventsDraft(stripTransient(view.events));
   // Если удалили ту запись, что была открыта в форме, форму тоже закрываем.
   if (view.eventDraft?.id === id) view.eventDraft = null;
   render();
@@ -504,6 +533,32 @@ async function publishEvents() {
   };
 
   try {
+    /*
+      Картинки, выбранные в форме, но ещё не загруженные, — грузим их первыми.
+      До этой минуты в репозиторий не ушло ни байта: только черновик в браузере.
+      Каждая уже загруженная картинка сразу сохраняется в список и в localStorage —
+      если следующая оборвётся по сети, повторное «Опубликовать» не зальёт
+      прежние картинки заново.
+    */
+    for (let i = 0; i < view.events.length; i++) {
+      const ev = view.events[i];
+      if (!ev._pendingImage) continue;
+
+      if (button) button.textContent = 'Загружаем картинку…';
+      const bytes = await ev._pendingImage.blob.arrayBuffer();
+      const url = await uploadImageFile({
+        path: uploadPath('jpg'),
+        bytes,
+        message: `хронология: картинка для записи ${ev.id}`,
+      });
+      revokePendingImage(ev);
+
+      const { _pendingImage, ...rest } = ev;
+      view.events = view.events.map((e, j) => (j === i ? { ...rest, imageUrl: url } : e));
+      saveEventsDraft(stripTransient(view.events));
+    }
+    if (button) button.textContent = 'Публикуем…';
+
     const candidate = applyEvents(view.raw, view.events);
 
     const problems = validateDataset(mapDataset(candidate));
@@ -641,6 +696,15 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  if (e.target.closest('[data-event-image-clear]') && view.eventDraft) {
+    // «Убрать» всегда значит «картинки не будет»: и невыгруженный выбор,
+    // и уже опубликованную ссылку снимаем одной и той же кнопкой.
+    revokePendingImage(view.eventDraft);
+    view.eventDraft = { ...view.eventDraft, _pendingImage: null, _imageError: null, imageUrl: '' };
+    render();
+    return;
+  }
+
   if (e.target.closest('[data-event-cancel]')) {
     closeEventForm();
     return;
@@ -652,6 +716,7 @@ document.addEventListener('click', (e) => {
   }
 
   if (e.target.closest('[data-events-reset]')) {
+    (view.events ?? []).forEach(revokePendingImage);
     dropEventsDraft();
     view.events = eventsFromRaw(view.raw);
     view.eventDraft = null;
@@ -678,6 +743,40 @@ document.addEventListener('input', (e) => {
   if (field && view?.eventDraft) {
     view.eventDraft = { ...view.eventDraft, [field.dataset.eventField]: e.target.value };
   }
+});
+
+/*
+  Выбор картинки. Обработка (сжатие) идёт сразу — она локальная, сети не
+  трогает, и без неё поле показало бы либо ничего, либо тяжеленный оригинал.
+  Сама загрузка в репозиторий отложена до «Опубликовать» (см. publishEvents):
+  до этой кнопки ни один байт никуда не уходит.
+*/
+document.addEventListener('change', async (e) => {
+  const input = e.target.closest?.('[data-event-image-input]');
+  if (!input || !view?.eventDraft) return;
+
+  const file = input.files?.[0];
+  if (!file) return;
+
+  revokePendingImage(view.eventDraft);
+  // Ссылка на этот конкретный объект черновика — за время обработки (доли
+  // секунды, но асинхронные) форму могли закрыть или открыть другую запись,
+  // и тогда результату уже некуда и незачем возвращаться.
+  const busyForm = { ...view.eventDraft, _imageBusy: true, _imageError: null, _pendingImage: null };
+  view.eventDraft = busyForm;
+  render();
+
+  let patch;
+  try {
+    const blob = await prepareImage(file);
+    patch = { _imageBusy: false, _pendingImage: { blob, previewUrl: URL.createObjectURL(blob) } };
+  } catch (err) {
+    patch = { _imageBusy: false, _imageError: String(err?.message ?? err) };
+  }
+
+  if (view.eventDraft !== busyForm) return;
+  view.eventDraft = { ...view.eventDraft, ...patch };
+  render();
 });
 
 window.addEventListener('hashchange', render);

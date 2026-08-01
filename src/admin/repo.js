@@ -166,6 +166,55 @@ export function encodeBase64Utf8(text) {
 }
 
 /**
+ * Байты (например картинка) → base64.
+ *
+ * В отличие от encodeBase64Utf8, вход уже бинарный, а не текст: пропускать
+ * его через UTF-8 значило бы интерпретировать байты как символы и испортить
+ * их. Здесь байты берутся как есть, тем же приёмом с чанками по 8 килобайт —
+ * по той же причине, что и у текстового варианта: спред на большом массиве
+ * кладёт стек.
+ *
+ * @param {ArrayBuffer} buffer
+ */
+export function encodeBase64Bytes(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * ЗАГРУЗКА КАРТИНКИ — коммитит один файл по новому пути.
+ *
+ * В отличие от writeDataFile, версия (sha) не нужна и не передаётся: путь
+ * всегда новый и уникальный (см. uploadPath в image.js), поэтому конфликтовать
+ * в нём не с чем — это не общий файл, который правят все разом, а отдельный
+ * файл на каждую картинку.
+ *
+ * @param {{path: string, bytes: ArrayBuffer, message: string}} opts
+ * @returns {Promise<string>} прямая ссылка на файл, рабочая сразу после коммита
+ */
+export async function uploadImageFile({ path, bytes, message }) {
+  const { owner, repo, branch } = CONFIG.github;
+  const url = `${repoBase()}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+
+  await request(url, {
+    method: 'PUT',
+    body: { message, content: encodeBase64Bytes(bytes), branch },
+  });
+
+  /*
+    raw.githubusercontent.com отдаёт файл сразу после коммита. Адрес самого
+    сайта (github.io) для этого не подходит: GitHub Pages пересобирает
+    страницы до минуты, и всё это время картинка была бы битой ссылкой.
+  */
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+}
+
+/**
  * ЗАПИСЬ ФАЙЛА ДАННЫХ — единственное место в панели, которое меняет данные.
  *
  * `sha` обязателен и передаётся всегда: это версия файла, которую человек
