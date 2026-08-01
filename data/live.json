@@ -266,7 +266,17 @@
     }
   ],
   "results": [],
-  "events": [],
+  "events": [
+    {
+      "id": "e1",
+      "date": "2026-08-01",
+      "type": "server_defended",
+      "title": "Успешно отбили атаку от 37 сервера",
+      "serverNumber": 37,
+      "body": "Наибольший вклад внесли 3 альянса:\n1. CCCP\n2. KP33\n3. NKVD",
+      "imageUrl": "https://raw.githubusercontent.com/Qvaden/zroute-s33/main/public/uploads/msaqcn90-ioi9zs.jpg"
+    }
+  ],
   "texts": [
     {
       "key": "guide-intro",
