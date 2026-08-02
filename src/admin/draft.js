@@ -97,3 +97,30 @@ export function eventsDraftSavedAt() {
   const at = safe(() => JSON.parse(localStorage.getItem(EVENTS_KEY) || 'null'), null)?.savedAt;
   return at ? new Date(at) : null;
 }
+
+/* ── Черновик альянсов ──────────────────────────────────────────────────────── */
+
+/**
+ * Тот же приём, что и у черновика хронологии: список альянсов целиком,
+ * а не по одному. Правят их так же пачкой — добавил, переименовал,
+ * деактивировал распавшийся, удалил лишний, — и публикуют разом.
+ */
+const ALLIANCES_KEY = 'zr33.admin.alliances';
+
+export function getAlliancesDraft() {
+  const parsed = safe(() => JSON.parse(localStorage.getItem(ALLIANCES_KEY) || 'null'), null);
+  return parsed && Array.isArray(parsed.list) ? parsed.list : null;
+}
+
+export function saveAlliancesDraft(list) {
+  safe(() => localStorage.setItem(ALLIANCES_KEY, JSON.stringify({ list, savedAt: new Date().toISOString() })));
+}
+
+export function dropAlliancesDraft() {
+  safe(() => localStorage.removeItem(ALLIANCES_KEY));
+}
+
+export function alliancesDraftSavedAt() {
+  const at = safe(() => JSON.parse(localStorage.getItem(ALLIANCES_KEY) || 'null'), null)?.savedAt;
+  return at ? new Date(at) : null;
+}

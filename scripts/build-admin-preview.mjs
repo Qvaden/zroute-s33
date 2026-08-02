@@ -13,7 +13,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
-import { marksFromRaw, eventsFromRaw } from '../src/admin/edit.js';
+import { marksFromRaw, eventsFromRaw, alliancesFromRaw } from '../src/admin/edit.js';
 import { byWeekStartDesc } from '../src/data/week-order.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
@@ -75,6 +75,12 @@ const view = {
   events: eventsFromRaw(raw),
   eventDraft: eventsFromRaw(raw)[0] ?? null,
   eventsSaved: null,
+
+  /* Тот же приём для альянсов: форма правки открыта сразу, иначе на статичном
+     превью её было бы не увидеть вовсе — кликов там никто не обрабатывает. */
+  alliances: alliancesFromRaw(raw),
+  allianceDraft: alliancesFromRaw(raw)[0] ?? null,
+  alliancesSaved: null,
 };
 
 const SCREENS = [

@@ -1239,6 +1239,174 @@ console.log('\nM. Правка хронологии');
   check('два вызова дают разные имена', uploadPath('jpg') !== uploadPath('jpg'));
 }
 
+// ── N. Правка альянсов ──────────────────────────────────────────────────────
+console.log('\nN. Правка альянсов');
+{
+  const { mapDataset } = await import('../src/data/adapters/_map.js');
+  const {
+    alliancesFromRaw, applyAlliances, alliancesDiff, nextAllianceId, allianceProblems,
+    allianceResultsCount, alliancesCommitMessage, blankAlliance,
+  } = await import('../src/admin/edit.js');
+
+  const raw = {
+    alliances: [
+      { id: 'a01', tag: 'STG', name: 'Сталкеры', color: '#d44949', active: true },
+      { id: 'a02', tag: 'VLK', name: 'Волки', color: '#e18651', active: true, note: 'старый союзник' },
+    ],
+    weeks: [{ id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02' }],
+    results: [{ weekId: 'W1', allianceId: 'a01', outcome: 'win' }],
+    events: [],
+    texts: [],
+  };
+
+  /* ── Чтение в форму ── */
+  const list = alliancesFromRaw(raw);
+  equal('альянсы читаются как есть, без пересортировки', list.map((a) => a.id).join(' '), 'a01 a02');
+  equal('незаполненная заметка — пустая строка, а не undefined', list[0].note, '');
+  equal('заполненная заметка сохраняется', list[1].note, 'старый союзник');
+
+  /* ── Идентификаторы ── */
+  equal('новый id не занят', nextAllianceId(raw, list), 'a03');
+  // Счёт по количеству записей выдал бы a03 — уже занятый. Отсюда и тест
+  // (тот же приём, что и у nextEventId).
+  equal(
+    'после удаления середины id не переиспользуется',
+    nextAllianceId({ alliances: [{ id: 'a01' }, { id: 'a02' }, { id: 'a09' }] }, []),
+    'a10'
+  );
+
+  /* ── Защита от удаления с историей ── */
+  equal('у альянса с результатом есть история', allianceResultsCount(raw, 'a01'), 1);
+  equal('у альянса без результатов истории нет', allianceResultsCount(raw, 'a02'), 0);
+
+  /* ── Проверки до сохранения ── */
+  check('без тега не сохранить', allianceProblems({ ...blankAlliance(), name: 'Тест' }, []).some((p) => /тег/i.test(p)));
+  check(
+    'без названия не сохранить',
+    allianceProblems({ ...blankAlliance(), tag: 'TST' }, []).some((p) => /названи/i.test(p))
+  );
+  check(
+    'некорректный цвет отвергается',
+    allianceProblems({ ...blankAlliance(), tag: 'TST', name: 'Тест', color: 'red' }, [])
+      .some((p) => /HEX/i.test(p))
+  );
+  check(
+    'занятый тег отвергается',
+    allianceProblems({ ...blankAlliance(), id: 'a09', tag: 'stg', name: 'Дубль' }, list)
+      .some((p) => /тег уже занят/i.test(p))
+  );
+  equal(
+    'заполненный альянс проходит',
+    allianceProblems({ ...blankAlliance(), tag: 'NEW', name: 'Новый' }, list).length,
+    0
+  );
+
+  /* ── Запись в данные ── */
+  const next = applyAlliances(raw, [
+    ...list,
+    { id: 'a03', tag: '  NEW  ', name: '  Новый союз  ', color: '', active: true, note: '' },
+  ]);
+
+  const byId = (id) => next.alliances.find((a) => a.id === id);
+
+  equal('порядок как в рабочем списке — новый в конце', next.alliances.map((a) => a.id).join(' '), 'a01 a02 a03');
+  equal('тег обрезается по краям', byId('a03').tag, 'NEW');
+  equal('название обрезается по краям', byId('a03').name, 'Новый союз');
+  check(
+    'пустые необязательные поля в файл не пишутся',
+    !('color' in byId('a03')) && !('note' in byId('a03'))
+  );
+  check('заполненные необязательные поля сохраняются', byId('a02').note === 'старый союзник');
+  equal('исходные данные не мутируются', raw.alliances.length, 2);
+
+  /* ── Что уйдёт в коммит ── */
+  const d = alliancesDiff(raw, [
+    { ...list[0], color: '#000000' },                                              // правка
+    { id: 'a05', tag: 'NEW2', name: 'Ещё один', color: '', active: true, note: '' }, // добавление
+  ]);                                                                               // a02 пропал — удаление
+  equal('посчитано добавленных', d.added, 1);
+  equal('посчитано изменённых', d.changed, 1);
+  equal('посчитано удаляемых', d.removed, 1);
+
+  equal(
+    'сообщение коммита человеческое',
+    alliancesCommitMessage({ added: 1, changed: 2, removed: 0, total: 3 }),
+    'альянсы: 1 новый альянс, 2 правки'
+  );
+  equal(
+    'без изменений называется отдельно',
+    alliancesCommitMessage({ added: 0, changed: 0, removed: 0, total: 0 }),
+    'альянсы: без изменений'
+  );
+
+  /*
+    ГЛАВНОЕ: правка альянсов обязана проходить тем же валидатором, что и сайт.
+    Деактивация — это просто active: false, а не удаление, поэтому результаты
+    прошлых недель остаются в силе и после того, как альянс распался.
+  */
+  check('правка проходит валидатор сайта', validateDataset(mapDataset(next)).length === 0);
+  check(
+    'дубль id валидатор ловит',
+    validateDataset(
+      mapDataset(applyAlliances(raw, [...list, { id: 'a01', tag: 'X', name: 'Y', active: true }]))
+    ).length > 0
+  );
+
+  /*
+    ГВОЗДЬ РАЗДЕЛА: удаление альянса, за которым уже есть результат, обязано
+    ломать валидацию сайта — именно это, а не только текст в интерфейсе,
+    держит в силе правило «не удалять, а деактивировать» из документации.
+  */
+  check(
+    'удаление альянса с историей ломает сайт — поэтому панель его не предлагает',
+    validateDataset(mapDataset(applyAlliances(raw, list.filter((a) => a.id !== 'a01')))).length > 0
+  );
+  check(
+    'удаление альянса без истории безопасно',
+    validateDataset(mapDataset(applyAlliances(raw, list.filter((a) => a.id !== 'a02')))).length === 0
+  );
+
+  /* ── Экран рисуется и на пустом списке, и на полном ── */
+  const { renderAlliances, describeAlliances } = await import('../src/admin/screens/alliances.js');
+  const viewFor = (over) => ({
+    raw, canPush: true, data: mapDataset(raw), alliances: alliancesFromRaw(raw), alliancesSaved: null, ...over,
+  });
+
+  check('экран показывает кнопку добавления', renderAlliances(viewFor({})).includes('data-alliance-new'));
+  check(
+    'у альянса без истории есть кнопка удаления',
+    renderAlliances(viewFor({})).includes('data-alliance-delete="a02"')
+  );
+  check(
+    'у альянса с историей кнопки удаления нет',
+    !renderAlliances(viewFor({})).includes('data-alliance-delete="a01"')
+  );
+  check(
+    'деактивировать можно любой альянс',
+    (renderAlliances(viewFor({})).match(/data-alliance-toggle=/g) || []).length === 2
+  );
+  check('форма появляется только когда что-то правят', !renderAlliances(viewFor({})).includes('data-alliance-form'));
+  check(
+    'открытая форма рисуется',
+    renderAlliances(viewFor({ allianceDraft: blankAlliance() })).includes('data-alliance-form')
+  );
+  check(
+    'без права записи кнопок правки нет',
+    !renderAlliances(viewFor({ canPush: false })).includes('data-alliance-edit')
+  );
+  check(
+    'id недоступен для правки в разметке формы',
+    !renderAlliances(viewFor({ allianceDraft: { ...list[0] } })).includes('data-alliance-field="id"')
+  );
+  check('пустой список объясняет себя', renderAlliances(viewFor({ alliances: [] })).includes('Альянсов пока нет'));
+
+  check('удаление названо вслух до нажатия', /удалится/.test(describeAlliances(d, null)));
+  check(
+    'без изменений публиковать нечего',
+    /нечего/.test(describeAlliances(alliancesDiff(raw, alliancesFromRaw(raw)), null))
+  );
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

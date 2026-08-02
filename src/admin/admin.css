@@ -554,6 +554,22 @@
 .adm-ally.is-gone { opacity: .5; }
 .adm-ally.is-gone .adm-ally__state { color: var(--loss); }
 
+/*
+  Кнопки правки, деактивации и удаления. Не колонка грида, а отдельный
+  элемент во всю ширину строки (grid-column: 1 / -1): на телефоне рядом
+  с тегом и названием кнопкам попросту негде поместиться, а разводить под них
+  отдельный набор grid-template-columns на каждый из трёх брейкпоинтов —
+  верный способ рассинхронизировать заголовок списка со строками.
+  Авторазмещение грида само переносит такой элемент на новую строку.
+*/
+.adm-ally__acts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 4px 20px;
+}
+
 /* ── Хронология ───────────────────────────────────────────────────────────── */
 .adm-evs { list-style: none; margin: 0; padding: 0; }
 .adm-ev { display: flex; gap: 13px; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
@@ -615,6 +631,14 @@
 .adm-form .adm-field textarea:focus { outline: none; border-color: var(--accent); }
 /* Родная иконка календаря в тёмной теме иначе остаётся чёрной на чёрном. */
 .adm-form input[type='date']::-webkit-calendar-picker-indicator { filter: invert(0.8); cursor: pointer; }
+/* Нативный выбор цвета иначе растягивается на всю высоту поля до нечитаемого
+   размера — переопределяем padding и высоту, а не только ширину. */
+.adm-form input[type='color'] {
+  width: 100%;
+  height: 44px;
+  padding: 4px;
+  cursor: pointer;
+}
 .adm-form__hint { margin: 0 0 4px; }
 
 /* ── Картинка события: выбор файла вместо ссылки ─────────────────────────── */

@@ -345,3 +345,178 @@ export function commitMessage(week, marks) {
     'поражений'
   )}`;
 }
+
+/* ── Альянсы ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Альянсы в виде, удобном для формы и списка.
+ *
+ * Порядок — как в файле, без пересортировки. В отличие от хронологии, у
+ * альянсов нет естественного ключа вроде даты: пересортировка при каждой
+ * правке развела бы в истории гита «поправили один альянс» и «перетасовался
+ * весь список» — ровно то, чего правило канонического порядка в applyMarks
+ * избегает для результатов недели.
+ */
+export function alliancesFromRaw(raw) {
+  return (raw?.alliances ?? []).map((a) => ({
+    id: String(a.id ?? ''),
+    tag: String(a.tag ?? ''),
+    name: String(a.name ?? ''),
+    color: String(a.color ?? ''),
+    active: a.active !== false,
+    note: String(a.note ?? ''),
+  }));
+}
+
+/**
+ * Пустая заготовка альянса для формы.
+ *
+ * Цвет — тот же нейтральный оттенок, которым сайт заменяет отсутствующий
+ * цвет (`a.color || '#7a8494'` в screens/week.js и в подсчёте рейтинга):
+ * свежедобавленный альянс не остаётся серым сиротой, а полю есть с чего
+ * начать выбор — нативный `<input type="color">` не умеет быть пустым.
+ */
+export function blankAlliance() {
+  return {
+    id: null,
+    tag: '',
+    name: '',
+    color: '#7a8494',
+    active: true,
+    note: '',
+  };
+}
+
+/**
+ * Свободный идентификатор альянса — тот же принцип, что и у nextEventId:
+ * следующий за максимальным ЗАНЯТЫМ номером, а не по количеству записей.
+ * Счёт по количеству после удаления альянса из середины выдал бы уже
+ * занятый id.
+ *
+ * В отличие от событий (e1, e2…), существующие 32 альянса пронумерованы
+ * с ведущим нулём (a01…a32) — это уже сложившийся формат в data/live.json,
+ * и новый id обязан ему следовать, иначе список вперемешку читался бы хуже.
+ * padStart ничего не обрежет и после a99: там ведущий ноль просто не нужен.
+ */
+export function nextAllianceId(raw, list) {
+  const used = new Set([
+    ...(raw?.alliances ?? []).map((a) => String(a.id)),
+    ...(list ?? []).map((a) => String(a.id)),
+  ]);
+
+  let max = 0;
+  for (const id of used) {
+    const m = /^a(\d+)$/.exec(id);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+
+  let n = max + 1;
+  while (used.has(`a${String(n).padStart(2, '0')}`)) n++;
+  return `a${String(n).padStart(2, '0')}`;
+}
+
+/**
+ * Сколько результатов VS в данных ссылаются на этот альянс.
+ *
+ * Единственное число, вокруг которого построена защита от удаления: пока
+ * оно больше нуля, сайт физически не откроется на данных, где альянс исчез,
+ * а результат всё ещё называет его id, — это ловит валидатор контракта
+ * (src/data/contract.js: «результат: неизвестный альянс»). Поэтому кнопка
+ * «Удалить» показывается только при нуле, а иначе панель предлагает
+ * деактивировать: истории это не касается вовсе.
+ */
+export function allianceResultsCount(raw, allianceId) {
+  return (raw?.results ?? []).filter((r) => String(r.allianceId) === String(allianceId)).length;
+}
+
+/**
+ * Человеческие проверки до сохранения в список.
+ *
+ * @param {any} a
+ * @param {any[]} others Остальные альянсы рабочего списка (без самого себя) —
+ *   нужны только для проверки на занятый тег.
+ * @returns {string[]} пустой список — можно сохранять
+ */
+export function allianceProblems(a, others) {
+  const problems = [];
+
+  if (!String(a?.tag ?? '').trim()) problems.push('Не заполнен тег.');
+  if (!String(a?.name ?? '').trim()) problems.push('Не заполнено название.');
+
+  const color = String(a?.color ?? '').trim();
+  if (color && !/^#[0-9a-f]{6}$/i.test(color)) {
+    problems.push('Цвет должен быть в формате HEX, например #d44949.');
+  }
+
+  const tag = String(a?.tag ?? '').trim().toLowerCase();
+  if (tag && (others ?? []).some((o) => String(o?.tag ?? '').trim().toLowerCase() === tag)) {
+    problems.push('Такой тег уже занят другим альянсом.');
+  }
+
+  return problems;
+}
+
+/**
+ * Записывает список альянсов в данные.
+ *
+ * Порядок — как в рабочем списке (новые дописываются в конец): так добавление
+ * одного альянса даёт в истории гита одну добавленную строку, а не
+ * перетасованный файл целиком.
+ */
+export function applyAlliances(raw, list) {
+  const alliances = (list ?? []).map((a) => {
+    const out = {
+      id: String(a.id),
+      tag: String(a.tag).trim(),
+      name: String(a.name).trim(),
+      active: a.active !== false,
+    };
+    // Необязательные поля не пишем пустыми: файл читают люди.
+    if (String(a.color ?? '').trim()) out.color = String(a.color).trim();
+    if (String(a.note ?? '').trim()) out.note = String(a.note).trim();
+    return out;
+  });
+
+  return { ...raw, alliances };
+}
+
+/**
+ * Что изменится в альянсах при публикации.
+ *
+ * Деактивация считается правкой, а не отдельной категорией: `active` —
+ * такое же поле альянса, как тег или цвет, и диф должен видеть его смену.
+ */
+export function alliancesDiff(raw, list) {
+  const before = new Map(alliancesFromRaw(raw).map((a) => [a.id, a]));
+  const after = new Map((list ?? []).map((a) => [String(a.id), a]));
+
+  let added = 0;
+  let changed = 0;
+  let removed = 0;
+
+  for (const [id, a] of after) {
+    const was = before.get(id);
+    if (!was) {
+      added++;
+      continue;
+    }
+    const same =
+      ['tag', 'name', 'color', 'note'].every((k) => String(was[k] ?? '') === String(a[k] ?? '')) &&
+      Boolean(was.active) === Boolean(a.active);
+    if (!same) changed++;
+  }
+
+  for (const id of before.keys()) if (!after.has(id)) removed++;
+
+  return { added, changed, removed, total: added + changed + removed };
+}
+
+/** Сообщение коммита для правки альянсов. */
+export function alliancesCommitMessage(diff) {
+  const parts = [];
+  if (diff.added) parts.push(plural(diff.added, 'новый альянс', 'новых альянса', 'новых альянсов'));
+  if (diff.changed) parts.push(plural(diff.changed, 'правка', 'правки', 'правок'));
+  if (diff.removed) parts.push(`удалено ${diff.removed}`);
+
+  return `альянсы: ${parts.length ? parts.join(', ') : 'без изменений'}`;
+}

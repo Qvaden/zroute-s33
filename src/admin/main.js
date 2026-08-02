@@ -35,6 +35,7 @@ import { prepareImage, uploadPath } from './image.js';
 import {
   applyMarks,
   applyEvents,
+  applyAlliances,
   marksFromRaw,
   diffMarks,
   commitMessage,
@@ -44,6 +45,13 @@ import {
   eventProblems,
   blankEvent,
   nextEventId,
+  alliancesFromRaw,
+  alliancesDiff,
+  alliancesCommitMessage,
+  allianceProblems,
+  allianceResultsCount,
+  blankAlliance,
+  nextAllianceId,
   serialize,
 } from './edit.js';
 import {
@@ -55,6 +63,10 @@ import {
   saveEventsDraft,
   dropEventsDraft,
   eventsDraftSavedAt,
+  getAlliancesDraft,
+  saveAlliancesDraft,
+  dropAlliancesDraft,
+  alliancesDraftSavedAt,
 } from './draft.js';
 import { renderShell } from './shell.js';
 import { renderLogin } from './login.js';
@@ -127,6 +139,13 @@ function render() {
     // Черновик летописи живёт списком целиком — правят её пачкой, а не по полю.
     view.events = view.events ?? getEventsDraft() ?? eventsFromRaw(view.raw);
     view.eventsSaved = eventsDraftSavedAt();
+    view.canPush = Boolean(view.repo?.canPush);
+  }
+
+  if (screen.id === 'alliances') {
+    // Тот же приём, что и у летописи: черновик — весь список альянсов целиком.
+    view.alliances = view.alliances ?? getAlliancesDraft() ?? alliancesFromRaw(view.raw);
+    view.alliancesSaved = alliancesDraftSavedAt();
     view.canPush = Boolean(view.repo?.canPush);
   }
 
@@ -600,6 +619,152 @@ async function publishEvents() {
   }
 }
 
+/* ── Альянсы ─────────────────────────────────────────────────────────────── */
+
+/** Открыть форму: пустую для нового альянса или заполненную для правки. */
+function openAllianceForm(id) {
+  const found = id ? view.alliances.find((a) => a.id === id) : null;
+  view.allianceDraft = found ? { ...found } : blankAlliance();
+  render();
+}
+
+function closeAllianceForm() {
+  view.allianceDraft = null;
+  render();
+}
+
+function showAllianceProblems(problems) {
+  const box = root.querySelector('[data-alliance-problems]');
+  if (!box) return;
+  box.innerHTML = `<b>Не сохранено.</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
+  box.hidden = false;
+}
+
+/**
+ * Сохранить альянс в рабочий список.
+ *
+ * В список, а не на сайт: публикация отдельным действием, как и в хронологии —
+ * можно поправить несколько альянсов и отправить их одним коммитом.
+ */
+function saveAllianceToList() {
+  const form = view.allianceDraft;
+  if (!form || !view.canPush) return;
+
+  const entry = {
+    id: form.id ?? nextAllianceId(view.raw, view.alliances),
+    tag: String(form.tag ?? '').trim(),
+    name: String(form.name ?? '').trim(),
+    color: String(form.color ?? '').trim(),
+    active: Boolean(form.active),
+    note: String(form.note ?? '').trim(),
+  };
+
+  const problems = allianceProblems(entry, view.alliances.filter((a) => a.id !== entry.id));
+  if (problems.length) {
+    showAllianceProblems(problems);
+    return;
+  }
+
+  const i = view.alliances.findIndex((a) => a.id === entry.id);
+  view.alliances = i >= 0
+    ? view.alliances.map((a) => (a.id === entry.id ? entry : a))
+    : [...view.alliances, entry];
+
+  saveAlliancesDraft(view.alliances);
+  view.allianceDraft = null;
+  render();
+}
+
+/**
+ * Удалить альянс из списка.
+ *
+ * Разрешено только когда за ним нет ни одного результата в истории — иначе
+ * сайт не откроется: результат продолжит ссылаться на исчезнувший id.
+ * Кнопка в разметке и так не показывается в этом случае (screens/alliances.js),
+ * проверка здесь — вторая линия защиты, а не единственная.
+ */
+function deleteAllianceFromList(id) {
+  if (!view.canPush) return;
+  if (allianceResultsCount(view.raw, id) > 0) return;
+
+  view.alliances = view.alliances.filter((a) => a.id !== id);
+  saveAlliancesDraft(view.alliances);
+  // Если удалили тот альянс, что был открыт в форме, форму тоже закрываем.
+  if (view.allianceDraft?.id === id) view.allianceDraft = null;
+  render();
+}
+
+/** Деактивировать или вернуть в игру — безопасная альтернатива удалению. */
+function toggleAllianceActive(id) {
+  if (!view.canPush) return;
+  view.alliances = view.alliances.map((a) => (a.id === id ? { ...a, active: !a.active } : a));
+  saveAlliancesDraft(view.alliances);
+  render();
+}
+
+function showAlliancesResult(html, kind) {
+  const box = root.querySelector('[data-alliances-result]');
+  if (!box) return;
+  box.className = `adm-result adm-result--${kind}`;
+  box.innerHTML = html;
+  box.hidden = false;
+}
+
+/** Публикация альянсов — тот же путь, что у недели и хронологии: проверка, версия, коммит. */
+async function publishAlliances() {
+  const button = root.querySelector('[data-alliances-publish]');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Публикуем…';
+  }
+  const restore = () => {
+    if (!button) return;
+    button.textContent = 'Опубликовать';
+    button.disabled = false;
+  };
+
+  try {
+    const candidate = applyAlliances(view.raw, view.alliances);
+
+    const problems = validateDataset(mapDataset(candidate));
+    if (problems.length) {
+      showAlliancesResult(
+        `<b>Публикация отменена: данные не проходят проверку.</b>
+         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
+        'bad'
+      );
+      restore();
+      return;
+    }
+
+    const result = await writeDataFile({
+      text: serialize(candidate),
+      sha: view.file.sha,
+      message: alliancesCommitMessage(alliancesDiff(view.raw, view.alliances)),
+    });
+
+    dropAlliancesDraft();
+    view.alliances = null;
+    view.allianceDraft = null;
+    await load();
+
+    showAlliancesResult(
+      `<b>Опубликовано.</b>
+       ${
+         safeUrl(result.commitUrl)
+           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
+           : `Коммит ${esc(result.commitSha)}`
+       }
+       <p class="muted">Сайт обновится в течение минуты.</p>`,
+      'ok'
+    );
+  } catch (err) {
+    showAlliancesResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, err?.conflict ? 'warn' : 'bad');
+    restore();
+  }
+}
+
 /* ── События ─────────────────────────────────────────────────────────────── */
 
 document.addEventListener('submit', async (e) => {
@@ -726,6 +891,65 @@ document.addEventListener('click', (e) => {
 
   if (e.target.closest('[data-events-publish]')) {
     publishEvents();
+    return;
+  }
+
+  /* ── Альянсы ── */
+
+  if (e.target.closest('[data-alliance-new]')) {
+    openAllianceForm(null);
+    return;
+  }
+
+  const allyEditBtn = e.target.closest('[data-alliance-edit]');
+  if (allyEditBtn) {
+    openAllianceForm(allyEditBtn.dataset.allianceEdit);
+    return;
+  }
+
+  const allyDelBtn = e.target.closest('[data-alliance-delete]');
+  if (allyDelBtn) {
+    deleteAllianceFromList(allyDelBtn.dataset.allianceDelete);
+    return;
+  }
+
+  const allyToggleBtn = e.target.closest('[data-alliance-toggle]');
+  if (allyToggleBtn) {
+    toggleAllianceActive(allyToggleBtn.dataset.allianceToggle);
+    return;
+  }
+
+  const allyActiveChoice = e.target.closest('[data-alliance-active-choice]');
+  if (allyActiveChoice && view.allianceDraft) {
+    view.allianceDraft = {
+      ...view.allianceDraft,
+      active: allyActiveChoice.dataset.allianceActiveChoice === 'true',
+    };
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-alliance-cancel]')) {
+    closeAllianceForm();
+    return;
+  }
+
+  if (e.target.closest('[data-alliance-save]')) {
+    saveAllianceToList();
+    return;
+  }
+
+  if (e.target.closest('[data-alliances-reset]')) {
+    dropAlliancesDraft();
+    view.alliances = alliancesFromRaw(view.raw);
+    view.allianceDraft = null;
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-alliances-publish]')) {
+    publishAlliances();
+    return;
   }
 });
 
@@ -742,6 +966,13 @@ document.addEventListener('input', (e) => {
   const field = e.target.closest?.('[data-event-field]');
   if (field && view?.eventDraft) {
     view.eventDraft = { ...view.eventDraft, [field.dataset.eventField]: e.target.value };
+  }
+
+  // Поля формы альянса — тег, название, цвет, заметка. Цвет тоже сюда:
+  // нативный `<input type="color">` шлёт те же события input/change.
+  const allyField = e.target.closest?.('[data-alliance-field]');
+  if (allyField && view?.allianceDraft) {
+    view.allianceDraft = { ...view.allianceDraft, [allyField.dataset.allianceField]: e.target.value };
   }
 });
 
