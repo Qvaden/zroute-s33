@@ -78,6 +78,10 @@ self.addEventListener('fetch', (event) => {
   if (url.hostname === 'api.github.com') return;
   if (url.origin === self.location.origin && /(^|\/)admin(\.html)?$|\/src\/admin\//.test(url.pathname)) return;
 
+  // Счётчик посещений (GoatCounter): каждый заход даёт свою строку запроса,
+  // повторно из кэша её всё равно не отдать — только копится мусор в запасе.
+  if (url.hostname === 'gc.zgo.at' || url.hostname.endsWith('.goatcounter.com')) return;
+
   event.respondWith(
     (async () => {
       try {

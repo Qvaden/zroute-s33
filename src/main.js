@@ -45,15 +45,39 @@ function renderNav(activeId) {
   ).join('');
 }
 
+/*
+  Счётчик посещений (GoatCounter, подключён в index.html) сам считает только
+  самый первый показ страницы — при загрузке своего скрипта. Дальше разделы
+  переключаются через #-адрес без перезагрузки, и об этих переходах он
+  ничего не знает, если не сказать явно.
+
+  Первый вызов render() — это как раз тот самый первый показ, который
+  GoatCounter уже посчитал сам; считать его второй раз не нужно. Досчитываем
+  только переходы после него, то есть каждый следующий render().
+*/
+let countedFirstView = false;
+function trackPageview(path) {
+  if (!countedFirstView) {
+    countedFirstView = true;
+    return;
+  }
+  // Не бросаем ошибку, если скрипт ещё не подгрузился или его блокирует
+  // расширение в браузере — без счётчика сайт обязан работать как ни в чём
+  // не бывало.
+  window.goatcounter?.count?.({ path });
+}
+
 function render() {
   if (!view) return;
   const { id, param } = parseHash();
 
+  let path;
   if (id === 'alliance' && param) {
     // Карточка альянса не своя вкладка, поэтому в меню подсвечиваем рейтинг,
     // откуда сюда и приходят.
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
+    path = `/alliance/${param}`;
   } else {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
     renderNav(route.id);
@@ -63,9 +87,11 @@ function render() {
     for (const fn of [window.__ladderApply, window.__timelineApply]) {
       if (typeof fn === 'function') fn();
     }
+    path = `/${route.id}`;
   }
 
   window.scrollTo(0, 0);
+  trackPageview(path);
 }
 
 async function boot() {
