@@ -161,11 +161,11 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
 
       <div class="split">
         <div class="split__col split__col--win">
-          <h3>Победили <span class="split__count num">${winners.length}</span><i class="split__bar"></i></h3>
+          <h3>Победа в VS <span class="split__count num">${winners.length}</span><i class="split__bar"></i></h3>
           <div class="tiles">${tiles(winners)}</div>
         </div>
         <div class="split__col split__col--loss">
-          <h3>Проиграли <span class="split__count num">${losers.length}</span><i class="split__bar"></i></h3>
+          <h3>Поражение в VS <span class="split__count num">${losers.length}</span><i class="split__bar"></i></h3>
           <div class="tiles">${tiles(losers)}</div>
         </div>
       </div>
@@ -202,13 +202,13 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
         <header class="panel__head"><h2>Движение за неделю</h2></header>
         <div class="movers">
           <div>
-            <h4 class="movers__title movers__title--up">Поднялись</h4>
+            <h4 class="movers__title movers__title--up">Рейтинг поднялся</h4>
             <ul class="movers__list">${
               movers.up.length ? movers.up.map(moverRow).join('') : '<li class="muted">без изменений</li>'
             }</ul>
           </div>
           <div>
-            <h4 class="movers__title movers__title--down">Опустились</h4>
+            <h4 class="movers__title movers__title--down">Рейтинг снизился</h4>
             <ul class="movers__list">${
               movers.down.length ? movers.down.map(moverRow).join('') : '<li class="muted">без изменений</li>'
             }</ul>

@@ -238,7 +238,7 @@ h1,h2,h3,h4 {
   color: var(--gold);
 }
 
-/* Победили / проиграли */
+/* Победа в VS / поражение в VS */
 .split { display: grid; gap: 14px; margin-top: 20px; position: relative; z-index: 1; }
 @media (min-width: 720px) { .split { grid-template-columns: 1fr 1fr; gap: 20px; } }
 
