@@ -6,225 +6,197 @@
       "id": "a01",
       "tag": "cccp",
       "name": "CosmicCoalition",
-      "color": "#d44949",
-      "active": true
+      "active": true,
+      "color": "#d44949"
     },
     {
       "id": "a02",
       "tag": "AMGK",
       "name": "AllMightyGodKillers",
-      "color": "#e18651",
-      "active": true
+      "active": true,
+      "color": "#e18651"
     },
     {
       "id": "a03",
       "tag": "KOP",
       "name": "KingsOfPerfection",
-      "color": "#ed925a",
-      "active": true
+      "active": true,
+      "color": "#ed925a"
     },
     {
       "id": "a04",
       "tag": "Dnr",
       "name": "Donetsk",
-      "color": "#e0c77b",
-      "active": true
+      "active": true,
+      "color": "#e0c77b"
     },
     {
       "id": "a05",
       "tag": "BARS",
       "name": "BloodyLegion",
-      "color": "#deb73f",
-      "active": true
+      "active": true,
+      "color": "#deb73f"
     },
     {
       "id": "a06",
       "tag": "TWay",
       "name": "ThatsTheWay",
-      "color": "#d8eb47",
-      "active": true
+      "active": true,
+      "color": "#d8eb47"
     },
     {
       "id": "a07",
       "tag": "SRV",
       "name": "ShieldRisingVictory",
-      "color": "#cddc6a",
-      "active": true
+      "active": true,
+      "color": "#cddc6a"
     },
     {
       "id": "a08",
       "tag": "КР33",
       "name": "Кремлёвцы",
-      "color": "#ade773",
-      "active": true
+      "active": true,
+      "color": "#ade773"
     },
     {
       "id": "a09",
       "tag": "Gig",
       "name": "Gigant",
-      "color": "#8fe935",
-      "active": true
+      "active": true,
+      "color": "#8fe935"
     },
     {
       "id": "a10",
       "tag": "UNGD",
       "name": "UNDERGROUND",
-      "color": "#6bd85a",
-      "active": true
+      "active": true,
+      "color": "#6bd85a"
     },
     {
       "id": "a11",
       "tag": "FGG",
       "name": "ForGoodGame",
-      "color": "#71e462",
-      "active": true
+      "active": true,
+      "color": "#71e462"
     },
     {
       "id": "a12",
       "tag": "FUCK",
       "name": "FuryUnderCrownKills",
-      "color": "#6cef8d",
-      "active": true
+      "active": true,
+      "color": "#6cef8d"
     },
     {
       "id": "a13",
       "tag": "AMGB",
       "name": "AlmightyGodBloodline",
-      "color": "#49d46c",
-      "active": true
+      "active": true,
+      "color": "#49d46c"
     },
     {
       "id": "a14",
       "tag": "INVI",
       "name": "FightingKittens",
-      "color": "#51e1aa",
-      "active": true
+      "active": true,
+      "color": "#51e1aa"
     },
     {
       "id": "a15",
       "tag": "BEST",
       "name": "SteelBrotherhood",
-      "color": "#5aedb7",
-      "active": true
+      "active": true,
+      "color": "#5aedb7"
     },
     {
       "id": "a16",
       "tag": "FFR",
       "name": "FightForRight",
-      "color": "#7be0e0",
-      "active": true
+      "active": true,
+      "color": "#7be0e0"
     },
     {
       "id": "a17",
       "tag": "amgb",
       "name": "ARTofWAR",
-      "color": "#3fdede",
-      "active": true
+      "active": true,
+      "color": "#3fdede"
     },
     {
       "id": "a18",
       "tag": "SRVA",
       "name": "SRVictoryAcademy",
-      "color": "#47afeb",
-      "active": true
+      "active": true,
+      "color": "#47afeb"
     },
     {
       "id": "a19",
       "tag": "NKVD",
       "name": "MilitaryKomissariat",
-      "color": "#6ab0dc",
-      "active": true
+      "active": true,
+      "color": "#6ab0dc"
     },
     {
       "id": "a20",
       "tag": "MkL",
       "name": "MakeL163",
-      "color": "#7390e7",
-      "active": true
+      "active": true,
+      "color": "#7390e7"
     },
     {
       "id": "a21",
       "tag": "EWSR",
       "name": "EWSR21",
-      "color": "#3562e9",
-      "active": true
+      "active": true,
+      "color": "#3562e9"
     },
     {
       "id": "a22",
       "tag": "Adon",
       "name": "Adskie",
-      "color": "#695ad8",
-      "active": true
+      "active": true,
+      "color": "#695ad8"
     },
     {
       "id": "a23",
       "tag": "EKFA",
       "name": "EKFAkademy",
-      "color": "#7362e4",
-      "active": true
+      "active": true,
+      "color": "#7362e4"
     },
     {
       "id": "a24",
       "tag": "F100",
       "name": "Fragment100",
-      "color": "#ad6cef",
-      "active": true
+      "active": true,
+      "color": "#ad6cef"
     },
     {
       "id": "a25",
       "tag": "FIX",
       "name": "Fenixx",
-      "color": "#8f49d4",
-      "active": true
-    },
-    {
-      "id": "a26",
-      "tag": "VAR",
-      "name": "Vargar",
-      "color": "#ce51e1",
-      "active": true
-    },
-    {
-      "id": "a27",
-      "tag": "NEAS",
-      "name": "TheCrimsonVangua",
-      "color": "#dc5aed",
-      "active": true
-    },
-    {
-      "id": "a28",
-      "tag": "Love",
-      "name": "Lovendi",
-      "color": "#e07bc7",
-      "active": true
+      "active": true,
+      "color": "#8f49d4"
     },
     {
       "id": "a29",
       "tag": "EKF",
       "name": "EliteKombatForce",
-      "color": "#de3fb7",
-      "active": true
+      "active": true,
+      "color": "#de3fb7"
     },
     {
       "id": "a30",
       "tag": "TURS",
       "name": "TURTLES",
-      "color": "#eb4786",
-      "active": true
+      "active": true,
+      "color": "#eb4786"
     },
     {
       "id": "a31",
       "tag": "tOp",
       "name": "TORNAD0",
-      "color": "#dc6a94",
-      "active": true
-    },
-    {
-      "id": "a32",
-      "tag": "Kir",
-      "name": "KirFex",
-      "color": "#e77373",
-      "active": true
+      "active": true,
+      "color": "#dc6a94"
     }
   ],
   "weeks": [
