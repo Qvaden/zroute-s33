@@ -372,6 +372,11 @@
       "weekId": "W1",
       "allianceId": "a31",
       "outcome": "loss"
+    },
+    {
+      "weekId": "W1",
+      "allianceId": "a32",
+      "outcome": "loss"
     }
   ],
   "events": [
