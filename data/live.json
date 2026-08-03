@@ -190,6 +190,13 @@
       "name": "TORNAD0",
       "active": true,
       "color": "#dc6a94"
+    },
+    {
+      "id": "a32",
+      "tag": "VAR",
+      "name": "Vargar",
+      "active": true,
+      "color": "#00ff77"
     }
   ],
   "weeks": [
