@@ -29,6 +29,7 @@ export function renderAlliance(view, allianceId) {
 
   const a = row.alliance;
   const color = a.color || '#7a8494';
+  const mergedTarget = a.mergedInto ? standings.find((r) => r.alliance.id === a.mergedInto) : null;
   const ordered = [...weeks].sort((x, y) => x.number - y.number);
   const history = computeAllianceHistory(a.id, ordered, results);
   const { bestWin, bestLoss } = computeBestStreaks(history.map((h) => h.outcome));
@@ -61,7 +62,11 @@ export function renderAlliance(view, allianceId) {
         <div>
           <h1 class="ally__name">${esc(a.name)}</h1>
           <p class="ally__sub">
-            ${a.active ? 'Активен' : 'Распался'} ·
+            ${
+              mergedTarget
+                ? `Слился с <a href="#/alliance/${esc(mergedTarget.alliance.id)}">${esc(mergedTarget.alliance.tag)}</a>`
+                : a.active ? 'Активен' : 'Распался'
+            } ·
             ${plural(row.played, 'сыгранный VS', 'сыгранных VS', 'сыгранных VS')}
             ${bestWin > 1 ? ` · лучшая серия ${plural(bestWin, 'победа', 'победы', 'побед')} подряд` : ''}
             ${bestLoss > 1 ? ` · худшая ${plural(bestLoss, 'поражение', 'поражения', 'поражений')} подряд` : ''}

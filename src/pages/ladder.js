@@ -8,7 +8,8 @@ import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js';
  * ту же строку можно перестроить в два яруса и ничего не потерять.
  */
 export function renderLadder({ standings }) {
-  const rows = standings.map((r) => rowHtml(r)).join('');
+  const byId = new Map(standings.map((r) => [r.alliance.id, r.alliance]));
+  const rows = standings.map((r) => rowHtml(r, byId)).join('');
   const active = standings.filter((r) => r.alliance.active).length;
 
   return `
@@ -55,9 +56,10 @@ export function renderLadder({ standings }) {
     </section>`;
 }
 
-function rowHtml(r) {
+function rowHtml(r, byId) {
   const a = r.alliance;
   const color = a.color || '#7a8494';
+  const mergedTarget = a.mergedInto ? byId.get(a.mergedInto) : null;
 
   // Свежая форма: сколько побед в последних пяти. Нужна для сортировки «по форме».
   const formScore = r.form.filter((o) => o === 'win').length;
@@ -94,7 +96,11 @@ function rowHtml(r) {
       <span class="tag">${esc(a.tag)}</span>
       <span class="lad__name">${esc(a.name)}</span>
       ${streak}
-      ${a.active ? '' : '<em class="lad__off">распался</em>'}
+      ${
+        mergedTarget
+          ? `<em class="lad__off">слился с ${esc(mergedTarget.tag)}</em>`
+          : a.active ? '' : '<em class="lad__off">распался</em>'
+      }
     </span>
 
     <span class="lad__form">${formDots(r.form)}</span>

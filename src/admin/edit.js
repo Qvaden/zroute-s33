@@ -365,6 +365,7 @@ export function alliancesFromRaw(raw) {
     color: String(a.color ?? ''),
     active: a.active !== false,
     note: String(a.note ?? ''),
+    mergedInto: String(a.mergedInto ?? ''),
   }));
 }
 
@@ -384,6 +385,7 @@ export function blankAlliance() {
     color: '#7a8494',
     active: true,
     note: '',
+    mergedInto: '',
   };
 }
 
@@ -453,6 +455,15 @@ export function allianceProblems(a, others) {
     problems.push('Такой тег уже занят другим альянсом.');
   }
 
+  const mergedInto = String(a?.mergedInto ?? '').trim();
+  if (mergedInto) {
+    if (mergedInto === String(a?.id ?? '')) {
+      problems.push('Альянс не может слиться сам с собой.');
+    } else if (!(others ?? []).some((o) => String(o?.id ?? '') === mergedInto)) {
+      problems.push('Альянс, в который слились, не найден в списке.');
+    }
+  }
+
   return problems;
 }
 
@@ -465,15 +476,22 @@ export function allianceProblems(a, others) {
  */
 export function applyAlliances(raw, list) {
   const alliances = (list ?? []).map((a) => {
+    const mergedInto = String(a.mergedInto ?? '').trim();
+
     const out = {
       id: String(a.id),
       tag: String(a.tag).trim(),
       name: String(a.name).trim(),
-      active: a.active !== false,
+      // Слившийся альянс обязан быть неактивным независимо от того, что
+      // выбрано в форме, — иначе получится альянс, который одновременно
+      // «в игре» и «вошёл в другой». Проверка здесь — та же вторая линия
+      // защиты, что и у allianceResultsCount при удалении.
+      active: mergedInto ? false : a.active !== false,
     };
     // Необязательные поля не пишем пустыми: файл читают люди.
     if (String(a.color ?? '').trim()) out.color = String(a.color).trim();
     if (String(a.note ?? '').trim()) out.note = String(a.note).trim();
+    if (mergedInto) out.mergedInto = mergedInto;
     return out;
   });
 
@@ -501,7 +519,7 @@ export function alliancesDiff(raw, list) {
       continue;
     }
     const same =
-      ['tag', 'name', 'color', 'note'].every((k) => String(was[k] ?? '') === String(a[k] ?? '')) &&
+      ['tag', 'name', 'color', 'note', 'mergedInto'].every((k) => String(was[k] ?? '') === String(a[k] ?? '')) &&
       Boolean(was.active) === Boolean(a.active);
     if (!same) changed++;
   }

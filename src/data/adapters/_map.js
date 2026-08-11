@@ -22,6 +22,7 @@ export function mapAlliances(rows) {
     color: a.color ? toStr(a.color) : undefined,
     active: toBool(a.active, true),
     note: a.note ? toStr(a.note) : undefined,
+    mergedInto: a.mergedInto ? toStr(a.mergedInto) : undefined,
   }));
 }
 

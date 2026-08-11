@@ -46,8 +46,9 @@ export function renderAlliances(view) {
     wins.set(r.allianceId, (wins.get(r.allianceId) ?? 0) + 1);
   }
 
+  const byId = new Map(list.map((a) => [a.id, a]));
   const listHtml = rows
-    .map((a) => row(a, canPush, wins.get(a.id) ?? 0, allianceResultsCount(raw, a.id)))
+    .map((a) => row(a, canPush, wins.get(a.id) ?? 0, allianceResultsCount(raw, a.id), byId))
     .join('');
 
   return `
@@ -60,7 +61,7 @@ export function renderAlliances(view) {
       </p>
     </section>
 
-    ${renderForm(form, canPush, raw)}
+    ${renderForm(form, canPush, raw, list)}
 
     <section class="panel" data-alliances-form>
       <header class="panel__head adm-head-row">
@@ -112,8 +113,14 @@ export function renderAlliances(view) {
 }
 
 /** Строка списка. Правка и деактивация или удаление — рядом, потому что ищут их вместе. */
-function row(a, canPush, winsCount, resultsCount) {
+function row(a, canPush, winsCount, resultsCount, byId) {
   const canDelete = resultsCount === 0;
+  const mergedTarget = a.mergedInto ? byId.get(a.mergedInto) : null;
+  const state = mergedTarget
+    ? `слился с ${esc(mergedTarget.tag)}`
+    : a.active
+      ? 'в игре'
+      : 'распался';
 
   return `<li class="adm-ally ${a.active ? '' : 'is-gone'}" data-alliance-row="${esc(a.id)}">
     <i class="adm-ally__color" style="background:${esc(a.color || '#7a8494')}"></i>
@@ -122,7 +129,7 @@ function row(a, canPush, winsCount, resultsCount) {
     <span class="adm-ally__note muted">${esc(a.note || '')}</span>
     <span class="adm-ally__wins muted">${winsCount}</span>
     <code class="adm-mono adm-ally__id">${esc(a.id)}</code>
-    <span class="adm-ally__state">${a.active ? 'в игре' : 'распался'}</span>
+    <span class="adm-ally__state">${state}</span>
     ${
       canPush
         ? `<div class="adm-ally__acts">
@@ -141,13 +148,24 @@ function row(a, canPush, winsCount, resultsCount) {
   </li>`;
 }
 
+/** Варианты выбора «Слился с»: все альянсы списка, кроме самого правимого. */
+function mergeOptions(list, form) {
+  return (list ?? [])
+    .filter((a) => a.id !== form.id)
+    .map(
+      (a) =>
+        `<option value="${esc(a.id)}" ${form.mergedInto === a.id ? 'selected' : ''}>${esc(a.tag)} — ${esc(a.name)}</option>`
+    )
+    .join('');
+}
+
 /**
  * Форма добавления и правки.
  *
  * Появляется только когда что-то правят, как и в хронологии: пустая форма,
  * висящая всё время, заставляет искать список глазами под ней.
  */
-function renderForm(form, canPush, raw) {
+function renderForm(form, canPush, raw, list) {
   if (!form || !canPush) return '';
 
   const isNew = !form.id;
@@ -184,6 +202,18 @@ function renderForm(form, canPush, raw) {
                 data-alliance-active-choice="false">Распался</button>
       </div>
 
+      ${
+        isNew
+          ? ''
+          : `<label class="adm-field">
+               <span>Слился с</span>
+               <select data-alliance-field="mergedInto">
+                 <option value="">— нет —</option>
+                 ${mergeOptions(list, form)}
+               </select>
+             </label>`
+      }
+
       <label class="adm-field">
         <span>Заметка</span>
         <input type="text" data-alliance-field="note" value="${esc(form.note)}" placeholder="Необязательно">
@@ -198,6 +228,11 @@ function renderForm(form, canPush, raw) {
                  удалить нельзя, только деактивировать. Id ${esc(form.id)} не меняется никогда.`
               : `У альянса пока нет результатов в истории — можно удалить из списка.
                  Id ${esc(form.id)} не меняется никогда.`
+        }
+        ${
+          form.mergedInto
+            ? ' Слившийся альянс автоматически становится неактивным — история его VS остаётся за ним самим, очки в поглотившем альянсе задним числом не пересчитываются.'
+            : ''
         }
       </p>
 

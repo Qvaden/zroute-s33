@@ -616,7 +616,8 @@
 
 .adm-form .adm-field { margin-bottom: 14px; }
 .adm-form .adm-field input,
-.adm-form .adm-field textarea {
+.adm-form .adm-field textarea,
+.adm-form .adm-field select {
   width: 100%;
   font-family: inherit;
   font-size: 14.5px;
@@ -628,7 +629,11 @@
   resize: vertical;
 }
 .adm-form .adm-field input:focus,
-.adm-form .adm-field textarea:focus { outline: none; border-color: var(--accent); }
+.adm-form .adm-field textarea:focus,
+.adm-form .adm-field select:focus { outline: none; border-color: var(--accent); }
+/* Выбор «слился с» — тот же select, но должен быть кликабельным курсором,
+   а не текстовым: это выбор из списка, а не набор текста. */
+.adm-form .adm-field select { cursor: pointer; }
 /* Родная иконка календаря в тёмной теме иначе остаётся чёрной на чёрном. */
 .adm-form input[type='date']::-webkit-calendar-picker-indicator { filter: invert(0.8); cursor: pointer; }
 /* Нативный выбор цвета иначе растягивается на всю высоту поля до нечитаемого

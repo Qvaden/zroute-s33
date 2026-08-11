@@ -1407,6 +1407,141 @@ console.log('\nN. Правка альянсов');
   );
 }
 
+// ── O. Слияние альянсов ─────────────────────────────────────────────────────
+console.log('\nO. Слияние альянсов');
+{
+  const { mapDataset } = await import('../src/data/adapters/_map.js');
+  const { computeStandings } = await import('../src/logic/standings.js');
+  const {
+    alliancesFromRaw, applyAlliances, alliancesDiff, allianceProblems, blankAlliance,
+  } = await import('../src/admin/edit.js');
+
+  /*
+    a02 слился в a01: неактивен, но результат за W1 остаётся его собственным —
+    очки a01 задним числом не пересчитываются.
+  */
+  const raw = {
+    alliances: [
+      { id: 'a01', tag: 'STG', name: 'Сталкеры', color: '#d44949', active: true },
+      { id: 'a02', tag: 'VLK', name: 'Волки', color: '#e18651', active: false, mergedInto: 'a01' },
+      { id: 'a03', tag: 'RUS', name: 'Русичи', color: '#ed925a', active: true },
+    ],
+    weeks: [{ id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02' }],
+    results: [
+      { weekId: 'W1', allianceId: 'a01', outcome: 'win' },
+      { weekId: 'W1', allianceId: 'a02', outcome: 'loss' },
+    ],
+    events: [],
+    texts: [],
+  };
+
+  /* ── Чтение ── */
+  const list = alliancesFromRaw(raw);
+  equal('mergedInto читается из данных', list.find((a) => a.id === 'a02').mergedInto, 'a01');
+  equal('у не слившегося альянса mergedInto пустой', list.find((a) => a.id === 'a01').mergedInto, '');
+
+  /* ── Валидатор ── */
+  check('корректное слияние проходит валидатор', validateDataset(mapDataset(raw)).length === 0);
+  check(
+    'слияние с самим собой валидатор ловит',
+    validateDataset(
+      mapDataset({ ...raw, alliances: [{ ...raw.alliances[0], mergedInto: 'a01' }, raw.alliances[1], raw.alliances[2]] })
+    ).some((p) => /самого себя/.test(p))
+  );
+  check(
+    'слияние в несуществующий альянс валидатор ловит',
+    validateDataset(
+      mapDataset({
+        ...raw,
+        alliances: [raw.alliances[0], { ...raw.alliances[1], mergedInto: 'нет-такого' }, raw.alliances[2]],
+      })
+    ).some((p) => /несуществующий альянс/.test(p))
+  );
+  check(
+    'слившийся, но помеченный активным альянс валидатор ловит',
+    validateDataset(
+      mapDataset({
+        ...raw,
+        alliances: [raw.alliances[0], { ...raw.alliances[1], active: true }, raw.alliances[2]],
+      })
+    ).some((p) => /обязан быть неактивным/.test(p))
+  );
+
+  /* ── Проверки формы ── */
+  check(
+    'слияние с самим собой отвергается формой',
+    allianceProblems({ ...blankAlliance(), id: 'a01', tag: 'X', name: 'Y', mergedInto: 'a01' }, list.filter((a) => a.id !== 'a01'))
+      .some((p) => /сам с собой/.test(p))
+  );
+  check(
+    'слияние в несуществующий альянс отвергается формой',
+    allianceProblems({ ...blankAlliance(), tag: 'X', name: 'Y', mergedInto: 'нет-такого' }, list)
+      .some((p) => /не найден/.test(p))
+  );
+  equal(
+    'слияние в существующий альянс проходит форму',
+    allianceProblems({ ...blankAlliance(), tag: 'NEW', name: 'Новый', mergedInto: 'a01' }, list).length,
+    0
+  );
+
+  /* ── Запись в данные ── */
+  const next = applyAlliances(raw, [
+    list[0],
+    list[1],
+    { ...list[2], mergedInto: 'a01', active: true }, // форма прислала active:true — должно быть перебито
+  ]);
+  const a03after = next.alliances.find((a) => a.id === 'a03');
+  equal('слияние принудительно деактивирует альянс', a03after.active, false);
+  equal('mergedInto записывается', a03after.mergedInto, 'a01');
+  check(
+    'пустой mergedInto не пишется в файл',
+    !('mergedInto' in next.alliances.find((a) => a.id === 'a01'))
+  );
+
+  /* ── Диф видит слияние как правку ── */
+  const d = alliancesDiff(raw, [list[0], list[1], { ...list[2], mergedInto: 'a01', active: false }]);
+  equal('слияние посчитано изменением', d.changed, 1);
+
+  /* ── Экран панели ── */
+  const { renderAlliances } = await import('../src/admin/screens/alliances.js');
+  const viewFor = (over) => ({
+    raw, canPush: true, data: mapDataset(raw), alliances: list, alliancesSaved: null, ...over,
+  });
+
+  check(
+    'слившийся альянс подписан через того, кого поглотил, а не «распался»',
+    renderAlliances(viewFor({})).includes('слился с STG')
+  );
+  check(
+    'форма правки существующего альянса предлагает выбор «слился с»',
+    renderAlliances(viewFor({ allianceDraft: { ...list[0] } })).includes('data-alliance-field="mergedInto"')
+  );
+  check(
+    'у формы нового альянса выбора «слился с» нет',
+    !renderAlliances(viewFor({ allianceDraft: blankAlliance() })).includes('data-alliance-field="mergedInto"')
+  );
+  check(
+    'альянс не предлагается слиться сам с собой',
+    !renderAlliances(viewFor({ allianceDraft: { ...list[0] } })).includes('value="a01"')
+  );
+
+  /* ── Публичный сайт: рейтинг и страница альянса ── */
+  const data = mapDataset(raw);
+  const standings = computeStandings(data.alliances, data.weeks, data.results, { win: 1, loss: -1 }, 5);
+
+  const { renderLadder } = await import('../src/pages/ladder.js');
+  const ladderHtml = renderLadder({ standings });
+  check('на сайте слившийся альянс подписан через поглотившего', ladderHtml.includes('слился с STG'));
+  check('обычное «распался» не путается со слившимся', !/VLK[\s\S]{0,200}распался/.test(ladderHtml));
+
+  const { renderAlliance } = await import('../src/pages/alliance.js');
+  const allyHtml = renderAlliance({ standings, weeks: data.weeks, results: data.results, placeHistory: new Map() }, 'a02');
+  check('на странице слившегося альянса — ссылка на поглотившего', allyHtml.includes('Слился с <a href="#/alliance/a01">STG</a>'));
+
+  const survivorHtml = renderAlliance({ standings, weeks: data.weeks, results: data.results, placeHistory: new Map() }, 'a01');
+  check('на странице поглотившего альянса статус обычный', survivorHtml.includes('Активен'));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

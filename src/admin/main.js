@@ -650,13 +650,17 @@ function saveAllianceToList() {
   const form = view.allianceDraft;
   if (!form || !view.canPush) return;
 
+  const mergedInto = String(form.mergedInto ?? '').trim();
   const entry = {
     id: form.id ?? nextAllianceId(view.raw, view.alliances),
     tag: String(form.tag ?? '').trim(),
     name: String(form.name ?? '').trim(),
     color: String(form.color ?? '').trim(),
-    active: Boolean(form.active),
+    // Слившийся альянс не может остаться «в игре» — та же защита, что и
+    // в applyAlliances при публикации, только на шаг раньше.
+    active: mergedInto ? false : Boolean(form.active),
     note: String(form.note ?? '').trim(),
+    mergedInto,
   };
 
   const problems = allianceProblems(entry, view.alliances.filter((a) => a.id !== entry.id));
@@ -972,7 +976,19 @@ document.addEventListener('input', (e) => {
   // нативный `<input type="color">` шлёт те же события input/change.
   const allyField = e.target.closest?.('[data-alliance-field]');
   if (allyField && view?.allianceDraft) {
-    view.allianceDraft = { ...view.allianceDraft, [allyField.dataset.allianceField]: e.target.value };
+    const key = allyField.dataset.allianceField;
+    view.allianceDraft = { ...view.allianceDraft, [key]: e.target.value };
+
+    /*
+      «Слился с» — выбор из списка, а не набор текста, поэтому курсору
+      здесь ничего не грозит и перерисовку можно не бояться, в отличие от
+      остальных полей формы. А отражать выбор нужно сразу: иначе чипсы
+      «В игре» / «Распался» разойдутся с тем, что реально уйдёт в данные.
+    */
+    if (key === 'mergedInto') {
+      if (e.target.value) view.allianceDraft.active = false;
+      render();
+    }
   }
 });
 

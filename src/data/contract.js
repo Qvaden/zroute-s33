@@ -43,6 +43,20 @@ export function validateDataset(data) {
     allianceIds.add(a.id);
   });
 
+  /*
+    mergedInto — отдельный проход, а не внутри цикла выше: ссылка может вести
+    на альянс, который в массиве стоит позже. Собирать allianceIds и сверять
+    с ним одновременно означало бы зависеть от порядка записей в файле.
+  */
+  data.alliances.forEach((a, i) => {
+    if (a.mergedInto == null) return;
+    if (a.mergedInto === a.id) add(`alliances[${i}] (${a.id}): mergedInto ссылается на самого себя`);
+    else if (!allianceIds.has(a.mergedInto)) {
+      add(`alliances[${i}] (${a.id}): mergedInto ссылается на несуществующий альянс «${a.mergedInto}»`);
+    }
+    if (a.active !== false) add(`alliances[${i}] (${a.id}): слившийся альянс обязан быть неактивным`);
+  });
+
   const weekIds = new Set();
   data.weeks.forEach((w, i) => {
     if (!isStr(w.id)) add(`weeks[${i}]: пустой id`);
