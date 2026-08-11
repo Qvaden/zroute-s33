@@ -538,3 +538,100 @@ export function alliancesCommitMessage(diff) {
 
   return `альянсы: ${parts.length ? parts.join(', ') : 'без изменений'}`;
 }
+
+/* ── Тексты ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Известные ключи, которые сейчас читает сайт (src/pages/guide.js). Список
+ * не жёсткий: у текста нет проверки формата ключа, страница просто не найдёт
+ * незнакомый и промолчит. Но подсказать редактору правильное имя — дешевле,
+ * чем потом объяснять, почему раздел на сайте не появился.
+ */
+export const KNOWN_TEXT_KEYS = ['guide-intro', 'guide-principles', 'guide-week', 'guide-donts', 'guide-benefits'];
+
+/** Тексты в виде, удобном для формы и списка. Порядок — как в файле. */
+export function textsFromRaw(raw) {
+  return (raw?.texts ?? []).map((t) => ({
+    key: String(t.key ?? ''),
+    title: String(t.title ?? ''),
+    body: String(t.body ?? ''),
+  }));
+}
+
+/**
+ * Пустая заготовка текста для формы.
+ *
+ * `originalKey` — единственное поле, которого нет в самих данных: пока
+ * оно `null`, ключ ещё можно набрать руками, а форма показывает поле ввода.
+ * Как только текст сохранён хотя бы раз, `originalKey` фиксирует ключ,
+ * и дальше он только показан — так же, как id у альянса. Ключ — это то,
+ * что ищет на странице src/pages/guide.js; переименовать его вручную —
+ * молча потерять раздел на сайте, а не переименовать его.
+ */
+export function blankText() {
+  return { originalKey: null, key: '', title: '', body: '' };
+}
+
+/**
+ * Человеческие проверки до сохранения в список.
+ *
+ * @param {any} t Уже с разрешённым ключом (originalKey ?? key).
+ * @param {any[]} others Остальные тексты рабочего списка (без самого себя).
+ */
+export function textProblems(t, others) {
+  const problems = [];
+
+  if (!String(t?.key ?? '').trim()) problems.push('Не заполнен ключ.');
+
+  const key = String(t?.key ?? '').trim();
+  if (key && (others ?? []).some((o) => String(o?.key ?? '') === key)) {
+    problems.push('Такой ключ уже занят другим текстом.');
+  }
+
+  return problems;
+}
+
+/** Записывает список текстов в данные. Порядок — как в рабочем списке. */
+export function applyTexts(raw, list) {
+  const texts = (list ?? []).map((t) => ({
+    key: String(t.key).trim(),
+    title: String(t.title ?? '').trim(),
+    body: String(t.body ?? ''),
+  }));
+
+  return { ...raw, texts };
+}
+
+/** Что изменится в текстах при публикации. */
+export function textsDiff(raw, list) {
+  const before = new Map(textsFromRaw(raw).map((t) => [t.key, t]));
+  const after = new Map((list ?? []).map((t) => [String(t.key), t]));
+
+  let added = 0;
+  let changed = 0;
+  let removed = 0;
+
+  for (const [key, t] of after) {
+    const was = before.get(key);
+    if (!was) {
+      added++;
+      continue;
+    }
+    const same = ['title', 'body'].every((k) => String(was[k] ?? '') === String(t[k] ?? ''));
+    if (!same) changed++;
+  }
+
+  for (const key of before.keys()) if (!after.has(key)) removed++;
+
+  return { added, changed, removed, total: added + changed + removed };
+}
+
+/** Сообщение коммита для правки текстов. */
+export function textsCommitMessage(diff) {
+  const parts = [];
+  if (diff.added) parts.push(plural(diff.added, 'новый блок', 'новых блока', 'новых блоков'));
+  if (diff.changed) parts.push(plural(diff.changed, 'правка', 'правки', 'правок'));
+  if (diff.removed) parts.push(`удалено ${diff.removed}`);
+
+  return `тексты: ${parts.length ? parts.join(', ') : 'без изменений'}`;
+}

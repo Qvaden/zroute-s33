@@ -13,7 +13,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
-import { marksFromRaw, eventsFromRaw, alliancesFromRaw } from '../src/admin/edit.js';
+import { marksFromRaw, eventsFromRaw, alliancesFromRaw, textsFromRaw } from '../src/admin/edit.js';
 import { byWeekStartDesc } from '../src/data/week-order.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
@@ -81,6 +81,11 @@ const view = {
   alliances: alliancesFromRaw(raw),
   allianceDraft: alliancesFromRaw(raw)[0] ?? null,
   alliancesSaved: null,
+
+  /* И для текстов — та же причина. */
+  texts: textsFromRaw(raw),
+  textDraft: textsFromRaw(raw)[0] ? { ...textsFromRaw(raw)[0], originalKey: textsFromRaw(raw)[0].key } : null,
+  textsSaved: null,
 };
 
 const SCREENS = [

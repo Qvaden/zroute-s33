@@ -52,6 +52,12 @@ import {
   allianceResultsCount,
   blankAlliance,
   nextAllianceId,
+  textsFromRaw,
+  applyTexts,
+  textsDiff,
+  textsCommitMessage,
+  textProblems,
+  blankText,
   serialize,
 } from './edit.js';
 import {
@@ -67,6 +73,10 @@ import {
   saveAlliancesDraft,
   dropAlliancesDraft,
   alliancesDraftSavedAt,
+  getTextsDraft,
+  saveTextsDraft,
+  dropTextsDraft,
+  textsDraftSavedAt,
 } from './draft.js';
 import { renderShell } from './shell.js';
 import { renderLogin } from './login.js';
@@ -146,6 +156,13 @@ function render() {
     // Тот же приём, что и у летописи: черновик — весь список альянсов целиком.
     view.alliances = view.alliances ?? getAlliancesDraft() ?? alliancesFromRaw(view.raw);
     view.alliancesSaved = alliancesDraftSavedAt();
+    view.canPush = Boolean(view.repo?.canPush);
+  }
+
+  if (screen.id === 'texts') {
+    // Тот же приём в третий раз: черновик — весь список текстов целиком.
+    view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
+    view.textsSaved = textsDraftSavedAt();
     view.canPush = Boolean(view.repo?.canPush);
   }
 
@@ -769,6 +786,136 @@ async function publishAlliances() {
   }
 }
 
+/* ── Тексты ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Открыть форму: пустую для нового текста или заполненную для правки.
+ *
+ * `originalKey` — единственное, чего нет в самих данных: пока оно `null`,
+ * форма считает текст новым и даёт набрать ключ руками; как только оно
+ * заполнено, ключ показан, но недоступен для правки — см. edit.js.
+ */
+function openTextForm(key) {
+  const found = key ? view.texts.find((t) => t.key === key) : null;
+  view.textDraft = found ? { ...found, originalKey: found.key } : blankText();
+  render();
+}
+
+function closeTextForm() {
+  view.textDraft = null;
+  render();
+}
+
+function showTextProblems(problems) {
+  const box = root.querySelector('[data-text-problems]');
+  if (!box) return;
+  box.innerHTML = `<b>Не сохранено.</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
+  box.hidden = false;
+}
+
+/** Сохранить текст в рабочий список — публикация отдельным действием, как и везде. */
+function saveTextToList() {
+  const form = view.textDraft;
+  if (!form || !view.canPush) return;
+
+  const entry = {
+    // Новый текст берёт ключ из поля, существующий — свой собственный:
+    // поле показано, но недоступно для правки, а прочитать оттуда чужой
+    // ввод означало бы позволить переименовать ключ через консоль браузера.
+    key: form.originalKey ?? String(form.key ?? '').trim(),
+    title: String(form.title ?? '').trim(),
+    body: String(form.body ?? ''),
+  };
+
+  const problems = textProblems(entry, view.texts.filter((t) => t.key !== entry.key));
+  if (problems.length) {
+    showTextProblems(problems);
+    return;
+  }
+
+  const i = view.texts.findIndex((t) => t.key === entry.key);
+  view.texts = i >= 0
+    ? view.texts.map((t) => (t.key === entry.key ? entry : t))
+    : [...view.texts, entry];
+
+  saveTextsDraft(view.texts);
+  view.textDraft = null;
+  render();
+}
+
+/** Удалить текст из списка. Безопасно всегда: пропавший блок сайт не сломает. */
+function deleteTextFromList(key) {
+  if (!view.canPush) return;
+
+  view.texts = view.texts.filter((t) => t.key !== key);
+  saveTextsDraft(view.texts);
+  if (view.textDraft?.originalKey === key) view.textDraft = null;
+  render();
+}
+
+function showTextsResult(html, kind) {
+  const box = root.querySelector('[data-texts-result]');
+  if (!box) return;
+  box.className = `adm-result adm-result--${kind}`;
+  box.innerHTML = html;
+  box.hidden = false;
+}
+
+/** Публикация текстов — тот же путь, что у альянсов и хронологии: проверка, версия, коммит. */
+async function publishTexts() {
+  const button = root.querySelector('[data-texts-publish]');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Публикуем…';
+  }
+  const restore = () => {
+    if (!button) return;
+    button.textContent = 'Опубликовать';
+    button.disabled = false;
+  };
+
+  try {
+    const candidate = applyTexts(view.raw, view.texts);
+
+    const problems = validateDataset(mapDataset(candidate));
+    if (problems.length) {
+      showTextsResult(
+        `<b>Публикация отменена: данные не проходят проверку.</b>
+         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
+        'bad'
+      );
+      restore();
+      return;
+    }
+
+    const result = await writeDataFile({
+      text: serialize(candidate),
+      sha: view.file.sha,
+      message: textsCommitMessage(textsDiff(view.raw, view.texts)),
+    });
+
+    dropTextsDraft();
+    view.texts = null;
+    view.textDraft = null;
+    await load();
+
+    showTextsResult(
+      `<b>Опубликовано.</b>
+       ${
+         safeUrl(result.commitUrl)
+           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
+           : `Коммит ${esc(result.commitSha)}`
+       }
+       <p class="muted">Сайт обновится в течение минуты.</p>`,
+      'ok'
+    );
+  } catch (err) {
+    showTextsResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, err?.conflict ? 'warn' : 'bad');
+    restore();
+  }
+}
+
 /* ── События ─────────────────────────────────────────────────────────────── */
 
 document.addEventListener('submit', async (e) => {
@@ -955,6 +1102,48 @@ document.addEventListener('click', (e) => {
     publishAlliances();
     return;
   }
+
+  /* ── Тексты ── */
+
+  if (e.target.closest('[data-text-new]')) {
+    openTextForm(null);
+    return;
+  }
+
+  const textEditBtn = e.target.closest('[data-text-edit]');
+  if (textEditBtn) {
+    openTextForm(textEditBtn.dataset.textEdit);
+    return;
+  }
+
+  const textDelBtn = e.target.closest('[data-text-delete]');
+  if (textDelBtn) {
+    deleteTextFromList(textDelBtn.dataset.textDelete);
+    return;
+  }
+
+  if (e.target.closest('[data-text-cancel]')) {
+    closeTextForm();
+    return;
+  }
+
+  if (e.target.closest('[data-text-save]')) {
+    saveTextToList();
+    return;
+  }
+
+  if (e.target.closest('[data-texts-reset]')) {
+    dropTextsDraft();
+    view.texts = textsFromRaw(view.raw);
+    view.textDraft = null;
+    render();
+    return;
+  }
+
+  if (e.target.closest('[data-texts-publish]')) {
+    publishTexts();
+    return;
+  }
 });
 
 /*
@@ -989,6 +1178,12 @@ document.addEventListener('input', (e) => {
       if (e.target.value) view.allianceDraft.active = false;
       render();
     }
+  }
+
+  // Поля формы текста — ключ (только у нового), заголовок, тело.
+  const textField = e.target.closest?.('[data-text-field]');
+  if (textField && view?.textDraft) {
+    view.textDraft = { ...view.textDraft, [textField.dataset.textField]: e.target.value };
   }
 });
 

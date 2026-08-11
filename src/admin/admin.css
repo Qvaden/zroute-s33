@@ -711,6 +711,7 @@
 .adm-text summary code { color: var(--accent); }
 .adm-text summary b { font-weight: 600; font-size: 14px; }
 .adm-text__body { padding: 2px 2px 18px 18px; }
+.adm-text__acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 18px 18px; }
 
 /* ── Вход ─────────────────────────────────────────────────────────────────── */
 .adm-login {

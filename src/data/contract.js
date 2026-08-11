@@ -84,9 +84,12 @@ export function validateDataset(data) {
     if (!isStr(e.title)) add(`events[${i}] (${e.id}): пустой title`);
   });
 
+  const textKeys = new Set();
   data.texts.forEach((t, i) => {
     if (!isStr(t.key)) add(`texts[${i}]: пустой key`);
     if (typeof t.body !== 'string') add(`texts[${i}] (${t.key}): body должен быть строкой`);
+    if (textKeys.has(t.key)) add(`texts: дубль key «${t.key}»`);
+    textKeys.add(t.key);
   });
 
   return problems;

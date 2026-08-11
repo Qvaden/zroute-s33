@@ -1542,6 +1542,115 @@ console.log('\nO. Слияние альянсов');
   check('на странице поглотившего альянса статус обычный', survivorHtml.includes('Активен'));
 }
 
+// ── P. Правка текстов ────────────────────────────────────────────────────────
+console.log('\nP. Правка текстов');
+{
+  const { mapDataset } = await import('../src/data/adapters/_map.js');
+  const {
+    textsFromRaw, applyTexts, textsDiff, textProblems, textsCommitMessage, blankText, KNOWN_TEXT_KEYS,
+  } = await import('../src/admin/edit.js');
+
+  const raw = {
+    alliances: [{ id: 'a01', tag: 'STG', name: 'Сталкеры', active: true }],
+    weeks: [],
+    results: [],
+    events: [],
+    texts: [
+      { key: 'guide-intro', title: 'Вступление', body: 'Текст вступления' },
+      { key: 'guide-week', title: 'Ритм недели', body: '- пункт 1\n- пункт 2' },
+    ],
+  };
+
+  /* ── Чтение ── */
+  const list = textsFromRaw(raw);
+  equal('тексты читаются как есть, без пересортировки', list.map((t) => t.key).join(' '), 'guide-intro guide-week');
+  check('известные ключи сайта названы явно', KNOWN_TEXT_KEYS.includes('guide-intro'));
+
+  /* ── Заготовка формы ── */
+  equal('у пустой заготовки originalKey пуст — значит форма для нового', blankText().originalKey, null);
+
+  /* ── Валидатор ── */
+  check('обычные тексты проходят валидатор', validateDataset(mapDataset(raw)).length === 0);
+  check(
+    'дубль ключа валидатор ловит',
+    validateDataset(mapDataset({ ...raw, texts: [...raw.texts, { key: 'guide-intro', title: 'Дубль', body: '' }] }))
+      .some((p) => /дубль key/.test(p))
+  );
+
+  /* ── Проверки формы ── */
+  check('без ключа не сохранить', textProblems({ key: '', title: 'Т', body: '' }, list).some((p) => /ключ/i.test(p)));
+  check(
+    'занятый ключ отвергается',
+    textProblems({ key: 'guide-intro', title: 'Т', body: '' }, list).some((p) => /уже занят/.test(p))
+  );
+  equal(
+    'новый ключ проходит форму',
+    textProblems({ key: 'guide-donts', title: 'Т', body: '' }, list).length,
+    0
+  );
+
+  /* ── Запись в данные ── */
+  const next = applyTexts(raw, [
+    ...list,
+    { key: 'guide-donts', title: '  Чего не стоит  ', body: 'body as-is  ' },
+  ]);
+  const added = next.texts.find((t) => t.key === 'guide-donts');
+  equal('порядок как в рабочем списке — новый в конце', next.texts.map((t) => t.key).join(' '), 'guide-intro guide-week guide-donts');
+  equal('заголовок обрезается по краям', added.title, 'Чего не стоит');
+  equal('тело текста не обрезается — пробелы могут быть частью markdown', added.body, 'body as-is  ');
+  equal('исходные данные не мутируются', raw.texts.length, 2);
+
+  /* ── Диф и сообщение коммита ── */
+  const d = textsDiff(raw, [
+    { ...list[0], title: 'Новое вступление' },       // правка
+    { key: 'guide-donts', title: 'Новый', body: '' }, // добавление
+  ]);                                                  // guide-week пропал — удаление
+  equal('посчитано добавленных', d.added, 1);
+  equal('посчитано изменённых', d.changed, 1);
+  equal('посчитано удаляемых', d.removed, 1);
+
+  equal(
+    'сообщение коммита человеческое',
+    textsCommitMessage({ added: 1, changed: 2, removed: 0, total: 3 }),
+    'тексты: 1 новый блок, 2 правки'
+  );
+  equal('без изменений называется отдельно', textsCommitMessage({ added: 0, changed: 0, removed: 0, total: 0 }), 'тексты: без изменений');
+
+  check('правка проходит валидатор сайта', validateDataset(mapDataset(next)).length === 0);
+
+  /* ── Экран рисуется на пустом списке и на полном ── */
+  const { renderTexts, describeTexts } = await import('../src/admin/screens/texts.js');
+  const viewFor = (over) => ({
+    raw, canPush: true, data: mapDataset(raw), texts: list, textsSaved: null, ...over,
+  });
+
+  check('экран показывает кнопку добавления', renderTexts(viewFor({})).includes('data-text-new'));
+  check(
+    'у каждого текста есть правка и удаление',
+    (renderTexts(viewFor({})).match(/data-text-edit=/g) || []).length === 2
+  );
+  check('форма появляется только когда что-то правят', !renderTexts(viewFor({})).includes('data-text-form'));
+  check(
+    'открытая форма нового текста рисуется и даёт ввести ключ',
+    renderTexts(viewFor({ textDraft: blankText() })).includes('data-text-field="key"')
+  );
+  check(
+    'у формы правки существующего текста ключ только показан, не редактируется',
+    !renderTexts(viewFor({ textDraft: { ...list[0], originalKey: list[0].key } })).includes('data-text-field="key"')
+  );
+  check(
+    'без права записи кнопок правки нет',
+    !renderTexts(viewFor({ canPush: false })).includes('data-text-edit')
+  );
+  check('пустой список объясняет себя', renderTexts(viewFor({ texts: [] })).includes('Текстов нет'));
+
+  check('удаление названо вслух до нажатия', /удалится/.test(describeTexts(d, null)));
+  check(
+    'без изменений публиковать нечего',
+    /нечего/.test(describeTexts(textsDiff(raw, textsFromRaw(raw)), null))
+  );
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
