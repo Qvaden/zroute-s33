@@ -1244,3 +1244,22 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-card__tag { justify-self: center; margin: 0; text-align: center; }
 .quart-card__streak-slot { justify-self: end; display: inline-flex; align-items: center; justify-content: flex-end; min-width: 24px; min-height: 16px; }
 .quart-card__streak-slot .quart-streak { margin: 0; }
+
+/* ── Shared motion layer for the admin experience ─────────────────────────── */
+@keyframes adm-screen-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes adm-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,106,43,0); } 50% { box-shadow: 0 0 24px -14px rgba(255,106,43,.8); } }
+@keyframes adm-shimmer { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+.adm #app, .adm .adm-shell { animation: adm-screen-in .44s var(--ease-out, cubic-bezier(.23,1,.32,1)) both; }
+.adm .adm-card, .adm .adm-panel, .adm .adm-section, .adm .adm-table, .adm .adm-list > * { animation: adm-screen-in .42s var(--ease-out, cubic-bezier(.23,1,.32,1)) both; }
+.adm button, .adm a, .adm input, .adm textarea, .adm select { transition: transform .16s var(--ease-out, cubic-bezier(.23,1,.32,1)), border-color .18s var(--ease-out, cubic-bezier(.23,1,.32,1)), background .18s var(--ease-out, cubic-bezier(.23,1,.32,1)), box-shadow .18s var(--ease-out, cubic-bezier(.23,1,.32,1)); }
+.adm button:active { transform: scale(.96); }
+.adm button:hover, .adm .adm-btn:hover { box-shadow: 0 8px 22px -16px currentColor; }
+.adm .adm-nav a:hover { transform: translateY(-2px); }
+.adm .adm-btn--primary { animation: adm-glow 4s ease-in-out infinite; }
+.adm input:focus, .adm textarea:focus, .adm select:focus { transform: translateY(-1px); box-shadow: 0 0 0 3px rgba(255,106,43,.12), 0 8px 22px -18px rgba(255,106,43,.8); }
+.adm .adm-panel, .adm .adm-section, .adm .adm-card { transition: transform .22s var(--ease-out, cubic-bezier(.23,1,.32,1)), border-color .22s var(--ease-out, cubic-bezier(.23,1,.32,1)), box-shadow .22s var(--ease-out, cubic-bezier(.23,1,.32,1)); }
+.adm .adm-panel:hover, .adm .adm-card:hover { transform: translateY(-2px); }
+.adm .adm-photo-drop::before { animation: adm-shimmer 4.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .adm *, .adm *::before, .adm *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
