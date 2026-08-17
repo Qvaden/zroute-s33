@@ -8,6 +8,7 @@ import {
   computePlaceHistory,
   weeksUpToLastData,
   computeQuarterWindow,
+  computeWindowForm,
 } from './logic/standings.js';
 import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js';
@@ -22,7 +23,7 @@ import './ui/timeline-controls.js';
 const ROUTES = [
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'timeline', label: 'Хронология', render: renderTimeline },
-  { id: 'quarter', label: 'Кватр', render: renderQuarter },
+  { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
   { id: 'guide', label: 'Малым алам', render: renderGuide },
 ];
@@ -126,7 +127,10 @@ async function boot() {
       data.results,
       CONFIG.scoring,
       4
-    );
+    ).map((row) => ({
+      ...row,
+      form: computeWindowForm(row.alliance.id, quarter.weeks, data.results),
+    }));
 
     view = {
       ...data,

@@ -124,9 +124,10 @@ function tallyUpTo(alliances, weeks, index, scoring, upToIndex) {
  * Возвращает текущий четырёхнедельный период.
  *
  * Периоды фиксированные: W1–W4, затем W5–W8 и так далее. Поэтому после
- * появления первой записи новой четвёрки рейтинг «Кватра» снова начинается
+ * появления первой записи новой четвёрки рейтинг «Кварта» снова начинается
  * с нуля, а не продолжает скользить за последними четырьмя неделями.
- * Будущие недели и недели после последнего внесённого результата не входят.
+ * В отображении остаются все четыре недели периода, даже если часть результатов
+ * ещё не внесена — для них показывается нейтральный кубик.
  *
  * @param {import('../data/types.js').Week[]} weeks
  * @param {import('../data/types.js').Result[]} results
@@ -146,7 +147,7 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
   const startNumber = (number - 1) * periodLength + 1;
   const endNumber = startNumber + periodLength - 1;
   const currentWeeks = ordered.filter(
-    (week) => week.number >= startNumber && week.number <= endNumber && week.number <= last.number
+    (week) => week.number >= startNumber && week.number <= endNumber
   );
 
   return { weeks: currentWeeks, number, startNumber, endNumber };
@@ -310,6 +311,23 @@ export function computeAllianceHistory(allianceId, weeks, results) {
   return [...weeks]
     .sort((a, b) => a.number - b.number)
     .map((week) => ({ week, outcome: index.get(`${week.id}|${allianceId}`) ?? null }));
+}
+
+/**
+ * Результат альянса на каждой неделе выбранного периода.
+ * В отличие от `form` в полном рейтинге, здесь сохраняются пустые недели,
+ * чтобы четыре кубика всегда соответствовали четырём неделям Кварта.
+ *
+ * @param {string} allianceId
+ * @param {import('../data/types.js').Week[]} weeks
+ * @param {import('../data/types.js').Result[]} results
+ * @returns {(import('../data/types.js').Outcome|null)[]}
+ */
+export function computeWindowForm(allianceId, weeks, results) {
+  const index = indexResults(results);
+  return [...weeks]
+    .sort((a, b) => a.number - b.number)
+    .map((week) => index.get(`${week.id}|${allianceId}`) ?? null);
 }
 
 /**

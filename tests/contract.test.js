@@ -8,7 +8,7 @@
  */
 import { CONFIG } from '../config.js';
 import { validateDataset, loadAndValidate } from '../src/data/contract.js';
-import { computeStandings, computeWeekSummary, computeQuarterWindow } from '../src/logic/standings.js';
+import { computeStandings, computeWeekSummary, computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 import { parseCsv, parseCsvObjects } from '../src/lib/csv.js';
 import * as jsonAdapter from '../src/data/adapters/json.js';
 
@@ -238,9 +238,39 @@ console.log('\nB3. Четырёхнедельный рейтинг');
   equal('первый Кватр имеет номер 1', first.number, 1);
   const second = computeQuarterWindow(weeks, results);
   equal('после новой недели начинается Кватр 2', second.number, 2);
-  equal('Кватр 2 начинается с недели 5', second.weeks.map((w) => w.number), [5]);
+  equal('Кварт 2 показывает полный блок недель 5–8', second.weeks.map((w) => w.number), [5, 6, 7, 8]);
   const secondStandings = computeStandings(alliances, second.weeks, results, CONFIG.scoring, 4);
   equal('очки нового Кватра считаются с нуля', secondStandings[0].points, -1);
+}
+
+// ── B4. Форма Кварта всегда состоит из четырёх недель ───────────────────────
+console.log('\nB4. Четыре кубика формы');
+{
+  const weeks = [1, 2, 3, 4].map((n) => ({
+    id: `W${n}`, number: n,
+    startDate: new Date(2026, 0, n), endDate: new Date(2026, 0, n + 6),
+  }));
+  const results = [
+    { weekId: 'W1', allianceId: 'kr33', outcome: 'win' },
+    { weekId: 'W2', allianceId: 'kr33', outcome: 'win' },
+    { weekId: 'W3', allianceId: 'kr33', outcome: 'win' },
+    { weekId: 'W4', allianceId: 'kr33', outcome: 'loss' },
+  ];
+  equal('форма Кварта — победа, победа, победа, поражение',
+    computeWindowForm('kr33', weeks, results), ['win', 'win', 'win', 'loss']);
+  equal('одинаковый результат даёт одинаковые очки',
+    computeStandings(
+      [{ id: 'kr33', name: 'КР33' }, { id: 'ekf', name: 'EKF' }],
+      weeks,
+      results.concat([
+        { weekId: 'W1', allianceId: 'ekf', outcome: 'win' },
+        { weekId: 'W2', allianceId: 'ekf', outcome: 'win' },
+        { weekId: 'W3', allianceId: 'ekf', outcome: 'win' },
+        { weekId: 'W4', allianceId: 'ekf', outcome: 'loss' },
+      ]),
+      CONFIG.scoring,
+      4
+    ).map((row) => row.points), [2, 2]);
 }
 
 // ── B2. Недели из будущего не считаются текущими ────────────────────────────

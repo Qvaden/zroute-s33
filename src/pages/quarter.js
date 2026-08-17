@@ -7,9 +7,10 @@ import { renderLadder } from './ladder.js';
 export function renderQuarter({ standings, quarter }) {
   return renderLadder({
     standings,
-    eyebrow: 'Текущий период',
-    title: 'Кватр',
-    description: 'Рейтинг только за четыре недели · после каждой четвёртой недели очки обнуляются',
+    eyebrow: 'Новый шанс каждые 4 недели',
+    title: 'Кварт',
+    description: 'Только очки текущего периода · без графика и старого хвоста',
     period: quarter,
+    variant: 'quarter',
   });
 }

@@ -64,7 +64,7 @@ export function deltaBadge(delta) {
 export function formDots(form) {
   if (!form.length) return '<span class="muted">нет данных</span>';
   return `<span class="form">${form
-    .map((o) => `<i class="dot dot--${o}" title="${o === 'win' ? 'победа' : 'поражение'}"></i>`)
+    .map((o) => `<i class="dot dot--${o ?? 'pending'}" title="${o === 'win' ? 'победа' : o === 'loss' ? 'поражение' : 'результат ещё не внесён'}"></i>`)
     .join('')}</span>`;
 }
 

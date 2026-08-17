@@ -437,6 +437,35 @@ h1,h2,h3,h4 {
   font-variant-numeric: tabular-nums;
 }
 
+.panel--quarter .lad__head { display: none; }
+.panel--quarter .lad__row {
+  grid-template-columns: 54px 1fr auto;
+  grid-template-areas:
+    "place ident pts"
+    "place form pts";
+}
+.panel--quarter .lad__wl,
+.panel--quarter .lad__spark { display: none; }
+.panel--quarter .lad__form { padding-top: 3px; }
+.panel--quarter .form { gap: 5px; }
+.panel--quarter .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+}
+
+@media (min-width: 880px) {
+  .panel--quarter .lad__row {
+    grid-template-columns: 74px minmax(180px, 1fr) 74px;
+    grid-template-areas:
+      "place ident pts"
+      "place form pts";
+    gap: 5px 10px;
+  }
+  .panel--quarter .lad__pts { align-self: center; }
+}
+
 .lad__count { margin: 14px 0 0; }
 
 /* Строка рейтинга — ссылка на карточку альянса. */
@@ -582,6 +611,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
 .dot--win  { background: var(--win); }
 .dot--loss { background: var(--loss); }
+.dot--pending { background: var(--line); border: 1px dashed var(--mute); }
 
 .streak { font-size: 10.5px; margin-left: 7px; white-space: nowrap; font-weight: 600; }
 .streak--win { color: var(--accent); }

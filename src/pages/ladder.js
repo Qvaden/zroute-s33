@@ -13,13 +13,14 @@ export function renderLadder({
   title = 'Рейтинг альянсов',
   description = 'Победа +1 · Поражение −1 · Третьего не бывает',
   period = null,
+  variant = 'season',
 }) {
   const byId = new Map(standings.map((r) => [r.alliance.id, r.alliance]));
-  const rows = standings.map((r) => rowHtml(r, byId)).join('');
+  const rows = standings.map((r) => rowHtml(r, byId, variant)).join('');
   const active = standings.filter((r) => r.alliance.active).length;
 
   return `
-    <section class="panel">
+    <section class="panel${variant === 'quarter' ? ' panel--quarter' : ''}">
       <header class="panel__head">
         <span class="eyebrow">${eyebrow}</span>
         <h2>${title}</h2>
@@ -63,9 +64,10 @@ export function renderLadder({
     </section>`;
 }
 
-function rowHtml(r, byId) {
+function rowHtml(r, byId, variant = 'season') {
   const a = r.alliance;
   const color = a.color || '#7a8494';
+  const isQuarter = variant === 'quarter';
   const mergedTarget = a.mergedInto ? byId.get(a.mergedInto) : null;
 
   // Свежая форма: сколько побед в последних пяти. Нужна для сортировки «по форме».
@@ -84,7 +86,7 @@ function rowHtml(r, byId) {
     В настоящем сайте отрабатывает обычный href.
   */
   return `
-  <a class="lad__row${medal}${a.active ? '' : ' lad__row--off'}"
+  <a class="lad__row${medal}${isQuarter ? ' lad__row--quarter' : ''}${a.active ? '' : ' lad__row--off'}"
        href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
        style="--tag-color:${esc(color)}"
        data-name="${esc(a.name.toLowerCase())}"
@@ -120,6 +122,6 @@ function rowHtml(r, byId) {
       ${r.points > 0 ? '+' : ''}${r.points}
     </span>
 
-    <span class="lad__spark">${sparkline(r.series, color, 92, 26)}</span>
+    ${isQuarter ? '' : `<span class="lad__spark">${sparkline(r.series, color, 92, 26)}</span>`}
   </a>`;
 }
