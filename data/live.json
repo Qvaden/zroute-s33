@@ -660,7 +660,7 @@
       "date": "2026-08-01",
       "type": "server_defended",
       "title": "Успешно отбили атаку 37 сервера",
-      "serverNumber": 37,
+      "serverNumber": 33,
       "body": "Общими усилиями сервер успешно защитили столицу. Среди альянсов по вкладу в битву лидировали: СССР, KP33, NKVD (Со слов kunilinar).",
       "imageUrl": "https://raw.githubusercontent.com/Qvaden/zroute-s33/main/public/uploads/msaqcn90-ioi9zs.jpg"
     },
