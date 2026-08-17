@@ -1366,3 +1366,33 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 @media (prefers-reduced-motion: reduce) {
   .site-head::after, .hero::before, .panel::after, .lad__row::after, .quart-card::after, .achievement::after, .tl__item::after, .proof__fill::after { display: none; }
 }
+
+/* ── Mobile motion: никакого долгого зажатия для красивого эффекта ────────── */
+@media (hover: none) and (pointer: coarse) {
+  body { -webkit-tap-highlight-color: rgba(255,106,43,.18); }
+  a, button, .seg__btn, .cal__btn { touch-action: manipulation; }
+
+  /* Блоки оживают именно в момент появления в области просмотра. */
+  .panel, .hero, .quart-hero, .quart-board, .achievements-panel, .tl__item, .lad__row, .card, .leader, .podium-card, .quart-card, .achievement {
+    animation-timeline: view();
+    animation-range: entry 0% cover 28%;
+  }
+
+  /* Убираем «залипающий» hover на сенсорных экранах. */
+  .site-head:hover { box-shadow: none; }
+  .nav__link:hover, .brand:hover .brand__num, .card:hover, .leader:hover, .podium-card:hover, .tl__item:hover, .panel:hover, .hero:hover, .quart-card:hover, .achievement:hover, .lad__row:hover { transform: none; }
+  .panel:hover, .hero:hover { border-color: var(--line); box-shadow: var(--shadow); }
+  .quart-card:hover { border-color: #26372a; box-shadow: none; }
+  .tl__gallery a:hover .tl__img, .tl__img:hover { transform: none; filter: none; box-shadow: none; }
+  .hero:hover::before, .panel:hover::after, .lad__row:hover::after, .quart-card:hover::after, .achievement:hover::after, .tl__item:hover::after { opacity: 0; animation: none; }
+
+  /* На обычный тап — короткий физический отклик, видимый без удержания. */
+  .nav__link:active, .tile:active, .seg__btn:active, .cal__btn:active { transform: scale(.95); }
+  .card:active, .leader:active, .podium-card:active, .quart-card:active, .achievement:active, .tl__item:active { transform: translateY(-3px) scale(.985); border-color: var(--accent); }
+  .tl__gallery a:active .tl__img { transform: scale(1.04); filter: saturate(1.14) brightness(1.08); }
+  .brand:active .brand__num { transform: rotate(-4deg) scale(1.08); }
+  .hero:active, .panel:active { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+
+  /* Чуть заметнее живые статусы на небольшом экране. */
+  .tl__marker, .dot, .achievement__icon, .quart-podium-card__medal { animation-duration: 2.2s; }
+}
