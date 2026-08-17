@@ -1237,3 +1237,10 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-card__top-right { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; margin-left: auto; min-width: 0; }
 .quart-card__top-right .quart-card__tag { max-width: 13ch; text-align: right; }
 .quart-podium-card__tag { justify-self: end; text-align: right; }
+
+/* Фиксированная шапка карточки Кварта: ничего не прыгает из-за серии. */
+.quart-card__top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; gap: 5px; }
+.quart-card__rank { justify-self: start; }
+.quart-card__tag { justify-self: center; margin: 0; text-align: center; }
+.quart-card__streak-slot { justify-self: end; display: inline-flex; align-items: center; justify-content: flex-end; min-width: 24px; min-height: 16px; }
+.quart-card__streak-slot .quart-streak { margin: 0; }
