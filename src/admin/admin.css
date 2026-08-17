@@ -802,3 +802,21 @@
   .adm-ally { grid-template-columns: 10px 60px 1fr 1fr 54px 108px 80px; }
   .adm-ally__note { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* ── Админка: редактор Кварта ──────────────────────────────────────────── */
+.adm-quarter-top { list-style: none; margin: 0; padding: 0; }
+.adm-quarter-top li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+.adm-quarter-top li:last-child { border-bottom: 0; }
+.adm-quarter-top li b { color: var(--text); }
+.adm-quarter-top li span { color: var(--dim); font-family: Inter, sans-serif; font-size: 12px; }
+.adm-quarter-weeks { margin-top: 16px; }
+.adm-quarter-week-grid { display: grid; gap: 10px; }
+.adm-quarter-week { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 13px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
+.adm-quarter-week > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.adm-quarter-week > div b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.adm-quarter-week__num { color: var(--accent); font-family: Unbounded, sans-serif; font-size: 12px; font-weight: 700; }
+@media (max-width: 620px) {
+  .adm-quarter-week { grid-template-columns: 1fr auto; }
+  .adm-quarter-week > .muted { grid-column: 1; grid-row: 2; }
+  .adm-quarter-week > .adm-btn { grid-column: 2; grid-row: 1 / span 2; }
+}

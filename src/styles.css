@@ -1228,3 +1228,12 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 @media (min-width: 920px) {
   .quart-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* Фильтры: активная кнопка остаётся читаемой даже при наведении. */
+.seg__btn.is-on:hover,
+.quart-controls .seg__btn.is-on:hover { color: #14100c; }
+
+/* В карточках Кварта тег всегда закреплён у правого края верхней строки. */
+.quart-card__top-right { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; margin-left: auto; min-width: 0; }
+.quart-card__top-right .quart-card__tag { max-width: 13ch; text-align: right; }
+.quart-podium-card__tag { justify-self: end; text-align: right; }

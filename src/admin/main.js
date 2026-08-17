@@ -85,10 +85,12 @@ import { renderWeek, describe } from './screens/week.js';
 import { renderAlliances } from './screens/alliances.js';
 import { renderEvents } from './screens/events.js';
 import { renderTexts } from './screens/texts.js';
+import { renderQuarter } from './screens/quarter.js';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
   { id: 'week', label: 'Неделя', render: renderWeek },
+  { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'alliances', label: 'Альянсы', render: renderAlliances },
   { id: 'events', label: 'Хронология', render: renderEvents },
   { id: 'texts', label: 'Тексты', render: renderTexts },

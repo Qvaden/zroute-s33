@@ -12,7 +12,7 @@ import {
 } from './logic/standings.js?v=2';
 import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js?v=2';
-import { renderQuarter } from './pages/quarter.js?v=4';
+import { renderQuarter } from './pages/quarter.js?v=5';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
 import { renderAlliance } from './pages/alliance.js';
@@ -22,9 +22,9 @@ import './ui/timeline-controls.js';
 
 const ROUTES = [
   { id: 'home', label: 'Итоги недели', render: renderHome },
-  { id: 'timeline', label: 'Хронология', render: renderTimeline },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
+  { id: 'timeline', label: 'Хронология', render: renderTimeline },
   { id: 'guide', label: 'Малым алам', render: renderGuide },
 ];
 
