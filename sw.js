@@ -17,7 +17,7 @@
   каждый раз идёт запрос в сеть. Для сайта на четыре страницы это
   незначительно, а предсказуемость дороже.
 */
-const CACHE = 'zroute-s33-v1';
+const CACHE = 'zroute-s33-v2';
 
 /*
   Минимум для первого офлайн-открытия. Добавляем поштучно и не падаем,
@@ -85,7 +85,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       try {
-        const fresh = await fetch(request);
+        const fresh = await fetch(request, { cache: 'no-store' });
 
         /*
           Кладём в запас удачные ответы, включая данные из Google Таблицы:
