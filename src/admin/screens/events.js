@@ -149,9 +149,12 @@ function imageField(form) {
              </div>`
           : ''
       }
-      <input type="file" accept="image/*" multiple data-event-image-input ${form._imageBusy ? 'disabled' : ''}>
-      <i class="muted">Можно выбрать несколько фотографий сразу.</i>
-      ${form._imageBusy ? '<i class="muted">Обрабатываем фотографии…</i>' : ''}
+      <label class="adm-photo-drop ${form._imageBusy ? 'is-busy' : ''}" data-event-image-drop>
+        <input type="file" accept="image/*" multiple data-event-image-input ${form._imageBusy ? 'disabled' : ''}>
+        <span class="adm-photo-drop__icon">＋</span>
+        <strong>${form._imageBusy ? 'Обрабатываем фотографии…' : 'Добавить фотографии'}</strong>
+        <small>${pending.length ? `${pending.length} новых · ещё можно добавить` : 'Перетащите сюда или нажмите для выбора'}</small>
+      </label>
       ${form._imageError ? `<p class="adm-img-field__error">${esc(form._imageError)}</p>` : ''}
     </div>`;
 }

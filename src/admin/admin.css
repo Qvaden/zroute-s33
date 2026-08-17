@@ -826,3 +826,29 @@
 .adm-img-preview--grid .adm-img-preview__row { grid-column: 1 / -1; }
 .adm-ev__gallery { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .adm-ev__img { color: var(--accent); font-size: 11px; }
+
+/* Стилизованный выбор фотографий */
+.adm-photo-drop {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-height: 116px;
+  padding: 18px 12px;
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--accent) 58%, var(--line));
+  border-radius: var(--r);
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 65%), var(--surface);
+  transition: border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease), box-shadow .2s var(--ease);
+}
+.adm-photo-drop::before { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 20%, color-mix(in srgb, var(--accent) 13%, transparent) 50%, transparent 80%); transform: translateX(-120%); transition: transform .65s var(--ease); pointer-events: none; }
+.adm-photo-drop:hover, .adm-photo-drop.is-drag { border-color: var(--accent); background-color: color-mix(in srgb, var(--accent) 8%, var(--surface)); box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 16%, transparent); transform: translateY(-1px); }
+.adm-photo-drop:hover::before, .adm-photo-drop.is-drag::before { transform: translateX(120%); }
+.adm-photo-drop.is-busy { cursor: wait; opacity: .72; }
+.adm-photo-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.adm-photo-drop__icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent); font-size: 27px; line-height: 1; animation: adm-photo-pulse 2.4s ease-in-out infinite; }
+.adm-photo-drop strong { color: var(--text); font-size: 13px; }
+.adm-photo-drop small { color: var(--mute); font-size: 11px; }
+@keyframes adm-photo-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent); } }

@@ -1203,28 +1203,24 @@ document.addEventListener('input', (e) => {
   Сама загрузка в репозиторий отложена до «Опубликовать» (см. publishEvents):
   до этой кнопки ни один байт никуда не уходит.
 */
-document.addEventListener('change', async (e) => {
-  const input = e.target.closest?.('[data-event-image-input]');
-  if (!input || !view?.eventDraft) return;
+async function processEventFiles(files) {
+  if (!view?.eventDraft || view.eventDraft._imageBusy) return;
+  const validFiles = [...files].filter((file) => file?.type?.startsWith('image/'));
+  if (!validFiles.length) return;
 
-  const files = [...(input.files ?? [])];
-  if (!files.length) return;
-
-  revokePendingImages(view.eventDraft);
-  // Ссылка на этот конкретный объект черновика — за время обработки (доли
-  // секунды, но асинхронные) форму могли закрыть или открыть другую запись,
-  // и тогда результату уже некуда и незачем возвращаться.
-  const busyForm = { ...view.eventDraft, _imageBusy: true, _imageError: null, _pendingImages: [] };
+  // Новая партия добавляется к уже выбранным фото, а не заменяет их.
+  const previousItems = view.eventDraft._pendingImages ?? [];
+  const busyForm = { ...view.eventDraft, _imageBusy: true, _imageError: null, _pendingImages: previousItems };
   view.eventDraft = busyForm;
   render();
 
   let patch;
   try {
-    const items = await Promise.all(files.map(async (file) => {
+    const items = await Promise.all(validFiles.map(async (file) => {
       const blob = await prepareImage(file);
       return { blob, previewUrl: URL.createObjectURL(blob) };
     }));
-    patch = { _imageBusy: false, _pendingImages: items };
+    patch = { _imageBusy: false, _pendingImages: [...previousItems, ...items] };
   } catch (err) {
     patch = { _imageBusy: false, _imageError: String(err?.message ?? err) };
   }
@@ -1232,6 +1228,34 @@ document.addEventListener('change', async (e) => {
   if (view.eventDraft !== busyForm) return;
   view.eventDraft = { ...view.eventDraft, ...patch };
   render();
+}
+
+document.addEventListener('change', (e) => {
+  const input = e.target.closest?.('[data-event-image-input]');
+  if (!input) return;
+  processEventFiles(input.files ?? []);
+  // Позволяет повторно выбрать тот же файл после удаления или дозагрузки.
+  input.value = '';
+});
+
+document.addEventListener('dragover', (e) => {
+  const drop = e.target.closest?.('[data-event-image-drop]');
+  if (!drop || view?.eventDraft?._imageBusy) return;
+  e.preventDefault();
+  drop.classList.add('is-drag');
+});
+
+document.addEventListener('dragleave', (e) => {
+  const drop = e.target.closest?.('[data-event-image-drop]');
+  if (drop && !drop.contains(e.relatedTarget)) drop.classList.remove('is-drag');
+});
+
+document.addEventListener('drop', (e) => {
+  const drop = e.target.closest?.('[data-event-image-drop]');
+  if (!drop) return;
+  e.preventDefault();
+  drop.classList.remove('is-drag');
+  processEventFiles(e.dataTransfer?.files ?? []);
 });
 
 window.addEventListener('hashchange', render);
