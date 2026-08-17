@@ -1,13 +1,13 @@
 import { esc, formDots, plural } from '../ui/helpers.js?v=2';
 
 /**
- * Самостоятельная страница Кварта.
- * Она намеренно не переиспользует визуальную таблицу сезонного рейтинга:
- * Кварт — это экран нового шанса, а не второй список с тем же видом.
+ * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,
+ * чтобы это ощущалось отдельной гонкой, а не вторым рейтингом.
  */
 export function renderQuarter({ standings, quarter }) {
   const active = standings.filter((r) => r.alliance.active).length;
-  const rows = standings.map(quartRow).join('');
+  const topThree = standings.slice(0, 3);
+  const cards = standings.map(quartCard).join('');
   const periodLabel = quarter.startNumber == null
     ? 'Период ещё не начат'
     : `Недели ${quarter.startNumber}–${quarter.endNumber}`;
@@ -22,7 +22,7 @@ export function renderQuarter({ standings, quarter }) {
           <div class="quart-hero__copy">
             <span class="quart-kicker"><i></i> COME BACK CYCLE</span>
             <h2>Кварт</h2>
-            <p>Новый шанс каждые четыре недели. Старый рейтинг остаётся в прошлом.</p>
+            <p>Новый шанс каждые четыре недели. Текущие результаты альянса независимо от старых неудач.</p>
           </div>
           <div class="quart-dial" aria-label="Текущий период">
             <span>ПЕРИОД</span>
@@ -36,13 +36,24 @@ export function renderQuarter({ standings, quarter }) {
         </div>
       </header>
 
+      <section class="quart-podium" aria-labelledby="quart-podium-title">
+        <div class="quart-podium__heading">
+          <div>
+            <span class="quart-section-label">CURRENT CHAMPIONS</span>
+            <h3 id="quart-podium-title">Кто лидирует в этом Кварте?</h3>
+          </div>
+          <span class="quart-podium__note">Победители по очкам</span>
+        </div>
+        <div class="quart-podium__grid">${topThree.map(podiumCard).join('')}</div>
+      </section>
+
       <section class="quart-board">
         <header class="quart-board__head">
           <div>
-            <span class="quart-section-label">LIVE RESET BOARD</span>
-            <h3>Кто забирает этот Кварт?</h3>
+            <span class="quart-section-label">THE COMEBACK BOARD</span>
+            <h3>Все альянсы в гонке</h3>
           </div>
-          <p>Только очки текущего периода</p>
+          <p>Очки и форма текущего периода</p>
         </header>
 
         <div class="quart-controls">
@@ -56,7 +67,7 @@ export function renderQuarter({ standings, quarter }) {
             <button type="button" class="seg__btn is-on" data-ladder-filter="active">Активные</button>
             <button type="button" class="seg__btn" data-ladder-filter="all">Все</button>
           </div>
-          <div class="seg" role="group" aria-label="Сортировка">
+          <div class="seg" role="group" aria-label="Сортировка карточек">
             <button type="button" class="seg__btn is-on" data-ladder-sort="points">Очки</button>
             <button type="button" class="seg__btn" data-ladder-sort="wins">Победы</button>
             <button type="button" class="seg__btn" data-ladder-sort="form">Форма</button>
@@ -64,27 +75,41 @@ export function renderQuarter({ standings, quarter }) {
           </div>
         </div>
 
-        <div class="quart-list" data-ladder-list>${rows}</div>
+        <div class="quart-grid" data-ladder-list>${cards}</div>
         <p class="quart-empty" data-ladder-empty hidden>Пока никого не нашли. Попробуйте другой тег.</p>
         <p class="quart-count" data-ladder-count>${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} в гонке</p>
       </section>
     </section>`;
 }
 
-function quartRow(r) {
+function podiumCard(r) {
   const a = r.alliance;
-  const color = a.color || '#7a8494';
+  const score = `${r.points > 0 ? '+' : ''}${r.points}`;
+  const medal = ['quart-podium-card--gold', 'quart-podium-card--silver', 'quart-podium-card--bronze'][r.place - 1] || '';
+  return `
+    <a class="quart-podium-card ${medal}" href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}" style="--tag-color:${esc(a.color || '#7a8494')}">
+      <span class="quart-podium-card__place">0${r.place}</span>
+      <span class="quart-podium-card__medal">${r.place === 1 ? '✦' : r.place === 2 ? '◆' : '◇'}</span>
+      <span class="quart-podium-card__tag">${esc(a.tag)}</span>
+      <b>${esc(a.name)}</b>
+      <span class="quart-podium-card__meta">${r.wins} побед · ${r.losses} поражений</span>
+      <strong>${score}</strong>
+    </a>`;
+}
+
+function quartCard(r) {
+  const a = r.alliance;
   const formScore = r.form.filter((o) => o === 'win').length;
   const streak = r.streak && r.streak.length > 1
     ? `<span class="quart-streak quart-streak--${r.streak.type}">${r.streak.type === 'win' ? '🔥' : '💀'}${r.streak.length}</span>`
     : '';
   const score = `${r.points > 0 ? '+' : ''}${r.points}`;
-  const medal = r.place <= 3 ? ` quart-row--m${r.place}` : '';
+  const medal = r.place <= 3 ? ` quart-card--m${r.place}` : '';
 
   return `
-    <a class="quart-row${medal}${a.active ? '' : ' quart-row--off'}"
+    <a class="quart-card${medal}${a.active ? '' : ' quart-card--off'}"
        href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
-       style="--tag-color:${esc(color)}"
+       style="--tag-color:${esc(a.color || '#7a8494')}"
        data-name="${esc(a.name.toLowerCase())}"
        data-tag="${esc(a.tag.toLowerCase())}"
        data-points="${r.points}"
@@ -92,11 +117,8 @@ function quartRow(r) {
        data-form="${formScore}"
        data-place="${r.place}"
        data-active="${a.active ? 1 : 0}">
-      <span class="quart-rank">${String(r.place).padStart(2, '0')}</span>
-      <span class="quart-team">
-        <span class="quart-team__name"><span class="tag">${esc(a.tag)}</span><b>${esc(a.name)}</b>${streak}</span>
-        <span class="quart-team__form">${formDots(r.form)}</span>
-      </span>
-      <span class="quart-score"><small>ОЧКИ</small><b>${score}</b></span>
+      <span class="quart-card__top"><span class="quart-card__rank">${String(r.place).padStart(2, '0')}</span><span class="quart-card__tag">${esc(a.tag)}</span>${streak}</span>
+      <b class="quart-card__name">${esc(a.name)}</b>
+      <span class="quart-card__bottom"><span class="quart-card__form">${formDots(r.form)}</span><strong>${score}<small> ОЧКИ</small></strong></span>
     </a>`;
 }
