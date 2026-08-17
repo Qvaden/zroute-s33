@@ -160,7 +160,7 @@
       "id": "a23",
       "tag": "EKF",
       "name": "EliteKombatForce",
-      "active": true,
+      "active": false,
       "color": "#7362e4"
     },
     {
@@ -168,8 +168,7 @@
       "tag": "F100",
       "name": "Fragment100",
       "active": false,
-      "color": "#ad6cef",
-      "mergedInto": "a22"
+      "color": "#ad6cef"
     },
     {
       "id": "a25",
