@@ -12,7 +12,7 @@ import {
 } from './logic/standings.js?v=2';
 import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js?v=2';
-import { renderQuarter } from './pages/quarter.js?v=2';
+import { renderQuarter } from './pages/quarter.js?v=3';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
 import { renderAlliance } from './pages/alliance.js';
