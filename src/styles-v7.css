@@ -1259,3 +1259,8 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .achievement-empty { margin: 0; padding: 14px; color: var(--dim); border: 1px dashed var(--line); border-radius: var(--r-sm); }
 
 .achievement-count { display: inline-flex; align-items: center; gap: 2px; margin-left: 7px; color: var(--accent); font-size: 10px; font-weight: 700; white-space: nowrap; }
+
+.achievement--crown { --achievement-color: #f3c969; }
+.achievement--veteran { --achievement-color: #c8d0dc; }
+.achievement--shield { --achievement-color: #7ec8ff; }
+.achievement--double { --achievement-color: #ff9ee7; }

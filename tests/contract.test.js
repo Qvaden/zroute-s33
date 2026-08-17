@@ -1717,12 +1717,22 @@ console.log('\nF. Достижения');
   const perfect = getAllianceAchievements('p', weeks4, result('p', ['win', 'win', 'win', 'win']));
   check('идеальный Кварт выдаёт значок', perfect.some((badge) => badge.id === 'perfect-quarter'));
   check('три победы подряд выдаёт значок серии', perfect.some((badge) => badge.id === 'streak3'));
+  check('идеальный Кварт считается Квартом без поражений', perfect.some((badge) => badge.id === 'undefeated-quarter'));
 
   const comeback = getAllianceAchievements('c', weeks4, result('c', ['loss', 'loss', 'win', 'win']));
   check('камбэк из минуса выдаёт отдельный значок', comeback.some((badge) => badge.id === 'comeback'));
 
   const ordinary = getAllianceAchievements('o', weeks4, result('o', ['win', 'loss', 'win', 'loss']));
   check('неидеальный Кварт не получает идеальный значок', !ordinary.some((badge) => badge.id === 'perfect-quarter'));
+
+  const lastStand = getAllianceAchievements('s', weeks4, result('s', ['loss', 'loss', 'loss', 'win']));
+  check('три поражения и победа дают значок последнего рывка', lastStand.some((badge) => badge.id === 'last-stand'));
+
+  const veteranWeeks = Array.from({ length: 12 }, (_, i) => ({ id: `V${i + 1}`, number: i + 1 }));
+  const veteranResults = Array.from({ length: 10 }, (_, i) => ({ weekId: `V${i + 1}`, allianceId: 'v', outcome: 'win' }));
+  const veteran = getAllianceAchievements('v', veteranWeeks, veteranResults);
+  check('10 побед дают значок ветерана', veteran.some((badge) => badge.id === 'veteran'));
+  check('7 побед подряд дают корону', veteran.some((badge) => badge.id === 'streak7'));
 }
 
 console.log(`\n${'─'.repeat(52)}`);
