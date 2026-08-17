@@ -1,4 +1,4 @@
-import { renderLadder } from './ladder.js';
+import { renderLadder } from './ladder.js?v=2';
 
 /**
  * Рейтинг только внутри текущего фиксированного четырёхнедельного периода.

@@ -515,7 +515,7 @@ console.log('\nI. Готовность к публикации');
     const code = await readFile(file, 'utf8');
     for (const m of code.matchAll(/(?:^|\n)\s*(?:import|export)[^'"\n]*from\s*['"](\.[^'"]+)['"]/g)) {
       edges++;
-      const target = path.resolve(path.dirname(file), m[1]);
+      const target = path.resolve(path.dirname(file), m[1].split(/[?#]/, 1)[0]);
       try {
         await stat(target);
       } catch {
