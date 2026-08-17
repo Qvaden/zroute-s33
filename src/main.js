@@ -16,6 +16,7 @@ import { renderQuarter } from './pages/quarter-final.js';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
 import { renderAlliance } from './pages/alliance.js';
+import { computeAchievements } from './logic/achievements.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
 import './ui/ladder-controls.js';
 import './ui/timeline-controls.js';
@@ -142,6 +143,7 @@ async function boot() {
       summary: computeWeekSummary(data.alliances, weeks, data.results),
       movers: computeMovers(standings),
       placeHistory: computePlaceHistory(data.alliances, weeks, data.results, CONFIG.scoring),
+      achievements: computeAchievements(data.alliances, data.weeks, data.results),
       problems,
     };
 

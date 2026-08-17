@@ -14,9 +14,10 @@ export function renderLadder({
   description = 'Победа +1 · Поражение −1 · Третьего не бывает',
   period = null,
   variant = 'season',
+  achievements,
 }) {
   const byId = new Map(standings.map((r) => [r.alliance.id, r.alliance]));
-  const rows = standings.map((r) => rowHtml(r, byId, variant)).join('');
+  const rows = standings.map((r) => rowHtml(r, byId, variant, achievements)).join('');
   const active = standings.filter((r) => r.alliance.active).length;
 
   return `
@@ -64,7 +65,7 @@ export function renderLadder({
     </section>`;
 }
 
-function rowHtml(r, byId, variant = 'season') {
+function rowHtml(r, byId, variant = 'season', achievements) {
   const a = r.alliance;
   const color = a.color || '#7a8494';
   const isQuarter = variant === 'quarter';
@@ -79,6 +80,8 @@ function rowHtml(r, byId, variant = 'season') {
       : '';
 
   const medal = r.place <= 3 ? ` lad__row--m${r.place}` : '';
+  const achievementCount = achievements?.get(a.id)?.length ?? 0;
+  const achievementMark = achievementCount ? `<span class="achievement-count" title="Достижения: ${achievementCount}">✦${achievementCount}</span>` : '';
 
   /*
     Строка — ссылка на карточку альянса. data-go нужен только собранному
@@ -104,7 +107,7 @@ function rowHtml(r, byId, variant = 'season') {
     <span class="lad__ident">
       <span class="tag">${esc(a.tag)}</span>
       <span class="lad__name">${esc(a.name)}</span>
-      ${streak}
+      ${streak}${achievementMark}
       ${
         mergedTarget
           ? `<em class="lad__off">слился с ${esc(mergedTarget.tag)}</em>`

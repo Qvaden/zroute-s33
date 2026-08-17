@@ -11,6 +11,7 @@ import { validateDataset, loadAndValidate } from '../src/data/contract.js';
 import { computeStandings, computeWeekSummary, computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 import { parseCsv, parseCsvObjects } from '../src/lib/csv.js';
 import * as jsonAdapter from '../src/data/adapters/json.js';
+import { getAllianceAchievements } from '../src/logic/achievements.js';
 
 let passed = 0;
 let failed = 0;
@@ -1706,6 +1707,22 @@ console.log('\nP. Правка текстов');
     'без изменений публиковать нечего',
     /нечего/.test(describeTexts(textsDiff(raw, textsFromRaw(raw)), null))
   );
+}
+
+// ── F. Достижения альянсов ────────────────────────────────────────────────
+console.log('\nF. Достижения');
+{
+  const weeks4 = [1, 2, 3, 4].map((number) => ({ id: `Q${number}`, number }));
+  const result = (allianceId, outcomes) => outcomes.map((outcome, i) => ({ weekId: `Q${i + 1}`, allianceId, outcome }));
+  const perfect = getAllianceAchievements('p', weeks4, result('p', ['win', 'win', 'win', 'win']));
+  check('идеальный Кварт выдаёт значок', perfect.some((badge) => badge.id === 'perfect-quarter'));
+  check('три победы подряд выдаёт значок серии', perfect.some((badge) => badge.id === 'streak3'));
+
+  const comeback = getAllianceAchievements('c', weeks4, result('c', ['loss', 'loss', 'win', 'win']));
+  check('камбэк из минуса выдаёт отдельный значок', comeback.some((badge) => badge.id === 'comeback'));
+
+  const ordinary = getAllianceAchievements('o', weeks4, result('o', ['win', 'loss', 'win', 'loss']));
+  check('неидеальный Кварт не получает идеальный значок', !ordinary.some((badge) => badge.id === 'perfect-quarter'));
 }
 
 console.log(`\n${'─'.repeat(52)}`);

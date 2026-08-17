@@ -16,7 +16,7 @@ const NO_DATA = { label: 'Нет данных', cls: 'none', sign: '—' };
  * Карточка одного альянса: весь его сезон на одном экране.
  */
 export function renderAlliance(view, allianceId) {
-  const { standings, weeks, results, placeHistory } = view;
+  const { standings, weeks, results, placeHistory, achievements } = view;
   const row = standings.find((r) => r.alliance.id === allianceId);
 
   if (!row) {
@@ -43,6 +43,19 @@ export function renderAlliance(view, allianceId) {
 
   const places = placeHistory.get(a.id) ?? [];
   const bestPlace = places.length ? Math.min(...places) : row.place;
+
+  const earned = achievements?.get(a.id) ?? [];
+  const achievementPanel = `
+    <section class="panel achievements-panel" aria-labelledby="achievements-title">
+      <header class="panel__head">
+        <span class="eyebrow">Коллекция</span>
+        <h2 id="achievements-title">Достижения</h2>
+        <p class="muted">Значки выдаются автоматически за реальные результаты альянса.</p>
+      </header>
+      ${earned.length
+        ? `<div class="achievement-grid">${earned.map((badge) => `<div class="achievement achievement--${badge.tone}" title="${esc(badge.text)}"><span class="achievement__icon">${badge.icon}</span><span><b>${esc(badge.title)}</b><small>${esc(badge.text)}</small></span></div>`).join('')}</div>`
+        : '<p class="achievement-empty">Пока нет значков. Следующая победа может открыть первый.</p>'}
+    </section>`;
 
   const stats = [
     { label: 'Место', value: row.place, extra: deltaBadge(row.delta) },
@@ -85,6 +98,8 @@ export function renderAlliance(view, allianceId) {
           .join('')}
       </div>
     </section>
+
+    ${achievementPanel}
 
     <section class="panel">
       <header class="panel__head">
