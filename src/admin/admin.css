@@ -820,3 +820,9 @@
   .adm-quarter-week > .muted { grid-column: 1; grid-row: 2; }
   .adm-quarter-week > .adm-btn { grid-column: 2; grid-row: 1 / span 2; }
 }
+
+.adm-img-preview--grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.adm-img-preview--grid img { width: 100%; height: 74px; object-fit: cover; border-radius: 7px; }
+.adm-img-preview--grid .adm-img-preview__row { grid-column: 1 / -1; }
+.adm-ev__gallery { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.adm-ev__img { color: var(--accent); font-size: 11px; }

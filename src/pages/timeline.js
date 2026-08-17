@@ -220,6 +220,21 @@ function renderFilters(events) {
   </div>`;
 }
 
+function eventImages(event) {
+  const urls = Array.isArray(event?.imageUrls)
+    ? event.imageUrls
+    : (event?.imageUrl ? [event.imageUrl] : []);
+  return urls.map((url) => safeUrl(url)).filter(Boolean);
+}
+
+function renderEventGallery(event) {
+  const images = eventImages(event);
+  if (!images.length) return '';
+  return `<div class="tl__gallery" data-tl-gallery>
+    ${images.map((url, i) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"><img class="tl__img" src="${esc(url)}" alt="${esc(event.title)} — фото ${i + 1}" loading="lazy"></a>`).join('')}
+  </div>`;
+}
+
 function renderFeed(events) {
   let lastYear = null;
   const items = events
@@ -243,11 +258,7 @@ function renderFeed(events) {
           </div>
           <h3>${esc(e.title)}</h3>
           ${e.body ? `<p>${esc(e.body)}</p>` : ''}
-          ${
-            safeUrl(e.imageUrl)
-              ? `<img class="tl__img" src="${esc(safeUrl(e.imageUrl))}" alt="${esc(e.title)}" loading="lazy">`
-              : ''
-          }
+          ${renderEventGallery(e)}
         </div>
       </li>`;
     })

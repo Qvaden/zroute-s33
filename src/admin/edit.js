@@ -160,6 +160,9 @@ export function eventsFromRaw(raw) {
       title: String(e.title ?? ''),
       body: String(e.body ?? ''),
       imageUrl: String(e.imageUrl ?? ''),
+      imageUrls: Array.isArray(e.imageUrls)
+        ? e.imageUrls.map((url) => String(url ?? '')).filter(Boolean)
+        : (String(e.imageUrl ?? '').trim() ? [String(e.imageUrl).trim()] : []),
       durationDays: e.durationDays != null && e.durationDays !== '' ? Number(e.durationDays) : null,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -175,6 +178,7 @@ export function blankEvent() {
     title: '',
     body: '',
     imageUrl: '',
+    imageUrls: [],
     durationDays: null,
   };
 }
@@ -229,9 +233,11 @@ export function eventProblems(ev) {
     problems.push('Длительность должна быть числом больше нуля.');
   }
 
-  const url = String(ev?.imageUrl ?? '').trim();
-  if (url && !/^https?:\/\//i.test(url)) {
-    problems.push('Ссылка на картинку должна начинаться с http:// или https://');
+  const urls = Array.isArray(ev?.imageUrls) && ev.imageUrls.length
+    ? ev.imageUrls.map((url) => String(url ?? '').trim()).filter(Boolean)
+    : (String(ev?.imageUrl ?? '').trim() ? [String(ev.imageUrl).trim()] : []);
+  if (urls.some((url) => !/^https?:\/\//i.test(url))) {
+    problems.push('Каждая ссылка на картинку должна начинаться с http:// или https://');
   }
 
   return problems;
@@ -258,7 +264,11 @@ export function applyEvents(raw, list) {
         out.serverNumber = Number(e.serverNumber);
       }
       if (String(e.body ?? '').trim()) out.body = String(e.body).trim();
-      if (String(e.imageUrl ?? '').trim()) out.imageUrl = String(e.imageUrl).trim();
+      const imageUrls = Array.isArray(e.imageUrls)
+        ? e.imageUrls.map((url) => String(url ?? '').trim()).filter(Boolean)
+        : (String(e.imageUrl ?? '').trim() ? [String(e.imageUrl).trim()] : []);
+      if (imageUrls.length === 1) out.imageUrl = imageUrls[0];
+      if (imageUrls.length > 1) out.imageUrls = imageUrls;
       if (Number(e.durationDays) > 0) out.durationDays = Number(e.durationDays);
       return out;
     })
@@ -290,13 +300,15 @@ export function eventsDiff(raw, list) {
       added++;
       continue;
     }
-    const same = ['date', 'type', 'title', 'body', 'imageUrl'].every(
+    const oldImages = Array.isArray(was.imageUrls) ? was.imageUrls : (was.imageUrl ? [was.imageUrl] : []);
+    const newImages = Array.isArray(ev.imageUrls) ? ev.imageUrls : (ev.imageUrl ? [ev.imageUrl] : []);
+    const same = ['date', 'type', 'title', 'body'].every(
       (k) => String(was[k] ?? '') === String(ev[k] ?? '')
-    );
+    ) && JSON.stringify(oldImages) === JSON.stringify(newImages);
     const sameNums =
       Number(was.serverNumber ?? 0) === Number(ev.serverNumber ?? 0) &&
       Number(was.durationDays ?? 0) === Number(ev.durationDays ?? 0);
-    if (!same || !sameNums || ev._pendingImage) changed++;
+    if (!same || !sameNums || ev._pendingImages?.length || ev._pendingImage) changed++;
   }
 
   for (const id of before.keys()) if (!after.has(id)) removed++;

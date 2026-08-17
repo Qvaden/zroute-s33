@@ -77,7 +77,8 @@
  * @property {number}  [serverNumber]  Номер сервера — для захватов.
  * @property {string}  title
  * @property {string}  [body]
- * @property {string}  [imageUrl]      В режиме sheets — внешняя ссылка.
+ * @property {string}  [imageUrl]      Старая одиночная внешняя ссылка.
+ * @property {string[]} [imageUrls]    Несколько внешних ссылок на фотографии.
  * @property {number}  [durationDays]  Сколько длилась кампания. Необязательно:
  *                                     заполнять никто не обязан, но если есть —
  *                                     хронология посчитает по нему статистику.

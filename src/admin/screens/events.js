@@ -96,12 +96,7 @@ function row(e, canPush) {
       </div>
       <b>${esc(e.title)}</b>
       ${e.body ? `<p class="muted">${esc(e.body)}</p>` : ''}
-      ${
-        safeUrl(e.imageUrl)
-          ? `<a class="adm-ev__img" href="${esc(safeUrl(e.imageUrl))}"
-                target="_blank" rel="noopener noreferrer">картинка</a>`
-          : ''
-      }
+      ${renderEventImages(e)}
     </div>
     ${
       canPush
@@ -123,24 +118,40 @@ function row(e, canPush) {
  * либо пусто. Обработка (сжатие) и сеть сюда не входят: это чистая разметка
  * по готовому состоянию формы.
  */
+function eventImageUrls(event) {
+  return Array.isArray(event?.imageUrls)
+    ? event.imageUrls.map((url) => safeUrl(url)).filter(Boolean)
+    : (safeUrl(event?.imageUrl) ? [safeUrl(event.imageUrl)] : []);
+}
+
+function renderEventImages(event) {
+  const urls = eventImageUrls(event);
+  if (!urls.length) return '';
+  return `<div class="adm-ev__gallery">${urls.map((url, i) => `<a class="adm-ev__img" href="${esc(url)}" target="_blank" rel="noopener noreferrer">фото ${i + 1}</a>`).join('')}</div>`;
+}
+
 function imageField(form) {
-  const previewSrc = form._pendingImage?.previewUrl || safeUrl(form.imageUrl);
+  const existing = eventImageUrls(form);
+  const pendingItems = form._pendingImages?.length ? form._pendingImages : (form._pendingImage ? [form._pendingImage] : []);
+  const pending = pendingItems.map((item) => item.previewUrl).filter(Boolean);
+  const previews = [...existing, ...pending];
 
   return `
     <div class="adm-img-field">
       ${
-        previewSrc
-          ? `<div class="adm-img-preview">
-               <img src="${esc(previewSrc)}" alt="">
+        previews.length
+          ? `<div class="adm-img-preview adm-img-preview--grid">
+               ${previews.map((src) => `<img src="${esc(src)}" alt="">`).join('')}
                <div class="adm-img-preview__row">
-                 <span>${form._pendingImage ? 'Загрузится при публикации' : 'Уже на сайте'}</span>
-                 <button type="button" class="adm-btn" data-event-image-clear>Убрать</button>
+                 <span>${pending.length ? `Загрузится при публикации: ${pending.length} фото` : `${previews.length} фото уже на сайте`}</span>
+                 <button type="button" class="adm-btn" data-event-image-clear>Убрать все</button>
                </div>
              </div>`
           : ''
       }
-      <input type="file" accept="image/*" data-event-image-input ${form._imageBusy ? 'disabled' : ''}>
-      ${form._imageBusy ? '<i class="muted">Обрабатываем картинку…</i>' : ''}
+      <input type="file" accept="image/*" multiple data-event-image-input ${form._imageBusy ? 'disabled' : ''}>
+      <i class="muted">Можно выбрать несколько фотографий сразу.</i>
+      ${form._imageBusy ? '<i class="muted">Обрабатываем фотографии…</i>' : ''}
       ${form._imageError ? `<p class="adm-img-field__error">${esc(form._imageError)}</p>` : ''}
     </div>`;
 }
@@ -212,7 +223,7 @@ function renderForm(form, canPush) {
                  placeholder="необязательно">
         </label>
         <label class="adm-field">
-          <span>Картинка</span>
+          <span>Фотографии</span>
           ${imageField(form)}
         </label>
       </div>

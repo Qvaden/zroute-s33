@@ -471,8 +471,10 @@ function stripTransient(list) {
 }
 
 /** Локальный адрес превью (URL.createObjectURL) не освобождён сам — отпускаем руками. */
-function revokePendingImage(ev) {
-  if (ev?._pendingImage?.previewUrl) URL.revokeObjectURL(ev._pendingImage.previewUrl);
+function revokePendingImages(ev) {
+  for (const item of ev?._pendingImages ?? []) {
+    if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+  }
 }
 
 /** Открыть форму: пустую для новой записи или заполненную для правки. */
@@ -483,7 +485,7 @@ function openEventForm(id) {
 }
 
 function closeEventForm() {
-  revokePendingImage(view.eventDraft);
+  revokePendingImages(view.eventDraft);
   view.eventDraft = null;
   render();
 }
@@ -520,6 +522,7 @@ function saveEventToList() {
     title: String(form.title).trim(),
     body: String(form.body ?? '').trim(),
     imageUrl: String(form.imageUrl ?? '').trim(),
+    imageUrls: Array.isArray(form.imageUrls) ? form.imageUrls.map((url) => String(url).trim()).filter(Boolean) : [],
     serverNumber: form.serverNumber === '' || form.serverNumber == null ? null : Number(form.serverNumber),
     durationDays: form.durationDays === '' || form.durationDays == null ? null : Number(form.durationDays),
   };
@@ -541,7 +544,7 @@ function saveEventToList() {
 
 function deleteEventFromList(id) {
   if (!view.canPush) return;
-  revokePendingImage(view.events.find((e) => e.id === id));
+  revokePendingImages(view.events.find((e) => e.id === id));
   view.events = view.events.filter((e) => e.id !== id);
   saveEventsDraft(stripTransient(view.events));
   // Если удалили ту запись, что была открыта в форме, форму тоже закрываем.
@@ -580,19 +583,24 @@ async function publishEvents() {
     */
     for (let i = 0; i < view.events.length; i++) {
       const ev = view.events[i];
-      if (!ev._pendingImage) continue;
+      if (!ev._pendingImages?.length) continue;
 
-      if (button) button.textContent = 'Загружаем картинку…';
-      const bytes = await ev._pendingImage.blob.arrayBuffer();
-      const url = await uploadImageFile({
-        path: uploadPath('jpg'),
-        bytes,
-        message: `хронология: картинка для записи ${ev.id}`,
-      });
-      revokePendingImage(ev);
+      if (button) button.textContent = 'Загружаем фотографии…';
+      const uploaded = [];
+      for (const item of ev._pendingImages) {
+        if (button) button.textContent = `Загружаем фото ${uploaded.length + 1}/${ev._pendingImages.length}…`;
+        const bytes = await item.blob.arrayBuffer();
+        uploaded.push(await uploadImageFile({
+          path: uploadPath('jpg'),
+          bytes,
+          message: `хронология: фото для записи ${ev.id}`,
+        }));
+      }
+      revokePendingImages(ev);
 
-      const { _pendingImage, ...rest } = ev;
-      view.events = view.events.map((e, j) => (j === i ? { ...rest, imageUrl: url } : e));
+      const { _pendingImages, ...rest } = ev;
+      const existing = Array.isArray(ev.imageUrls) ? ev.imageUrls : (ev.imageUrl ? [ev.imageUrl] : []);
+      view.events = view.events.map((e, j) => (j === i ? { ...rest, imageUrls: [...existing, ...uploaded] } : e));
       saveEventsDraft(stripTransient(view.events));
     }
     if (button) button.textContent = 'Публикуем…';
@@ -1017,8 +1025,8 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[data-event-image-clear]') && view.eventDraft) {
     // «Убрать» всегда значит «картинки не будет»: и невыгруженный выбор,
     // и уже опубликованную ссылку снимаем одной и той же кнопкой.
-    revokePendingImage(view.eventDraft);
-    view.eventDraft = { ...view.eventDraft, _pendingImage: null, _imageError: null, imageUrl: '' };
+    revokePendingImages(view.eventDraft);
+    view.eventDraft = { ...view.eventDraft, _pendingImages: [], _imageError: null, imageUrl: '', imageUrls: [] };
     render();
     return;
   }
@@ -1199,21 +1207,24 @@ document.addEventListener('change', async (e) => {
   const input = e.target.closest?.('[data-event-image-input]');
   if (!input || !view?.eventDraft) return;
 
-  const file = input.files?.[0];
-  if (!file) return;
+  const files = [...(input.files ?? [])];
+  if (!files.length) return;
 
-  revokePendingImage(view.eventDraft);
+  revokePendingImages(view.eventDraft);
   // Ссылка на этот конкретный объект черновика — за время обработки (доли
   // секунды, но асинхронные) форму могли закрыть или открыть другую запись,
   // и тогда результату уже некуда и незачем возвращаться.
-  const busyForm = { ...view.eventDraft, _imageBusy: true, _imageError: null, _pendingImage: null };
+  const busyForm = { ...view.eventDraft, _imageBusy: true, _imageError: null, _pendingImages: [] };
   view.eventDraft = busyForm;
   render();
 
   let patch;
   try {
-    const blob = await prepareImage(file);
-    patch = { _imageBusy: false, _pendingImage: { blob, previewUrl: URL.createObjectURL(blob) } };
+    const items = await Promise.all(files.map(async (file) => {
+      const blob = await prepareImage(file);
+      return { blob, previewUrl: URL.createObjectURL(blob) };
+    }));
+    patch = { _imageBusy: false, _pendingImages: items };
   } catch (err) {
     patch = { _imageBusy: false, _imageError: String(err?.message ?? err) };
   }
