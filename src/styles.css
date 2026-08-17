@@ -429,6 +429,14 @@ h1,h2,h3,h4 {
 .lad__spark { grid-area: spark; display: none; }
 
 .lad__empty { text-align: center; color: var(--mute); padding: 28px 0; font-size: 14px; }
+.lad__period {
+  margin: 8px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .lad__count { margin: 14px 0 0; }
 
 /* Строка рейтинга — ссылка на карточку альянса. */

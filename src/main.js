@@ -7,9 +7,11 @@ import {
   computeMovers,
   computePlaceHistory,
   weeksUpToLastData,
+  computeQuarterWindow,
 } from './logic/standings.js';
 import { renderHome } from './pages/home.js';
 import { renderLadder } from './pages/ladder.js';
+import { renderQuarter } from './pages/quarter.js';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
 import { renderAlliance } from './pages/alliance.js';
@@ -19,8 +21,9 @@ import './ui/timeline-controls.js';
 
 const ROUTES = [
   { id: 'home', label: 'Итоги недели', render: renderHome },
-  { id: 'ladder', label: 'Рейтинг', render: renderLadder },
   { id: 'timeline', label: 'Хронология', render: renderTimeline },
+  { id: 'quarter', label: 'Кватр', render: renderQuarter },
+  { id: 'ladder', label: 'Рейтинг', render: renderLadder },
   { id: 'guide', label: 'Малым алам', render: renderGuide },
 ];
 
@@ -81,7 +84,9 @@ function render() {
   } else {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
     renderNav(route.id);
-    app.innerHTML = route.render(view);
+    app.innerHTML = route.id === 'quarter'
+      ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
+      : route.render(view);
     // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
     // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
     for (const fn of [window.__ladderApply, window.__timelineApply]) {
@@ -114,12 +119,22 @@ async function boot() {
     const standings = computeStandings(
       data.alliances, weeks, data.results, CONFIG.scoring, CONFIG.formLength
     );
+    const quarter = computeQuarterWindow(data.weeks, data.results, 4);
+    const quarterStandings = computeStandings(
+      data.alliances,
+      quarter.weeks,
+      data.results,
+      CONFIG.scoring,
+      4
+    );
 
     view = {
       ...data,
       weeks,
       allWeeks: data.weeks,
       standings,
+      quarterStandings,
+      quarter,
       summary: computeWeekSummary(data.alliances, weeks, data.results),
       movers: computeMovers(standings),
       placeHistory: computePlaceHistory(data.alliances, weeks, data.results, CONFIG.scoring),

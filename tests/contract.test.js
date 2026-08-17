@@ -8,7 +8,7 @@
  */
 import { CONFIG } from '../config.js';
 import { validateDataset, loadAndValidate } from '../src/data/contract.js';
-import { computeStandings, computeWeekSummary } from '../src/logic/standings.js';
+import { computeStandings, computeWeekSummary, computeQuarterWindow } from '../src/logic/standings.js';
 import { parseCsv, parseCsvObjects } from '../src/lib/csv.js';
 import * as jsonAdapter from '../src/data/adapters/json.js';
 
@@ -214,6 +214,33 @@ console.log('\nF. Связка рейтинга: разметка ↔ скрип
   check('поиск сравнивает в нижнем регистре', !/data-name="[^"]*[А-ЯЁ]/.test(html));
   check('сортировки скрипта покрывают кнопки',
     ['points', 'wins', 'form', 'name'].every((s) => html.includes(`data-ladder-sort="${s}"`)));
+}
+
+// ── B3. Кватр — фиксированные периоды по четыре недели ──────────────────────
+console.log('\nB3. Четырёхнедельный рейтинг');
+{
+  const alliances = [{ id: 'x', tag: 'X', name: 'Икс', active: true }];
+  const weeks = Array.from({ length: 8 }, (_, i) => ({
+    id: `W${i + 1}`,
+    number: i + 1,
+    startDate: new Date(2026, 0, i * 7 + 5),
+    endDate: new Date(2026, 0, i * 7 + 11),
+  }));
+  const results = [
+    { weekId: 'W1', allianceId: 'x', outcome: 'win' },
+    { weekId: 'W2', allianceId: 'x', outcome: 'win' },
+    { weekId: 'W3', allianceId: 'x', outcome: 'loss' },
+    { weekId: 'W4', allianceId: 'x', outcome: 'win' },
+    { weekId: 'W5', allianceId: 'x', outcome: 'loss' },
+  ];
+  const first = computeQuarterWindow(weeks, results.slice(0, 4));
+  equal('первый Кватр — недели 1–4', first.weeks.map((w) => w.number), [1, 2, 3, 4]);
+  equal('первый Кватр имеет номер 1', first.number, 1);
+  const second = computeQuarterWindow(weeks, results);
+  equal('после новой недели начинается Кватр 2', second.number, 2);
+  equal('Кватр 2 начинается с недели 5', second.weeks.map((w) => w.number), [5]);
+  const secondStandings = computeStandings(alliances, second.weeks, results, CONFIG.scoring, 4);
+  equal('очки нового Кватра считаются с нуля', secondStandings[0].points, -1);
 }
 
 // ── B2. Недели из будущего не считаются текущими ────────────────────────────

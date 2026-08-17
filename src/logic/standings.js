@@ -121,6 +121,38 @@ function tallyUpTo(alliances, weeks, index, scoring, upToIndex) {
 }
 
 /**
+ * Возвращает текущий четырёхнедельный период.
+ *
+ * Периоды фиксированные: W1–W4, затем W5–W8 и так далее. Поэтому после
+ * появления первой записи новой четвёрки рейтинг «Кватра» снова начинается
+ * с нуля, а не продолжает скользить за последними четырьмя неделями.
+ * Будущие недели и недели после последнего внесённого результата не входят.
+ *
+ * @param {import('../data/types.js').Week[]} weeks
+ * @param {import('../data/types.js').Result[]} results
+ * @param {number} periodLength
+ * @returns {{weeks: import('../data/types.js').Week[], number: number, startNumber: number|null, endNumber: number|null}}
+ */
+export function computeQuarterWindow(weeks, results, periodLength = 4) {
+  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const filled = new Set(results.map((r) => r.weekId));
+  const last = [...ordered].reverse().find((week) => filled.has(week.id));
+
+  if (!last) {
+    return { weeks: [], number: 0, startNumber: null, endNumber: null };
+  }
+
+  const number = Math.floor((last.number - 1) / periodLength) + 1;
+  const startNumber = (number - 1) * periodLength + 1;
+  const endNumber = startNumber + periodLength - 1;
+  const currentWeeks = ordered.filter(
+    (week) => week.number >= startNumber && week.number <= endNumber && week.number <= last.number
+  );
+
+  return { weeks: currentWeeks, number, startNumber, endNumber };
+}
+
+/**
  * Главная функция: полная таблица рейтинга.
  *
  * @param {import('../data/types.js').Alliance[]} alliances

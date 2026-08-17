@@ -7,7 +7,13 @@ import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js';
  * в <table> на экране 375px превращаются в горизонтальный скролл, а на grid
  * ту же строку можно перестроить в два яруса и ничего не потерять.
  */
-export function renderLadder({ standings }) {
+export function renderLadder({
+  standings,
+  eyebrow = 'Сезон целиком',
+  title = 'Рейтинг альянсов',
+  description = 'Победа +1 · Поражение −1 · Третьего не бывает',
+  period = null,
+}) {
   const byId = new Map(standings.map((r) => [r.alliance.id, r.alliance]));
   const rows = standings.map((r) => rowHtml(r, byId)).join('');
   const active = standings.filter((r) => r.alliance.active).length;
@@ -15,9 +21,10 @@ export function renderLadder({ standings }) {
   return `
     <section class="panel">
       <header class="panel__head">
-        <span class="eyebrow">Сезон целиком</span>
-        <h2>Рейтинг альянсов</h2>
-        <p class="muted">Победа +1 · Поражение −1 · Третьего не бывает</p>
+        <span class="eyebrow">${eyebrow}</span>
+        <h2>${title}</h2>
+        <p class="muted">${description}</p>
+        ${period ? `<p class="lad__period">Недели ${period.startNumber}–${period.endNumber} · период ${period.number}</p>` : ''}
       </header>
 
       <div class="ctl">
