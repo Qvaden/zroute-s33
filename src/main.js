@@ -61,6 +61,31 @@ function renderNav(activeId) {
   только переходы после него, то есть каждый следующий render().
 */
 let countedFirstView = false;
+let scrollRevealObserver = null;
+
+function setupMobileScrollReveal() {
+  if (scrollRevealObserver) scrollRevealObserver.disconnect();
+  const isTouch = window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+  if (!isTouch || !('IntersectionObserver' in window)) return;
+
+  const revealables = app.querySelectorAll(
+    '.hero, .panel, .quart-hero, .quart-board, .achievements-panel, .tl__item, .lad__row, .card, .leader, .podium-card, .quart-card, .achievement'
+  );
+  scrollRevealObserver = new IntersectionObserver((entries, observer) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      entry.target.classList.add('is-scroll-visible');
+      observer.unobserve(entry.target);
+    }
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+
+  revealables.forEach((element, index) => {
+    element.classList.add('scroll-reveal');
+    element.style.setProperty('--scroll-delay', `${Math.min(index * 38, 220)}ms`);
+    scrollRevealObserver.observe(element);
+  });
+}
+
 function trackPageview(path) {
   if (!countedFirstView) {
     countedFirstView = true;
@@ -97,6 +122,7 @@ function render() {
     path = `/${route.id}`;
   }
 
+  setupMobileScrollReveal();
   window.scrollTo(0, 0);
   trackPageview(path);
 }

@@ -1464,3 +1464,10 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, rgba(255,106,4
   .site-head__inner::before, #app::before { display: none; }
   .hero { min-height: 270px; }
 }
+
+@keyframes s33-scroll-reveal { from { opacity: 0; transform: translate3d(0, 24px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+@media (hover: none) and (pointer: coarse) {
+  .scroll-reveal { opacity: 0; transform: translate3d(0, 24px, 0) scale(.985); animation: none !important; }
+  .scroll-reveal.is-scroll-visible { animation: s33-scroll-reveal .68s var(--ease-out) var(--scroll-delay, 0ms) both !important; }
+  .card:active, .leader:active, .podium-card:active, .quart-card:active, .achievement:active, .tl__item:active { transform: none; border-color: inherit; }
+}
