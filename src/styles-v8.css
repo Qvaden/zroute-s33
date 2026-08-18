@@ -1517,13 +1517,13 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @keyframes boot-scan { from { transform: translateX(-130%); } to { transform: translateX(260%); } }
 @keyframes boot-status { from { opacity: .35; } to { opacity: 1; } }
 @keyframes boot-exit { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
-.boot-loader { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; overflow: hidden; background: radial-gradient(680px 420px at 50% 44%, rgba(255,106,43,.13), transparent 64%), #08090b; transition: opacity .62s var(--ease-out), visibility .62s; }
+.boot-loader { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; overflow: hidden; contain: strict; background: radial-gradient(680px 420px at 50% 44%, rgba(255,106,43,.13), transparent 64%), #08090b; transition: opacity .34s var(--ease-out), visibility .34s; }
 .s33-loader-seen .boot-loader { display: none; }
 .boot-loader.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .boot-loader::before { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 42px 42px; mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%); }
 .boot-loader::after { content: ''; position: absolute; top: 0; left: -30%; width: 24%; height: 100%; background: linear-gradient(90deg, transparent, rgba(108,246,230,.12), transparent); transform: skewX(-15deg); animation: boot-scan 2.6s ease-in-out infinite; }
 .boot-loader__core { position: relative; z-index: 1; display: grid; justify-items: center; min-width: min(310px, 82vw); }
-.boot-loader__mark { position: relative; display: grid; place-items: center; width: 92px; height: 92px; border: 1px solid rgba(255,106,43,.8); border-radius: 25px; background: linear-gradient(145deg, #ff9b4a, var(--accent)); color: #12100d; box-shadow: 0 0 0 8px rgba(255,106,43,.06), 0 0 50px -12px rgba(255,106,43,.95); animation: boot-mark-in .78s var(--ease-spring) both; }
+.boot-loader__mark { position: relative; display: grid; place-items: center; contain: paint; width: 92px; height: 92px; border: 1px solid rgba(255,106,43,.8); border-radius: 25px; background: linear-gradient(145deg, #ff9b4a, var(--accent)); color: #12100d; box-shadow: 0 0 0 8px rgba(255,106,43,.06), 0 0 50px -12px rgba(255,106,43,.95); animation: boot-mark-in .78s var(--ease-spring) both; }
 .boot-loader__mark::before, .boot-loader__mark::after { content: ''; position: absolute; inset: -13px; border: 1px solid rgba(108,246,230,.35); border-radius: 31px; animation: boot-ring 5s linear infinite; }
 .boot-loader__mark::after { inset: -23px; border-color: rgba(255,106,43,.18); border-style: dashed; animation-direction: reverse; animation-duration: 8s; }
 .boot-loader__mark span { font: 800 31px/1 Unbounded, sans-serif; letter-spacing: -.08em; }

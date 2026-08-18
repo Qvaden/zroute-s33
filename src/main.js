@@ -37,12 +37,12 @@ const bootStartedAt = performance.now();
 
 function finishBootLoader() {
   if (!bootLoader || !isFirstVisit) return;
-  const wait = Math.max(0, 850 - (performance.now() - bootStartedAt));
+  const wait = Math.max(0, 420 - (performance.now() - bootStartedAt));
   window.setTimeout(() => {
     bootLoader.classList.add('is-hidden');
     document.documentElement.classList.add('s33-loader-seen');
     try { localStorage.setItem('s33-loader-seen', '1'); } catch (_) {}
-    window.setTimeout(() => bootLoader.remove(), 620);
+    window.setTimeout(() => bootLoader.remove(), 340);
   }, wait);
 }
 
