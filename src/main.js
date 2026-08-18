@@ -31,6 +31,20 @@ const ROUTES = [
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
+const bootLoader = document.getElementById('boot-loader');
+const isFirstVisit = !document.documentElement.classList.contains('s33-loader-seen');
+const bootStartedAt = performance.now();
+
+function finishBootLoader() {
+  if (!bootLoader || !isFirstVisit) return;
+  const wait = Math.max(0, 850 - (performance.now() - bootStartedAt));
+  window.setTimeout(() => {
+    bootLoader.classList.add('is-hidden');
+    document.documentElement.classList.add('s33-loader-seen');
+    try { localStorage.setItem('s33-loader-seen', '1'); } catch (_) {}
+    window.setTimeout(() => bootLoader.remove(), 620);
+  }, wait);
+}
 
 /** @type {any} */
 let view = null;
@@ -207,6 +221,7 @@ async function boot() {
 
     document.getElementById('source-badge').textContent = db.name;
     render();
+    finishBootLoader();
   } catch (err) {
     console.error(err);
     app.innerHTML = `<section class="panel error">
@@ -214,6 +229,7 @@ async function boot() {
       <p>${String(err.message ?? err)}</p>
       <p class="muted">Источник: <b>${CONFIG.dataSource}</b>. Проверьте настройки в config.js.</p>
     </section>`;
+    finishBootLoader();
   }
 }
 

@@ -55,8 +55,26 @@
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="./src/styles-v8.css">
+  <script>
+    try {
+      if (localStorage.getItem('s33-loader-seen') === '1') {
+        document.documentElement.classList.add('s33-loader-seen');
+      }
+    } catch (_) {}
+  </script>
 </head>
 <body>
+  <div id="boot-loader" class="boot-loader" role="status" aria-live="polite" aria-label="Загрузка Server 33">
+    <div class="boot-loader__core">
+      <div class="boot-loader__mark"><span>33</span></div>
+      <div class="boot-loader__brand">
+        <strong>СЕРВЕР 33</strong>
+        <small>Z ROUTE: REDEMPTION</small>
+      </div>
+      <div class="boot-loader__signal"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="boot-loader__status"><span>ИНИЦИАЛИЗАЦИЯ СЕРВЕРА</span><b>ONLINE</b></div>
+    </div>
+  </div>
   <header class="site-head">
     <div class="site-head__inner">
       <a class="brand" href="#/home">

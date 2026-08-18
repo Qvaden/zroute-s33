@@ -1509,3 +1509,33 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   button:hover::after, .nav__link:hover::after, .seg__btn:hover::after, .cal__btn:hover::after, .tile:hover::after, .tl__gallery a:hover::after { animation: none; opacity: 0; }
   button:active::after, .nav__link:active::after, .seg__btn:active::after, .cal__btn:active::after, .tile:active::after, .tl__gallery a:active::after { opacity: 1; animation: s33-sheen .38s var(--ease-out) both; }
 }
+
+/* ── First-visit loader ───────────────────────────────────────────────────── */
+@keyframes boot-mark-in { from { opacity: 0; transform: scale(.72) rotate(-9deg); } 65% { opacity: 1; transform: scale(1.06) rotate(1deg); } to { transform: scale(1) rotate(0); } }
+@keyframes boot-ring { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes boot-signal { 0%, 100% { opacity: .25; transform: scaleY(.65); } 50% { opacity: 1; transform: scaleY(1); } }
+@keyframes boot-scan { from { transform: translateX(-130%); } to { transform: translateX(260%); } }
+@keyframes boot-status { from { opacity: .35; } to { opacity: 1; } }
+@keyframes boot-exit { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+.boot-loader { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; overflow: hidden; background: radial-gradient(680px 420px at 50% 44%, rgba(255,106,43,.13), transparent 64%), #08090b; transition: opacity .62s var(--ease-out), visibility .62s; }
+.s33-loader-seen .boot-loader { display: none; }
+.boot-loader.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-loader::before { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 42px 42px; mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%); }
+.boot-loader::after { content: ''; position: absolute; top: 0; left: -30%; width: 24%; height: 100%; background: linear-gradient(90deg, transparent, rgba(108,246,230,.12), transparent); transform: skewX(-15deg); animation: boot-scan 2.6s ease-in-out infinite; }
+.boot-loader__core { position: relative; z-index: 1; display: grid; justify-items: center; min-width: min(310px, 82vw); }
+.boot-loader__mark { position: relative; display: grid; place-items: center; width: 92px; height: 92px; border: 1px solid rgba(255,106,43,.8); border-radius: 25px; background: linear-gradient(145deg, #ff9b4a, var(--accent)); color: #12100d; box-shadow: 0 0 0 8px rgba(255,106,43,.06), 0 0 50px -12px rgba(255,106,43,.95); animation: boot-mark-in .78s var(--ease-spring) both; }
+.boot-loader__mark::before, .boot-loader__mark::after { content: ''; position: absolute; inset: -13px; border: 1px solid rgba(108,246,230,.35); border-radius: 31px; animation: boot-ring 5s linear infinite; }
+.boot-loader__mark::after { inset: -23px; border-color: rgba(255,106,43,.18); border-style: dashed; animation-direction: reverse; animation-duration: 8s; }
+.boot-loader__mark span { font: 800 31px/1 Unbounded, sans-serif; letter-spacing: -.08em; }
+.boot-loader__brand { display: grid; gap: 4px; margin-top: 25px; text-align: center; }
+.boot-loader__brand strong { color: var(--text); font: 800 16px/1 Unbounded, sans-serif; letter-spacing: .04em; }
+.boot-loader__brand small { color: var(--electric); font: 600 9px/1 Inter, sans-serif; letter-spacing: .2em; }
+.boot-loader__signal { display: flex; align-items: center; gap: 5px; height: 22px; margin-top: 27px; }
+.boot-loader__signal i { display: block; width: 4px; height: 14px; border-radius: 3px; background: var(--accent); animation: boot-signal 1s var(--ease) infinite; }
+.boot-loader__signal i:nth-child(2) { animation-delay: .12s; } .boot-loader__signal i:nth-child(3) { animation-delay: .24s; } .boot-loader__signal i:nth-child(4) { animation-delay: .36s; } .boot-loader__signal i:nth-child(5) { animation-delay: .48s; }
+.boot-loader__status { display: flex; justify-content: space-between; width: 100%; margin-top: 10px; color: var(--dim); font: 700 9px/1 Inter, sans-serif; letter-spacing: .14em; animation: boot-status 1.2s ease-in-out infinite alternate; }
+.boot-loader__status b { color: var(--win); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .boot-loader::after, .boot-loader__mark, .boot-loader__mark::before, .boot-loader__mark::after, .boot-loader__signal i, .boot-loader__status { animation: none; }
+  .boot-loader { transition-duration: .01ms; }
+}
