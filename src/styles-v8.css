@@ -1466,8 +1466,24 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, rgba(255,106,4
 }
 
 @keyframes s33-scroll-reveal { from { opacity: 0; transform: translate3d(0, 24px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes s33-aurora {
+  0%, 100% { transform: translate3d(calc(-2% + var(--s33-parallax-x, 0px)), calc(-1% - var(--s33-parallax-y, 0px) * .06 + var(--s33-parallax-pointer-y, 0px)), 0) scale(1); opacity: .72; }
+  50% { transform: translate3d(calc(2% + var(--s33-parallax-x, 0px)), calc(2% - var(--s33-parallax-y, 0px) * .06 + var(--s33-parallax-pointer-y, 0px)), 0) scale(1.05); opacity: 1; }
+}
+@keyframes s33-grain {
+  0%, 100% { transform: translate3d(0, calc(var(--s33-parallax-y, 0px) * -.025), 0); }
+  25% { transform: translate3d(-1%, calc(1% + var(--s33-parallax-y, 0px) * -.025), 0); }
+  50% { transform: translate3d(1%, calc(-1% + var(--s33-parallax-y, 0px) * -.025), 0); }
+  75% { transform: translate3d(1%, calc(1% + var(--s33-parallax-y, 0px) * -.025), 0); }
+}
+.hero::after { transform: translate3d(var(--s33-parallax-x, 0px), calc(var(--s33-parallax-y, 0px) * .12), 0) rotate(4deg); }
+
 @media (hover: none) and (pointer: coarse) {
   .scroll-reveal { opacity: 0; transform: translate3d(0, 24px, 0) scale(.985); animation: none !important; }
   .scroll-reveal.is-scroll-visible { animation: s33-scroll-reveal .68s var(--ease-out) var(--scroll-delay, 0ms) both !important; }
   .card:active, .leader:active, .podium-card:active, .quart-card:active, .achievement:active, .tl__item:active { transform: none; border-color: inherit; }
+  .hero::after { transform: translate3d(0, calc(var(--s33-parallax-y, 0px) * .06), 0) rotate(4deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after, .hero::after { transform: none !important; }
 }

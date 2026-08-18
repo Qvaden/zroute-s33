@@ -62,6 +62,37 @@ function renderNav(activeId) {
 */
 let countedFirstView = false;
 let scrollRevealObserver = null;
+let parallaxFrame = 0;
+let parallaxReady = false;
+
+function setupParallax() {
+  const hasHero = Boolean(app.querySelector('.hero'));
+  if (!hasHero || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  if (parallaxReady) return;
+  parallaxReady = true;
+
+  const updateParallax = () => {
+    parallaxFrame = 0;
+    const y = Math.min(window.scrollY || 0, 140);
+    document.documentElement.style.setProperty('--s33-parallax-y', `${y}px`);
+  };
+  const requestParallax = () => {
+    if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
+  };
+  window.addEventListener('scroll', requestParallax, { passive: true });
+  window.addEventListener('resize', requestParallax, { passive: true });
+
+  const canTrackPointer = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  if (canTrackPointer) {
+    window.addEventListener('pointermove', (event) => {
+      const x = (event.clientX / window.innerWidth - 0.5) * 2;
+      const y = (event.clientY / window.innerHeight - 0.5) * 2;
+      document.documentElement.style.setProperty('--s33-parallax-x', `${(x * 8).toFixed(2)}px`);
+      document.documentElement.style.setProperty('--s33-parallax-pointer-y', `${(y * 5).toFixed(2)}px`);
+    }, { passive: true });
+  }
+  requestParallax();
+}
 
 function setupMobileScrollReveal() {
   if (scrollRevealObserver) scrollRevealObserver.disconnect();
@@ -123,6 +154,7 @@ function render() {
   }
 
   setupMobileScrollReveal();
+  setupParallax();
   window.scrollTo(0, 0);
   trackPageview(path);
 }
