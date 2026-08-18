@@ -1396,3 +1396,71 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
   /* Чуть заметнее живые статусы на небольшом экране. */
   .tl__marker, .dot, .achievement__icon, .quart-podium-card__medal { animation-duration: 2.2s; }
 }
+
+/* ── WOW redesign: тактический командный центр Server 33 ────────────────── */
+:root { --electric: #6cf6e6; --violet: #9c7cff; --hud-line: rgba(108,246,230,.20); }
+body {
+  background:
+    radial-gradient(900px 600px at 50% -18%, rgba(255,106,43,.12), transparent 62%),
+    radial-gradient(700px 520px at 110% 42%, rgba(108,246,230,.06), transparent 60%),
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+    var(--bg);
+  background-size: auto, auto, 46px 46px, 46px 46px, auto;
+}
+body::before { background: radial-gradient(560px 260px at 48% 5%, rgba(255,106,43,.13), transparent 70%), radial-gradient(420px 500px at 4% 55%, rgba(108,246,230,.05), transparent 72%); }
+.site-head {
+  background: linear-gradient(180deg, rgba(10,11,13,.96), rgba(10,11,13,.78));
+  border-bottom-color: rgba(255,106,43,.25);
+  box-shadow: 0 12px 40px -32px rgba(255,106,43,.7);
+}
+.site-head__inner { position: relative; }
+.site-head__inner::before { content: 'LIVE // SERVER 33'; position: absolute; top: 4px; right: 32px; color: rgba(108,246,230,.48); font: 700 8px/1 Inter, sans-serif; letter-spacing: .18em; pointer-events: none; }
+.brand__text small { color: var(--electric); }
+.nav { padding-top: 4px; }
+.nav__link { border: 1px solid transparent; background: rgba(255,255,255,.018); }
+.nav__link:hover { border-color: var(--hud-line); background: rgba(108,246,230,.07); }
+.nav__link.is-active { color: #081010; border-color: rgba(255,255,255,.3); background: linear-gradient(135deg, #ff9a4a, var(--accent)); box-shadow: 0 0 0 1px rgba(255,106,43,.18), 0 8px 24px -14px var(--accent); }
+
+#app { position: relative; }
+#app::before { content: 'SYSTEM ONLINE'; position: absolute; top: 5px; right: 18px; color: rgba(108,246,230,.48); font: 700 8px/1 Inter, sans-serif; letter-spacing: .18em; }
+.hero {
+  min-height: 315px;
+  border-color: rgba(255,106,43,.38);
+  background:
+    radial-gradient(480px 220px at 88% 8%, rgba(255,106,43,.24), transparent 66%),
+    radial-gradient(300px 260px at 2% 100%, rgba(108,246,230,.08), transparent 70%),
+    linear-gradient(145deg, #202733 0%, #11151c 58%, #0d1015 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 22px 70px -38px rgba(255,106,43,.85), var(--shadow);
+}
+.hero::after { opacity: .78; background: repeating-linear-gradient(58deg, rgba(255,106,43,.11) 0 2px, transparent 2px 12px); }
+.hero__top::after { content: 'TACTICAL OVERVIEW'; display: block; margin-top: 18px; color: rgba(108,246,230,.62); font: 700 9px/1 Inter, sans-serif; letter-spacing: .22em; }
+.hero__word { color: #ccd3df; text-transform: uppercase; letter-spacing: .08em; }
+.hero__num { text-shadow: 0 0 38px rgba(255,255,255,.12); }
+.leader { border-color: rgba(255,201,60,.48); background: linear-gradient(100deg, rgba(255,201,60,.17), rgba(255,255,255,.035) 58%, rgba(108,246,230,.05)); box-shadow: inset 3px 0 0 var(--gold), 0 14px 34px -26px rgba(255,201,60,.8); }
+.leader__crown { filter: drop-shadow(0 0 8px rgba(255,201,60,.6)); }
+.leader__pts { text-shadow: 0 0 18px rgba(255,201,60,.42); }
+.panel { border-color: rgba(255,255,255,.10); background: linear-gradient(145deg, rgba(24,29,38,.94), rgba(14,17,22,.96)); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 14px 34px -25px rgba(0,0,0,.9); }
+.panel::before { background: linear-gradient(90deg, var(--accent), var(--electric), transparent 72%); opacity: .48; }
+.panel__head h2 { letter-spacing: -.045em; }
+.eyebrow { color: var(--electric); }
+.lad__row { border-color: rgba(255,255,255,.07); background: linear-gradient(90deg, rgba(255,255,255,.035), transparent 72%); box-shadow: inset 3px 0 0 transparent; }
+.lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 14px 26px -24px rgba(255,106,43,.7); }
+.quart-hero { border-color: rgba(215,255,63,.36); box-shadow: inset 0 1px 0 rgba(215,255,63,.22), 0 20px 55px -34px rgba(215,255,63,.6); }
+.tl__item { border-color: rgba(108,246,230,.16); box-shadow: inset 3px 0 0 rgba(108,246,230,.42), 0 14px 36px -28px rgba(108,246,230,.4); }
+.tl__item:hover { border-color: rgba(108,246,230,.55); }
+.achievement { background: linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); }
+.achievement:hover { box-shadow: 0 16px 30px -24px var(--achievement-color); }
+.site-foot { border-top-color: rgba(108,246,230,.16); }
+
+@media (max-width: 759px) {
+  .site-head__inner::before { top: 3px; right: 18px; font-size: 7px; }
+  .nav { margin-top: 2px; padding-top: 5px; }
+  #app::before { right: 18px; font-size: 7px; }
+  .hero { min-height: 285px; padding-top: 26px; }
+  .hero__top::after { margin-top: 14px; font-size: 8px; }
+}
+@media (max-width: 520px) {
+  .site-head__inner::before, #app::before { display: none; }
+  .hero { min-height: 270px; }
+}
