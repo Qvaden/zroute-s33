@@ -849,6 +849,23 @@
 .adm-photo-drop.is-busy { cursor: wait; opacity: .72; }
 .adm-photo-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .adm-photo-drop__icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent); font-size: 27px; line-height: 1; animation: adm-photo-pulse 2.4s ease-in-out infinite; }
+
+/* Микроанимации админ-панели */
+@keyframes adm-control-pop { 0% { transform: scale(.95); } 65% { transform: scale(1.025); } 100% { transform: scale(1); } }
+@keyframes adm-sheen { from { transform: translateX(-140%) skewX(-18deg); } to { transform: translateX(220%) skewX(-18deg); } }
+.adm-btn, .adm-nav__link, .adm-tab, .adm-photo-drop { position: relative; overflow: hidden; }
+.adm-btn::after, .adm-nav__link::after, .adm-tab::after, .adm-photo-drop::after { content: ''; position: absolute; inset: 0 auto 0 -38%; width: 24%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent); transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+.adm-btn:hover::after, .adm-nav__link:hover::after, .adm-tab:hover::after, .adm-photo-drop:hover::after { opacity: 1; animation: adm-sheen .62s var(--ease-out, cubic-bezier(.23,1,.32,1)) both; }
+.adm-btn:active, .adm-nav__link:active, .adm-tab:active { animation: adm-control-pop .22s var(--ease-out, cubic-bezier(.23,1,.32,1)); }
+.adm-btn:focus-visible, .adm-nav__link:focus-visible, .adm-tab:focus-visible, .adm-photo-drop:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.adm-photo-drop:active { transform: scale(.99); }
+@media (hover: none) and (pointer: coarse) {
+  .adm-btn:hover::after, .adm-nav__link:hover::after, .adm-tab:hover::after, .adm-photo-drop:hover::after { animation: none; opacity: 0; }
+  .adm-btn:active::after, .adm-nav__link:active::after, .adm-tab:active::after, .adm-photo-drop:active::after { opacity: 1; animation: adm-sheen .38s var(--ease-out, cubic-bezier(.23,1,.32,1)) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm-btn::after, .adm-nav__link::after, .adm-tab::after, .adm-photo-drop::after { display: none; }
+}
 .adm-photo-drop strong { color: var(--text); font-size: 13px; }
 .adm-photo-drop small { color: var(--mute); font-size: 11px; }
 @keyframes adm-photo-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent); } }
