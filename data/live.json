@@ -168,7 +168,8 @@
       "tag": "F100",
       "name": "Fragment100",
       "active": false,
-      "color": "#ad6cef"
+      "color": "#ad6cef",
+      "mergedInto": "a19"
     },
     {
       "id": "a25",
