@@ -21,9 +21,9 @@ export function renderBot() {
         </div>
       </div>
       <div class="bot-hero__bottom">
-        <div class="bot-stat"><b>01</b><span>Открой бота</span></div>
-        <div class="bot-stat"><b>02</b><span>Выбери тему</span></div>
-        <div class="bot-stat"><b>03</b><span>Разберись и играй увереннее</span></div>
+        <div class="bot-stat"><b>1</b><span>Открой бота</span></div>
+        <div class="bot-stat"><b>2</b><span>Выбери тему</span></div>
+        <div class="bot-stat"><b>3</b><span>Разберись и играй увереннее</span></div>
       </div>
     </section>
 

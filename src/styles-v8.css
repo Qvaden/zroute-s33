@@ -1557,7 +1557,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .bot-hero__signal i:nth-child(2) { animation-delay: .14s; } .bot-hero__signal i:nth-child(3) { animation-delay: .28s; } .bot-hero__signal i:nth-child(4) { animation-delay: .42s; }
 .bot-hero__bottom { position: absolute; right: 24px; bottom: 24px; left: 24px; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 700px; }
 .bot-stat { display: grid; gap: 5px; padding: 12px 14px; border-left: 2px solid var(--electric); background: rgba(108,246,230,.055); }
-.bot-stat b { color: var(--electric); font: 800 11px/1 Unbounded, sans-serif; } .bot-stat span { color: var(--dim); font-size: 12px; }
+.bot-stat b { display: block; color: var(--electric); font: 900 clamp(22px, 3vw, 30px)/.95 Unbounded, sans-serif; letter-spacing: -.06em; text-shadow: 0 0 18px rgba(108,246,230,.28); } .bot-stat span { color: var(--dim); font-size: 12px; font-weight: 600; }
 .bot-launch { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px; border-color: rgba(108,246,230,.27); background: linear-gradient(110deg, rgba(108,246,230,.10), rgba(255,255,255,.035) 55%, rgba(255,106,43,.06)); }
 .bot-launch__mark { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid var(--electric); border-radius: 20px; color: #0b1011; background: var(--electric); font-size: 29px; box-shadow: 0 0 32px -13px var(--electric); animation: bot-float 3.4s ease-in-out infinite; }
 .bot-launch__copy h2 { margin: 5px 0 8px; } .bot-launch__copy p { max-width: 620px; margin: 0; color: var(--dim); line-height: 1.6; }
