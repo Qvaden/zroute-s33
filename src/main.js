@@ -15,6 +15,7 @@ import { renderLadder } from './pages/ladder.js?v=2';
 import { renderQuarter } from './pages/quarter-final.js';
 import { renderTimeline } from './pages/timeline.js';
 import { renderGuide } from './pages/guide.js';
+import { renderBot } from './pages/bot.js';
 import { renderAlliance } from './pages/alliance.js';
 import { computeAchievements } from './logic/achievements.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
@@ -27,6 +28,7 @@ const ROUTES = [
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
   { id: 'timeline', label: 'Хронология', render: renderTimeline },
   { id: 'guide', label: 'Малым алам', render: renderGuide },
+  { id: 'bot', label: 'Бот в ТГ', render: renderBot },
 ];
 
 const app = document.getElementById('app');
@@ -114,7 +116,7 @@ function setupMobileScrollReveal() {
   if (!isTouch || !('IntersectionObserver' in window)) return;
 
   const revealables = app.querySelectorAll(
-    '.hero, .panel, .quart-hero, .quart-board, .achievements-panel, .tl__item, .lad__row, .card, .leader, .podium-card, .quart-card, .achievement'
+    '.hero, .panel, .quart-hero, .quart-board, .achievements-panel, .tl__item, .lad__row, .card, .leader, .podium-card, .quart-card, .achievement, .bot-feature, .bot-launch, .bot-promise, .bot-final'
   );
   scrollRevealObserver = new IntersectionObserver((entries, observer) => {
     for (const entry of entries) {
@@ -158,7 +160,9 @@ function render() {
     renderNav(route.id);
     app.innerHTML = route.id === 'quarter'
       ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
-      : route.render(view);
+      : route.id === 'bot'
+        ? route.render()
+        : route.render(view);
     // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
     // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
     for (const fn of [window.__ladderApply, window.__timelineApply]) {
