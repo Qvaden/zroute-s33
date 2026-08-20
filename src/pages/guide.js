@@ -1,6 +1,6 @@
 import { esc, miniMarkdown, splitSections, plural } from '../ui/helpers.js';
 import { computeAllianceHistory, computeBestStreaks } from '../logic/standings.js';
-import { parseGuideRoles } from '../logic/guide-roles.js';
+import { parseGuidePage } from '../logic/guide-roles.js';
 
 /**
  * Раздел для малых альянсов.
@@ -16,49 +16,37 @@ import { parseGuideRoles } from '../logic/guide-roles.js';
  */
 export function renderGuide({ texts, standings, weeks, results }) {
   const byKey = Object.fromEntries(texts.map((t) => [t.key, t]));
-  const intro = byKey['guide-intro'];
-
+  const page = parseGuidePage(byKey['guide-page'], {
+    roles: parseGuidePage(byKey['guide-roles']).roles,
+    principles: byKey['guide-principles'], week: byKey['guide-week'],
+    donts: byKey['guide-donts'], benefits: byKey['guide-benefits'],
+  });
   return `
-    ${renderProof(standings, weeks, results)}
-
-    ${renderLeadershipRolesFromText(byKey['guide-roles'])}
-
-    ${renderList(byKey['guide-benefits'], 'Что даёт крупный альянс', 'week')}
-
-    <section class="panel">
-      <header class="panel__head">
-        <span class="eyebrow">Практика</span>
-        <h2>${esc(byKey['guide-principles']?.title ?? 'Образцовое руководство альянсом')}</h2>
-        ${intro ? `<p class="guide__lead">${esc(intro.body)}</p>` : ''}
-      </header>
-      ${renderCards(byKey['guide-principles']?.body)}
-    </section>
-
-    <div class="grid-2">
-      ${renderList(byKey['guide-week'], 'Ритм недели', 'week')}
-      ${renderList(byKey['guide-donts'], 'Чего делать не стоит', 'dont')}
-    </div>`;
+    ${renderProof(standings, weeks, results, page)}
+    ${renderLeadershipRoles(page)}
+    ${renderList({ title: page.benefitsTitle, body: page.benefitsBody }, page.benefitsTitle, 'week')}
+    <section class="panel"><header class="panel__head"><span class="eyebrow">Практика</span><h2>${esc(page.principlesTitle)}</h2></header>${renderCards(page.principlesBody)}</section>
+    <div class="grid-2">${renderList({ title: page.weekTitle, body: page.weekBody }, page.weekTitle, 'week')}${renderList({ title: page.dontsTitle, body: page.dontsBody }, page.dontsTitle, 'dont')}</div>`;
 }
 
-function renderLeadershipRolesFromText(entry) {
-  const data = parseGuideRoles(entry?.body);
-  const roles = data.roles;
+function renderLeadershipRoles(page) {
+  const roles = page.roles;
   return `
     <section class="roles-panel panel">
       <header class="panel__head roles-panel__head">
         <span class="eyebrow">Alliance // Command</span>
-        <h2>Обязанности руководства</h2>
-        <p class="guide__lead">Пример распределения ролей для успешного развития альянса. Главное — чтобы работа была разделена, а не держалась на одном человеке.</p>
+        <h2>${esc(page.rolesTitle)}</h2>
+        <p class="guide__lead">${esc(page.rolesSubtitle)}</p>
       </header>
       <div class="roles-grid">
         ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">R4</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
       </div>
     </section>
-    <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // Balance</span><h3>Распределяем нагрузку, а не героизм</h3><p>Часть обязанностей может передаваться от одного R4 другому — не придумываем лишнюю работу и не смотрим, как один игрок тянет всё на себе. Иначе он выгорит, и развитие альянса остановится.</p><p>Помощник может поддерживать двух офицеров. По мере роста объёма работы помощников станет четыре — по одному для каждого офицера.</p></div></section>
-    <p class="roles-credit">${esc(data.credit)}</p>`;
+    <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // Balance</span><h3>${esc(page.noticeTitle)}</h3>${miniMarkdown(page.noticeBody)}</div></section>
+    <p class="roles-credit">${esc(page.credit)}</p>`;
 }
 
-function renderLeadershipRoles() {
+function legacyLeadershipRoles() {
   const roles = [
     {
       icon: '👑', title: 'Глава альянса', tone: 'gold',
@@ -94,8 +82,8 @@ function renderLeadershipRoles() {
     <section class="roles-panel panel">
       <header class="panel__head roles-panel__head">
         <span class="eyebrow">Alliance // Command</span>
-        <h2>Обязанности руководства</h2>
-        <p class="guide__lead">Пример распределения ролей для успешного развития альянса. Главное — чтобы работа была разделена, а не держалась на одном человеке.</p>
+        <h2>${esc(page.rolesTitle)}</h2>
+        <p class="guide__lead">${esc(page.rolesSubtitle)}</p>
       </header>
       <div class="roles-grid">
         ${roles.map((role) => `
@@ -123,7 +111,7 @@ function renderLeadershipRoles() {
  * Доказательная часть: сравнение верхней и нижней трети таблицы
  * по трём показателям. Считается из тех же данных, что и рейтинг.
  */
-function renderProof(standings, weeks, results = []) {
+function renderProof(standings, weeks, results = [], page = {}) {
   const active = standings.filter((r) => r.alliance.active);
   const third = Math.max(1, Math.floor(active.length / 3));
   const top = active.slice(0, third);
@@ -140,11 +128,9 @@ function renderProof(standings, weeks, results = []) {
     return `
       <section class="hero hero--guide">
         <span class="eyebrow">Наглядно</span>
-        <h2 class="tl__title">Что даёт сильный альянс</h2>
+        <h2 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h2>
         <p class="guide__sub">
-          Здесь появится сравнение верхней и нижней трети таблицы по реальным
-          цифрам этого сервера: доля побед, серии, очки за сезон. Не общие слова,
-          а данные — но для них нужны результаты хотя бы за одну полную неделю.
+${esc(page.proofSubtitle || 'Здесь появится сравнение верхней и нижней трети таблицы по реальным цифрам этого сервера.')}
         </p>
         <p class="guide__sub muted">
           Пока их нет, ниже — то, что и без цифр работает.
@@ -242,9 +228,9 @@ function renderProof(standings, weeks, results = []) {
   return `
     <section class="hero hero--guide">
       <span class="eyebrow">Наглядно</span>
-      <h2 class="tl__title">Что даёт сильный альянс</h2>
+      <h2 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h2>
       <p class="guide__sub">
-        Не общие слова, а цифры этого сервера:
+        ${esc(page.proofSubtitle || 'Не общие слова, а цифры этого сервера:')}
         ${plural(third, 'альянс', 'альянса', 'альянсов')} из верхней трети таблицы
         против ${third} из нижней.
       </p>

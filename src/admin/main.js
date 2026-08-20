@@ -84,9 +84,8 @@ import { renderOverview } from './screens/overview.js';
 import { renderWeek, describe } from './screens/week.js';
 import { renderAlliances } from './screens/alliances.js';
 import { renderEvents } from './screens/events.js';
-import { renderTexts } from './screens/texts.js';
 import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js';
-import { serializeGuideRoles, blankGuideRole } from '../logic/guide-roles.js';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js';
 import { renderQuarter } from './screens/quarter.js';
 
 const SCREENS = [
@@ -95,8 +94,7 @@ const SCREENS = [
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'alliances', label: 'Альянсы', render: renderAlliances },
   { id: 'events', label: 'Хронология', render: renderEvents },
-  { id: 'texts', label: 'Тексты', render: renderTexts },
-  { id: 'guideRoles', label: 'Малым алам', render: renderGuideRoles },
+  { id: 'guidePage', label: 'Малым алам', render: renderGuideRoles },
 ];
 
 const root = document.getElementById('admin');
@@ -164,7 +162,7 @@ function render() {
     view.canPush = Boolean(view.repo?.canPush);
   }
 
-  if (screen.id === 'texts' || screen.id === 'guideRoles') {
+  if (screen.id === 'guidePage') {
     // Общий черновик: роли лежат в том же безопасном массиве texts, но имеют отдельный удобный редактор.
     view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
     view.textsSaved = textsDraftSavedAt();
@@ -933,7 +931,7 @@ async function publishTexts() {
 /* ── Роли руководства ───────────────────────────────────────────────────── */
 function saveGuideToList() {
   if (!view?.canPush || !view.guideDraft) return;
-  const entry = { key: 'guide-roles', title: 'Обязанности руководства альянса', body: serializeGuideRoles(view.guideDraft) };
+  const entry = { key: 'guide-page', title: 'Малым алам — вся страница', body: serializeGuidePage(view.guideDraft) };
   const i = view.texts.findIndex((t) => t.key === entry.key);
   view.texts = i >= 0 ? view.texts.map((t) => (t.key === entry.key ? entry : t)) : [...view.texts, entry];
   saveTextsDraft(view.texts);
@@ -943,14 +941,14 @@ function saveGuideToList() {
 
 function addGuideRole() {
   if (!view?.guideDraft || !view.canPush) return;
-  view.guideDraft.roles = [...view.guideDraft.roles, blankGuideRole()];
+  view.guideDraft = { ...view.guideDraft, roles: [...view.guideDraft.roles, blankGuideRole()] };
   render();
 }
 
 function removeGuideRole(index) {
   if (!view?.guideDraft || !view.canPush) return;
   if (view.guideDraft.roles.length <= 1) return;
-  view.guideDraft.roles = view.guideDraft.roles.filter((_, i) => i !== index);
+  view.guideDraft = { ...view.guideDraft, roles: view.guideDraft.roles.filter((_, i) => i !== index) };
   render();
 }
 
@@ -1232,15 +1230,20 @@ document.addEventListener('input', (e) => {
 
   const guideRole = e.target.closest?.('[data-guide-role]');
   const guideField = e.target.closest?.('[data-guide-field]');
-  const guideItems = e.target.closest?.('[data-guide-items]');
-  if (guideRole && view?.guideDraft) {
-    const index = Number(guideRole.dataset.guideRole);
-    const role = view.guideDraft.roles[index];
-    if (role && guideField) {
+  if (guideField && view?.guideDraft) {
+    if (guideRole) {
+      const index = Number(guideRole.dataset.guideRole);
+      const role = view.guideDraft.roles[index];
+      if (role) {
+        const key = guideField.dataset.guideField;
+        role[key] = key === 'items'
+          ? guideField.value.split(/\n/).map((item) => item.trim()).filter(Boolean)
+          : guideField.type === 'checkbox' ? guideField.checked : guideField.value;
+      }
+    } else {
       const key = guideField.dataset.guideField;
-      role[key] = guideField.type === 'checkbox' ? guideField.checked : guideField.value;
+      view.guideDraft = { ...view.guideDraft, [key]: guideField.value };
     }
-    if (role && guideItems) role.items = guideItems.value.split(/\n/).map((item) => item.trim()).filter(Boolean);
   }
 
   // Поля формы текста — ключ (только у нового), заголовок, тело.

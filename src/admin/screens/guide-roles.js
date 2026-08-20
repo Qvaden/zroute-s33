@@ -1,44 +1,51 @@
 import { esc } from '../../ui/helpers.js';
-import { parseGuideRoles, serializeGuideRoles, blankGuideRole, DEFAULT_GUIDE_CREDIT } from '../../logic/guide-roles.js';
+import { parseGuidePage, serializeGuidePage, blankGuideRole, DEFAULT_GUIDE_PAGE } from '../../logic/guide-roles.js';
 
-const TONE_OPTIONS = ['gold', 'orange', 'violet', 'cyan', 'red'];
+const TONES = ['gold', 'orange', 'violet', 'cyan', 'red'];
 
 export function guideFromTexts(texts) {
-  const entry = (texts ?? []).find((t) => t.key === 'guide-roles');
-  return parseGuideRoles(entry?.body);
+  const byKey = Object.fromEntries((texts ?? []).map((t) => [t.key, t]));
+  return parseGuidePage(byKey['guide-page'], {
+    roles: parseGuidePage(byKey['guide-roles']).roles,
+    principles: byKey['guide-principles'], week: byKey['guide-week'],
+    donts: byKey['guide-donts'], benefits: byKey['guide-benefits'],
+  });
 }
 
 export function renderGuideRoles(view) {
-  const data = view.guideDraft ?? guideFromTexts(view.texts);
-  const canPush = Boolean(view.canPush);
+  const page = view.guideDraft ?? guideFromTexts(view.texts);
+  const disabled = view.canPush ? '' : 'disabled';
   return `
-    <section class="adm-hero adm-hero--tight">
-      <span class="eyebrow">Малым алам // редактор</span>
-      <h1 class="adm-h1">Роли руководства</h1>
-      <p class="adm-lead">Редактируйте карточки обязанностей прямо здесь. Изменения сначала сохраняются как черновик, а на сайт попадут после отдельной публикации.</p>
-    </section>
-    <section class="panel adm-form guide-editor" data-guide-editor>
-      <header class="panel__head adm-head-row"><div><h2>Структура справочника</h2><p class="muted">У каждой роли можно изменить иконку, название, цвет, описание, список обязанностей и помощника.</p></div><button type="button" class="adm-btn" data-guide-add ${canPush ? '' : 'disabled'}>+ Добавить роль</button></header>
-      <label class="adm-field guide-editor__credit"><span>Сноска внизу страницы</span><input type="text" data-guide-credit value="${esc(data.credit || DEFAULT_GUIDE_CREDIT)}" ${canPush ? '' : 'disabled'}></label>
-      <div class="guide-editor__roles">
-        ${(data.roles ?? []).map((role, index) => renderRole(role, index, canPush)).join('')}
-      </div>
-      ${canPush ? '' : '<p class="adm-warn">У токена нет права на запись — редактирование и публикация недоступны.</p>'}
-      <div class="adm-publish"><div class="adm-publish__state muted" data-guide-state>Изменения применятся после сохранения черновика.</div><div class="adm-publish__actions"><button type="button" class="adm-btn" data-guide-reset ${canPush ? '' : 'disabled'}>Сбросить</button><button type="button" class="adm-btn adm-btn--primary" data-guide-save ${canPush ? '' : 'disabled'}>Сохранить черновик</button><button type="button" class="adm-btn adm-btn--primary" data-texts-publish ${canPush ? '' : 'disabled'}>Опубликовать</button></div></div>
-      <div class="adm-result" data-texts-result hidden></div>
+    <section class="adm-hero adm-hero--tight"><span class="eyebrow">Полное содержание страницы</span><h1 class="adm-h1">Малым алам</h1><p class="adm-lead">Здесь редактируется вся вкладка сайта целиком. Никаких отдельных текстовых ключей: меняйте поля, сохраняйте черновик и публикуйте одной кнопкой.</p></section>
+    <section class="panel guide-editor" data-guide-editor>
+      <header class="panel__head adm-head-row"><div><h2>Верхняя часть и аналитика</h2><p class="muted">Заголовок блока сравнения и пояснение к нему.</p></div></header>
+      ${field('Заголовок сравнения', 'proofTitle', page.proofTitle, disabled)}
+      ${field('Подзаголовок сравнения', 'proofSubtitle', page.proofSubtitle, disabled)}
+      <header class="panel__head guide-editor__section-head"><h2>Роли руководства</h2><button type="button" class="adm-btn" data-guide-add ${disabled}>+ Добавить роль</button></header>
+      ${field('Заголовок раздела ролей', 'rolesTitle', page.rolesTitle, disabled)}
+      ${textarea('Описание раздела ролей', 'rolesSubtitle', page.rolesSubtitle, disabled, 3)}
+      <div class="guide-editor__roles">${page.roles.map((role, index) => renderRole(role, index, disabled)).join('')}</div>
+      <header class="panel__head guide-editor__section-head"><h2>Важное правило</h2></header>
+      ${field('Заголовок важного блока', 'noticeTitle', page.noticeTitle, disabled)}
+      ${textarea('Текст важного блока', 'noticeBody', page.noticeBody, disabled, 6)}
+      <header class="panel__head guide-editor__section-head"><h2>Остальные разделы</h2></header>
+      ${field('Заголовок «Образцовое руководство»', 'principlesTitle', page.principlesTitle, disabled)}
+      ${textarea('Текст «Образцовое руководство»', 'principlesBody', page.principlesBody, disabled, 12)}
+      ${field('Заголовок «Ритм недели»', 'weekTitle', page.weekTitle, disabled)}
+      ${textarea('Текст «Ритм недели»', 'weekBody', page.weekBody, disabled, 8)}
+      ${field('Заголовок «Чего делать не стоит»', 'dontsTitle', page.dontsTitle, disabled)}
+      ${textarea('Текст «Чего делать не стоит»', 'dontsBody', page.dontsBody, disabled, 8)}
+      ${field('Заголовок «Что даёт крупный альянс»', 'benefitsTitle', page.benefitsTitle, disabled)}
+      ${textarea('Текст «Что даёт крупный альянс»', 'benefitsBody', page.benefitsBody, disabled, 8)}
+      <header class="panel__head guide-editor__section-head"><h2>Финальная сноска</h2></header>
+      ${field('Маленькая благодарность внизу страницы', 'credit', page.credit, disabled)}
+      ${view.canPush ? '' : '<p class="adm-warn">У токена нет права на запись — редактирование и публикация недоступны.</p>'}
+      <div class="adm-publish"><div class="adm-publish__state muted" data-guide-state>Изменения сохраняются в черновик браузера.</div><div class="adm-publish__actions"><button type="button" class="adm-btn" data-guide-reset ${disabled}>Сбросить</button><button type="button" class="adm-btn adm-btn--primary" data-guide-save ${disabled}>Сохранить черновик</button><button type="button" class="adm-btn adm-btn--primary" data-texts-publish ${disabled}>Опубликовать всю страницу</button></div></div><div class="adm-result" data-texts-result hidden></div>
     </section>`;
 }
 
-function renderRole(role, index, canPush) {
-  return `<article class="guide-editor__role" data-guide-role="${index}">
-    <header class="guide-editor__role-head"><span class="guide-editor__number">${index + 1}</span><h3>Роль ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-remove="${index}" ${canPush ? '' : 'disabled'}>Удалить</button></header>
-    <div class="guide-editor__role-grid">
-      <label class="adm-field"><span>Иконка</span><input data-guide-field="icon" value="${esc(role.icon)}" ${canPush ? '' : 'disabled'}></label>
-      <label class="adm-field"><span>Название роли</span><input data-guide-field="title" value="${esc(role.title)}" ${canPush ? '' : 'disabled'}></label>
-      <label class="adm-field"><span>Цвет</span><select data-guide-field="tone" ${canPush ? '' : 'disabled'}>${TONE_OPTIONS.map((tone) => `<option value="${tone}" ${tone === role.tone ? 'selected' : ''}>${tone}</option>`).join('')}</select></label>
-    </div>
-    <label class="adm-field"><span>Короткое описание</span><input data-guide-field="intro" value="${esc(role.intro)}" ${canPush ? '' : 'disabled'}></label>
-    <label class="adm-field"><span>Обязанности — по одному пункту на строку</span><textarea rows="5" data-guide-items ${canPush ? '' : 'disabled'}>${esc((role.items ?? []).join('\n'))}</textarea></label>
-    <label class="guide-editor__check"><input type="checkbox" data-guide-field="assistant" ${role.assistant ? 'checked' : ''} ${canPush ? '' : 'disabled'}><span>Добавить пометку «🤝 + помощник»</span></label>
-  </article>`;
+function renderRole(role, index, disabled) {
+  return `<article class="guide-editor__role" data-guide-role="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">${index + 1}</span><h3>Роль ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-remove="${index}" ${disabled}>Удалить</button></header><div class="guide-editor__role-grid">${field('Иконка', 'icon', role.icon, disabled)}${field('Название роли', 'title', role.title, disabled)}<label class="adm-field"><span>Цвет</span><select data-guide-field="tone" ${disabled}>${TONES.map((tone) => `<option value="${tone}" ${tone === role.tone ? 'selected' : ''}>${tone}</option>`).join('')}</select></label></div>${field('Короткое описание', 'intro', role.intro, disabled)}${textarea('Обязанности — по одному пункту на строку', 'items', (role.items ?? []).join('\n'), disabled, 5)}<label class="guide-editor__check"><input type="checkbox" data-guide-field="assistant" ${role.assistant ? 'checked' : ''} ${disabled}><span>Показывать «🤝 + помощник»</span></label></article>`;
 }
+function field(label, key, value, disabled = '') { return `<label class="adm-field"><span>${label}</span><input type="text" data-guide-field="${key}" value="${esc(value ?? '')}" ${disabled}></label>`; }
+function textarea(label, key, value, disabled = '', rows = 5) { return `<label class="adm-field"><span>${label}</span><textarea rows="${rows}" data-guide-field="${key}" ${disabled}>${esc(value ?? '')}</textarea></label>`; }
