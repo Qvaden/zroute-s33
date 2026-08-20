@@ -887,6 +887,9 @@ async function publishTexts() {
   };
 
   try {
+    // Публикация должна брать последние введённые значения даже если
+    // пользователь не нажал отдельную кнопку «Сохранить черновик».
+    syncGuideDraft();
     const candidate = applyTexts(view.raw, view.texts);
 
     const problems = validateDataset(mapDataset(candidate));
@@ -930,13 +933,18 @@ async function publishTexts() {
 
 /* ── Роли руководства ───────────────────────────────────────────────────── */
 function saveGuideToList() {
-  if (!view?.canPush || !view.guideDraft) return;
+  if (!view?.canPush || !view.guideDraft) return false;
   const entry = { key: 'guide-page', title: 'Малым алам — вся страница', body: serializeGuidePage(view.guideDraft) };
   const i = view.texts.findIndex((t) => t.key === entry.key);
   view.texts = i >= 0 ? view.texts.map((t) => (t.key === entry.key ? entry : t)) : [...view.texts, entry];
   saveTextsDraft(view.texts);
   const state = root.querySelector('[data-guide-state]');
   if (state) state.textContent = 'Черновик сохранён в браузере. Нажмите «Опубликовать», чтобы отправить изменения на сайт.';
+  return true;
+}
+
+function syncGuideDraft() {
+  return saveGuideToList();
 }
 
 function addGuideRole() {
@@ -1259,6 +1267,8 @@ document.addEventListener('input', (e) => {
       const key = guideField.dataset.guideField;
       view.guideDraft = { ...view.guideDraft, [key]: guideField.value };
     }
+    // Не теряем длинный ввод при переходе между экранами или перезагрузке.
+    syncGuideDraft();
   }
 
   // Поля формы текста — ключ (только у нового), заголовок, тело.
@@ -1331,3 +1341,23 @@ document.addEventListener('drop', (e) => {
 
 window.addEventListener('hashchange', render);
 boot();
+
+// Select и checkbox на некоторых мобильных браузерах не всегда дают input-событие.
+// Дублируем фиксацию на change, чтобы такие поля не терялись.
+document.addEventListener('change', (e) => {
+  const field = e.target.closest?.('[data-guide-field]');
+  if (!field || !view?.guideDraft) return;
+  const roleEl = field.closest('[data-guide-role]');
+  const extraEl = field.closest('[data-guide-extra]');
+  if (roleEl) {
+    const index = Number(roleEl.dataset.guideRole);
+    const role = view.guideDraft.roles[index];
+    if (role) role[field.dataset.guideField] = field.type === 'checkbox' ? field.checked : field.value;
+  } else if (extraEl) {
+    const index = Number(extraEl.dataset.guideExtra);
+    view.guideDraft.extraBlocks[index] = { ...view.guideDraft.extraBlocks[index], [field.dataset.guideField]: field.value };
+  } else {
+    view.guideDraft = { ...view.guideDraft, [field.dataset.guideField]: field.value };
+  }
+  syncGuideDraft();
+});
