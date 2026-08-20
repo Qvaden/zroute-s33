@@ -116,7 +116,7 @@ function setupMobileScrollReveal() {
   if (!isTouch || !('IntersectionObserver' in window)) return;
 
   const revealables = app.querySelectorAll(
-    '.hero, .panel, .quart-hero, .quart-board, .achievements-panel, .tl__item, .lad__row, .card, .leader, .podium-card, .quart-card, .achievement, .bot-feature, .bot-launch, .bot-promise, .bot-final'
+    '.hero, .panel, .quart-hero, .quart-board, .achievements-panel, .tl__item, .lad__row, .card, .leader, .podium-card, .quart-card, .achievement, .bot-feature, .bot-launch, .bot-promise, .bot-final, .role-card'
   );
   scrollRevealObserver = new IntersectionObserver((entries, observer) => {
     for (const entry of entries) {

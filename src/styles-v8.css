@@ -1576,3 +1576,21 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .bot-cta--large { margin-top: 22px; padding: 14px 18px; }
 @media (max-width: 800px) { .bot-feature-grid { grid-template-columns: repeat(2, 1fr); } .bot-launch { grid-template-columns: auto 1fr; } .bot-launch__handle { grid-column: 2; } }
 @media (max-width: 560px) { .bot-hero { min-height: 0; padding-bottom: 24px; } .bot-hero__top { display: block; } .bot-hero__signal { position: absolute; top: 5px; right: 0; min-width: 62px; } .bot-hero__bottom { position: relative; right: auto; bottom: auto; left: auto; grid-template-columns: 1fr; width: 100%; margin-top: 34px; } .bot-hero::before { display: none; } .bot-launch { grid-template-columns: 1fr; gap: 14px; } .bot-launch__handle { grid-column: auto; } .bot-feature-grid { grid-template-columns: 1fr; } .bot-feature { min-height: 0; } .bot-promise { grid-template-columns: 1fr; gap: 18px; } .bot-promise__line { position: relative; width: 70px; height: 2px; } }
+
+/* ── Alliance leadership guide ───────────────────────────────────────────── */
+.roles-panel { margin-top: 22px; border-color: rgba(108,246,230,.24); background: linear-gradient(145deg, rgba(18,25,30,.96), rgba(12,16,21,.98)); }
+.roles-panel__head { margin-bottom: 15px; } .roles-panel__head h2 { margin-top: 5px; } .roles-panel__head .guide__lead { max-width: 780px; }
+.roles-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.role-card { position: relative; display: flex; flex-direction: column; min-height: 255px; padding: 16px; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.025); transition: transform .24s var(--ease-spring), border-color .24s var(--ease-out), box-shadow .24s var(--ease-out); }
+.role-card::after { content: ''; position: absolute; right: -28px; bottom: -40px; width: 120px; height: 120px; border: 1px solid currentColor; border-radius: 50%; opacity: .12; pointer-events: none; }
+.role-card:hover { transform: translateY(-5px); border-color: currentColor; box-shadow: 0 16px 30px -25px currentColor; }
+.role-card--gold { color: var(--gold); } .role-card--orange { color: var(--accent); } .role-card--violet { color: #c7a6ff; } .role-card--cyan { color: var(--electric); } .role-card--red { color: #ff7f7f; }
+.role-card__top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; } .role-card__icon { font-size: 25px; filter: saturate(1.1); } .role-card__tag { padding: 4px 7px; border: 1px solid currentColor; border-radius: 4px; opacity: .72; font: 800 9px/1 Inter, sans-serif; letter-spacing: .12em; }
+.role-card h3 { margin: 18px 0 6px; color: var(--text); font-size: 18px; font-weight: 900; } .role-card__intro { min-height: 42px; margin: 0 0 8px; color: var(--dim); font-size: 13px; line-height: 1.45; }
+.role-card ul { display: grid; gap: 5px; margin: 0; padding: 0 0 0 16px; color: var(--dim); font-size: 12px; line-height: 1.42; } .role-card li::marker { color: currentColor; }
+.role-card__assistant { display: inline-flex; align-self: flex-start; margin-top: auto; padding-top: 10px; color: currentColor; font-size: 11px; font-weight: 800; }
+.roles-notice { display: grid; grid-template-columns: 44px 1fr; gap: 15px; align-items: start; margin-top: 12px; border-color: rgba(255,201,60,.34); background: linear-gradient(110deg, rgba(255,201,60,.09), rgba(255,255,255,.025)); }
+.roles-notice__mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; color: #18130a; background: var(--gold); font: 900 20px/1 Unbounded, sans-serif; box-shadow: 0 0 22px -10px var(--gold); }
+.roles-notice h3 { margin: 5px 0 8px; color: var(--gold); font-size: 18px; } .roles-notice p { max-width: 900px; margin: 6px 0 0; color: var(--dim); font-size: 13px; line-height: 1.55; }
+@media (max-width: 900px) { .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
