@@ -932,3 +932,12 @@ body.guide-color-modal-open{overflow:hidden}
 .guide-color-modal__hex{display:block;margin-top:18px}.guide-color-modal__hex>span{display:block;margin-bottom:7px;color:var(--dim);font-size:12px;font-weight:700}.guide-color-modal__hex input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#080d14;color:var(--text);font:700 15px ui-monospace,SFMono-Regular,monospace;letter-spacing:.08em;text-transform:uppercase}.guide-color-modal__hex input:focus{border-color:var(--electric);outline:0;box-shadow:0 0 0 3px rgba(99,245,229,.12)}.guide-color-modal__error{margin:8px 0 0;color:var(--loss);font-size:12px}.guide-color-modal__actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
 @media(max-width:560px){.guide-color-modal{padding:10px;align-items:end}.guide-color-modal__dialog{max-height:calc(100dvh - 20px);padding:18px;border-radius:20px 20px 14px 14px}.guide-color-modal__swatches{grid-template-columns:repeat(2,1fr)}.guide-color-modal__actions{display:grid;grid-template-columns:1fr 1.3fr}.guide-color-modal__actions .adm-btn{min-height:46px}}
 @media(prefers-reduced-motion:reduce){.guide-color-modal__dialog,.guide-color-trigger,.guide-color-modal__swatch{animation:none;transition:none}}
+
+/* Mobile modal scrolling: the page stays locked, the palette owns the scroll */
+.guide-color-modal{overscroll-behavior:contain;touch-action:pan-y}
+@media(max-width:560px){
+  .guide-color-modal{display:block;height:100dvh;min-height:100dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:calc(12px + env(safe-area-inset-top)) 10px calc(18px + env(safe-area-inset-bottom));}
+  .guide-color-modal__dialog{width:100%;max-height:none;margin:0 auto;overflow:visible;touch-action:pan-y;}
+  .guide-color-modal__backdrop{position:fixed;}
+  .guide-color-modal__head{position:sticky;top:0;z-index:2;padding-bottom:12px;background:linear-gradient(#182531 72%,transparent);}
+}

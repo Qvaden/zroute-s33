@@ -960,17 +960,30 @@ function openGuideColorModal(trigger) {
   const input = modal.querySelector('[data-guide-color-hex]');
   if (input) input.value = view.colorDraft.toUpperCase();
   updateColorModalPreview(view.colorDraft);
-  modal.hidden = false;
+  view.colorScrollY = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${view.colorScrollY}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
   document.body.classList.add('guide-color-modal-open');
-  input?.focus();
+  modal.hidden = false;
+  input?.focus({ preventScroll: true });
 }
 
 function closeGuideColorModal() {
   const modal = root.querySelector('[data-guide-color-modal]');
   if (modal) modal.hidden = true;
+  const scrollY = view?.colorScrollY ?? 0;
   document.body.classList.remove('guide-color-modal-open');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
   view.colorTarget = null;
   view.colorDraft = null;
+  window.scrollTo(0, scrollY);
 }
 
 function applyGuideColor() {
