@@ -1594,3 +1594,5 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .roles-notice h3 { margin: 5px 0 8px; color: var(--gold); font-size: 18px; } .roles-notice p { max-width: 900px; margin: 6px 0 0; color: var(--dim); font-size: 13px; line-height: 1.55; }
 @media (max-width: 900px) { .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
+
+.roles-credit { margin: 18px 0 0; color: var(--mute); font-size: 10px; line-height: 1.4; letter-spacing: .02em; text-align: center; opacity: .78; }

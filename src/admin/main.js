@@ -85,6 +85,8 @@ import { renderWeek, describe } from './screens/week.js';
 import { renderAlliances } from './screens/alliances.js';
 import { renderEvents } from './screens/events.js';
 import { renderTexts } from './screens/texts.js';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js';
+import { serializeGuideRoles, blankGuideRole } from '../logic/guide-roles.js';
 import { renderQuarter } from './screens/quarter.js';
 
 const SCREENS = [
@@ -94,6 +96,7 @@ const SCREENS = [
   { id: 'alliances', label: 'Альянсы', render: renderAlliances },
   { id: 'events', label: 'Хронология', render: renderEvents },
   { id: 'texts', label: 'Тексты', render: renderTexts },
+  { id: 'guideRoles', label: 'Малым алам', render: renderGuideRoles },
 ];
 
 const root = document.getElementById('admin');
@@ -161,10 +164,11 @@ function render() {
     view.canPush = Boolean(view.repo?.canPush);
   }
 
-  if (screen.id === 'texts') {
-    // Тот же приём в третий раз: черновик — весь список текстов целиком.
+  if (screen.id === 'texts' || screen.id === 'guideRoles') {
+    // Общий черновик: роли лежат в том же безопасном массиве texts, но имеют отдельный удобный редактор.
     view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
     view.textsSaved = textsDraftSavedAt();
+    view.guideDraft = view.guideDraft ?? guideFromTexts(view.texts);
     view.canPush = Boolean(view.repo?.canPush);
   }
 
@@ -926,7 +930,31 @@ async function publishTexts() {
   }
 }
 
-/* ── События ─────────────────────────────────────────────────────────────── */
+/* ── Роли руководства ───────────────────────────────────────────────────── */
+function saveGuideToList() {
+  if (!view?.canPush || !view.guideDraft) return;
+  const entry = { key: 'guide-roles', title: 'Обязанности руководства альянса', body: serializeGuideRoles(view.guideDraft) };
+  const i = view.texts.findIndex((t) => t.key === entry.key);
+  view.texts = i >= 0 ? view.texts.map((t) => (t.key === entry.key ? entry : t)) : [...view.texts, entry];
+  saveTextsDraft(view.texts);
+  const state = root.querySelector('[data-guide-state]');
+  if (state) state.textContent = 'Черновик сохранён в браузере. Нажмите «Опубликовать», чтобы отправить изменения на сайт.';
+}
+
+function addGuideRole() {
+  if (!view?.guideDraft || !view.canPush) return;
+  view.guideDraft.roles = [...view.guideDraft.roles, blankGuideRole()];
+  render();
+}
+
+function removeGuideRole(index) {
+  if (!view?.guideDraft || !view.canPush) return;
+  if (view.guideDraft.roles.length <= 1) return;
+  view.guideDraft.roles = view.guideDraft.roles.filter((_, i) => i !== index);
+  render();
+}
+
+/* ── События ── */
 
 document.addEventListener('submit', async (e) => {
   const form = e.target.closest('[data-login]');
@@ -1113,6 +1141,15 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  /* ── Роли руководства ── */
+  if (e.target.closest('[data-guide-add]')) { addGuideRole(); return; }
+  const guideRemove = e.target.closest('[data-guide-remove]');
+  if (guideRemove) { removeGuideRole(Number(guideRemove.dataset.guideRemove)); return; }
+  if (e.target.closest('[data-guide-save]')) { saveGuideToList(); return; }
+  if (e.target.closest('[data-guide-reset]')) {
+    dropTextsDraft(); view.texts = textsFromRaw(view.raw); view.guideDraft = guideFromTexts(view.texts); render(); return;
+  }
+
   /* ── Тексты ── */
 
   if (e.target.closest('[data-text-new]')) {
@@ -1188,6 +1225,22 @@ document.addEventListener('input', (e) => {
       if (e.target.value) view.allianceDraft.active = false;
       render();
     }
+  }
+
+  const guideCredit = e.target.closest?.('[data-guide-credit]');
+  if (guideCredit && view?.guideDraft) view.guideDraft.credit = e.target.value;
+
+  const guideRole = e.target.closest?.('[data-guide-role]');
+  const guideField = e.target.closest?.('[data-guide-field]');
+  const guideItems = e.target.closest?.('[data-guide-items]');
+  if (guideRole && view?.guideDraft) {
+    const index = Number(guideRole.dataset.guideRole);
+    const role = view.guideDraft.roles[index];
+    if (role && guideField) {
+      const key = guideField.dataset.guideField;
+      role[key] = guideField.type === 'checkbox' ? guideField.checked : guideField.value;
+    }
+    if (role && guideItems) role.items = guideItems.value.split(/\n/).map((item) => item.trim()).filter(Boolean);
   }
 
   // Поля формы текста — ключ (только у нового), заголовок, тело.

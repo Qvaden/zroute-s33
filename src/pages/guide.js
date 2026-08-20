@@ -1,5 +1,6 @@
 import { esc, miniMarkdown, splitSections, plural } from '../ui/helpers.js';
 import { computeAllianceHistory, computeBestStreaks } from '../logic/standings.js';
+import { parseGuideRoles } from '../logic/guide-roles.js';
 
 /**
  * Раздел для малых альянсов.
@@ -20,7 +21,7 @@ export function renderGuide({ texts, standings, weeks, results }) {
   return `
     ${renderProof(standings, weeks, results)}
 
-    ${renderLeadershipRoles()}
+    ${renderLeadershipRolesFromText(byKey['guide-roles'])}
 
     ${renderList(byKey['guide-benefits'], 'Что даёт крупный альянс', 'week')}
 
@@ -37,6 +38,24 @@ export function renderGuide({ texts, standings, weeks, results }) {
       ${renderList(byKey['guide-week'], 'Ритм недели', 'week')}
       ${renderList(byKey['guide-donts'], 'Чего делать не стоит', 'dont')}
     </div>`;
+}
+
+function renderLeadershipRolesFromText(entry) {
+  const data = parseGuideRoles(entry?.body);
+  const roles = data.roles;
+  return `
+    <section class="roles-panel panel">
+      <header class="panel__head roles-panel__head">
+        <span class="eyebrow">Alliance // Command</span>
+        <h2>Обязанности руководства</h2>
+        <p class="guide__lead">Пример распределения ролей для успешного развития альянса. Главное — чтобы работа была разделена, а не держалась на одном человеке.</p>
+      </header>
+      <div class="roles-grid">
+        ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">R4</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
+      </div>
+    </section>
+    <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // Balance</span><h3>Распределяем нагрузку, а не героизм</h3><p>Часть обязанностей может передаваться от одного R4 другому — не придумываем лишнюю работу и не смотрим, как один игрок тянет всё на себе. Иначе он выгорит, и развитие альянса остановится.</p><p>Помощник может поддерживать двух офицеров. По мере роста объёма работы помощников станет четыре — по одному для каждого офицера.</p></div></section>
+    <p class="roles-credit">${esc(data.credit)}</p>`;
 }
 
 function renderLeadershipRoles() {

@@ -869,3 +869,15 @@
 .adm-photo-drop strong { color: var(--text); font-size: 13px; }
 .adm-photo-drop small { color: var(--mute); font-size: 11px; }
 @keyframes adm-photo-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent); } }
+
+/* ── Structured leadership guide editor ─────────────────────────────────── */
+.guide-editor__credit { max-width: 760px; margin-bottom: 18px; }
+.guide-editor__roles { display: grid; gap: 12px; }
+.guide-editor__role { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
+.guide-editor__role-head { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; } .guide-editor__role-head h3 { margin: 0; flex: 1; }
+.guide-editor__number { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--electric); border-radius: 50%; color: var(--electric); font-weight: 800; }
+.guide-editor__role-grid { display: grid; grid-template-columns: 90px 1.4fr 120px; gap: 10px; } .guide-editor__role .adm-field { margin-bottom: 10px; }
+.guide-editor__check { display: inline-flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; } .guide-editor__check input { accent-color: var(--electric); }
+.adm-btn--danger { color: #ff8b8b; border-color: rgba(255,110,110,.35); }
+@media (max-width: 640px) { .guide-editor__role-grid { grid-template-columns: 1fr 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: 1 / -1; } .guide-editor__role-head { align-items: flex-start; } }
+@media (max-width: 430px) { .guide-editor__role-grid { grid-template-columns: 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: auto; } .guide-editor__role-head { flex-wrap: wrap; } .guide-editor__role-head h3 { min-width: 120px; } }
