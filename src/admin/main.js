@@ -889,6 +889,7 @@ async function publishTexts() {
   try {
     // Публикация должна брать последние введённые значения даже если
     // пользователь не нажал отдельную кнопку «Сохранить черновик».
+    collectGuideDraftFromDom();
     syncGuideDraft();
     const candidate = applyTexts(view.raw, view.texts);
 
@@ -932,8 +933,39 @@ async function publishTexts() {
 }
 
 /* ── Роли руководства ───────────────────────────────────────────────────── */
+function collectGuideDraftFromDom() {
+  const editor = root.querySelector('[data-guide-editor]');
+  if (!editor || !view?.guideDraft) return;
+  const next = JSON.parse(JSON.stringify(view.guideDraft));
+  editor.querySelectorAll('[data-guide-role]').forEach((roleEl) => {
+    const index = Number(roleEl.dataset.guideRole);
+    if (!next.roles[index]) return;
+    roleEl.querySelectorAll('[data-guide-field]').forEach((field) => {
+      const key = field.dataset.guideField;
+      next.roles[index][key] = field.type === 'checkbox'
+        ? field.checked
+        : key === 'items'
+          ? field.value.split(/\n/).map((item) => item.trim()).filter(Boolean)
+          : field.value;
+    });
+  });
+  editor.querySelectorAll('[data-guide-extra]').forEach((blockEl) => {
+    const index = Number(blockEl.dataset.guideExtra);
+    if (!next.extraBlocks?.[index]) return;
+    blockEl.querySelectorAll('[data-guide-field]').forEach((field) => {
+      next.extraBlocks[index][field.dataset.guideField] = field.value;
+    });
+  });
+  editor.querySelectorAll('[data-guide-field]').forEach((field) => {
+    if (field.closest('[data-guide-role], [data-guide-extra]')) return;
+    next[field.dataset.guideField] = field.value;
+  });
+  view.guideDraft = next;
+}
+
 function saveGuideToList() {
   if (!view?.canPush || !view.guideDraft) return false;
+  collectGuideDraftFromDom();
   const entry = { key: 'guide-page', title: 'Малым алам — вся страница', body: serializeGuidePage(view.guideDraft) };
   const i = view.texts.findIndex((t) => t.key === entry.key);
   view.texts = i >= 0 ? view.texts.map((t) => (t.key === entry.key ? entry : t)) : [...view.texts, entry];
@@ -949,12 +981,15 @@ function syncGuideDraft() {
 
 function addGuideRole() {
   if (!view?.guideDraft || !view.canPush) return;
+  collectGuideDraftFromDom();
+  saveGuideToList();
   view.guideDraft = { ...view.guideDraft, roles: [...view.guideDraft.roles, blankGuideRole()] };
   render();
 }
 
 function removeGuideRole(index) {
   if (!view?.guideDraft || !view.canPush) return;
+  collectGuideDraftFromDom();
   if (view.guideDraft.roles.length <= 1) return;
   view.guideDraft = { ...view.guideDraft, roles: view.guideDraft.roles.filter((_, i) => i !== index) };
   render();
@@ -1150,11 +1185,14 @@ document.addEventListener('click', (e) => {
   /* ── Роли руководства ── */
   if (e.target.closest('[data-guide-add]')) { addGuideRole(); return; }
   if (e.target.closest('[data-guide-extra-add]')) {
+    collectGuideDraftFromDom();
+    saveGuideToList();
     view.guideDraft = { ...view.guideDraft, extraBlocks: [...(view.guideDraft.extraBlocks ?? []), { title: 'Новый блок', body: '', tone: 'cyan' }] };
     render(); return;
   }
   const extraRemove = e.target.closest('[data-guide-extra-remove]');
   if (extraRemove) {
+    collectGuideDraftFromDom();
     const index = Number(extraRemove.dataset.guideExtraRemove);
     view.guideDraft = { ...view.guideDraft, extraBlocks: (view.guideDraft.extraBlocks ?? []).filter((_, i) => i !== index) };
     render(); return;

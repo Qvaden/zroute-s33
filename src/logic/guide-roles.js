@@ -65,8 +65,11 @@ export function blankGuideRole() {
 function normalizePage(data) {
   const out = { ...DEFAULT_GUIDE_PAGE, ...data };
   for (const key of ['proofTitle','proofSubtitle','rolesTitle','rolesSubtitle','noticeTitle','noticeBody','principlesTitle','principlesBody','weekTitle','weekBody','dontsTitle','dontsBody','benefitsTitle','benefitsBody','credit']) out[key] = String(out[key] ?? '');
-  out.extraBlocks = Array.isArray(out.extraBlocks) ? out.extraBlocks.map((block) => ({ title: String(block?.title ?? '').trim(), body: String(block?.body ?? ''), tone: String(block?.tone ?? 'cyan') })).filter((block) => block.title || block.body) : [];
-  out.roles = Array.isArray(out.roles) ? out.roles.map(normalizeRole).filter((r) => r.title) : DEFAULT_GUIDE_ROLES.map(normalizeRole);
+  // Не удаляем временно пустые поля: при редактировании пользователь может
+  // стереть старый текст перед вводом нового. Иначе autosave удалит карточку
+  // уже на первом пустом input и следующий рендер покажет «исчезновение».
+  out.extraBlocks = Array.isArray(out.extraBlocks) ? out.extraBlocks.map((block) => ({ title: String(block?.title ?? ''), body: String(block?.body ?? ''), tone: String(block?.tone ?? 'cyan') })) : [];
+  out.roles = Array.isArray(out.roles) ? out.roles.map(normalizeRole) : DEFAULT_GUIDE_ROLES.map(normalizeRole);
   return out;
 }
 function normalizeRole(role) {
