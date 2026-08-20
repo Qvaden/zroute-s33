@@ -45,7 +45,7 @@ function renderLeadershipRoles(page) {
         <p class="guide__lead">${esc(page.rolesSubtitle)}</p>
       </header>
       <div class="roles-grid">
-        ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">R4</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
+        ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">${role.title.trim().toLowerCase() === 'глава альянса' ? 'R5' : 'R4'}</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
       </div>
     </section>
     <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // Balance</span><h3>${esc(page.noticeTitle)}</h3>${miniMarkdown(page.noticeBody)}</div></section>
@@ -94,7 +94,7 @@ function legacyLeadershipRoles() {
       <div class="roles-grid">
         ${roles.map((role) => `
           <article class="role-card role-card--${role.tone}">
-            <div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${role.icon}</span><span class="role-card__tag">R4</span></div>
+            <div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${role.icon}</span><span class="role-card__tag">${role.title.trim().toLowerCase() === 'глава альянса' ? 'R5' : 'R4'}</span></div>
             <h3>${role.title}</h3>
             <p class="role-card__intro">${role.intro}</p>
             <ul>${role.items.map((item) => `<li>${item}</li>`).join('')}</ul>
