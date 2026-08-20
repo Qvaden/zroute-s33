@@ -881,3 +881,23 @@
 .adm-btn--danger { color: #ff8b8b; border-color: rgba(255,110,110,.35); }
 @media (max-width: 640px) { .guide-editor__role-grid { grid-template-columns: 1fr 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: 1 / -1; } .guide-editor__role-head { align-items: flex-start; } }
 @media (max-width: 430px) { .guide-editor__role-grid { grid-template-columns: 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: auto; } .guide-editor__role-head { flex-wrap: wrap; } .guide-editor__role-head h3 { min-width: 120px; } }
+
+/* ── Full guide editor: mobile-first long text and extra blocks ──────────── */
+.guide-editor__section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.guide-editor__section-head h2 { margin: 0; } .guide-editor__section-head p { margin: 5px 0 0; }
+.guide-editor__extras { display: grid; gap: 12px; margin-bottom: 8px; }
+.guide-editor__extra { padding: 15px; border: 1px solid color-mix(in srgb, var(--electric) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--electric) 4%, var(--surface)); }
+.guide-editor textarea[data-guide-field] { min-height: 118px; resize: vertical; line-height: 1.55; }
+.guide-editor__role textarea[data-guide-field="items"] { min-height: 120px; }
+@media (max-width: 560px) {
+  .guide-editor { padding: 14px; }
+  .guide-editor__section-head { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .guide-editor__section-head .adm-btn { justify-self: stretch; min-height: 44px; }
+  .guide-editor .adm-field input, .guide-editor .adm-field select, .guide-editor .adm-field textarea { font-size: 16px; }
+  .guide-editor .adm-field textarea { min-height: 150px; padding: 12px; }
+  .guide-editor__role textarea[data-guide-field="items"] { min-height: 170px; }
+  .guide-editor__role-head { gap: 8px; }
+  .guide-editor__role-head .adm-btn { min-height: 40px; }
+  .guide-editor .adm-publish__actions { display: grid; grid-template-columns: 1fr; width: 100%; gap: 8px; }
+  .guide-editor .adm-publish__actions .adm-btn { min-height: 44px; width: 100%; }
+}

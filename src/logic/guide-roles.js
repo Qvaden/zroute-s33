@@ -24,6 +24,7 @@ export const DEFAULT_GUIDE_PAGE = {
   benefitsTitle: 'Что даёт крупный альянс',
   benefitsBody: '',
   credit: DEFAULT_GUIDE_CREDIT,
+  extraBlocks: [],
   roles: DEFAULT_GUIDE_ROLES,
 };
 
@@ -64,6 +65,7 @@ export function blankGuideRole() {
 function normalizePage(data) {
   const out = { ...DEFAULT_GUIDE_PAGE, ...data };
   for (const key of ['proofTitle','proofSubtitle','rolesTitle','rolesSubtitle','noticeTitle','noticeBody','principlesTitle','principlesBody','weekTitle','weekBody','dontsTitle','dontsBody','benefitsTitle','benefitsBody','credit']) out[key] = String(out[key] ?? '');
+  out.extraBlocks = Array.isArray(out.extraBlocks) ? out.extraBlocks.map((block) => ({ title: String(block?.title ?? '').trim(), body: String(block?.body ?? ''), tone: String(block?.tone ?? 'cyan') })).filter((block) => block.title || block.body) : [];
   out.roles = Array.isArray(out.roles) ? out.roles.map(normalizeRole).filter((r) => r.title) : DEFAULT_GUIDE_ROLES.map(normalizeRole);
   return out;
 }

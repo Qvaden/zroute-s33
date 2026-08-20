@@ -24,9 +24,15 @@ export function renderGuide({ texts, standings, weeks, results }) {
   return `
     ${renderProof(standings, weeks, results, page)}
     ${renderLeadershipRoles(page)}
+    ${renderExtraBlocks(page.extraBlocks)}
     ${renderList({ title: page.benefitsTitle, body: page.benefitsBody }, page.benefitsTitle, 'week')}
     <section class="panel"><header class="panel__head"><span class="eyebrow">Практика</span><h2>${esc(page.principlesTitle)}</h2></header>${renderCards(page.principlesBody)}</section>
     <div class="grid-2">${renderList({ title: page.weekTitle, body: page.weekBody }, page.weekTitle, 'week')}${renderList({ title: page.dontsTitle, body: page.dontsBody }, page.dontsTitle, 'dont')}</div>`;
+}
+
+function renderExtraBlocks(blocks = []) {
+  if (!blocks.length) return '';
+  return `<section class="guide-extra-grid">${blocks.map((block, i) => `<article class="guide-extra-card guide-extra-card--${esc(block.tone)}" style="--i:${i}"><span class="eyebrow">Дополнительный блок</span><h2>${esc(block.title)}</h2><div class="prose">${miniMarkdown(block.body)}</div></article>`).join('')}</section>`;
 }
 
 function renderLeadershipRoles(page) {

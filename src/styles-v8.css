@@ -1596,3 +1596,10 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @media (max-width: 560px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
 
 .roles-credit { margin: 18px 0 0; color: var(--mute); font-size: 10px; line-height: 1.4; letter-spacing: .02em; text-align: center; opacity: .78; }
+
+/* ── User-created guide blocks ───────────────────────────────────────────── */
+.guide-extra-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px 0; }
+.guide-extra-card { padding: 20px; border: 1px solid var(--line); border-top: 2px solid var(--electric); border-radius: var(--r); background: linear-gradient(145deg, rgba(24,29,38,.92), rgba(14,17,22,.96)); animation: s33-rise .7s var(--ease-out) both; animation-delay: calc(var(--i) * 80ms); }
+.guide-extra-card h2 { margin: 8px 0 12px; font-size: clamp(19px, 3vw, 26px); } .guide-extra-card .prose { color: var(--dim); line-height: 1.65; }
+.guide-extra-card--gold { border-top-color: var(--gold); } .guide-extra-card--orange { border-top-color: var(--accent); } .guide-extra-card--violet { border-top-color: #c7a6ff; } .guide-extra-card--red { border-top-color: #ff7f7f; }
+@media (max-width: 560px) { .guide-extra-grid { grid-template-columns: 1fr; gap: 10px; } .guide-extra-card { padding: 16px; } }

@@ -1141,6 +1141,16 @@ document.addEventListener('click', (e) => {
 
   /* ── Роли руководства ── */
   if (e.target.closest('[data-guide-add]')) { addGuideRole(); return; }
+  if (e.target.closest('[data-guide-extra-add]')) {
+    view.guideDraft = { ...view.guideDraft, extraBlocks: [...(view.guideDraft.extraBlocks ?? []), { title: 'Новый блок', body: '', tone: 'cyan' }] };
+    render(); return;
+  }
+  const extraRemove = e.target.closest('[data-guide-extra-remove]');
+  if (extraRemove) {
+    const index = Number(extraRemove.dataset.guideExtraRemove);
+    view.guideDraft = { ...view.guideDraft, extraBlocks: (view.guideDraft.extraBlocks ?? []).filter((_, i) => i !== index) };
+    render(); return;
+  }
   const guideRemove = e.target.closest('[data-guide-remove]');
   if (guideRemove) { removeGuideRole(Number(guideRemove.dataset.guideRemove)); return; }
   if (e.target.closest('[data-guide-save]')) { saveGuideToList(); return; }
@@ -1229,8 +1239,13 @@ document.addEventListener('input', (e) => {
   if (guideCredit && view?.guideDraft) view.guideDraft.credit = e.target.value;
 
   const guideRole = e.target.closest?.('[data-guide-role]');
+  const guideExtra = e.target.closest?.('[data-guide-extra]');
   const guideField = e.target.closest?.('[data-guide-field]');
-  if (guideField && view?.guideDraft) {
+  if (guideField && guideExtra && view?.guideDraft) {
+    const index = Number(guideExtra.dataset.guideExtra);
+    const block = view.guideDraft.extraBlocks?.[index];
+    if (block) view.guideDraft = { ...view.guideDraft, extraBlocks: view.guideDraft.extraBlocks.map((item, i) => i === index ? { ...item, [guideField.dataset.guideField]: guideField.value } : item) };
+  } else if (guideField && view?.guideDraft) {
     if (guideRole) {
       const index = Number(guideRole.dataset.guideRole);
       const role = view.guideDraft.roles[index];

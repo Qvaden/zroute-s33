@@ -25,6 +25,8 @@ export function renderGuideRoles(view) {
       ${field('Заголовок раздела ролей', 'rolesTitle', page.rolesTitle, disabled)}
       ${textarea('Описание раздела ролей', 'rolesSubtitle', page.rolesSubtitle, disabled, 3)}
       <div class="guide-editor__roles">${page.roles.map((role, index) => renderRole(role, index, disabled)).join('')}</div>
+      <header class="panel__head guide-editor__section-head"><div><h2>Новые информационные блоки</h2><p class="muted">Добавляйте свои разделы: FAQ, правила, памятки или объявления.</p></div><button type="button" class="adm-btn" data-guide-extra-add ${disabled}>+ Новый блок</button></header>
+      <div class="guide-editor__extras">${(page.extraBlocks ?? []).map((block, index) => renderExtraBlock(block, index, disabled)).join('')}</div>
       <header class="panel__head guide-editor__section-head"><h2>Важное правило</h2></header>
       ${field('Заголовок важного блока', 'noticeTitle', page.noticeTitle, disabled)}
       ${textarea('Текст важного блока', 'noticeBody', page.noticeBody, disabled, 6)}
@@ -44,8 +46,12 @@ export function renderGuideRoles(view) {
     </section>`;
 }
 
+function renderExtraBlock(block, index, disabled) {
+  return `<article class="guide-editor__extra" data-guide-extra="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">＋</span><h3>Дополнительный блок ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-extra-remove="${index}" ${disabled}>Удалить</button></header>${field('Заголовок блока', 'title', block.title, disabled, 'data-guide-extra-field')}${field('Цвет блока', 'tone', block.tone, disabled, 'data-guide-extra-field')}${textarea('Текст блока', 'body', block.body, disabled, 8, 'data-guide-extra-field')}</article>`;
+}
+
 function renderRole(role, index, disabled) {
   return `<article class="guide-editor__role" data-guide-role="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">${index + 1}</span><h3>Роль ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-remove="${index}" ${disabled}>Удалить</button></header><div class="guide-editor__role-grid">${field('Иконка', 'icon', role.icon, disabled)}${field('Название роли', 'title', role.title, disabled)}<label class="adm-field"><span>Цвет</span><select data-guide-field="tone" ${disabled}>${TONES.map((tone) => `<option value="${tone}" ${tone === role.tone ? 'selected' : ''}>${tone}</option>`).join('')}</select></label></div>${field('Короткое описание', 'intro', role.intro, disabled)}${textarea('Обязанности — по одному пункту на строку', 'items', (role.items ?? []).join('\n'), disabled, 5)}<label class="guide-editor__check"><input type="checkbox" data-guide-field="assistant" ${role.assistant ? 'checked' : ''} ${disabled}><span>Показывать «🤝 + помощник»</span></label></article>`;
 }
-function field(label, key, value, disabled = '') { return `<label class="adm-field"><span>${label}</span><input type="text" data-guide-field="${key}" value="${esc(value ?? '')}" ${disabled}></label>`; }
-function textarea(label, key, value, disabled = '', rows = 5) { return `<label class="adm-field"><span>${label}</span><textarea rows="${rows}" data-guide-field="${key}" ${disabled}>${esc(value ?? '')}</textarea></label>`; }
+function field(label, key, value, disabled = '', attr = '') { return `<label class="adm-field"><span>${label}</span><input type="text" ${attr} data-guide-field="${key}" value="${esc(value ?? '')}" ${disabled}></label>`; }
+function textarea(label, key, value, disabled = '', rows = 5, attr = '') { return `<label class="adm-field"><span>${label}</span><textarea rows="${rows}" ${attr} data-guide-field="${key}" ${disabled}>${esc(value ?? '')}</textarea></label>`; }
