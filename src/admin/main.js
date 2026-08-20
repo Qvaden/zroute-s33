@@ -1183,6 +1183,18 @@ document.addEventListener('click', (e) => {
   }
 
   /* ── Роли руководства ── */
+  const colorSwatch = e.target.closest('[data-guide-color]');
+  if (colorSwatch) {
+    const picker = colorSwatch.closest('[data-guide-color-picker]');
+    const native = picker?.querySelector('[data-guide-field]');
+    if (native) {
+      native.value = colorSwatch.dataset.guideColor;
+      native.dispatchEvent(new Event('input', { bubbles: true }));
+      const output = picker.querySelector('[data-guide-color-output]');
+      if (output) { output.textContent = native.value; output.style.setProperty('--picker-color', native.value); }
+    }
+    return;
+  }
   if (e.target.closest('[data-guide-add]')) { addGuideRole(); return; }
   if (e.target.closest('[data-guide-extra-add]')) {
     collectGuideDraftFromDom();
@@ -1287,6 +1299,11 @@ document.addEventListener('input', (e) => {
   const guideRole = e.target.closest?.('[data-guide-role]');
   const guideExtra = e.target.closest?.('[data-guide-extra]');
   const guideField = e.target.closest?.('[data-guide-field]');
+  if (guideField && guideField.type === 'color') {
+    const picker = guideField.closest('[data-guide-color-picker]');
+    const output = picker?.querySelector('[data-guide-color-output]');
+    if (output) { output.textContent = guideField.value; output.style.setProperty('--picker-color', guideField.value); }
+  }
   if (guideField && guideExtra && view?.guideDraft) {
     const index = Number(guideExtra.dataset.guideExtra);
     const block = view.guideDraft.extraBlocks?.[index];

@@ -30,9 +30,15 @@ export function renderGuide({ texts, standings, weeks, results }) {
     <div class="grid-2">${renderList({ title: page.weekTitle, body: page.weekBody }, page.weekTitle, 'week')}${renderList({ title: page.dontsTitle, body: page.dontsBody }, page.dontsTitle, 'dont')}</div>`;
 }
 
+function colorValue(value) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  const legacy = { gold: '#d8ff3e', orange: '#ff8a3d', violet: '#b78cff', cyan: '#63f5e5', red: '#ff5364' };
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw : legacy[raw] ?? '#63f5e5';
+}
+
 function renderExtraBlocks(blocks = []) {
   if (!blocks.length) return '';
-  return `<section class="guide-extra-grid">${blocks.map((block, i) => `<article class="guide-extra-card guide-extra-card--${esc(block.tone)}" style="--i:${i}"><span class="eyebrow">Дополнительный блок</span><h2>${esc(block.title)}</h2><div class="prose">${miniMarkdown(block.body)}</div></article>`).join('')}</section>`;
+  return `<section class="guide-extra-grid">${blocks.map((block, i) => `<article class="guide-extra-card guide-extra-card--${esc(block.tone)}" style="--i:${i};--extra-color:${colorValue(block.tone)}"><span class="eyebrow">Дополнительный блок</span><h2>${esc(block.title)}</h2><div class="prose">${miniMarkdown(block.body)}</div></article>`).join('')}</section>`;
 }
 
 function renderLeadershipRoles(page) {
@@ -45,7 +51,7 @@ function renderLeadershipRoles(page) {
         <p class="guide__lead">${esc(page.rolesSubtitle)}</p>
       </header>
       <div class="roles-grid">
-        ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">${role.title.trim().toLowerCase() === 'глава альянса' ? 'R5' : 'R4'}</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
+        ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}" style="--role-color:${colorValue(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">${role.title.trim().toLowerCase() === 'глава альянса' ? 'R5' : 'R4'}</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
       </div>
     </section>
     <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // Balance</span><h3>${esc(page.noticeTitle)}</h3>${miniMarkdown(page.noticeBody)}</div></section>

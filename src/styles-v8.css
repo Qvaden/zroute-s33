@@ -1603,3 +1603,10 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .guide-extra-card h2 { margin: 8px 0 12px; font-size: clamp(19px, 3vw, 26px); } .guide-extra-card .prose { color: var(--dim); line-height: 1.65; }
 .guide-extra-card--gold { border-top-color: var(--gold); } .guide-extra-card--orange { border-top-color: var(--accent); } .guide-extra-card--violet { border-top-color: #c7a6ff; } .guide-extra-card--red { border-top-color: #ff7f7f; }
 @media (max-width: 560px) { .guide-extra-grid { grid-template-columns: 1fr; gap: 10px; } .guide-extra-card { padding: 16px; } }
+
+/* User-selected colours from the full Guide editor */
+.role-card[style*="--role-color"]{--tone:var(--role-color);border-color:color-mix(in srgb,var(--role-color) 62%,var(--line));box-shadow:inset 0 0 32px color-mix(in srgb,var(--role-color) 8%,transparent),0 0 24px color-mix(in srgb,var(--role-color) 12%,transparent)}
+.role-card[style*="--role-color"] .role-card__icon,.role-card[style*="--role-color"] .role-card__tag{color:var(--role-color);text-shadow:0 0 16px color-mix(in srgb,var(--role-color) 52%,transparent)}
+.role-card[style*="--role-color"]::after{background:linear-gradient(90deg,transparent,var(--role-color),transparent);opacity:.42}
+.guide-extra-card[style*="--extra-color"]{border-color:color-mix(in srgb,var(--extra-color) 58%,var(--line));box-shadow:inset 0 0 36px color-mix(in srgb,var(--extra-color) 8%,transparent),0 0 22px color-mix(in srgb,var(--extra-color) 10%,transparent)}
+.guide-extra-card[style*="--extra-color"] .eyebrow{color:var(--extra-color);text-shadow:0 0 14px color-mix(in srgb,var(--extra-color) 48%,transparent)}

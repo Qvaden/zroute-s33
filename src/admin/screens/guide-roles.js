@@ -1,7 +1,13 @@
 import { esc } from '../../ui/helpers.js';
 import { parseGuidePage, serializeGuidePage, blankGuideRole, DEFAULT_GUIDE_PAGE } from '../../logic/guide-roles.js';
 
-const TONES = ['gold', 'orange', 'violet', 'cyan', 'red'];
+const COLOR_PRESETS = ['#d8ff3e', '#ff8a3d', '#b78cff', '#63f5e5', '#ff5364', '#4da3ff', '#f5d06f', '#ffffff', '#151b2a'];
+const LEGACY_COLORS = { gold: '#d8ff3e', orange: '#ff8a3d', violet: '#b78cff', cyan: '#63f5e5', red: '#ff5364' };
+
+function colorValue(value) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw : LEGACY_COLORS[raw] ?? '#63f5e5';
+}
 
 export function guideFromTexts(texts) {
   const byKey = Object.fromEntries((texts ?? []).map((t) => [t.key, t]));
@@ -47,11 +53,15 @@ export function renderGuideRoles(view) {
 }
 
 function renderExtraBlock(block, index, disabled) {
-  return `<article class="guide-editor__extra" data-guide-extra="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">＋</span><h3>Дополнительный блок ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-extra-remove="${index}" ${disabled}>Удалить</button></header>${field('Заголовок блока', 'title', block.title, disabled, 'data-guide-extra-field')}${field('Цвет блока', 'tone', block.tone, disabled, 'data-guide-extra-field')}${textarea('Текст блока', 'body', block.body, disabled, 8, 'data-guide-extra-field')}</article>`;
+  return `<article class="guide-editor__extra" data-guide-extra="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">＋</span><h3>Дополнительный блок ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-extra-remove="${index}" ${disabled}>Удалить</button></header>${field('Заголовок блока', 'title', block.title, disabled, 'data-guide-extra-field')}${colorPicker('Цвет блока', 'tone', block.tone, disabled, 'data-guide-extra-field')}${textarea('Текст блока', 'body', block.body, disabled, 8, 'data-guide-extra-field')}</article>`;
 }
 
 function renderRole(role, index, disabled) {
-  return `<article class="guide-editor__role" data-guide-role="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">${index + 1}</span><h3>Роль ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-remove="${index}" ${disabled}>Удалить</button></header><div class="guide-editor__role-grid">${field('Иконка', 'icon', role.icon, disabled)}${field('Название роли', 'title', role.title, disabled)}<label class="adm-field"><span>Цвет</span><select data-guide-field="tone" ${disabled}>${TONES.map((tone) => `<option value="${tone}" ${tone === role.tone ? 'selected' : ''}>${tone}</option>`).join('')}</select></label></div>${field('Короткое описание', 'intro', role.intro, disabled)}${textarea('Обязанности — по одному пункту на строку', 'items', (role.items ?? []).join('\n'), disabled, 5)}<label class="guide-editor__check"><input type="checkbox" data-guide-field="assistant" ${role.assistant ? 'checked' : ''} ${disabled}><span>Показывать «🤝 + помощник»</span></label></article>`;
+  return `<article class="guide-editor__role" data-guide-role="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">${index + 1}</span><h3>Роль ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-remove="${index}" ${disabled}>Удалить</button></header><div class="guide-editor__role-grid">${field('Иконка', 'icon', role.icon, disabled)}${field('Название роли', 'title', role.title, disabled)}${colorPicker('Цвет роли', 'tone', role.tone, disabled)}</div>${field('Короткое описание', 'intro', role.intro, disabled)}${textarea('Обязанности — по одному пункту на строку', 'items', (role.items ?? []).join('\n'), disabled, 5)}<label class="guide-editor__check"><input type="checkbox" data-guide-field="assistant" ${role.assistant ? 'checked' : ''} ${disabled}><span>Показывать «🤝 + помощник»</span></label></article>`;
 }
 function field(label, key, value, disabled = '', attr = '') { return `<label class="adm-field"><span>${label}</span><input type="text" ${attr} data-guide-field="${key}" value="${esc(value ?? '')}" ${disabled}></label>`; }
 function textarea(label, key, value, disabled = '', rows = 5, attr = '') { return `<label class="adm-field"><span>${label}</span><textarea rows="${rows}" ${attr} data-guide-field="${key}" ${disabled}>${esc(value ?? '')}</textarea></label>`; }
+function colorPicker(label, key, value, disabled = '', attr = '') {
+  const color = colorValue(value);
+  return `<div class="guide-color-picker" data-guide-color-picker><div class="guide-color-picker__head"><span>${label}</span><output data-guide-color-output style="--picker-color:${color}">${color}</output></div><div class="guide-color-picker__controls"><input class="guide-color-picker__native" type="color" value="${color}" data-guide-field="${key}" ${attr} ${disabled} aria-label="${label}"><div class="guide-color-picker__swatches">${COLOR_PRESETS.map((preset) => `<button type="button" class="guide-color-swatch" style="--swatch:${preset}" data-guide-color="${preset}" ${disabled} aria-label="Выбрать цвет ${preset}"></button>`).join('')}</div></div><small class="guide-color-picker__hint">Выберите любой оттенок или используйте палитру</small></div>`;
+}
