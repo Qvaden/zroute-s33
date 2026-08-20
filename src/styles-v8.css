@@ -1615,3 +1615,9 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .roles-credit{position:relative;display:block;max-width:fit-content;margin:22px auto 0;padding:7px 14px 8px;color:color-mix(in srgb,var(--text) 72%,var(--mute));font-size:10.5px;line-height:1.45;letter-spacing:.035em;text-align:center;opacity:.9;border-top:1px solid color-mix(in srgb,var(--electric) 42%,transparent);border-bottom:1px solid color-mix(in srgb,var(--electric) 18%,transparent);text-shadow:0 0 12px color-mix(in srgb,var(--electric) 26%,transparent)}
 .roles-credit::before,.roles-credit::after{content:"✦";display:inline-block;margin:0 8px;color:var(--electric);font-size:9px;vertical-align:1px;opacity:.75}
 @media (max-width:560px){.roles-credit{max-width:92%;padding:7px 10px;font-size:10px}.roles-credit::before,.roles-credit::after{margin:0 5px}}
+
+/* Calm card atmosphere: replace distracting circles with a lightweight scan accent */
+.role-card::after{right:auto;bottom:auto;left:-48%;top:0;width:48%;height:1px;border:0;border-radius:0;background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.48;animation:role-card-scan 8s ease-in-out infinite;will-change:transform}
+.role-card:nth-child(2)::after{animation-delay:-2.2s}.role-card:nth-child(3)::after{animation-delay:-4.4s}.role-card:nth-child(4)::after{animation-delay:-1.1s}.role-card:nth-child(5)::after{animation-delay:-3.3s}
+@keyframes role-card-scan{0%,18%{transform:translateX(0);opacity:0}32%{opacity:.42}58%,100%{transform:translateX(310%);opacity:0}}
+@media (prefers-reduced-motion:reduce){.role-card::after{animation:none;left:0;width:100%;opacity:.22}}
