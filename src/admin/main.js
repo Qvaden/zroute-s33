@@ -933,6 +933,66 @@ async function publishTexts() {
 }
 
 /* ── Роли руководства ───────────────────────────────────────────────────── */
+function isHexColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(String(value ?? '').trim());
+}
+
+function updateColorModalPreview(value) {
+  const color = String(value ?? '').trim().toUpperCase();
+  const modal = root.querySelector('[data-guide-color-modal]');
+  if (!modal) return;
+  const hex = modal.querySelector('[data-guide-color-modal-hex]');
+  const orb = modal.querySelector('[data-guide-color-modal-orb]');
+  if (hex) hex.textContent = color || '#------';
+  if (orb && isHexColor(color)) orb.style.setProperty('--modal-color', color);
+}
+
+function openGuideColorModal(trigger) {
+  const modal = root.querySelector('[data-guide-color-modal]');
+  if (!modal) return;
+  const container = trigger.closest('[data-guide-role], [data-guide-extra]');
+  view.colorTarget = {
+    kind: container?.matches('[data-guide-role]') ? 'role' : 'extra',
+    index: Number(container?.dataset.guideRole ?? container?.dataset.guideExtra ?? 0),
+    key: trigger.dataset.guideColorOpen,
+  };
+  view.colorDraft = trigger.dataset.guideColorValue || '#63F5E5';
+  const input = modal.querySelector('[data-guide-color-hex]');
+  if (input) input.value = view.colorDraft.toUpperCase();
+  updateColorModalPreview(view.colorDraft);
+  modal.hidden = false;
+  document.body.classList.add('guide-color-modal-open');
+  input?.focus();
+}
+
+function closeGuideColorModal() {
+  const modal = root.querySelector('[data-guide-color-modal]');
+  if (modal) modal.hidden = true;
+  document.body.classList.remove('guide-color-modal-open');
+  view.colorTarget = null;
+  view.colorDraft = null;
+}
+
+function applyGuideColor() {
+  const color = String(view.colorDraft ?? '').trim().toLowerCase();
+  const target = view.colorTarget;
+  if (!target || !isHexColor(color)) {
+    const error = root.querySelector('[data-guide-color-error]');
+    if (error) error.hidden = false;
+    return;
+  }
+  const page = view.guideDraft;
+  if (target.kind === 'role' && page.roles[target.index]) page.roles[target.index] = { ...page.roles[target.index], [target.key]: color };
+  if (target.kind === 'extra' && page.extraBlocks?.[target.index]) page.extraBlocks[target.index] = { ...page.extraBlocks[target.index], [target.key]: color };
+  const container = root.querySelector(`[data-guide-${target.kind}="${target.index}"]`);
+  const trigger = container?.querySelector('[data-guide-color-open]');
+  const output = container?.querySelector('[data-guide-color-output]');
+  if (trigger) { trigger.dataset.guideColorValue = color; trigger.style.setProperty('--picker-color', color); }
+  if (output) { output.textContent = color; output.style.setProperty('--picker-color', color); }
+  closeGuideColorModal();
+  syncGuideDraft();
+}
+
 function collectGuideDraftFromDom() {
   const editor = root.querySelector('[data-guide-editor]');
   if (!editor || !view?.guideDraft) return;
@@ -1183,18 +1243,18 @@ document.addEventListener('click', (e) => {
   }
 
   /* ── Роли руководства ── */
-  const colorSwatch = e.target.closest('[data-guide-color]');
-  if (colorSwatch) {
-    const picker = colorSwatch.closest('[data-guide-color-picker]');
-    const native = picker?.querySelector('[data-guide-field]');
-    if (native) {
-      native.value = colorSwatch.dataset.guideColor;
-      native.dispatchEvent(new Event('input', { bubbles: true }));
-      const output = picker.querySelector('[data-guide-color-output]');
-      if (output) { output.textContent = native.value; output.style.setProperty('--picker-color', native.value); }
-    }
+  const colorOpen = e.target.closest('[data-guide-color-open]');
+  if (colorOpen) { openGuideColorModal(colorOpen); return; }
+  const modalColor = e.target.closest('[data-guide-modal-color]');
+  if (modalColor) {
+    view.colorDraft = modalColor.dataset.guideModalColor;
+    const input = root.querySelector('[data-guide-color-hex]');
+    if (input) input.value = view.colorDraft.toUpperCase();
+    updateColorModalPreview(view.colorDraft);
     return;
   }
+  if (e.target.closest('[data-guide-color-close]')) { closeGuideColorModal(); return; }
+  if (e.target.closest('[data-guide-color-apply]')) { applyGuideColor(); return; }
   if (e.target.closest('[data-guide-add]')) { addGuideRole(); return; }
   if (e.target.closest('[data-guide-extra-add]')) {
     collectGuideDraftFromDom();
@@ -1298,6 +1358,14 @@ document.addEventListener('input', (e) => {
 
   const guideRole = e.target.closest?.('[data-guide-role]');
   const guideExtra = e.target.closest?.('[data-guide-extra]');
+  const colorHex = e.target.closest?.('[data-guide-color-hex]');
+  if (colorHex) {
+    view.colorDraft = colorHex.value.trim();
+    const error = root.querySelector('[data-guide-color-error]');
+    if (error) error.hidden = !colorHex.value || isHexColor(colorHex.value);
+    updateColorModalPreview(colorHex.value);
+  }
+
   const guideField = e.target.closest?.('[data-guide-field]');
   if (guideField && guideField.type === 'color') {
     const picker = guideField.closest('[data-guide-color-picker]');
@@ -1365,6 +1433,10 @@ async function processEventFiles(files) {
   view.eventDraft = { ...view.eventDraft, ...patch };
   render();
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && root.querySelector('[data-guide-color-modal]:not([hidden])')) closeGuideColorModal();
+});
 
 document.addEventListener('change', (e) => {
   const input = e.target.closest?.('[data-event-image-input]');
