@@ -941,3 +941,10 @@ body.guide-color-modal-open{overflow:hidden}
   .guide-color-modal__backdrop{position:fixed;}
   .guide-color-modal__head{position:sticky;top:0;z-index:2;padding-bottom:12px;background:linear-gradient(#182531 72%,transparent);}
 }
+
+/* Exact mobile dialog height: stable viewport, inner scrolling only */
+@media(max-width:560px){
+  .guide-color-modal{display:grid;height:100svh;min-height:100svh;overflow:hidden;align-items:center;justify-items:center;padding:10px;}
+  .guide-color-modal__dialog{height:calc(100svh - 20px);max-height:calc(100svh - 20px);margin:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;}
+  .guide-color-modal__head{position:sticky;top:0;z-index:2;padding-bottom:12px;background:linear-gradient(#182531 72%,transparent);}
+}
