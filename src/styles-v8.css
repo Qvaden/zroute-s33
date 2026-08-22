@@ -1653,3 +1653,24 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .president-board{margin-bottom:20px}
 @media(max-width:700px){.president-board{margin-bottom:16px}}
 @media(max-width:390px){.president-board{margin-bottom:14px}}
+
+/* ── Mobile timeline containment and header order ───────────────────────── */
+@media(max-width:759px){
+  .site-head__inner{display:flex;flex-direction:column;align-items:stretch;gap:0}
+  .site-head__inner .brand{order:1}
+  .site-head__inner #president-board{order:2}
+  .site-head__inner .nav{order:3}
+  .site-head__inner .president-board{width:100%}
+  .site-head__inner .nav{width:100%;max-width:100%;min-width:0;overflow-x:auto}
+  .tl,.tl__item,.tl__body,.tl__details,.tl__details-body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
+  .tl__item{gap:10px}
+  .tl__marker{width:36px;height:36px;overflow:hidden;transform-origin:center;font-size:10px;line-height:1;flex:0 0 36px}
+  .tl__item--server_capture .tl__marker{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+  .tl__body h3,.tl__body p,.tl__summary{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+  .tl__meta{min-width:0;max-width:100%;gap:4px 8px}
+  .tl__meta time,.tl__type{max-width:100%;overflow-wrap:anywhere}
+  .tl__gallery{max-width:100%;overflow:hidden}
+}
+@keyframes s33-pulse-dot-contained{0%,100%{transform:scale(1);opacity:.86}50%{transform:scale(1.07);opacity:1}}
+.tl__marker{animation:s33-pulse-dot-contained 2.8s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.tl__marker{animation:none}}
