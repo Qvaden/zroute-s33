@@ -158,6 +158,7 @@ export function eventsFromRaw(raw) {
       type: EVENT_TYPE[String(e.type)] ? String(e.type) : 'other',
       serverNumber: e.serverNumber != null && e.serverNumber !== '' ? Number(e.serverNumber) : null,
       title: String(e.title ?? ''),
+      summary: String(e.summary ?? ''),
       body: String(e.body ?? ''),
       imageUrl: String(e.imageUrl ?? ''),
       imageUrls: Array.isArray(e.imageUrls)
