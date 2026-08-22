@@ -529,6 +529,7 @@ function saveEventToList() {
     ...form,
     id: form.id ?? nextEventId(view.raw, view.events),
     title: String(form.title).trim(),
+    summary: String(form.summary ?? '').trim(),
     body: String(form.body ?? '').trim(),
     imageUrl: String(form.imageUrl ?? '').trim(),
     imageUrls: Array.isArray(form.imageUrls) ? form.imageUrls.map((url) => String(url).trim()).filter(Boolean) : [],
