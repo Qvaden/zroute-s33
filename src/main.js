@@ -74,10 +74,15 @@ function renderPresidentBoard(texts = []) {
   const board = presidentBoardFromTexts(texts);
   presidentBoard.hidden = !board.enabled;
   presidentBoard.innerHTML = board.enabled ? `
-    <span class="president-board__signal" aria-hidden="true"></span>
-    <span class="president-board__label">${esc(board.label)}</span>
-    <strong class="president-board__name">${esc(board.name)}</strong>
-    <span class="president-board__alliance">${esc(board.alliance)}</span>
+    <div class="president-board__head">
+      <span class="president-board__signal" aria-hidden="true"></span>
+      <span class="president-board__label">${esc(board.label)}</span>
+      <span class="president-board__live">LIVE</span>
+    </div>
+    <div class="president-board__identity">
+      <strong class="president-board__name">${esc(board.name)}</strong>
+      <span class="president-board__alliance">${esc(board.alliance)}</span>
+    </div>
     ${board.note ? `<small class="president-board__note">${esc(board.note)}</small>` : ''}
   ` : '';
 }
