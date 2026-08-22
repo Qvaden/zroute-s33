@@ -1734,3 +1734,8 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   .panel__head h2{font-size:17px}
   .quart-controls,.ctl{gap:7px}
 }
+
+/* The gold quarter medal had its float animation overridden by the breathe rule. */
+@keyframes quart-gold-medal-float{0%,100%{transform:translateY(0) scale(1);filter:drop-shadow(0 0 7px color-mix(in srgb,var(--quart-acid) 38%,transparent))}50%{transform:translateY(-5px) scale(1.045);filter:drop-shadow(0 0 14px color-mix(in srgb,var(--quart-acid) 72%,transparent))}}
+.quart-podium-card--gold .quart-podium-card__medal{display:inline-block;transform-origin:center;animation:quart-gold-medal-float 2.8s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.quart-podium-card--gold .quart-podium-card__medal{animation:none}}
