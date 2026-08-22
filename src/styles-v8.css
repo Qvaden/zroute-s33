@@ -1648,3 +1648,8 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:8.5px;letter-spacing:.14em}.president-board__live{font-size:7px;padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:14px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:9.5px}.president-board::after{right:13px;bottom:10px;font-size:7px}}
 @media(max-width:390px){.president-board__identity{display:grid;grid-template-columns:1fr auto;align-items:center}.president-board__name{font-size:15px}.president-board__alliance{font-size:13px}.president-board::after{display:none}}
 @media(prefers-reduced-motion:reduce){.president-board,.president-board::before,.president-board__signal{animation:none}}
+
+/* Keep the presidential board visually separated from the animated header edge. */
+.president-board{margin-bottom:20px}
+@media(max-width:700px){.president-board{margin-bottom:16px}}
+@media(max-width:390px){.president-board{margin-bottom:14px}}
