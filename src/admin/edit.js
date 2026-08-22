@@ -176,6 +176,7 @@ export function blankEvent() {
     type: 'server_capture',
     serverNumber: null,
     title: '',
+    summary: '',
     body: '',
     imageUrl: '',
     imageUrls: [],
@@ -257,12 +258,14 @@ export function applyEvents(raw, list) {
         id: String(e.id),
         date: isoDay(e.date),
         type: String(e.type),
-        title: String(e.title).trim(),
-      };
+      title: String(e.title).trim(),
+      summary: String(e.summary ?? '').trim(),
+    };
       // Необязательные поля не пишем пустыми: файл читают люди.
       if (Number.isFinite(Number(e.serverNumber)) && e.serverNumber !== null && e.serverNumber !== '') {
         out.serverNumber = Number(e.serverNumber);
       }
+      if (String(e.summary ?? '').trim()) out.summary = String(e.summary).trim();
       if (String(e.body ?? '').trim()) out.body = String(e.body).trim();
       const imageUrls = Array.isArray(e.imageUrls)
         ? e.imageUrls.map((url) => String(url ?? '').trim()).filter(Boolean)
@@ -302,7 +305,7 @@ export function eventsDiff(raw, list) {
     }
     const oldImages = Array.isArray(was.imageUrls) ? was.imageUrls : (was.imageUrl ? [was.imageUrl] : []);
     const newImages = Array.isArray(ev.imageUrls) ? ev.imageUrls : (ev.imageUrl ? [ev.imageUrl] : []);
-    const same = ['date', 'type', 'title', 'body'].every(
+    const same = ['date', 'type', 'title', 'summary', 'body'].every(
       (k) => String(was[k] ?? '') === String(ev[k] ?? '')
     ) && JSON.stringify(oldImages) === JSON.stringify(newImages);
     const sameNums =

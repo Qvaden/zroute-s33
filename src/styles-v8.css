@@ -1630,3 +1630,10 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @keyframes president-board-pulse{0%,100%{opacity:.55;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
 @media(max-width:700px){.president-board{grid-template-columns:auto 1fr auto;gap:6px 8px;padding:9px 10px}.president-board__label{grid-column:2/-1;font-size:8px}.president-board__name{grid-column:2;font-size:13px}.president-board__alliance{grid-column:3;font-size:12px}.president-board__note{grid-column:2/-1;text-align:left;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.president-board,.president-board__signal{animation:none}}
+
+/* Compact timeline cards: summary stays visible, details open on demand */
+.tl__summary{display:-webkit-box;overflow:hidden;margin:7px 0 0;color:var(--dim);font-size:14px;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.tl__details{margin-top:10px;border-top:1px solid var(--line-soft)}.tl__details>summary{display:inline-flex;align-items:center;gap:7px;padding:9px 0 2px;color:var(--electric);cursor:pointer;font-size:12px;font-weight:800;list-style:none}.tl__details>summary::-webkit-details-marker{display:none}.tl__details>summary::before{content:'＋';display:grid;place-items:center;width:18px;height:18px;border:1px solid currentColor;border-radius:50%;font-size:14px;line-height:1;transition:transform .2s var(--ease-out)}.tl__details[open]>summary::before{content:'−';transform:rotate(180deg)}.tl__details-body{padding:5px 0 2px;color:var(--dim);animation:timeline-details-in .22s var(--ease-out) both}.tl__details-body p{margin:0;line-height:1.65}.tl__details-body .tl__gallery{margin-top:12px}@keyframes timeline-details-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.adm-publish--top{position:sticky;top:10px;z-index:8;margin:0 0 14px;box-shadow:0 12px 30px -24px rgba(0,0,0,.9);backdrop-filter:blur(12px)}
+@media(max-width:600px){.adm-publish--top{top:6px;display:grid;gap:10px}.adm-publish--top .adm-publish__actions{display:grid;grid-template-columns:1fr 1fr}.tl__summary{font-size:13px}}
+@media(prefers-reduced-motion:reduce){.tl__details-body{animation:none}}

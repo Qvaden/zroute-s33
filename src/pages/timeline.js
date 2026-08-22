@@ -257,8 +257,8 @@ function renderFeed(events) {
             ${e.durationDays ? `<span class="tl__dur">${plural(e.durationDays, 'день', 'дня', 'дней')}</span>` : ''}
           </div>
           <h3>${esc(e.title)}</h3>
-          ${e.body ? `<p>${esc(e.body)}</p>` : ''}
-          ${renderEventGallery(e)}
+          ${e.summary ? `<p class="tl__summary">${esc(e.summary)}</p>` : ''}
+          ${e.body || eventImages(e).length ? `<details class="tl__details"><summary>Открыть событие</summary><div class="tl__details-body">${e.body ? `<p>${esc(e.body)}</p>` : ''}${renderEventGallery(e)}</div></details>` : ''}
         </div>
       </li>`;
     })

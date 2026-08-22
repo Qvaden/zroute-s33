@@ -40,16 +40,21 @@ export function renderEvents(view) {
       </p>
     </section>
 
+    <section class="adm-publish adm-publish--top" data-events-toolbar>
+      <div class="adm-publish__state">${describeEvents(diff, view.eventsSaved)}</div>
+      <div class="adm-publish__actions">
+        ${canPush ? '<button type="button" class="adm-btn" data-event-new>Добавить запись</button>' : ''}
+        <button type="button" class="adm-btn" data-events-reset ${diff.total ? '' : 'disabled'}>Сбросить</button>
+        <button type="button" class="adm-btn adm-btn--primary" data-events-publish ${diff.total && canPush ? '' : 'disabled'}>Опубликовать</button>
+      </div>
+      <div class="adm-result" data-events-result hidden></div>
+    </section>
+
     ${renderForm(form, canPush)}
 
     <section class="panel" data-events-form>
       <header class="panel__head adm-head-row">
         <h2>Записи</h2>
-        ${
-          canPush
-            ? '<button type="button" class="adm-btn" data-event-new>Добавить запись</button>'
-            : ''
-        }
       </header>
 
       ${
@@ -61,17 +66,6 @@ export function renderEvents(view) {
 
       ${list.length ? `<ul class="adm-evs">${list.map((e) => row(e, canPush)).join('')}</ul>` : empty()}
 
-      <div class="adm-publish">
-        <div class="adm-publish__state">${describeEvents(diff, view.eventsSaved)}</div>
-        <div class="adm-publish__actions">
-          <button type="button" class="adm-btn" data-events-reset
-                  ${diff.total ? '' : 'disabled'}>Сбросить</button>
-          <button type="button" class="adm-btn adm-btn--primary" data-events-publish
-                  ${diff.total && canPush ? '' : 'disabled'}>Опубликовать</button>
-        </div>
-      </div>
-
-      <div class="adm-result" data-events-result hidden></div>
     </section>`;
 }
 
@@ -95,7 +89,8 @@ function row(e, canPush) {
         <code class="adm-mono adm-ev__id">${esc(e.id)}</code>
       </div>
       <b>${esc(e.title)}</b>
-      ${e.body ? `<p class="muted">${esc(e.body)}</p>` : ''}
+      ${e.summary ? `<p class="adm-ev__summary">${esc(e.summary)}</p>` : ''}
+      ${e.body ? `<p class="muted adm-ev__full">${esc(e.body)}</p>` : ''}
       ${renderEventImages(e)}
     </div>
     ${
@@ -213,9 +208,15 @@ function renderForm(form, canPush) {
       </label>
 
       <label class="adm-field">
-        <span>Описание</span>
-        <textarea rows="3" data-event-field="body"
-                  placeholder="Как всё прошло. Можно оставить пустым.">${esc(form.body)}</textarea>
+        <span>Короткая сноска для карточки <small>(видна всегда, до 2 строк)</small></span>
+        <textarea rows="2" maxlength="180" data-event-field="summary"
+                  placeholder="Кратко: что произошло и почему это важно.">${esc(form.summary ?? '')}</textarea>
+      </label>
+
+      <label class="adm-field">
+        <span>Основной текст события <small>(скрыт до нажатия)</small></span>
+        <textarea rows="5" data-event-field="body"
+                  placeholder="Подробности события. Пользователь откроет их кнопкой «Открыть событие».">${esc(form.body)}</textarea>
       </label>
 
       <div class="adm-grid2">

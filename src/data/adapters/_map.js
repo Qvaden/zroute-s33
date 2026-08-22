@@ -66,6 +66,7 @@ export function mapEvents(rows) {
       type: toStr(e.type) || 'other',
       serverNumber: e.serverNumber != null ? Number(e.serverNumber) : undefined,
       title: toStr(e.title),
+      summary: e.summary ? toStr(e.summary) : undefined,
       body: e.body ? toStr(e.body) : undefined,
       imageUrl: e.imageUrl ? toStr(e.imageUrl) : undefined,
       durationDays: e.durationDays != null ? Number(e.durationDays) : undefined,
