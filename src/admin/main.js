@@ -86,7 +86,9 @@ import { renderAlliances } from './screens/alliances.js';
 import { renderEvents } from './screens/events.js';
 import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js';
 import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js';
 import { renderQuarter } from './screens/quarter.js';
+import { renderPresident } from './screens/president.js';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -95,6 +97,7 @@ const SCREENS = [
   { id: 'alliances', label: 'Альянсы', render: renderAlliances },
   { id: 'events', label: 'Хронология', render: renderEvents },
   { id: 'guidePage', label: 'Малым алам', render: renderGuideRoles },
+  { id: 'president', label: 'Президент', render: renderPresident },
 ];
 
 const root = document.getElementById('admin');
@@ -162,12 +165,16 @@ function render() {
     view.canPush = Boolean(view.repo?.canPush);
   }
 
-  if (screen.id === 'guidePage') {
-    // Общий черновик: роли лежат в том же безопасном массиве texts, но имеют отдельный удобный редактор.
+  if (screen.id === 'guidePage' || screen.id === 'president') {
     view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
     view.textsSaved = textsDraftSavedAt();
-    view.guideDraft = view.guideDraft ?? guideFromTexts(view.texts);
     view.canPush = Boolean(view.repo?.canPush);
+  }
+  if (screen.id === 'guidePage') {
+    view.guideDraft = view.guideDraft ?? guideFromTexts(view.texts);
+  }
+  if (screen.id === 'president') {
+    view.presidentDraft = view.presidentDraft ?? presidentBoardFromTexts(view.texts);
   }
 
   root.innerHTML = renderShell({
@@ -1036,6 +1043,28 @@ function collectGuideDraftFromDom() {
   view.guideDraft = next;
 }
 
+function collectPresidentFromDom() {
+  const editor = root.querySelector('[data-president-editor]');
+  if (!editor || !view?.presidentDraft) return;
+  const next = { ...view.presidentDraft };
+  editor.querySelectorAll('[data-president-field]').forEach((field) => {
+    next[field.dataset.presidentField] = field.type === 'checkbox' ? field.checked : field.value;
+  });
+  view.presidentDraft = next;
+}
+
+function savePresidentToList() {
+  if (!view?.canPush || !view.presidentDraft) return false;
+  collectPresidentFromDom();
+  const entry = { key: PRESIDENT_BOARD_KEY, title: 'Президент сервера', body: serializePresidentBoard(view.presidentDraft) };
+  const i = view.texts.findIndex((text) => text.key === PRESIDENT_BOARD_KEY);
+  view.texts = i >= 0 ? view.texts.map((text) => (text.key === PRESIDENT_BOARD_KEY ? entry : text)) : [...view.texts, entry];
+  saveTextsDraft(view.texts);
+  const state = root.querySelector('[data-president-state]');
+  if (state) state.textContent = 'Черновик доски сохранён в браузере. Нажмите «Опубликовать доску», чтобы отправить его на сайт.';
+  return true;
+}
+
 function saveGuideToList() {
   if (!view?.canPush || !view.guideDraft) return false;
   collectGuideDraftFromDom();
@@ -1255,6 +1284,13 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  /* ── Президентская доска ── */
+  if (e.target.closest('[data-president-save]')) { savePresidentToList(); return; }
+  if (e.target.closest('[data-president-reset]')) {
+    dropTextsDraft(); view.texts = textsFromRaw(view.raw); view.presidentDraft = presidentBoardFromTexts(view.texts); render(); return;
+  }
+  if (e.target.closest('[data-president-publish]')) { savePresidentToList(); publishTexts(); return; }
+
   /* ── Роли руководства ── */
   const colorOpen = e.target.closest('[data-guide-color-open]');
   if (colorOpen) { openGuideColorModal(colorOpen); return; }
@@ -1338,6 +1374,8 @@ document.addEventListener('click', (e) => {
   потому что поле не потеряло фокус.
 */
 document.addEventListener('input', (e) => {
+  const presidentField = e.target.closest?.('[data-president-field]');
+  if (presidentField && view?.presidentDraft) { collectPresidentFromDom(); savePresidentToList(); return; }
   /*
     Поля формы события пишем в состояние на каждый ввод и НЕ перерисовываем:
     перерисовка на каждую букву уносила бы курсор в конец строки.

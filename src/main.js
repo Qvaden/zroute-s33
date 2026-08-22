@@ -18,6 +18,8 @@ import { renderGuide } from './pages/guide.js';
 import { renderBot } from './pages/bot.js';
 import { renderAlliance } from './pages/alliance.js';
 import { computeAchievements } from './logic/achievements.js';
+import { esc } from './ui/helpers.js';
+import { presidentBoardFromTexts } from './logic/president-board.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
 import './ui/ladder-controls.js';
 import './ui/timeline-controls.js';
@@ -33,6 +35,7 @@ const ROUTES = [
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
+const presidentBoard = document.getElementById('president-board');
 const bootLoader = document.getElementById('boot-loader');
 const isFirstVisit = !document.documentElement.classList.contains('s33-loader-seen');
 const bootStartedAt = performance.now();
@@ -64,6 +67,19 @@ function renderNav(activeId) {
   nav.innerHTML = ROUTES.map(
     (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}">${r.label}</a>`
   ).join('');
+}
+
+function renderPresidentBoard(texts = []) {
+  if (!presidentBoard) return;
+  const board = presidentBoardFromTexts(texts);
+  presidentBoard.hidden = !board.enabled;
+  presidentBoard.innerHTML = board.enabled ? `
+    <span class="president-board__signal" aria-hidden="true"></span>
+    <span class="president-board__label">${esc(board.label)}</span>
+    <strong class="president-board__name">${esc(board.name)}</strong>
+    <span class="president-board__alliance">${esc(board.alliance)}</span>
+    ${board.note ? `<small class="president-board__note">${esc(board.note)}</small>` : ''}
+  ` : '';
 }
 
 /*
@@ -147,6 +163,7 @@ function trackPageview(path) {
 function render() {
   if (!view) return;
   const { id, param } = parseHash();
+  renderPresidentBoard(view.texts);
 
   let path;
   if (id === 'alliance' && param) {
