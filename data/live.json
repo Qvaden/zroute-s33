@@ -653,6 +653,136 @@
       "weekId": "W3",
       "allianceId": "a32",
       "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a01",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a02",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a03",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a04",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a05",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a06",
+      "outcome": "loss"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a07",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a08",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a09",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a10",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a11",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a12",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a13",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a14",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a15",
+      "outcome": "loss"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a16",
+      "outcome": "loss"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a17",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a18",
+      "outcome": "loss"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a19",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a20",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a21",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a22",
+      "outcome": "loss"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a25",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a30",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a31",
+      "outcome": "win"
+    },
+    {
+      "weekId": "W4",
+      "allianceId": "a32",
+      "outcome": "loss"
     }
   ],
   "events": [
