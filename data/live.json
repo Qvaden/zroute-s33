@@ -896,6 +896,11 @@
     },
     {
       "weekId": "W5",
+      "allianceId": "a23",
+      "outcome": "loss"
+    },
+    {
+      "weekId": "W5",
       "allianceId": "a30",
       "outcome": "win"
     },
