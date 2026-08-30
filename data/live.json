@@ -160,7 +160,7 @@
       "id": "a23",
       "tag": "EKF",
       "name": "EliteKombatForce",
-      "active": false,
+      "active": true,
       "color": "#7362e4"
     },
     {
@@ -175,7 +175,7 @@
       "id": "a25",
       "tag": "FIX",
       "name": "Fenixx",
-      "active": true,
+      "active": false,
       "color": "#8f49d4"
     },
     {
