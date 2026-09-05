@@ -2219,6 +2219,52 @@ console.log('\nQ. Форум');
   equal('каждый охранник пропускает запрос из SQL-редактора',
     guards.filter((g) => /auth\.uid\(\) is null/.test(g)).length, guards.length);
 
+  /*
+    СХЕМУ ВСТАВЛЯЮТ ЦЕЛИКОМ И НЕ ПРАВЯТ.
+
+    В конце файла лежали два закомментированных блока, где требовалось
+    подставить свой ник: назначение администратора и очистка пробных данных.
+    Это оказалось ловушкой. Правка внутри комментария рвёт строку, её хвост
+    остаётся без «--» и становится настоящим SQL — запуск всего файла падает
+    с невнятной синтаксической ошибкой в конце, хотя со схемой всё в порядке.
+    Ровно это и произошло: перенос строки внутри `lower('...')`.
+
+    Одноразовые действия вынесены в отдельные файлы, где правка — цель,
+    а не ловушка посреди семисот строк.
+  */
+  check('в схеме нет мест, которые нужно править руками',
+    !/ТВОЙ_НИК|Раскомментируй|раскомментируй/.test(schema));
+
+  const { stat: statFile } = await import('node:fs/promises');
+  for (const f of ['supabase/first-admin.sql', 'supabase/cleanup-test-data.sql']) {
+    let exists = true;
+    try { await statFile(f); } catch { exists = false; }
+    check(`одноразовое действие вынесено отдельно: ${f}`, exists);
+  }
+
+  /*
+    Проверяем, что в одноразовых файлах ровно одно место для правки: два
+    и больше — это приглашение поправить одно и забыть про другое.
+  */
+  for (const f of ['supabase/first-admin.sql', 'supabase/cleanup-test-data.sql']) {
+    const text = await readFile(f, 'utf8');
+    const code = text.replace(/^\s*--.*$/gm, '');
+    const spots = (code.match(/ТВОЙ_НИК/g) ?? []).length;
+    equal(`${f}: одно место для правки`, spots, 1);
+  }
+
+  /*
+    Очистка обязана останавливаться, если ник не совпал: без этого опечатка
+    удаляет всех, включая владельца, и вернуть уже нечего.
+  */
+  const cleanup = await readFile('supabase/cleanup-test-data.sql', 'utf8');
+  check('очистка идёт одной транзакцией',
+    /^begin;/m.test(cleanup) && /^commit;/m.test(cleanup));
+  check('при несовпадении ника очистка останавливается и не удаляет ничего',
+    /raise exception/.test(cleanup) && /Ничего не удалено/.test(cleanup));
+  check('очистка удаляет и учётные записи, а не только посты',
+    /delete from auth\.users/.test(cleanup));
+
   /* ── Страница и панель ── */
 
   const { renderForum } = await import('../src/pages/forum.js');
