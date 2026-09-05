@@ -1177,3 +1177,17 @@ body.guide-color-modal-open{overflow:hidden}
   .adm-player__reason { max-width: none; }
   .adm-modal__box { padding: 16px; border-radius: 16px; }
 }
+
+/*
+  Пояснение внизу окна: чем тишина отличается от запрета. Стоит там,
+  где меру и выбирают, — человек, который сомневается, в документацию
+  не пойдёт.
+*/
+.adm-modal__note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft, rgba(255,255,255,.06));
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.adm-modal__note b { color: var(--dim); }

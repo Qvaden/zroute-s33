@@ -55,6 +55,24 @@ select
   u.about,
   u.alliance_tag,
   u.role,
+  /*
+    ВЛАДЕЛЕЦ — ЭТО ПЕРВЫЙ АДМИНИСТРАТОР, А НЕ ОТДЕЛЬНАЯ РОЛЬ.
+
+    Права у владельца и у назначенного им администратора одинаковые, и делить
+    их на уровни было бы неправдой: оба могут всё. Но для читателя это разные
+    люди — один сделал сайт, второму дали доступ.
+    
+    Поэтому признак вычисляется, а не хранится: владелец тот, чья запись
+    с ролью admin самая ранняя. Хранимое поле пришлось бы поддерживать руками
+    и однажды оно разошлось бы с правдой — например, после смены владельца
+    осталось бы у двоих.
+  */
+  (u.id = (
+    select id from public.forum_users
+     where role = 'admin'
+     order by created_at
+     limit 1
+  )) as is_owner,
   u.created_at,
   (select count(*) from public.forum_posts p
      where p.author_id = u.id and p.deleted = false) as post_count,
@@ -364,6 +382,14 @@ select
   */
   prof.avatar_url as author_avatar,
   prof.alliance_tag as author_alliance,
+  /*
+    Роль автора идёт в ленту, чтобы метку «владелец» или «модератор» было видно
+    рядом с ником. Это не украшение: читатель должен понимать, кто перед ним,
+    когда речь идёт о правилах или решении по жалобе — иначе слово модератора
+    ничем не отличается от слова любого участника.
+  */
+  prof.role as author_role,
+  prof.is_owner as author_is_owner,
   p.category,
   p.title,
   p.body,
@@ -406,6 +432,8 @@ select
   c.author_id,
   c.author_nick,
   prof.avatar_url as author_avatar,
+  prof.role as author_role,
+  prof.is_owner as author_is_owner,
   c.body,
   c.created_at,
   c.deleted,

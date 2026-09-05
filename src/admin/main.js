@@ -50,6 +50,7 @@ import {
   readDataset, recentChanges, uploadPhoto, setEditor,
 } from './store.js';
 import { diffDataset, applyChanges, describeChanges } from './publish.js';
+import { roleLabel } from '../forum/roles.js';
 import { prepareImage, uploadPath } from './image.js';
 import {
   applyMarks,
@@ -225,10 +226,10 @@ function render() {
     /*
       Раньше рядом с логином показывался хвост токена — чтобы человек убедился,
       что вошёл тем токеном, которым думал. Токенов больше нет, а полезный
-      вопрос остался: «какими правами я сейчас работаю». Роль отвечает на него
-      прямо, и её не надо прятать за точками.
+      вопрос остался: «какими правами я сейчас работаю». Подпись роли отвечает
+      на него прямо, и словарь для неё один на сайт и панель (forum/roles.js).
     */
-    role: roleWord(account),
+    role: roleLabel(account),
     canPush: canEditSite(account),
     weekIds: view.data.weeks.map((w) => w.id),
   });
@@ -331,20 +332,6 @@ async function load() {
 
 /** Кто вошёл. Держится отдельно от view: нужен и до загрузки данных. */
 let account = null;
-
-/**
- * Чем человек здесь занимается, одним словом.
- *
- * Права две штуки и они независимы, поэтому «администратор» и «редактор» —
- * не ступени одной лестницы: редактор правит историю сервера, модератор
- * разбирает жалобы, и это разные обязанности.
- */
-function roleWord(acc) {
-  if (!acc) return '';
-  if (acc.role === 'admin') return 'администратор';
-  if (acc.role === 'moderator') return acc.canEditSite ? 'модератор, редактор' : 'модератор';
-  return acc.canEditSite ? 'редактор' : 'участник';
-}
 
 async function boot() {
   if (!isConfigured()) {

@@ -336,6 +336,17 @@ function userOut(row) {
     id: row.id,
     nick: row.nick,
     role: row.role,
+    /*
+      Признак владельца приходит из представления forum_profiles: он вычисляется
+      как «первый администратор по дате регистрации», а не хранится полем.
+      Хранимое пришлось бы поддерживать руками, и оно однажды разошлось бы
+      с правдой — например, осталось бы у двоих после смены владельца.
+    */
+    isOwner: Boolean(row.is_owner),
+    avatarUrl: row.avatar_url || '',
+    about: row.about || '',
+    allianceTag: row.alliance_tag || '',
+    canEditSite: Boolean(row.can_edit_site) || row.role === 'admin',
     createdAt: toDate(row.created_at) ?? new Date(),
     mutedUntil: toDate(row.muted_until),
     banned: Boolean(row.banned),
@@ -370,7 +381,23 @@ export async function currentUser() {
     return null;
   }
 
-  const rows = await rest(`/forum_users?select=*&id=eq.${encodeURIComponent(myId)}&limit=1`);
+  /*
+    Два запроса вместо одного, и это осознанно.
+
+    forum_users содержит запреты и признак редактора — то, что нужно самому
+    человеку и модерации. forum_profiles содержит is_owner, который считается
+    как «первый администратор» и в таблице не хранится.
+
+    Соединить их в один запрос PostgREST не даёт: связи между таблицей
+    и представлением он не знает. Два запроса на открытие страницы дешевле,
+    чем хранимое поле, которое надо поддерживать руками и которое однажды
+    разойдётся с правдой.
+  */
+  const [rows, profiles] = await Promise.all([
+    rest(`/forum_users?select=*&id=eq.${encodeURIComponent(myId)}&limit=1`),
+    rest(`/forum_profiles?select=is_owner&id=eq.${encodeURIComponent(myId)}&limit=1`),
+  ]);
+
   const me = Array.isArray(rows) ? rows[0] : null;
 
   /*
@@ -381,7 +408,9 @@ export async function currentUser() {
     writeSession(null);
     return null;
   }
-  return userOut(me);
+
+  const isOwner = Array.isArray(profiles) ? Boolean(profiles[0]?.is_owner) : false;
+  return userOut({ ...me, is_owner: isOwner });
 }
 
 /**
@@ -493,6 +522,13 @@ function postOut(row) {
     */
     authorAvatar: row.author_avatar || '',
     authorAlliance: row.author_alliance || '',
+    /*
+      Роль автора нужна для метки рядом с ником: читатель должен понимать,
+      кто перед ним, когда речь о правилах или решении по жалобе — иначе слово
+      модератора ничем не отличается от слова любого участника.
+    */
+    authorRole: row.author_role || 'member',
+    authorIsOwner: Boolean(row.author_is_owner),
     category: row.category,
     title: row.title,
     body: row.body,
@@ -596,6 +632,8 @@ function commentOut(row) {
     authorId: row.author_id,
     authorNick: row.author_nick,
     authorAvatar: row.author_avatar || '',
+    authorRole: row.author_role || 'member',
+    authorIsOwner: Boolean(row.author_is_owner),
     body: row.body,
     createdAt: toDate(row.created_at) ?? new Date(),
     deleted: Boolean(row.deleted),

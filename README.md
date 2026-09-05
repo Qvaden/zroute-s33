@@ -7,6 +7,7 @@
 Подробности об устройстве проекта — в папке [`docs/`](./docs).
 
 - [`FORUM.md`](./docs/FORUM.md) — как включить форум и модерацию.
+- [`MODERATION.md`](./docs/MODERATION.md) — роли, права, как дать мут и бан, как удалить чужой пост.
 - [`MIGRATION.md`](./docs/MIGRATION.md) — переезд данных сайта в базу: вход по нику вместо токена GitHub, выдача прав редактора нажатием.
 - [`ADMIN.md`](./docs/ADMIN.md) — работа в панели.
 - [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — почему сделано именно так.

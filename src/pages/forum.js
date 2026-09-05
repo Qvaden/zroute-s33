@@ -23,6 +23,7 @@ import { esc, plural } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { roleBadge, roleLabel } from '../forum/roles.js';
 import { CONFIG } from '../../config.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -259,7 +260,7 @@ function renderWhoAmI(s) {
         ${avatar(s.me.nick, s.me.avatarUrl)}
         <span class="forum-me__body">
           <b>${nickLink(s.me.nick)}</b>
-          <small>${esc(roleLabel(s.me.role))}</small>
+          <small>${roleBadge(s.me) || esc(roleLabel(s.me))}</small>
         </span>
         <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
         <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
@@ -306,10 +307,6 @@ function renderWhoAmI(s) {
       </p>
       <p class="forum-error" data-forum-auth-error hidden></p>
     </form>`;
-}
-
-function roleLabel(role) {
-  return role === 'admin' ? 'администратор' : role === 'moderator' ? 'модератор' : 'участник';
 }
 
 /* ── Написать пост ────────────────────────────────────────────────────────── */
@@ -547,6 +544,8 @@ function renderPostCard(p, s) {
         ${avatar(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
           <b>${nickLink(p.authorNick)}${
+            roleBadge({ role: p.authorRole, isOwner: p.authorIsOwner }, { short: true })
+          }${
             p.authorAlliance ? ` <span class="forum-post__ally">${esc(p.authorAlliance)}</span>` : ''
           }</b>
           <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
@@ -676,7 +675,9 @@ function renderComments(post, s) {
             ${avatar(c.authorNick, c.authorAvatar, 'sm')}
             <div class="forum-comment__body">
               <div class="forum-comment__head">
-                <b>${nickLink(c.authorNick)}</b>
+                <b>${nickLink(c.authorNick)}${
+                  roleBadge({ role: c.authorRole, isOwner: c.authorIsOwner }, { short: true })
+                }</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>
               </div>
               ${postBody(c.body)}

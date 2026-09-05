@@ -1,5 +1,6 @@
-import { esc } from '../../ui/helpers.js';
+﻿import { esc } from '../../ui/helpers.js';
 import { RULES } from '../../forum/rules.js';
+import { roleBadge, roleLabel } from '../../forum/roles.js';
 
 /**
  * ЭКРАН «ИГРОКИ» — учётные записи форума.
@@ -80,7 +81,7 @@ export function renderPlayers(view) {
           <h1 class="adm-h1">Игроки</h1>
         </header>
         <p class="adm-lead">
-          Вы вошли как <b>${esc(forum.me.nick)}</b> (${esc(roleWord(forum.me.role))}).
+          Вы вошли как <b>${esc(forum.me.nick)}</b> (${esc(roleLabel(forum.me))}).
           Пароли сбрасывает только администратор форума.
         </p>
       </section>`;
@@ -146,11 +147,9 @@ function renderRow(user, me) {
   return `
     <div class="adm-player" data-player="${esc(user.id)}">
       <div class="adm-player__who">
-        <b>${esc(user.nick)}</b>
+        <b>${esc(user.nick)}${roleBadge(user, { short: true })}</b>
         <small>
-          ${esc(roleWord(user.role))}
-          ${isEditor ? ' · <b class="adm-player__editor">редактор</b>' : ''}
-          · с ${esc(shortDate(user.createdAt))}
+          ${isEditor && user.role !== 'admin' ? 'редактор · ' : ''}с ${esc(shortDate(user.createdAt))}
         </small>
       </div>
 
@@ -237,7 +236,7 @@ function renderResetModal() {
 }
 
 /**
- * Окно запрета.
+ * Окно ограничений.
  *
  * Причина обязательна и пункт правил выбирается из того же списка, что
  * показан игрокам: «запрещено» без причины выглядит произволом и ничему
@@ -286,12 +285,20 @@ function renderRestrictModal() {
           </div>
           <div class="adm-result" data-restrict-error hidden></div>
         </form>
+
+        <!--
+          Разница между тишиной и запретом объяснена здесь, а не в документации:
+          выбирают её в этом окне, и человек, который сомневается, до документации
+          не пойдёт.
+        -->
+        <p class="muted adm-modal__note">
+          <b>Тишина</b> — не может писать посты, комментарии и ставить реакции,
+          но остаётся на форуме и видит причину. Снимается сама по истечении срока.
+          <br>
+          <b>Запрет</b> — то же самое, но без срока: снимать только вручную.
+        </p>
       </div>
     </div>`;
-}
-
-function roleWord(role) {
-  return role === 'admin' ? 'администратор' : role === 'moderator' ? 'модератор' : 'участник';
 }
 
 function peopleWord(n) {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * СТРАНИЦА УЧАСТНИКА И ПРАВКА СВОЕГО ПРОФИЛЯ.
  *
  * Открывается по адресу #/user/Ковыль — по нику, а не по идентификатору:
@@ -14,6 +14,7 @@
  */
 import { esc } from '../ui/helpers.js';
 import { excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { roleBadge, roleLabel } from '../forum/roles.js';
 
 /**
  * @param {{
@@ -76,7 +77,7 @@ function renderCard(p, isMe, editing) {
         <div class="forum-profile__ident">
           <h1 class="forum-profile__nick">${esc(p.nick)}</h1>
           <div class="forum-profile__meta">
-            <span class="forum-profile__role">${esc(roleLabel(p.role))}</span>
+            ${roleBadge(p) || `<span class="forum-profile__role">${esc(roleLabel(p))}</span>`}
             ${p.allianceTag ? `<span class="forum-profile__ally">${esc(p.allianceTag)}</span>` : ''}
             <span class="muted">с ${esc(joinDate(p.createdAt))}</span>
           </div>
@@ -228,10 +229,6 @@ function renderPosts(profile, posts) {
           .join('')}
       </ul>
     </section>`;
-}
-
-function roleLabel(role) {
-  return role === 'admin' ? 'администратор' : role === 'moderator' ? 'модератор' : 'участник';
 }
 
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
