@@ -1,0 +1,292 @@
+/*
+  ЭЛЕМЕНТЫ ВВОДА — ОДИН ВИД НА САЙТ И НА ПАНЕЛЬ.
+
+  Подключается после всех остальных, поэтому перебивает и styles-v8.css,
+  и forum.css, и admin.css. Так сделано намеренно: правила ниже описывают
+  ОДНУ вещь — как выглядят поля, списки, переключатели, — и разбросать их
+  по трём файлам значило бы получить три немного разных вида одного элемента.
+  Это уже случилось: в admin.css правила для select лежат в четырёх местах
+  и спорят друг с другом.
+
+  ЧТО ИМЕННО ЗДЕСЬ ИСПРАВЛЯЕТСЯ.
+
+  Выпадающие списки, флажки, переключатели, выбор файла и даты сайт до этого
+  файла рисовал системными средствами. На тёмной странице это выглядит
+  инородно: белый прямоугольник Windows среди чёрных панелей, синяя галочка
+  вместо оранжевой, стрелка списка чужого цвета.
+
+  Хуже, что системный вид РАЗНЫЙ у каждого браузера и системы: на телефоне
+  список выглядит иначе, чем на компьютере, и предсказать это нельзя.
+  Аудитория здесь заходит с телефона — значит именно там сайт и выглядел
+  чужим.
+
+  ЧЕГО ЗДЕСЬ НЕТ НАМЕРЕННО.
+
+  Самодельных выпадающих списков на <div> нет и не будет. Настоящий <select>
+  на телефоне открывает системный выбор снизу экрана — крупный, с прокруткой
+  пальцем, знакомый. Своя реализация это ломает и требует ещё сотни строк
+  на клавиатуру и экранного диктора. Поэтому стилизуется только закрытый вид
+  списка; открытый остаётся системным, и это правильно.
+*/
+
+/* ── Поля ввода ───────────────────────────────────────────────────────────── */
+
+/*
+  Один вид у всех полей: сайт, форум, панель. Селектор перечисляет классы,
+  а не просто input — иначе правило задело бы поиск, флажки и выбор файла,
+  у которых своя жизнь.
+*/
+.forum-field input:not([type='file']):not([type='checkbox']):not([type='radio']),
+.forum-field textarea,
+.forum-field select,
+.forum-reply textarea,
+.adm-field input:not([type='file']):not([type='checkbox']):not([type='radio']):not([type='color']),
+.adm-field textarea,
+.adm-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font-family: inherit;
+  /*
+    16 пикселов — не про красоту. Safari на iPhone масштабирует всю страницу
+    при фокусе в поле с меньшим шрифтом, и человек оказывается в увеличенной
+    вёрстке, из которой сам не выйдет.
+  */
+  font-size: 16px;
+  line-height: 1.45;
+  transition: border-color 0.16s var(--ease), background 0.16s var(--ease),
+    box-shadow 0.16s var(--ease);
+}
+
+/*
+  Подсказка внутри поля тусклее текста. Без этого пустое поле выглядит
+  заполненным, и человек не понимает, надо ли вводить.
+*/
+.forum-field ::placeholder,
+.adm-field ::placeholder { color: var(--mute); opacity: 1; }
+
+.forum-field input:hover,
+.forum-field textarea:hover,
+.forum-field select:hover,
+.adm-field input:hover,
+.adm-field textarea:hover,
+.adm-field select:hover { border-color: rgba(255, 255, 255, 0.2); }
+
+.forum-field input:focus,
+.forum-field textarea:focus,
+.forum-field select:focus,
+.forum-reply textarea:focus,
+.adm-field input:focus,
+.adm-field textarea:focus,
+.adm-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.14);
+}
+
+/*
+  Поле, которое трогать нельзя. Курсор говорит об этом раньше, чем человек
+  нажмёт: без него он щёлкает по нику в профиле и не понимает, почему ничего
+  не происходит.
+*/
+.forum-field input:disabled,
+.adm-field input:disabled,
+.forum-field select:disabled,
+.adm-field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.forum-field textarea,
+.forum-reply textarea,
+.adm-field textarea { min-height: 76px; resize: vertical; }
+
+/* ── Выпадающие списки ────────────────────────────────────────────────────── */
+
+/*
+  Стрелка рисуется фоном, а системная убирается. Иначе их две: своя и родная
+  от браузера, причём вторая другого цвета и в другом месте.
+
+  Стрелка — inline-SVG в адресе, а не файл: одна картинка не стоит запроса
+  к серверу, а в проекте нет шага сборки, который мог бы её встроить.
+*/
+.forum-field select,
+.adm-field select,
+.adm-form .adm-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  /* Место справа под стрелку: без отступа длинный текст заезжает под неё. */
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%23ff6a2b' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  cursor: pointer;
+}
+
+/*
+  СОДЕРЖИМОЕ РАСКРЫТОГО СПИСКА.
+
+  Стилизовать его нельзя — это системное окно. Но цвета задать можно, и без
+  них получается худший случай: на тёмном сайте раскрывается белый список
+  с чёрным текстом, а в Windows ещё и подсветка выбранного пункта синяя.
+
+  Пишем цвета явно, чтобы список принадлежал сайту хотя бы по цвету.
+*/
+.forum-field select option,
+.adm-field select option {
+  background: var(--raised-2);
+  color: var(--text);
+}
+
+/* ── Флажки и переключатели ───────────────────────────────────────────────── */
+
+/*
+  accent-color красит системный флажок в цвет сайта. Это единственный
+  способ, не заменяя элемент собственным: заменённый теряет поведение
+  клавиатуры и экранного диктора, а выигрывает только внешне.
+*/
+.forum-field input[type='checkbox'],
+.forum-field input[type='radio'],
+.adm-field input[type='checkbox'],
+.adm-field input[type='radio'],
+.adm-check input,
+.forum-modal__rule input,
+.guide-editor__check input {
+  accent-color: var(--accent);
+  /* 18 пикселов вместо системных 13: по 13 палец промахивается. */
+  width: 18px;
+  height: 18px;
+  flex: none;
+  cursor: pointer;
+}
+
+/*
+  Подпись рядом с флажком — часть цели нажатия. Без этого нажать можно
+  только по самому квадратику, а он маленький.
+*/
+.adm-check,
+.guide-editor__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Выбор файла ──────────────────────────────────────────────────────────── */
+
+/*
+  Системная кнопка «Обзор…» выглядит как из другого приложения, а надпись
+  «Файл не выбран» рядом с ней ещё и на другом языке в части браузеров.
+
+  Поэтому поле спрятано, а нажимают по <label> — он выглядит кнопкой сайта.
+  Такой приём работает везде и не ломает поведение: диалог выбора файла
+  браузер открывает только по настоящему <input type="file">.
+*/
+.forum-attach__btn,
+.adm-photo-drop,
+.forum-profile-edit__ava-acts label {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Дата и число ─────────────────────────────────────────────────────────── */
+
+/*
+  Значок календаря в поле даты по умолчанию чёрный — на тёмном фоне почти
+  невидим. Фильтр превращает его в светлый; отдельного свойства для цвета
+  этого значка в CSS нет.
+*/
+.adm-field input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.55);
+  cursor: pointer;
+}
+.adm-field input[type='date']:hover::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.9);
+}
+
+/*
+  Стрелочки увеличения у числового поля. Мелкие, серые, и в них попадают
+  случайно вместо ввода цифры. Номер сервера и число дней всё равно набирают
+  с клавиатуры.
+*/
+.adm-field input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.adm-field input[type='number']::-webkit-outer-spin-button,
+.adm-field input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/*
+  Выбор цвета альянса. Системный элемент рисует рамку и отступы по-своему;
+  убираем их, оставляя ровный цветной прямоугольник в стиле сайта.
+*/
+.adm-field input[type='color'] {
+  width: 56px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+}
+.adm-field input[type='color']::-webkit-color-swatch-wrapper { padding: 3px; }
+.adm-field input[type='color']::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+/* ── Подписи полей ────────────────────────────────────────────────────────── */
+
+.forum-field > span,
+.adm-field > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--dim);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Пояснение под полем: мельче подписи, иначе спорит с ней за внимание. */
+.forum-field small,
+.adm-field small {
+  display: block;
+  margin-top: 5px;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* ── Телефон ──────────────────────────────────────────────────────────────── */
+
+@media (hover: none) and (pointer: coarse) {
+  /*
+    Цели ввода на телефоне выше: по полю высотой 38 пикселов палец попадает
+    через раз, особенно в длинной форме, где поля идут подряд.
+  */
+  .forum-field input,
+  .forum-field select,
+  .adm-field input,
+  .adm-field select { min-height: 46px; }
+
+  /* Наведения на телефоне не бывает — подсветка только мешает. */
+  .forum-field input:hover,
+  .forum-field select:hover,
+  .adm-field input:hover,
+  .adm-field select:hover { border-color: var(--line); }
+}
+
+@media (max-width: 420px) {
+  /*
+    Стрелка списка ближе к краю: на узком экране каждый пиксел под текст,
+    а 38 пикселов отступа съедали половину короткой строки вроде «Новости».
+  */
+  .forum-field select,
+  .adm-field select { padding-right: 32px; background-position: right 10px center; }
+}

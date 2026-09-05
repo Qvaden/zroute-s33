@@ -37,10 +37,25 @@
     а выглядит по-разному.
   -->
   <link rel="stylesheet" href="./src/styles-v8.css?v=1">
-  <link rel="stylesheet" href="./src/admin/admin.css?v=7">
+  <link rel="stylesheet" href="./src/admin/admin.css?v=8">
+  <!--
+    Телефон — последним слоем перед элементами ввода.
+
+    Итоги VS вносят вечером после боя, и делают это с телефона: компьютер
+    в этот момент не у всех под рукой. Тридцать две отметки пальцем по мелким
+    кнопкам это работа, а не удобство.
+  -->
+  <link rel="stylesheet" href="./src/admin/admin-mobile.css?v=1">
+  <!--
+    Элементы ввода — общие с сайтом. Списки, флажки и поля даты в панели
+    выглядели системными: белый прямоугольник среди тёмных панелей.
+    Правила для select до этого лежали в четырёх местах admin.css и спорили
+    друг с другом; теперь они в одном файле на оба входа.
+  -->
+  <link rel="stylesheet" href="./src/controls.css?v=1">
 </head>
 <body class="adm">
   <div id="admin"><div class="loading">Загружаем панель…</div></div>
-  <script type="module" src="./src/admin/main.js?v=7"></script>
+  <script type="module" src="./src/admin/main.js?v=8"></script>
 </body>
 </html>
