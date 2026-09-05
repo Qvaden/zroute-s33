@@ -224,15 +224,47 @@ as $$
 declare
   who text;
   ident text;
+  row_data jsonb;
 begin
   select nick into who from public.forum_users where id = auth.uid();
 
-  -- У составного ключа результатов нет одного id: собираем читаемый.
-  ident := case TG_TABLE_NAME
-    when 'site_results' then coalesce(new.week_id, old.week_id) || '/' || coalesce(new.alliance_id, old.alliance_id)
-    when 'site_texts'   then coalesce(new.key, old.key)
-    else coalesce(new.id, old.id)
-  end;
+  /*
+    СТРОКУ ПРЕВРАЩАЕМ В JSONB И РАБОТАЕМ С НИМ, А НЕ С ПОЛЯМИ НАПРЯМУЮ.
+
+    Один триггер обслуживает пять разных таблиц, и поля у них разные:
+    у результатов составной ключ week_id + alliance_id, у текстов — key,
+    у остальных — id.
+
+    Первая версия выбирала нужное через CASE по имени таблицы:
+
+      case TG_TABLE_NAME
+        when 'site_results' then new.week_id || '/' || new.alliance_id
+        ...
+
+    И падала на первой же вставке альянса:
+
+      record "new" has no field "week_id"
+
+    Причина в том, как PL/pgSQL исполняет выражения: он отдаёт CASE целиком
+    как один SQL-запрос, и ссылки на поля проверяются во ВСЕХ ветках сразу,
+    а не только в подходящей. У альянса поля week_id нет — отказ, хотя эта
+    ветка никогда бы не выполнилась.
+
+    Обращение к jsonb такой проверки не требует: отсутствующий ключ даёт
+    просто NULL. Заодно to_jsonb нужен ниже для самой записи в журнал,
+    так что лишней работы не появилось.
+  */
+  row_data := case when TG_OP = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
+
+  ident := coalesce(
+    case TG_TABLE_NAME
+      -- У составного ключа результатов нет одного id: собираем читаемый.
+      when 'site_results' then (row_data ->> 'week_id') || '/' || (row_data ->> 'alliance_id')
+      when 'site_texts'   then row_data ->> 'key'
+      else row_data ->> 'id'
+    end,
+    ''
+  );
 
   insert into public.site_audit (actor_id, actor_nick, entity, entity_id, action, details)
   values (
@@ -241,7 +273,7 @@ begin
     TG_TABLE_NAME,
     ident,
     lower(TG_OP),
-    case when TG_OP = 'DELETE' then to_jsonb(old) else to_jsonb(new) end
+    row_data
   );
 
   return coalesce(new, old);

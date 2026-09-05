@@ -2284,6 +2284,35 @@ console.log('\nQ. Форум');
     /add column if not exists author_nick/.test(schema));
 
   /*
+    ТРИГГЕР НА НЕСКОЛЬКО ТАБЛИЦ НЕ ОБРАЩАЕТСЯ К ПОЛЯМ НАПРЯМУЮ.
+
+    Журнал правок обслуживает пять таблиц с разными ключами: у результатов
+    составной week_id + alliance_id, у текстов key, у остальных id. Первая
+    версия выбирала нужное через CASE по имени таблицы — и падала на первой
+    же вставке альянса:
+
+      record "new" has no field "week_id"
+
+    PL/pgSQL отдаёт CASE целиком как один SQL-запрос, и ссылки на поля
+    проверяются во ВСЕХ ветках сразу, а не только в подходящей. У альянса
+    поля week_id нет — отказ, хотя эта ветка никогда бы не выполнилась.
+
+    Обращение к jsonb такой проверки не требует: отсутствующий ключ даёт NULL.
+  */
+  const siteData = await readFile('supabase/site-data.sql', 'utf8');
+  const auditFn = siteData.match(/create or replace function public\.site_write_audit[\s\S]*?\$\$;/)?.[0] ?? '';
+  /*
+    Комментарии выбрасываем: разбор этой самой ошибки написан внутри функции,
+    и без чистки тест поймал бы объяснение вместо кода — ровно та же ловушка,
+    что была в проверке подзапросов в политиках.
+  */
+  const auditCode = auditFn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*--.*$/gm, '');
+  check('журнал правок читает строку как jsonb, а не по именам полей',
+    /to_jsonb/.test(auditCode) && !/new\.week_id|new\.alliance_id|new\.key\b/.test(auditCode));
+  check('составной ключ результата собирается читаемым',
+    /week_id.*\|\|.*alliance_id/.test(auditCode));
+
+  /*
     В ПОЛИТИКАХ НЕ ДОЛЖНО БЫТЬ ПОДЗАПРОСОВ К СВОЕЙ ЖЕ ТАБЛИЦЕ.
 
     Здесь стояло условие «pinned = (select pinned from forum_posts p where
