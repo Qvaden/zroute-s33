@@ -13,48 +13,50 @@
 -- в обход прав, и это единственное место, где такое уместно: чистит владелец
 -- проекта руками, а не сайт.
 --
--- ЧТО ПОПРАВИТЬ: одно место — ТВОЙ_НИК в строке 38. Все, кроме него,
--- будут удалены вместе со всем, что написали.
+-- ЧТО ПОПРАВИТЬ: одно место — ТВОЙ_НИК ниже. Все, кроме него, будут удалены
+-- вместе со всем, что написали.
 --
 -- ПОЧЕМУ «ВСЕ, КРОМЕ МЕНЯ», А НЕ СПИСОК ПРОБНЫХ НИКОВ. Список пришлось бы
 -- помнить и обновлять после каждой проверки, а забытая в нём запись остаётся
 -- с рабочим паролем. «Все, кроме меня» не забывает ничего — и работает ровно
 -- один раз, пока на форуме нет настоящих людей.
 --
--- СНАЧАЛА СТАНЬ АДМИНИСТРАТОРОМ (first-admin.sql), ПОТОМ ЧИСТИ. Наоборот
--- нельзя: роль выдаётся по нику, а после удаления записи выдавать будет некому.
+-- ПОЧЕМУ ВСЁ ВНУТРИ ОДНОГО БЛОКА. Первая версия складывала «кого оставить»
+-- во временную таблицу — и редактор Supabase на любое создание таблицы
+-- спрашивал: «Run without RLS» или «Run and enable RLS». Вопрос по делу,
+-- но не про этот случай: временная таблица живёт секунду и тут же удаляется,
+-- а человек, пришедший стереть пробные записи, вынужден выбирать между двумя
+-- непонятными вариантами.
 --
--- Запрос работает как одно целое: если ник не найдётся, он остановится
--- и не удалит ничего. Без этой проверки опечатка стёрла бы всех, включая тебя,
--- а обратно уже никак.
+-- Заодно так надёжнее: блок целиком либо выполняется, либо нет. Если ник
+-- не найдётся, ничего не удалится — без этого опечатка стёрла бы всех,
+-- включая тебя, а обратно уже никак.
 
-begin;
+do $$
+declare
+  keeper uuid;
+begin
 
-  create temporary table keep_me as
-    select id
-      from public.forum_users
-     where lower(nick) = lower('ТВОЙ_НИК');
+  select id
+    into keeper
+    from public.forum_users
+   where lower(nick) = lower('ТВОЙ_НИК');
 
-  do $$
-  begin
-    if not exists (select 1 from keep_me) then
-      raise exception 'Ник не найден. Проверь написание в forum_users. Ничего не удалено.';
-    end if;
-  end $$;
+  if keeper is null then
+    raise exception 'Ник не найден. Проверь написание в forum_users. Ничего не удалено.';
+  end if;
 
   -- Порядок важен: сначала то, что ссылается на посты, потом сами посты.
-  delete from public.forum_reactions where user_id     not in (select id from keep_me);
-  delete from public.forum_comments  where author_id   not in (select id from keep_me);
-  delete from public.forum_reports   where reporter_id not in (select id from keep_me);
-  delete from public.forum_posts     where author_id   not in (select id from keep_me);
+  delete from public.forum_reactions where user_id     <> keeper;
+  delete from public.forum_comments  where author_id   <> keeper;
+  delete from public.forum_reports   where reporter_id <> keeper;
+  delete from public.forum_posts     where author_id   <> keeper;
 
   -- Учётные записи. Профиль связан с системой входа через on delete cascade,
   -- поэтому строка в forum_users уйдёт вслед за auth.users сама.
-  delete from auth.users where id not in (select id from keep_me);
+  delete from auth.users where id <> keeper;
 
-  drop table keep_me;
-
-commit;
+end $$;
 
 
 -- ── Проверить, что получилось ───────────────────────────────────────────────
