@@ -369,11 +369,55 @@ node tests/contract.test.js
 
 ## Убрать пробные записи
 
-После проверки в базе остаются пробные учётные записи и посты. Обычным
-запросом их не стереть: политики запрещают удаление строк всем, включая
-администратора — удаление на форуме это отметка с причиной, а не стирание.
+После проверки в базе остаются пробные учётные записи и посты. Их надо убрать
+не только для порядка: у каждой рабочий пароль, и знает его не только владелец
+форума.
 
-Поэтому чистка делается один раз, руками, служебными правами SQL-редактора.
-В конце `supabase/schema.sql` есть готовый закомментированный блок: подставь
-в него свой ник (чтобы не удалить себя) и выполни. Делать это стоит перед тем,
-как открывать форум людям.
+Обычным запросом их не стереть: политики запрещают удаление строк всем,
+включая администратора — удаление на форуме это отметка с причиной,
+а не стирание. Поэтому чистка делается один раз, руками, служебными правами
+SQL-редактора.
+
+**Supabase → SQL Editor → New query**, вставить целиком, заменив `ТВОЙ_НИК`
+на свой (ровно как в `forum_users`):
+
+```sql
+begin;
+  create temporary table keep_me as
+    select id from public.forum_users where lower(nick) = lower('ТВОЙ_НИК');
+
+  -- Если ник не совпал, дальше идти нельзя: удалило бы всех, включая тебя.
+  do $$
+  begin
+    if not exists (select 1 from keep_me) then
+      raise exception 'Ник не найден — проверь написание в forum_users. Ничего не удалено.';
+    end if;
+  end $$;
+
+  delete from public.forum_reactions where user_id not in (select id from keep_me);
+  delete from public.forum_comments  where author_id not in (select id from keep_me);
+  delete from public.forum_reports   where reporter_id not in (select id from keep_me);
+  delete from public.forum_posts     where author_id not in (select id from keep_me);
+  delete from auth.users             where id not in (select id from keep_me);
+
+  drop table keep_me;
+commit;
+```
+
+Удаляет всех, кроме тебя, и всё, что они написали. Работает как одно целое:
+если ник не найдётся, запрос остановится и не удалит ничего.
+
+Проверить, что получилось:
+
+```sql
+select nick, role, created_at from public.forum_users order by created_at;
+select title, author_nick from public.forum_post_list;
+```
+
+Должна остаться одна строка — твоя, с ролью `admin` — и ни одного поста.
+
+**Порядок важен: сначала стань администратором (шаг 5), потом чистка.**
+Наоборот нельзя — роль выдаётся по нику, а к этому моменту записи уже не будет.
+
+Тот же блок лежит закомментированным в конце `supabase/schema.sql`, чтобы
+не искать его здесь.

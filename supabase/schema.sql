@@ -738,23 +738,41 @@ grant execute on function public.forum_admin_reset_password(uuid, text) to authe
 -- проекта руками, а не сайт.
 --
 -- ЗАПУСКАТЬ ОДИН РАЗ, когда форум уже проверен и пора открывать его людям.
--- Раскомментируй блок и подставь свой ник в последнюю строку, чтобы не
--- удалить самого себя.
+-- Подставь свой ник в ПЕРВУЮ строку — все, кроме него, будут удалены.
+--
+-- ПОЧЕМУ «ВСЕ, КРОМЕ МЕНЯ», А НЕ СПИСОК ПРОБНЫХ НИКОВ. Список пришлось бы
+-- держать в голове и обновлять после каждой проверки: забытая в нём запись
+-- остаётся с рабочим паролем, который знает не только владелец форума.
+-- «Все, кроме меня» не забывает ничего — и работает ровно один раз, пока
+-- на форуме нет настоящих людей.
+--
+-- Раскомментируй блок целиком (выдели и нажми Ctrl+/) и выполни.
 
 -- begin;
---   -- Посты, комментарии и реакции пробных учётных записей.
---   delete from public.forum_reactions where user_id in (
---     select id from public.forum_users where lower(nick) <> lower('Qvaden')
---   );
---   delete from public.forum_comments where author_id in (
---     select id from public.forum_users where lower(nick) <> lower('Qvaden')
---   );
---   delete from public.forum_posts where author_id in (
---     select id from public.forum_users where lower(nick) <> lower('Qvaden')
---   );
---   -- Сами учётные записи. Профиль связан с системой входа, поэтому удаление
---   -- строки в auth.users уносит профиль за собой (on delete cascade).
---   delete from auth.users where id in (
---     select id from public.forum_users where lower(nick) <> lower('Qvaden')
---   );
+--   -- Свой ник: единственное место, которое нужно поправить.
+--   create temporary table keep_me as
+--     select id from public.forum_users where lower(nick) = lower('ТВОЙ_НИК');
+--
+--   -- Если ник не совпал, дальше идти нельзя: удалило бы всех, включая тебя.
+--   do $$
+--   begin
+--     if not exists (select 1 from keep_me) then
+--       raise exception 'Ник не найден — проверь написание в forum_users. Ничего не удалено.';
+--     end if;
+--   end $$;
+--
+--   delete from public.forum_reactions where user_id not in (select id from keep_me);
+--   delete from public.forum_comments  where author_id not in (select id from keep_me);
+--   delete from public.forum_reports   where reporter_id not in (select id from keep_me);
+--   delete from public.forum_posts     where author_id not in (select id from keep_me);
+--
+--   -- Учётные записи. Профиль связан с системой входа через on delete cascade,
+--   -- поэтому строка в forum_users уйдёт вслед за auth.users сама.
+--   delete from auth.users where id not in (select id from keep_me);
+--
+--   drop table keep_me;
 -- commit;
+
+-- Проверить, что осталось:
+-- select nick, role, created_at from public.forum_users order by created_at;
+-- select title, author_nick from public.forum_post_list;
