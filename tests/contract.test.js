@@ -2232,11 +2232,28 @@ console.log('\nQ. Форум');
   /*
     security_invoker обязателен: без него представление читало бы данные
     правами своего владельца, то есть в обход всех политик выше.
+
+    Считаем объявления «create view», а не «create or replace»: представления
+    пересоздаются через drop, потому что заменой нельзя добавить колонку
+    в середину — Postgres принимает это за переименование и отказывает.
   */
-  const views = schema.match(/create or replace view public\.\w+/g) ?? [];
+  const views = schema.match(/create (?:or replace )?view public\.\w+/g) ?? [];
   const invokers = schema.match(/with \(security_invoker = on\)/g) ?? [];
   equal('каждое представление читает данные правами того, кто спросил',
     invokers.length, views.length);
+
+  /*
+    Схему запускают повторно при каждом обновлении, поэтому каждое
+    представление обязано сначала удаляться. Без этого второй запуск падает
+    на первом же изменившемся составе колонок — и падает невнятно, сообщением
+    про переименование колонки, которую никто не переименовывал.
+  */
+  const viewNames = [...schema.matchAll(/create (?:or replace )?view public\.(\w+)/g)].map((m) => m[1]);
+  const withoutDrop = viewNames.filter(
+    (name) => !new RegExp(`drop view if exists public\\.${name}`).test(schema)
+  );
+  equal('каждое представление удаляется перед созданием — иначе повторный запуск падает',
+    withoutDrop.join(', '), '');
 
   check('жалобы видит только модерация — открытый список стал бы травлей',
     /create policy forum_reports_read on public\.forum_reports\s+[\s\S]{0,200}?forum_is_staff\(\)/.test(schema));

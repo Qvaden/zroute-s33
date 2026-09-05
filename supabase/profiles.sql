@@ -39,8 +39,14 @@ alter table public.forum_users
 -- Поэтому представление отдаёт РОВНО то, что можно показать чужому человеку:
 -- ник, аватарку, подпись, альянс, дату регистрации и счётчики. Запретов
 -- и служебных полей здесь нет вовсе — не «скрыты», а не выбраны.
+--
+-- drop перед create по той же причине, что у представлений ленты ниже:
+-- добавить колонку в середину «заменой» нельзя, Postgres считает это
+-- переименованием. Данных это не касается — представление их не хранит.
 
-create or replace view public.forum_profiles
+drop view if exists public.forum_profiles;
+
+create view public.forum_profiles
 with (security_invoker = on) as
 select
   u.id,
@@ -319,8 +325,29 @@ create policy forum_uploads_delete on storage.objects
 -- Пересобираем представления, чтобы лента отдавала и картинки, и аватарку
 -- автора. Иначе на каждый пост шёл бы отдельный запрос за вложениями —
 -- двадцать постов означали бы двадцать запросов.
+--
+-- ПОЧЕМУ СНАЧАЛА DROP, А НЕ ПРОСТО «CREATE OR REPLACE».
+--
+-- «Заменить» представление можно только теми же колонками в том же порядке.
+-- Здесь добавляется author_avatar сразу после ника — то есть в середину, —
+-- и Postgres отказывается, считая это переименованием третьей колонки:
+--
+--   cannot change name of view column "category" to "author_avatar"
+--
+-- Совет из подсказки («используйте ALTER VIEW RENAME COLUMN») здесь не годится:
+-- колонка не переименовывается, а вставляется. Правильный путь — удалить
+-- представление и создать заново.
+--
+-- Данные при этом в безопасности: представление не хранит ничего, это готовый
+-- запрос. Удаление и пересоздание не касается ни одной строки в таблицах.
+--
+-- CASCADE не пишем намеренно: если от представления что-то зависит, лучше
+-- увидеть отказ и разобраться, чем молча снести зависимое.
 
-create or replace view public.forum_post_list
+drop view if exists public.forum_post_list;
+drop view if exists public.forum_comment_list;
+
+create view public.forum_post_list
 with (security_invoker = on) as
 select
   p.id,
@@ -371,7 +398,7 @@ select
 from public.forum_posts p
 left join public.forum_profiles prof on prof.id = p.author_id;
 
-create or replace view public.forum_comment_list
+create view public.forum_comment_list
 with (security_invoker = on) as
 select
   c.id,

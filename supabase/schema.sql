@@ -567,8 +567,17 @@ create trigger forum_reactions_user
 -- Соединение с forum_users выбрасывало из ленты все посты, кроме собственных:
 -- читать профили разрешено только свой и только модерации. Лента выглядела
 -- пустой при полной базе постов. Ник теперь лежит копией в самой записи.
+--
+-- drop перед create нужен для повторных запусков: «заменить» представление
+-- можно только теми же колонками в том же порядке, а состав колонок между
+-- версиями схемы менялся. Postgres в таком случае отказывает с сообщением
+-- про переименование колонки, хотя колонка вставляется, а не переименовывается.
+--
+-- Данных это не касается: представление ничего не хранит, это готовый запрос.
 
-create or replace view public.forum_post_list
+drop view if exists public.forum_post_list;
+
+create view public.forum_post_list
 with (security_invoker = on) as
 select
   p.id,
@@ -602,7 +611,9 @@ select
   ) as score
 from public.forum_posts p;
 
-create or replace view public.forum_comment_list
+drop view if exists public.forum_comment_list;
+
+create view public.forum_comment_list
 with (security_invoker = on) as
 select
   c.id,
@@ -631,8 +642,12 @@ from public.forum_comments c;
 
   Соединение с профилями здесь допустимо: список видит только модерация,
   и ей профили читать разрешено.
+
+  drop перед create — по той же причине, что у представлений выше.
 */
-create or replace view public.forum_report_list
+drop view if exists public.forum_report_list;
+
+create view public.forum_report_list
 with (security_invoker = on) as
 select
   r.id,
