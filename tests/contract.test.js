@@ -876,6 +876,64 @@ console.log('\nJ. Админ-панель');
   equal('экраны панели не читают поля эпохи GitHub', stale.join(', '), '');
 
   /*
+    ВЕРСИЯ У ИМПОРТОВ ПАНЕЛИ И В admin.html ОБЯЗАНА СОВПАДАТЬ.
+
+    GitHub Pages велит браузеру хранить файлы десять минут, и тот слушается:
+    обновление страницы перезапрашивает саму страницу и main.js, но вложенные
+    модули берёт из кэша.
+
+    Это уже стоило поломки. Обзор переписали под базу, main.js обновился,
+    а screens/overview.js остался прежним — тот, что читал поля репозитория.
+    Панель падала «Cannot read properties of undefined (reading fullName)»
+    на исправленном коде, и понять это было нельзя: файл на диске правильный.
+
+    Номер в адресе делает файл другим файлом для кэша, но работает это только
+    если номер поднят и там, и там: иначе страница придёт свежая, а модули
+    старые — то есть ровно та беда, от которой номер и ставили.
+  */
+  const adminMain = await readFile('src/admin/main.js', 'utf8');
+  const htmlVersion = adminHtml.match(/admin\/main\.js\?v=(\d+)/)?.[1];
+  const importVersions = [...adminMain.matchAll(/from '\.[^']+\.js\?v=(\d+)'/g)].map((m) => m[1]);
+
+  check('в admin.html указана версия панели', Boolean(htmlVersion), `нашлось: ${htmlVersion}`);
+  check('версия у всех импортов панели одна и та же',
+    new Set(importVersions).size <= 1, `версии: ${[...new Set(importVersions)].join(', ')}`);
+  equal('версия импортов совпадает с версией в admin.html',
+    importVersions[0] ?? '', htmlVersion ?? '');
+
+  /*
+    Все относительные импорты панели должны быть с версией. Один забытый —
+    один файл, который останется старым, и поломка вернётся ровно в том же
+    виде: правильный код на диске, ошибка в браузере.
+  */
+  const bareImports = [...adminMain.matchAll(/from '(\.[^']+\.js)'/g)].map((m) => m[1]);
+  equal('у каждого импорта панели есть версия', bareImports.join(', '), '');
+
+  /*
+    ТО ЖЕ ПРАВИЛО ДЛЯ САЙТА.
+
+    Беда одна на оба входа: страница обновляется, main.js обновляется,
+    а вложенные модули браузер берёт из кэша. У сайта это проявляется мягче
+    (страница просто выглядит по-старому), но однажды проявится так же
+    жёстко: свежий main.js вызовет функцию, которой в старом модуле нет.
+
+    Версия обязана совпадать с той, что стоит в index.html.
+  */
+  const siteMain = await readFile('src/main.js', 'utf8');
+  const siteHtml = await readFile('index.html', 'utf8');
+  const indexVersion = siteHtml.match(/src\/main\.js\?v=(\d+)/)?.[1];
+  const siteImportVersions = [...siteMain.matchAll(/from '\.[^']+\.js\?v=(\d+)'/g)].map((m) => m[1]);
+
+  check('версия у всех импортов сайта одна и та же',
+    new Set(siteImportVersions).size <= 1,
+    `версии: ${[...new Set(siteImportVersions)].join(', ')}`);
+  equal('версия импортов сайта совпадает с версией в index.html',
+    siteImportVersions[0] ?? '', indexVersion ?? '');
+
+  const bareSiteImports = [...siteMain.matchAll(/from '(\.[^']+\.js)'/g)].map((m) => m[1]);
+  equal('у каждого импорта сайта есть версия', bareSiteImports.join(', '), '');
+
+  /*
     ЭКРАНЫ ПАНЕЛИ ПРОВЕРЯЮТСЯ НА ТОМ, ЧТО ПАНЕЛЬ ИМ ДЕЙСТВИТЕЛЬНО ДАЁТ.
 
     Здесь была подложена выдумка: объект с полями repo, commit и sha —

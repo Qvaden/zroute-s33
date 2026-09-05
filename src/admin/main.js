@@ -4,31 +4,43 @@
  * Отдельная точка входа, а не раздел сайта. Причины две: посетитель не должен
  * грузить код панели, и попасть в неё случайно из меню тоже не должен.
  *
- * Фаза 1 доказала главное: api.github.com достаётся из сети редактора, а значит
- * бесплатная панель без сервера работает. Фаза 2 добавляет ввод недели
- * и публикацию одним коммитом.
+ * ПОЧЕМУ У КАЖДОГО ИМПОРТА СТОИТ ?v=N.
+ *
+ * GitHub Pages отдаёт файлы с указанием «хранить десять минут», и браузер
+ * слушается: обновление страницы, даже с Ctrl+Shift+R, перезапрашивает
+ * саму страницу и main.js, но вложенные модули берёт из кэша.
+ *
+ * Это уже стоило одной поломки. Обзор переписали под базу, main.js обновился,
+ * а screens/overview.js остался прежним — тот, что читал поля репозитория.
+ * Панель падала с «Cannot read properties of undefined (reading fullName)»
+ * на исправленном коде, и понять это было нельзя: файл на диске правильный.
+ *
+ * Номер в адресе делает файл другим файлом для кэша. Поднимать его надо
+ * ВМЕСТЕ с версией в admin.html — иначе смысл теряется: страница придёт
+ * свежая, а модули старые.
  *
  * ТРИ ПРАВИЛА ПУБЛИКАЦИИ, которые здесь соблюдаются буквально:
  *
  * 1. Каждое нажатие сразу в черновик. Кнопки «сохранить» нет, потому что
  *    забыть её нажать — самый частый способ потерять полчаса работы.
- * 2. Перед коммитом данные проходят валидатор сайта. Панель физически
+ * 2. Перед записью данные проходят валидатор сайта. Панель физически
  *    не может опубликовать то, на чём сайт откроется пустым.
- * 3. Коммит всегда с версией прочитанного файла. Если файл успели изменить,
- *    GitHub откажет, и мы объясним — вместо того чтобы затереть чужую работу.
+ * 3. В базу уходит только разница. Отправлять всё целиком значило бы
+ *    затирать работу второго редактора, который в это же время вносит
+ *    другую неделю.
  */
-import { CONFIG } from '../../config.js';
-import { esc, safeUrl } from '../ui/helpers.js';
-import { mapDataset } from '../data/adapters/_map.js';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js';
-import { validateDataset } from '../data/contract.js';
+import { CONFIG } from '../../config.js?v=7';
+import { esc, safeUrl } from '../ui/helpers.js?v=7';
+import { mapDataset } from '../data/adapters/_map.js?v=7';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=7';
+import { validateDataset } from '../data/contract.js?v=7';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js';
-import { renderHome } from '../pages/home.js';
+} from '../logic/standings.js?v=7';
+import { renderHome } from '../pages/home.js?v=7';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -45,13 +57,13 @@ import { renderHome } from '../pages/home.js';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js';
+} from '../db/account.js?v=7';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js';
-import { diffDataset, applyChanges, describeChanges } from './publish.js';
-import { roleLabel } from '../forum/roles.js';
-import { prepareImage, uploadPath } from './image.js';
+} from './store.js?v=7';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=7';
+import { roleLabel } from '../forum/roles.js?v=7';
+import { prepareImage, uploadPath } from './image.js?v=7';
 import {
   applyMarks,
   applyEvents,
@@ -79,7 +91,7 @@ import {
   textProblems,
   blankText,
   serialize,
-} from './edit.js';
+} from './edit.js?v=7';
 import {
   getDraft,
   saveDraft,
@@ -97,22 +109,22 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js';
-import { renderShell } from './shell.js';
-import { renderLogin } from './login.js';
-import { renderOverview } from './screens/overview.js';
-import { renderWeek, describe } from './screens/week.js';
-import { renderAlliances } from './screens/alliances.js';
-import { renderEvents } from './screens/events.js';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js';
-import { renderQuarter } from './screens/quarter.js';
-import { renderPresident } from './screens/president.js';
-import { renderPlayers } from './screens/players.js';
-import { renderModeration } from './screens/moderation.js';
-import { forum } from '../forum/index.js';
-import { deletionReason } from '../forum/rules.js';
+} from './draft.js?v=7';
+import { renderShell } from './shell.js?v=7';
+import { renderLogin } from './login.js?v=7';
+import { renderOverview } from './screens/overview.js?v=7';
+import { renderWeek, describe } from './screens/week.js?v=7';
+import { renderAlliances } from './screens/alliances.js?v=7';
+import { renderEvents } from './screens/events.js?v=7';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=7';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=7';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=7';
+import { renderQuarter } from './screens/quarter.js?v=7';
+import { renderPresident } from './screens/president.js?v=7';
+import { renderPlayers } from './screens/players.js?v=7';
+import { renderModeration } from './screens/moderation.js?v=7';
+import { forum } from '../forum/index.js?v=7';
+import { deletionReason } from '../forum/rules.js?v=7';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },

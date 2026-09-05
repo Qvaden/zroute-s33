@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js';
-import { loadAll, capabilities, db } from './data/index.js';
-import { validateDataset } from './data/contract.js';
+﻿import { CONFIG } from '../config.js?v=13';
+import { loadAll, capabilities, db } from './data/index.js?v=13';
+import { validateDataset } from './data/contract.js?v=13';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,21 +9,21 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=2';
-import { renderHome } from './pages/home.js';
-import { renderLadder } from './pages/ladder.js?v=2';
-import { renderQuarter } from './pages/quarter-final.js';
-import { renderTimeline } from './pages/timeline.js';
-import { renderGuide } from './pages/guide.js';
-import { renderBot } from './pages/bot.js';
-import { renderAlliance } from './pages/alliance.js';
-import { computeAchievements } from './logic/achievements.js';
-import { esc } from './ui/helpers.js';
-import { presidentBoardFromTexts } from './logic/president-board.js';
+} from './logic/standings.js?v=13';
+import { renderHome } from './pages/home.js?v=13';
+import { renderLadder } from './pages/ladder.js?v=13';
+import { renderQuarter } from './pages/quarter-final.js?v=13';
+import { renderTimeline } from './pages/timeline.js?v=13';
+import { renderGuide } from './pages/guide.js?v=13';
+import { renderBot } from './pages/bot.js?v=13';
+import { renderAlliance } from './pages/alliance.js?v=13';
+import { computeAchievements } from './logic/achievements.js?v=13';
+import { esc } from './ui/helpers.js?v=13';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=13';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
 import './ui/ladder-controls.js';
 import './ui/timeline-controls.js';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=13';
 
 /*
   РАЗДЕЛЫ.
