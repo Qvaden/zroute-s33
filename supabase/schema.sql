@@ -231,6 +231,68 @@ create policy forum_users_moderate on public.forum_users
   for update using (public.forum_is_staff())
   with check (public.forum_is_staff());
 
+/*
+  ЧЕГО НЕ МОЖЕТ ДАЖЕ МОДЕРАТОР.
+
+  Политика выше пускает к профилям и модератора, и администратора. Но роль —
+  это не то же самое, что запрет писать: модератор, способный менять роли,
+  назначит администратором себя, и разница между ролями исчезнет.
+
+  Поэтому роль трогает только администратор, и никто — включая его — не может
+  снять роль администратора с последнего оставшегося: иначе форум остался бы
+  без хозяина, а вернуть роль можно только запросом в базу руками.
+*/
+create or replace function public.forum_users_guard()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  /*
+    ЗАПРОС НАПРЯМУЮ ИЗ SQL-РЕДАКТОРА ПРОПУСКАЕМ БЕЗ ПРОВЕРОК.
+
+    Без этой строки нельзя было назначить ПЕРВОГО администратора — а это
+    обязательный шаг настройки. В редакторе Supabase нет вошедшего человека,
+    поэтому auth.uid() пуст, forum_is_admin() отвечает «нет», и проверка ниже
+    отбивала бы запрос владельца проекта от его же базы.
+
+    Доверие здесь не подарок: у того, кто дошёл до SQL-редактора, и так есть
+    полный доступ к базе. Проверять его правами форума бессмысленно.
+  */
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if new.role <> old.role then
+    if not public.forum_is_admin() then
+      raise exception 'Роль меняет только администратор';
+    end if;
+
+    if old.role = 'admin' and new.role <> 'admin'
+       and (select count(*) from public.forum_users where role = 'admin') <= 1 then
+      raise exception 'Это последний администратор — снять роль нельзя';
+    end if;
+  end if;
+
+  -- Ник и дату регистрации не меняет никто: на ник ссылаются копии в постах.
+  new.nick := old.nick;
+  new.created_at := old.created_at;
+  new.id := old.id;
+
+  -- Администратора нельзя забанить: это способ отобрать форум у владельца.
+  if old.role = 'admin' then
+    new.banned := old.banned;
+    new.muted_until := old.muted_until;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_users_guard on public.forum_users;
+create trigger forum_users_guard
+  before update on public.forum_users
+  for each row execute function public.forum_users_guard();
+
 -- Посты ─────────────────────────────────────────────────────────────────────
 
 drop policy if exists forum_posts_read on public.forum_posts;
@@ -252,17 +314,81 @@ create policy forum_posts_insert on public.forum_posts
 
 drop policy if exists forum_posts_update_own on public.forum_posts;
 create policy forum_posts_update_own on public.forum_posts
+  /*
+    Автор правит свой пост, пока он не удалён.
+
+    ЗДЕСЬ БЫЛ ПОДЗАПРОС, И ОН ЛОМАЛ ПРАВКУ ЦЕЛИКОМ. Стояло условие
+    «pinned = (select pinned from forum_posts p where p.id = id)» — попытка
+    запретить автору закреплять свой пост. Но `id` без имени таблицы Postgres
+    связал с той же таблицей внутри подзапроса: условие превратилось
+    в «p.id = p.id», подзапрос вернул все строки, и любая правка падала
+    с «more than one row returned by a subquery».
+
+    Ошибка была не в опечатке, а в самой затее: политика доступа отвечает
+    на вопрос «можно ли трогать эту строку», а не «какие поля разрешено
+    менять». Второй вопрос решает триггер ниже — там доступно OLD, и сравнивать
+    старое с новым не нужно через подзапрос.
+  */
   for update using (author_id = auth.uid() and deleted = false)
-  with check (
-    author_id = auth.uid()
-    -- Автор не может закрепить свой пост и не может подменить автора.
-    and pinned = (select pinned from public.forum_posts p where p.id = id)
-  );
+  with check (author_id = auth.uid());
 
 drop policy if exists forum_posts_moderate on public.forum_posts;
 create policy forum_posts_moderate on public.forum_posts
   for update using (public.forum_is_staff())
   with check (public.forum_is_staff());
+
+/*
+  ЧТО АВТОРУ МЕНЯТЬ НЕЛЬЗЯ.
+
+  Политика выше пускает автора к своей строке целиком, поэтому ограничения
+  по полям живут здесь: в триггере есть OLD, и «осталось ли поле прежним»
+  проверяется прямо, без подзапросов.
+
+  Запрещённое не вызывает ошибку, а молча возвращается к прежнему значению.
+  Причина: человек правит текст поста, а не «отправляет строку таблицы».
+  Отказ с руганью на поле, которого он не трогал, выглядел бы поломкой сайта.
+*/
+create or replace function public.forum_posts_guard()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  -- Запрос из SQL-редактора не ограничиваем: там нет вошедшего человека,
+  -- а у владельца проекта и так полный доступ. Подробнее — в forum_users_guard.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if public.forum_is_staff() then
+    return new;
+  end if;
+
+  -- Закрепление темы — дело модерации.
+  new.pinned := old.pinned;
+  -- Подменить автора или дату публикации нельзя: это перепись истории.
+  new.author_id := old.author_id;
+  new.author_nick := old.author_nick;
+  new.created_at := old.created_at;
+  /*
+    Свой пост автор удаляет с пометкой «удалено автором» — и не может выдать
+    её за решение модерации, приписав чужую причину. Обратно тоже нельзя:
+    удалённый пост не возвращается, иначе модерацию можно было бы отменить.
+  */
+  if new.deleted and not old.deleted then
+    new.deleted_reason := 'Удалено автором';
+  elsif old.deleted then
+    new.deleted := old.deleted;
+    new.deleted_reason := old.deleted_reason;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_posts_guard on public.forum_posts;
+create trigger forum_posts_guard
+  before update on public.forum_posts
+  for each row execute function public.forum_posts_guard();
 
 -- Стирать строки нельзя никому, включая администратора: удаление — это
 -- отметка с причиной. Политики `for delete` нет вовсе, поэтому запрос
@@ -293,6 +419,41 @@ drop policy if exists forum_comments_moderate on public.forum_comments;
 create policy forum_comments_moderate on public.forum_comments
   for update using (public.forum_is_staff())
   with check (public.forum_is_staff());
+
+-- То же ограничение по полям, что и у постов, и по той же причине.
+create or replace function public.forum_comments_guard()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if public.forum_is_staff() then
+    return new;
+  end if;
+
+  new.author_id := old.author_id;
+  new.author_nick := old.author_nick;
+  new.created_at := old.created_at;
+  new.post_id := old.post_id;
+
+  if new.deleted and not old.deleted then
+    new.deleted_reason := 'Удалено автором';
+  elsif old.deleted then
+    new.deleted := old.deleted;
+    new.deleted_reason := old.deleted_reason;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_comments_guard on public.forum_comments;
+create trigger forum_comments_guard
+  before update on public.forum_comments
+  for each row execute function public.forum_comments_guard();
 
 -- Реакции ───────────────────────────────────────────────────────────────────
 
