@@ -2239,14 +2239,38 @@ console.log('\nQ. Форум');
     security_invoker обязателен: без него представление читало бы данные
     правами своего владельца, то есть в обход всех политик выше.
 
-    Считаем объявления «create view», а не «create or replace»: представления
-    пересоздаются через drop, потому что заменой нельзя добавить колонку
-    в середину — Postgres принимает это за переименование и отказывает.
+    ОДНО ИСКЛЮЧЕНИЕ — forum_profiles. Там invoker выключен НАРОЧНО: это
+    открытая страница участника, и представление само служит границей доступа.
+    Оно отбирает поля, которые можно показать кому угодно, и читается правами
+    владельца — поверх правил на таблице.
+
+    С invoker = on оно повторяло проверку самой таблицы («читать только свой
+    профиль»), и гость не видел ни аватарок в ленте, ни чужих страниц.
+    Ошибку допустили дважды, поэтому здесь она закреплена проверкой.
+
+    Считаем объявления «create view»: представления пересоздаются через drop,
+    потому что заменой нельзя добавить колонку в середину.
   */
   const views = schema.match(/create (?:or replace )?view public\.\w+/g) ?? [];
   const invokers = schema.match(/with \(security_invoker = on\)/g) ?? [];
   equal('каждое представление читает данные правами того, кто спросил',
     invokers.length, views.length);
+
+  const profilesSql = await readFile('supabase/profiles.sql', 'utf8');
+  const profileView = profilesSql.slice(
+    profilesSql.indexOf('create view public.forum_profiles'),
+    profilesSql.indexOf('grant select on public.forum_profiles')
+  );
+  check('открытый профиль читается поверх правил таблицы, иначе гость не видит ничего',
+    /security_invoker = off/.test(profileView));
+  /*
+    Обратная сторона того же решения: раз представление проходит поверх правил,
+    в нём не должно быть ни одного поля, которое нельзя показать чужому.
+    Не «скрыто», а не выбрано.
+  */
+  for (const secret of ['banned', 'ban_reason', 'muted_until', 'can_edit_site']) {
+    check(`открытый профиль не отдаёт ${secret}`, !new RegExp(`\\b${secret}\\b`).test(profileView));
+  }
 
   /*
     Схему запускают повторно при каждом обновлении, поэтому каждое
