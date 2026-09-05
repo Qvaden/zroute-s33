@@ -132,15 +132,33 @@
       Убираем за левый край, а не прячем display: none. Скрытая панель
       появлялась бы рывком, а сдвинутая — выезжает, и человек видит, откуда
       она взялась.
+
+      visibility нужен вдобавок к сдвигу: панель за краем остаётся в потоке
+      чтения, и клавиатура с экранным диктором доходили до вкладок, которых
+      не видно — человек оказывался в невидимом меню без выхода. Переключается
+      скачком, поэтому при открытии панель видна сразу, а при закрытии
+      исчезает только после того, как уедет.
     */
     transform: translateX(-100%);
-    transition: transform .26s var(--ease);
+    visibility: hidden;
+    transition: transform .26s var(--ease), visibility .26s var(--ease);
     box-shadow: 24px 0 60px -30px rgba(0,0,0,.9);
+    /*
+      Вырез под фронтальную камеру и полоса жестов: без этого верхние вкладки
+      уезжают под чёрную скобу, а нижняя прижимается к полосе, из-за чего
+      нажатие по ней уводит приложение вместо перехода в раздел.
+    */
+    padding-top: max(18px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-left: max(14px, env(safe-area-inset-left));
   }
-  .is-side-open .side { transform: translateX(0); }
+  .is-side-open .side { transform: translateX(0); visibility: visible; }
 
-  /* Прокрутка страницы под открытым меню — верный способ потерять место. */
-  .is-side-open body { overflow: hidden; }
+  /*
+    Прокрутка страницы под открытым меню — верный способ потерять место.
+    Класс висит на <html>, потому что overflow на body в iOS не работает.
+  */
+  .is-side-open, .is-side-open body { overflow: hidden; }
 
   .side-veil {
     position: fixed;
@@ -151,37 +169,87 @@
   }
 }
 
+/* Открытое окно: та же беда, что с меню — страница не должна ехать под ним. */
+.is-modal-open, .is-modal-open body { overflow: hidden; }
+
 @media (prefers-reduced-motion: reduce) {
   .side { transition: none; }
 }
 
 .burger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  /*
+    44 пиксела — не про красоту. Меньше этого палец промахивается, и человек
+    жмёт второй раз, думая, что не нажалось. Это самая частая кнопка на сайте.
+  */
+  min-height: 44px;
+  flex: none;
+  padding: 0 13px 0 11px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  /*
+    ПОЧЕМУ КНОПКА ЗАМЕТНАЯ, А НЕ ДЕЛИКАТНАЯ.
+
+    Сначала это были три полоски на прозрачном фоне — «как принято».
+    На тёмной шапке рядом с яркой оранжевой маркой их не видно: глаз уходит
+    на марку, а кнопка читается как часть фона. Человек не понимает, где
+    остальные разделы, и решает, что их нет.
+
+    Три полоски вообще узнаёт не каждый. Поэтому рядом стоит слово «Меню»:
+    оно снимает вопрос целиком и стоит десяти пикселов ширины.
+  */
+  background: linear-gradient(145deg, rgba(255,154,74,.16), rgba(255,106,43,.1));
+  box-shadow: inset 0 0 0 1px rgba(255,106,43,.14), 0 6px 18px -14px var(--accent);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color .18s var(--ease), background .18s var(--ease), transform .16s var(--ease);
+}
+
+/* Полоски: столбиком внутри своей ячейки, чтобы не спорить с подписью. */
+.burger__lines {
   display: grid;
   gap: 4px;
-  place-content: center;
-  width: 38px;
-  height: 38px;
   flex: none;
-  padding: 0 9px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255,255,255,.03);
-  cursor: pointer;
 }
-.burger span {
+.burger__lines i {
   display: block;
-  width: 18px;
+  width: 17px;
   height: 2px;
   border-radius: 2px;
-  background: var(--text);
-  transition: transform .22s var(--ease), opacity .18s var(--ease);
+  background: var(--accent);
+  transition: transform .22s var(--ease), opacity .18s var(--ease), background .18s var(--ease);
 }
-.burger:hover { border-color: rgba(255,255,255,.2); }
+
+.burger:hover {
+  border-color: rgba(255,106,43,.5);
+  background: linear-gradient(145deg, rgba(255,154,74,.24), rgba(255,106,43,.15));
+}
+.burger:active { transform: scale(.97); }
+.burger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Открытое меню — крестик: та же кнопка закрывает, и это должно быть видно. */
-.is-side-open .burger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
-.is-side-open .burger span:nth-child(2) { opacity: 0; }
-.is-side-open .burger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.is-side-open .burger__lines i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.is-side-open .burger__lines i:nth-child(2) { opacity: 0; }
+.is-side-open .burger__lines i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.is-side-open .burger {
+  border-color: rgba(255,106,43,.5);
+  background: linear-gradient(145deg, rgba(255,154,74,.26), rgba(255,106,43,.17));
+}
+
+/*
+  Подпись прячем только на самых узких экранах, где каждый пиксел шапки
+  на счету, — и то оставляем полоски заметно окрашенными.
+*/
+@media (max-width: 359px) {
+  .burger__label { display: none; }
+  .burger { padding: 0 11px; }
+}
 
 /*
   Шапка: кнопка, марка, статус президента. Правила из styles-v8.css для
@@ -193,9 +261,13 @@
   align-items: center;
   gap: 12px;
   padding: 8px 18px;
+  /* Вырез камеры и «уши» в ландшафтном положении. */
+  padding-top: max(8px, env(safe-area-inset-top));
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
 }
 @media (min-width: 760px) {
-  .site-head__inner { padding: 8px 32px; }
+  .site-head__inner { padding-left: max(32px, env(safe-area-inset-left)); padding-right: max(32px, env(safe-area-inset-right)); }
 }
 .brand--head { padding: 4px 0; }
 /* Марка в шапке дублирует ту, что в панели. На широком экране прячем её. */
@@ -501,6 +573,11 @@
 
 .forum-btn {
   padding: 10px 17px;
+  /*
+    44 пиксела высоты — минимум, при котором палец попадает уверенно.
+    Меньше — человек промахивается, жмёт второй раз и получает второй пост.
+  */
+  min-height: 44px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: linear-gradient(135deg, #ff9a4a, var(--accent));
@@ -509,10 +586,18 @@
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform .16s var(--ease), box-shadow .18s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform .16s var(--ease), box-shadow .18s var(--ease), opacity .16s var(--ease);
 }
-.forum-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -12px var(--accent); }
-.forum-btn:active { transform: none; }
+.forum-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px -12px var(--accent); }
+.forum-btn:active:not(:disabled) { transform: none; }
+.forum-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/*
+  Занятая кнопка: запрос идёт, ответа нет. Без этого состояния человек
+  нажимает второй раз и получает две одинаковые записи.
+*/
+.forum-btn:disabled { opacity: .6; cursor: progress; transform: none; box-shadow: none; }
 .forum-btn--ghost {
   background: rgba(255,255,255,.03);
   border-color: var(--line);
@@ -876,7 +961,8 @@
 .forum-toast {
   position: fixed;
   z-index: 70;
-  bottom: 20px;
+  /* Над полосой жестов, иначе сообщение наполовину под ней. */
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 14px));
   left: 50%;
   transform: translateX(-50%);
   max-width: calc(100% - 36px);
@@ -895,4 +981,68 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .forum-toast { animation: none; }
+}
+
+/* ── Удобство ввода и попадания пальцем ───────────────────────────────────── */
+
+/*
+  Всё, по чему нажимают, обязано быть не меньше 44 пикселов. Ниже — те места,
+  где кнопки мелкие по виду: реакции, действия под постом, вкладки.
+  Размер добирается невидимой областью вокруг, чтобы вид не поехал.
+*/
+@media (hover: none) and (pointer: coarse) {
+  .forum-react__btn { min-height: 40px; padding: 8px 12px; }
+  .forum-act { min-height: 40px; padding: 8px 11px; }
+  .forum-emoji__item { min-width: 44px; min-height: 44px; justify-content: center; }
+  .seg__btn { min-height: 40px; }
+  .side .nav__link { min-height: 46px; }
+  .forum-post__title a { display: inline-block; padding: 2px 0; }
+
+  /* Наведения на телефоне не бывает — движение при нажатии только мешает. */
+  .forum-btn:hover, .forum-react__btn:hover { transform: none; }
+}
+
+/*
+  Подсветка при нажатии вместо наведения: на телефоне это единственный способ
+  показать, что нажатие принято.
+*/
+.forum-react__btn:active:not(:disabled),
+.forum-act:active,
+.forum-emoji__item:active { background: rgba(255,255,255,.09); }
+
+/*
+  Обводка фокуса для тех, кто ходит по сайту с клавиатуры. Только :focus-visible:
+  обычный :focus подсветил бы всё и при нажатии мышью.
+*/
+.nav__link:focus-visible,
+.seg__btn:focus-visible,
+.forum-react__btn:focus-visible,
+.forum-act:focus-visible,
+.forum-emoji__item:focus-visible,
+.forum-rules__summary:focus-visible,
+.forum-composer__summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/*
+  Длинные ники и ссылки без пробелов растягивали карточку по ширине,
+  и вся страница начинала ездить в сторону. Ломаем в любом месте.
+*/
+.forum-post__title,
+.forum-post__body,
+.forum-comment__body,
+.forum-me__body b,
+.forum-post__by b { overflow-wrap: anywhere; }
+
+/*
+  Прокрутка внутри окна не должна утягивать за собой страницу — иначе
+  на телефоне окно уезжает, стоит доскроллить список правил до конца.
+*/
+.forum-modal__box { overscroll-behavior: contain; }
+
+/* Подвал и содержимое над полосой жестов. */
+@media (max-width: 1039px) {
+  .site-foot { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
 }

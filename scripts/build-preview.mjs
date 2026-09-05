@@ -25,6 +25,10 @@ import { renderLadder } from '../src/pages/ladder.js';
 import { renderTimeline } from '../src/pages/timeline.js';
 import { renderGuide } from '../src/pages/guide.js';
 import { renderAlliance } from '../src/pages/alliance.js';
+import { renderQuarter } from '../src/pages/quarter-final.js';
+import { renderBot } from '../src/pages/bot.js';
+import { renderForum } from '../src/pages/forum.js';
+import { computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 
 const data = await loadAll();
 // Только недели, за которые есть результаты — см. weeksUpToLastData.
@@ -42,11 +46,38 @@ const view = {
   placeHistory: computePlaceHistory(data.alliances, weeks, data.results, CONFIG.scoring),
 };
 
+const quarter = computeQuarterWindow(data.weeks, data.results, 4);
+const quarterStandings = computeStandings(
+  data.alliances, quarter.weeks, data.results, CONFIG.scoring, 4
+).map((row) => ({
+  ...row,
+  form: computeWindowForm(row.alliance.id, quarter.weeks, data.results),
+}));
+
+/*
+  ПОРЯДОК И СОСТАВ РАЗДЕЛОВ ЗДЕСЬ ОБЯЗАН СОВПАДАТЬ С САЙТОМ.
+
+  Превью — это не только «показать кому-то файлом», но и аварийный выход
+  из плана: если источник данных однажды отвалится, этот скрипт превращает
+  сайт в статику, и накопленная история остаётся доступной.
+
+  Значит собранный файл должен быть ТЕМ ЖЕ сайтом. Пока здесь было четыре
+  раздела из семи, аварийный выход давал сайт без Кварта, без бота и без
+  форума — то есть не спасал, а подменял. Обнаружилось бы это в тот день,
+  когда выход понадобится, то есть в худший.
+
+  Форум в превью показывается без ленты: постов в файле нет и быть не может,
+  они лежат в базе. Зато видна сводка сервера и правила — то, что и так
+  часть страницы.
+*/
 const NAV = [
+  { id: 'forum', label: 'Форум', html: renderForum(view, { ready: false, loading: false }) },
   { id: 'home', label: 'Итоги недели', html: renderHome(view) },
+  { id: 'quarter', label: 'Кварт', html: renderQuarter({ standings: quarterStandings, quarter }) },
   { id: 'ladder', label: 'Рейтинг', html: renderLadder(view) },
   { id: 'timeline', label: 'Хронология', html: renderTimeline(view) },
   { id: 'guide', label: 'Малым алам', html: renderGuide(view) },
+  { id: 'bot', label: 'Бот в ТГ', html: renderBot() },
 ];
 
 /*
@@ -61,14 +92,24 @@ const ALLY = data.alliances.map((a) => ({
 
 const PAGES = [...NAV, ...ALLY];
 
-const startId = process.argv[2] && PAGES.some((p) => p.id === process.argv[2]) ? process.argv[2] : 'home';
+const startId = process.argv[2] && PAGES.some((p) => p.id === process.argv[2]) ? process.argv[2] : 'forum';
 const outFile = process.argv[3] || 'dist/preview.html';
 const isStart = (p) => p.id === startId;
 // У карточки альянса своей вкладки нет — в меню подсвечиваем рейтинг,
 // откуда на неё и приходят.
 const startNavId = startId.startsWith('alliance-') ? 'ladder' : startId;
 
-const css = await readFile('src/styles.css', 'utf8');
+/*
+  Стили берём те же, что грузит index.html, а не зашитое имя файла.
+
+  Здесь стоял src/styles.css — файл, от которого сайт ушёл в версии v6.
+  Превью собиралось из чужого оформления, и «аварийный выход» давал сайт,
+  похожий на настоящий, но другой. Читаем список из самой страницы: тогда
+  переименование файла стилей не оставит превью позади.
+*/
+const indexHtml = await readFile('index.html', 'utf8');
+const cssFiles = [...indexHtml.matchAll(/href="\.\/(src\/[^"?]+\.css)/g)].map((m) => m[1]);
+const css = (await Promise.all(cssFiles.map((f) => readFile(f, 'utf8')))).join('\n');
 
 /*
   Скрипты фильтров написаны без import и export именно ради этих строк:
@@ -100,15 +141,33 @@ ${css}
 <body>
 <header class="site-head">
   <div class="site-head__inner">
-    <a class="brand" href="#" data-go="home">
+    <!--
+      Кнопка меню и боковая панель — как на настоящем сайте. Раньше превью
+      собиралось со вкладками в строке, то есть показывало прошлую версию
+      навигации: аварийный выход давал сайт, похожий на настоящий, но другой.
+    -->
+    <button type="button" id="side-toggle" class="burger"
+            aria-controls="side" aria-expanded="false" aria-label="Открыть меню разделов">
+      <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+    </button>
+    <a class="brand brand--head" href="#" data-go="forum">
       <span class="brand__num">33</span>
       <span class="brand__text"><b>Сервер 33</b><small>Z Route: Redemption</small></span>
     </a>
-    <nav class="nav" id="nav">
-      ${NAV.map((p) => `<a href="#" class="nav__link${p.id === startNavId ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n      ')}
-    </nav>
   </div>
 </header>
+
+<aside id="side" class="side" aria-label="Разделы сайта">
+  <a class="brand brand--side" href="#" data-go="forum">
+    <span class="brand__num">33</span>
+    <span class="brand__text"><b>Сервер 33</b><small>Z Route: Redemption</small></span>
+  </a>
+  <nav class="nav" id="nav">
+    ${NAV.map((p) => `<a href="#" class="nav__link${p.id === startNavId ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n    ')}
+  </nav>
+  <div class="side__foot"><span class="side__note">Собранная копия сайта</span></div>
+</aside>
+<div class="side-veil" id="side-veil" hidden></div>
 
 <main class="wrap" id="app">
   ${PAGES.map((p) => `<div class="page${isStart(p) ? ' is-active' : ''}" id="page-${p.id}">${p.html}</div>`).join('\n  ')}
@@ -118,6 +177,30 @@ ${css}
   <p>Неофициальный сайт сообщества 33 сервера. Данные вносятся вручную после каждого VS.
   Источник данных: <b>${CONFIG.dataSource}</b>${CONFIG.dataSource === 'json' ? ' (выдуманные данные)' : ''}.</p>
 </footer>
+
+<script>
+// Боковое меню: то же поведение, что в src/main.js.
+(function () {
+  var toggle = document.getElementById('side-toggle');
+  var veil = document.getElementById('side-veil');
+  var side = document.getElementById('side');
+  function setOpen(open) {
+    document.documentElement.classList.toggle('is-side-open', open);
+    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    if (veil) veil.hidden = !open;
+  }
+  if (toggle) toggle.addEventListener('click', function () {
+    setOpen(!document.documentElement.classList.contains('is-side-open'));
+  });
+  if (veil) veil.addEventListener('click', function () { setOpen(false); });
+  if (side) side.addEventListener('click', function (e) {
+    if (e.target.closest('a')) setOpen(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') setOpen(false);
+  });
+})();
+</script>
 
 <script>
 // Мини-роутер превью. В настоящем сайте это делает адресная строка.

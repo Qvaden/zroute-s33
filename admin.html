@@ -23,12 +23,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Сначала язык сайта: токены, типографика, панели. Потом только своё. -->
-  <link rel="stylesheet" href="./src/styles.css?v=5">
-  <link rel="stylesheet" href="./src/admin/admin.css?v=5">
+  <!--
+    Сначала язык сайта: токены, типографика, панели. Потом только своё.
+
+    Здесь стоял src/styles.css — файл, который сам сайт не грузит с версии v6.
+    Панель при этом выглядела почти правильно: базовые цвета и радиусы в обоих
+    файлах совпадают. Но admin.css ссылается на --ease-out и --electric,
+    которых в старом файле нет вовсе, и часть оформления молча не работала:
+    подсветка президентской доски, плавность кнопок.
+
+    Правило простое: панель переиспользует ТОТ ЖЕ язык, что и сайт. Иначе
+    расхождение накапливается незаметно — оба файла живые, ошибки нет,
+    а выглядит по-разному.
+  -->
+  <link rel="stylesheet" href="./src/styles-v8.css?v=1">
+  <link rel="stylesheet" href="./src/admin/admin.css?v=6">
 </head>
 <body class="adm">
   <div id="admin"><div class="loading">Загружаем панель…</div></div>
-  <script type="module" src="./src/admin/main.js?v=5"></script>
+  <script type="module" src="./src/admin/main.js?v=6"></script>
 </body>
 </html>

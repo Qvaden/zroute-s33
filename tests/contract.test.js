@@ -661,24 +661,51 @@ console.log('\nJ. Админ-панель');
   check(`панель разложена по файлам (${adminFiles.length} шт.)`, adminFiles.length >= 5);
 
   /*
-    ВСЯ СЕТЬ И ВСЯ ЗАПИСЬ — В ОДНОМ ФАЙЛЕ.
+    ВСЯ ЗАПИСЬ — В ОДНОМ ФАЙЛЕ.
 
     Пока это так, у вопроса «что в панели способно испортить накопленную
-    историю» есть ровно один адрес. Стоит появиться второму fetch в экране
-    или в логике правки — и ответ на этот вопрос перестанет быть коротким.
+    историю» есть ровно один адрес. Стоит появиться записи в экране или
+    в логике правки — и ответ на этот вопрос перестанет быть коротким.
+
+    ЧТО ИЗМЕНИЛОСЬ ПОСЛЕ ПЕРЕЕЗДА С GITHUB. Раньше сеть и запись совпадали:
+    единственным способом что-то изменить был запрос к api.github.com.
+    Теперь запросы к базе делает общий клиент (src/db/client.js), которым
+    пользуются и сайт, и форум, — и через него же ходит чтение, которое
+    испортить ничего не может.
+
+    Поэтому проверка сместилась с «где сеть» на «где запись». Это и был
+    настоящий предмет беспокойства: испортить историю может изменяющий
+    запрос, а не любой.
   */
-  const networkFiles = [];
+  const writeFiles = [];
   for (const f of adminFiles) {
     const code = stripComments(await readFile(f, 'utf8'));
-    if (/\bfetch\(/.test(code) || /method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(code)) {
-      networkFiles.push(f);
-    }
+    if (/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(code)) writeFiles.push(f);
   }
-  equal('сеть и запись живут ровно в одном файле', networkFiles.join(', '), 'src/admin/repo.js');
+  equal('запись живёт ровно в одном файле', writeFiles.join(', '), 'src/admin/store.js');
 
-  const repoCode = stripComments(await readFile('src/admin/repo.js', 'utf8'));
-  check('публикация идёт методом PUT с версией файла', /method:\s*'PUT'/.test(repoCode) && /\bsha,/.test(repoCode));
-  check('без версии файла публикация отказывает', /if\s*\(!sha\)\s*throw/.test(repoCode));
+  /*
+    Панель не разговаривает с сетью напрямую: транспорт общий с сайтом
+    и форумом. Свой fetch в панели означал бы вторую реализацию обновления
+    токена и разбора ошибок — то есть два немного разных поведения.
+  */
+  const ownFetch = [];
+  for (const f of adminFiles) {
+    const code = stripComments(await readFile(f, 'utf8'));
+    if (/\bfetch\(/.test(code)) ownFetch.push(f);
+  }
+  equal('панель не делает своих сетевых запросов', ownFetch.join(', '), '');
+
+  const storeCode = stripComments(await readFile('src/admin/store.js', 'utf8'));
+  /*
+    Пустая отметка УДАЛЯЕТ результат, а не пишет третий исход. Отсутствие
+    записи означает «результат ещё не внесли» — это состояние данных,
+    а не игры (см. src/data/types.js).
+  */
+  check('снятая отметка удаляет результат, а не пишет третий исход',
+    /method: 'DELETE'/.test(storeCode) && /site_results\?week_id=eq/.test(storeCode));
+  check('право редактора выдаётся функцией базы, а не правкой профиля',
+    /rpc\/site_set_editor/.test(storeCode));
 
   /*
     Токен — единственный секрет в проекте. Случайный console.log с ним
@@ -750,15 +777,68 @@ console.log('\nJ. Админ-панель');
   check('панель не подключает манифест', !adminHtml.includes('rel="manifest"'));
   check('панель закрыта от поисковиков', /name="robots"[^>]*noindex/.test(adminHtml));
   check('в admin.html нет абсолютных путей от корня домена', !/(?:src|href)="\/(?!\/)/.test(adminHtml));
-  check('панель переиспользует стили сайта', adminHtml.includes('./src/styles.css'));
+  /*
+    ПАНЕЛЬ ПЕРЕИСПОЛЬЗУЕТ ТОТ ЖЕ ЯЗЫК, ЧТО И САЙТ.
+
+    Проверяем не «подключён какой-то styles.css», а «подключён тот самый файл,
+    который грузит index.html». Прежняя проверка искала строку './src/styles.css'
+    и пропустила настоящую поломку: панель осталась на файле, от которого сайт
+    ушёл ещё в версии v6. Выглядело почти правильно — базовые цвета совпадают, —
+    но переменных --ease-out и --electric в старом файле нет, и часть оформления
+    молча не работала.
+
+    Расхождение такого рода накапливается незаметно: оба файла живые, ошибки
+    нет, а выглядит по-разному.
+  */
+  const indexForCss = await readFile('index.html', 'utf8');
+  const siteCss = indexForCss.match(/href="\.\/(src\/[\w.-]+\.css)/)?.[1];
+  check('панель переиспользует тот же файл стилей, что и сайт',
+    Boolean(siteCss) && adminHtml.includes(`./${siteCss}`),
+    `сайт: ${siteCss}`);
+
 
   /*
     Кэш админки опаснее устаревшего сайта: показав прошлую неделю, панель
     даёт опубликовать правку поверх чужой незаметно для обоих редакторов.
   */
   const sw = await readFile('sw.js', 'utf8');
-  check('service worker обходит api.github.com', sw.includes('api.github.com'));
   check('service worker обходит панель', /admin/.test(sw));
+  /*
+    Раньше проверялось «обходит api.github.com»: панель писала данные туда,
+    и закэшированный ответ с токеном в заголовке был бы утечкой. Теперь панель
+    ходит в базу, и мимо кэша должна идти она.
+  */
+  check('service worker обходит базу', /supabase/i.test(sw) || /api\.github\.com/.test(sw));
+
+  /*
+    РЕЗЕРВНАЯ КОПИЯ — УСЛОВИЕ ПЕРЕЕЗДА, А НЕ УДОБСТВО.
+
+    Пока история лежала в git, ей не могло случиться ничего: репозиторий
+    раздаётся тысячами копий, история правок неудаляема. В базе иначе —
+    аккаунт можно потерять, тариф изменить, а неудачный запрос стирает данные
+    молча и навсегда.
+
+    Без выгрузки переезд означал бы обмен вечного хранилища на удобное. Поэтому
+    здесь проверяется не наличие файла, а его предохранители: скрипт, который
+    молча пишет пустоту поверх истории, хуже отсутствующего.
+  */
+  const backup = await readFile('scripts/backup-from-db.mjs', 'utf8');
+  check('выгрузка отказывается писать пустой набор поверх копии',
+    /не перезаписываю|НЕ перезаписываю/i.test(backup) && /process\.exit\(1\)/.test(backup));
+  check('выгрузка замечает резкую потерю записей',
+    /0\.5|половин/i.test(backup));
+  check('выгрузка не требует служебного ключа',
+    !/service_role|sb_secret/.test(backup));
+  check('формат файла тот же, что был до переезда',
+    /JSON\.stringify\(data, null, 2\)/.test(backup));
+
+  const backupFlow = await readFile('.github/workflows/backup-from-db.yml', 'utf8');
+  check('выгрузка идёт по расписанию, а не только руками',
+    /schedule:/.test(backupFlow) && /cron:/.test(backupFlow));
+  check('выгрузку можно запустить руками перед рискованной правкой',
+    /workflow_dispatch:/.test(backupFlow));
+  check('в воркфлоу выгрузки нет секретов — данные сайта открыты на чтение',
+    !/secrets\./.test(backupFlow));
 
   // Экраны — чистые функции над данными, поэтому проверяются без браузера.
   const screens = [
@@ -1297,11 +1377,31 @@ console.log('\nM. Правка хронологии');
   check('подписано, что загрузится при публикации', pendingForm.includes('Загрузится при публикации'));
   check('кнопка «убрать картинку» есть', pendingForm.includes('data-event-image-clear'));
 
-  /* ── Подготовка имени файла под загрузку (src/admin/image.js) ── */
+  /* ── Подготовка имени файла под загрузку (src/ui/image-prep.js) ── */
   const { uploadPath } = await import('../src/admin/image.js');
-  check('путь загрузки лежит в public/uploads', uploadPath('jpg').startsWith('public/uploads/'));
+  /*
+    Раньше путь начинался с public/uploads — там лежали файлы, закоммиченные
+    в репозиторий. После переезда фотографии живут в хранилище базы, и папка
+    внутри него другая: «public/» в имени объекта означало бы папку с таким
+    названием, а не публичный доступ — он задаётся правами на хранилище.
+  */
+  check('путь загрузки лежит в папке событий', uploadPath('jpg').startsWith('events/'));
   check('путь загрузки оканчивается на расширение', uploadPath('jpg').endsWith('.jpg'));
   check('два вызова дают разные имена', uploadPath('jpg') !== uploadPath('jpg'));
+
+  /*
+    Подготовка картинок общая для панели и форума: у аватарок и скриншотов
+    разные пределы веса, но одно место, где обрабатывается HEIC и считается
+    сжатие. Две копии означали бы два предела и два места для одной правки.
+  */
+  const { readFile: readSrc } = await import('node:fs/promises');
+  const prep = await readSrc('src/ui/image-prep.js', 'utf8');
+  check('аватарка обрезается по центру, а не сжимается по осям',
+    /square: true/.test(prep) && /Math\.min\(bitmap\.width, bitmap\.height\)/.test(prep));
+  check('у аватарки и фото разные пределы размера',
+    /avatar:[\s\S]{0,140}max: 256/.test(prep) && /photo:[\s\S]{0,140}max: 1600/.test(prep));
+  check('HEIC объясняется человеку, а не падает молча',
+    /HEIC/.test(prep) && /Сохраните фото как JPG/.test(prep));
 }
 
 // ── N. Правка альянсов ──────────────────────────────────────────────────────
@@ -2421,6 +2521,29 @@ console.log('\nQ. Форум');
     с ошибкой вместо всего сайта.
   */
   check('сломанные данные сайта не роняют форум', /loadError/.test(mainJs));
+
+  /*
+    ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.
+
+    Если источник данных однажды отвалится, scripts/build-preview.mjs
+    превращает сайт в статику, и накопленная история остаётся доступной.
+    Значит собранный файл обязан быть ТЕМ ЖЕ сайтом.
+
+    Пока в превью было четыре раздела из семи и стили от версии v6, аварийный
+    выход давал сайт без Кварта, без бота и без форума — то есть не спасал,
+    а подменял. Обнаружилось бы это в тот день, когда выход понадобится.
+  */
+  const preview = await readFile('scripts/build-preview.mjs', 'utf8');
+  const routeIds = [...mainJs.matchAll(/\{ id: '([\w-]+)',/g)].map((m) => m[1]);
+  const previewIds = [...preview.matchAll(/\{ id: '([\w-]+)',/g)].map((m) => m[1]);
+  const missingInPreview = routeIds.filter((id) => !previewIds.includes(id));
+  equal('превью собирает все разделы сайта', missingInPreview.join(', '), '');
+
+  check('превью берёт стили из index.html, а не зашитым именем',
+    /matchAll\(\/href="\\\.\\\/\(src\\\/\[\^"\?\]\+\\\.css\)/.test(preview) ||
+      /indexHtml\.matchAll/.test(preview));
+  check('превью показывает боковое меню, как настоящий сайт',
+    /id="side"/.test(preview) && /side-toggle/.test(preview));
 
   /*
     Список офлайн-копии уже один раз разъехался: в нём лежал src/styles.css,

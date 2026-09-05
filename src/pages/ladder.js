@@ -6,6 +6,15 @@ import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v
  * Сделано не таблицей, а строками на grid. Причина в телефоне: семь колонок
  * в <table> на экране 375px превращаются в горизонтальный скролл, а на grid
  * ту же строку можно перестроить в два яруса и ничего не потерять.
+ *
+ * ПОЧЕМУ ПАРАМЕТР ПРИНИМАЕТСЯ С ПОДСТАНОВКОЙ ПО УМОЛЧАНИЮ. Раньше страница
+ * разбирала объект сразу и падала, если данные не пришли. Пока источник был
+ * один и обязательный, это было незаметно: без данных весь сайт всё равно
+ * показывал страницу с ошибкой.
+ *
+ * Теперь недоступная таблица результатов не закрывает сайт — форум с ней
+ * не связан. Значит рейтинг может законно получить пустоту, и упасть ему
+ * нельзя: одна страница без данных не должна ронять остальные.
  */
 export function renderLadder({
   standings,
@@ -15,10 +24,14 @@ export function renderLadder({
   period = null,
   variant = 'season',
   achievements,
-}) {
-  const byId = new Map(standings.map((r) => [r.alliance.id, r.alliance]));
-  const rows = standings.map((r) => rowHtml(r, byId, variant, achievements)).join('');
-  const active = standings.filter((r) => r.alliance.active).length;
+} = {}) {
+  const list = Array.isArray(standings) ? standings : [];
+
+  if (!list.length) return renderEmpty(eyebrow, title);
+
+  const byId = new Map(list.map((r) => [r.alliance.id, r.alliance]));
+  const rows = list.map((r) => rowHtml(r, byId, variant, achievements)).join('');
+  const active = list.filter((r) => r.alliance.active).length;
 
   return `
     <section class="panel${variant === 'quarter' ? ' panel--quarter' : ''}">
@@ -60,7 +73,27 @@ export function renderLadder({
 
       <p class="lad__empty" data-ladder-empty hidden>Ничего не нашлось. Проверьте написание.</p>
       <p class="lad__count muted" data-ladder-count>
-        ${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} из ${standings.length}
+        ${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} из ${list.length}
+      </p>
+    </section>`;
+}
+
+/**
+ * Состояние без данных.
+ *
+ * Не «ошибка» и не пустая страница: то, что результатов ещё нет, — обычное
+ * положение дел в начале сезона и при недоступном источнике. Человек должен
+ * прочитать, почему пусто, а не решить, что сайт сломался.
+ */
+function renderEmpty(eyebrow, title) {
+  return `
+    <section class="panel">
+      <header class="panel__head">
+        <span class="eyebrow">${esc(eyebrow)}</span>
+        <h2>${esc(title)}</h2>
+      </header>
+      <p class="muted">
+        Результатов пока нет. Рейтинг появится, как только внесут первые итоги VS.
       </p>
     </section>`;
 }

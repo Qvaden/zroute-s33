@@ -9,8 +9,9 @@ import { CONFIG } from '../../config.js';
 import * as json from './adapters/json.js';
 import * as sheets from './adapters/sheets.js';
 import * as pocketbase from './adapters/pocketbase.js';
+import * as supabase from './adapters/supabase.js';
 
-const ADAPTERS = { json, sheets, pocketbase };
+const ADAPTERS = { json, sheets, pocketbase, supabase };
 
 const selected = ADAPTERS[CONFIG.dataSource];
 if (!selected) {

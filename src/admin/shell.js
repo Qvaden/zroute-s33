@@ -1,5 +1,4 @@
 import { esc, plural } from '../ui/helpers.js';
-import { maskToken } from './auth.js';
 import { draftWeekIds } from './draft.js';
 
 /**
@@ -16,12 +15,12 @@ import { draftWeekIds } from './draft.js';
  *   activeId: string,
  *   inner: string,
  *   login?: string,
- *   token?: string,
+ *   role?: string,
  *   canPush?: boolean,
  *   weekIds?: string[],
  * }} opts
  */
-export function renderShell({ screens, activeId, inner, login = '', token, canPush = true, weekIds }) {
+export function renderShell({ screens, activeId, inner, login = '', role = '', canPush = true, weekIds }) {
   /*
     Значок незаконченного ввода виден с любого экрана. Черновик живёт
     в браузере и молча ждёт публикации — без напоминания неделя может
@@ -66,7 +65,7 @@ export function renderShell({ screens, activeId, inner, login = '', token, canPu
         <button type="button" class="adm-btn" data-refresh>Обновить</button>
         <span class="adm-who">
           ${login ? `<b>${esc(login)}</b>` : ''}
-          <i class="adm-mono muted">${esc(maskToken(token))}</i>
+          ${role ? `<i class="muted">${esc(role)}</i>` : ''}
         </span>
         <button type="button" class="adm-btn" data-logout>Выйти</button>
       </div>

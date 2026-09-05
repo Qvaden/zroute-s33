@@ -2,17 +2,43 @@ import { esc } from '../ui/helpers.js';
 import { CONFIG } from '../../config.js';
 
 /**
- * Экран входа.
+ * ЭКРАН ВХОДА.
  *
- * Своей системы аккаунтов нет: пароль — это токен GitHub. Экран обязан
- * объяснить это так, чтобы человек не программист понял, что делает,
- * и не испугался слова «токен».
+ * Раньше вместо пароля здесь был токен GitHub, и экран занимали две длинные
+ * инструкции: как выпустить токен владельцу и как — приглашённому редактору
+ * (у GitHub там ловушка: fine-grained токен нельзя выдать на чужой
+ * репозиторий, приглашённому нужен классический, а он шире по правам).
  *
- * Инструкция здесь же, а не только в docs/ADMIN.md: человек, который
- * не может войти, до документации не доберётся.
+ * Это работало, но означало, что редактор фактически один — владелец.
+ * Объяснять человеку, что такое personal access token, ради правки счёта
+ * в VS — заведомо проигрышная затея, и на практике никого не приглашали.
+ *
+ * Теперь вход тот же, что на форуме: ник и пароль. Права выдаются нажатием
+ * в панели, у нового редактора нет ни одного лишнего шага. Инструкции
+ * исчезли не потому, что их сократили, а потому что объяснять больше нечего.
  */
-export function renderLogin({ error } = {}) {
-  const { owner, repo } = CONFIG.github;
+export function renderLogin({ error, configured = true } = {}) {
+  if (!configured) {
+    return `
+      <div class="adm-login">
+        <section class="adm-login__card">
+          <span class="eyebrow">Панель · Сервер 33</span>
+          <h1 class="adm-h1">База не подключена</h1>
+          <p class="adm-lead">
+            В <code class="adm-mono">config.js</code> не заполнен раздел
+            <code class="adm-mono">supabase</code>. Пока его нет, входить некуда:
+            и данные сайта, и учётные записи живут в базе.
+          </p>
+          <p class="muted">Порядок подключения — <code class="adm-mono">docs/FORUM.md</code>.</p>
+          <p class="adm-login__foot muted">
+            <span></span>
+            <a href="./index.html">Вернуться на сайт</a>
+          </p>
+        </section>
+      </div>`;
+  }
+
+  const L = CONFIG.forum.limits;
 
   return `
     <div class="adm-login">
@@ -20,53 +46,42 @@ export function renderLogin({ error } = {}) {
         <span class="eyebrow">Панель · Сервер 33</span>
         <h1 class="adm-h1">Вход</h1>
         <p class="adm-lead">
-          Пароля у панели нет. Вместо него — токен GitHub: он же и определяет,
-          что вам разрешено. Токен остаётся в этом браузере и уходит только
-          на api.github.com.
+          Тот же ник и пароль, что на форуме. Отдельной учётной записи
+          для панели нет — права различаются ролью, а не паролем.
         </p>
 
         ${error ? `<p class="adm-error">${esc(error)}</p>` : ''}
 
         <form class="adm-login__form" data-login>
           <label class="adm-field">
-            <span>Токен</span>
-            <input type="password" name="token" autocomplete="off" spellcheck="false"
-                   placeholder="github_pat_… или ghp_…" required>
+            <span>Ник</span>
+            <input type="text" name="nick" autocomplete="username" spellcheck="false"
+                   minlength="${L.nickMin}" maxlength="${L.nickMax}"
+                   placeholder="как на форуме" required>
+          </label>
+          <label class="adm-field">
+            <span>Пароль</span>
+            <input type="password" name="password" autocomplete="current-password"
+                   minlength="${L.passwordMin}" required>
           </label>
           <button type="submit" class="adm-btn adm-btn--primary">Войти</button>
         </form>
 
         <details class="adm-help">
-          <summary>Как получить токен — для владельца репозитория</summary>
-          <ol>
-            <li>GitHub → аватар → <b>Settings</b></li>
-            <li>Внизу слева <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b></li>
-            <li><b>Generate new token</b></li>
-            <li>Repository access → <b>Only select repositories</b> → <code class="adm-mono">${esc(owner)}/${esc(repo)}</code></li>
-            <li>Permissions → Repository permissions → <b>Contents: Read and write</b></li>
-            <li>Срок годности — год, максимум разрешённый GitHub</li>
-            <li><b>Generate token</b>, скопировать и вставить сюда</li>
-          </ol>
-          <p class="muted">Токен показывается один раз. Потерялся — выпускается новый, старый отзывается.</p>
-        </details>
-
-        <details class="adm-help">
-          <summary>Как получить токен — для приглашённого редактора</summary>
+          <summary>Нет доступа?</summary>
           <p>
-            Здесь у GitHub есть ловушка: <b>fine-grained токен нельзя выдать
-            на чужой репозиторий.</b> Он видит только то, что принадлежит своему
-            владельцу. Поэтому приглашённому редактору нужен классический токен:
+            Панель открывается тем, у кого есть право редактора. Его выдаёт
+            администратор форума на вкладке <b>Игроки</b> — одним нажатием,
+            без GitHub и без токенов.
           </p>
           <ol>
-            <li>Владелец добавляет человека: репозиторий → Settings → Collaborators</li>
-            <li>Редактор: Settings → Developer settings → <b>Tokens (classic)</b></li>
-            <li><b>Generate new token (classic)</b>, право — только <code class="adm-mono">public_repo</code></li>
+            <li>Зарегистрируйтесь на сайте, на вкладке <b>Форум</b></li>
+            <li>Скажите администратору свой ник</li>
+            <li>Возвращайтесь сюда</li>
           </ol>
           <p class="muted">
-            Классический токен шире по правам, чем хотелось бы: он действует
-            на все публичные репозитории человека. Если это однажды станет
-            неприемлемо — репозиторий переносится в бесплатную организацию,
-            и тогда fine-grained заработает и для приглашённых.
+            Забытый пароль сбрасывает администратор: письма «восстановить
+            пароль» не существует, потому что почты у сайта нет.
           </p>
         </details>
 

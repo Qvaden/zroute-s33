@@ -1,4 +1,4 @@
-/**
+﻿/**
  * АДМИН-ПАНЕЛЬ.
  *
  * Отдельная точка входа, а не раздел сайта. Причины две: посетитель не должен
@@ -29,8 +29,27 @@ import {
   weeksUpToLastData,
 } from '../logic/standings.js';
 import { renderHome } from '../pages/home.js';
-import { hasToken, clearToken, setToken } from './auth.js';
-import { whoAmI, repoInfo, readDataFile, lastCommit, writeDataFile, uploadImageFile } from './repo.js';
+/*
+  ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
+
+  Здесь стояли auth.js (токен GitHub) и repo.js (запись в репозиторий). Теперь
+  учётная запись общая с форумом, а данные лежат в базе:
+
+    db/account.js   — кто вошёл и что ему можно;
+    admin/store.js  — единственное место, которое пишет данные сайта;
+    admin/publish.js — что именно изменилось (в базу уходит только разница).
+
+  repo.js оставлен в проекте до конца переезда: пока история не перенесена
+  и не проверена, возможность прочитать старый data/live.json через API
+  GitHub — единственный путь назад. Панель его не использует.
+*/
+import {
+  currentAccount, signIn, signOut, canEditSite, canModerate, isAdmin, isConfigured,
+} from '../db/account.js';
+import {
+  readDataset, recentChanges, uploadPhoto, setEditor,
+} from './store.js';
+import { diffDataset, applyChanges, describeChanges } from './publish.js';
 import { prepareImage, uploadPath } from './image.js';
 import {
   applyMarks,
@@ -159,27 +178,27 @@ function render() {
     view.weekId = week?.id ?? null;
     view.marks = week ? getDraft(week.id) ?? marksFromRaw(view.raw, week.id) : {};
     view.draftSaved = week ? draftSavedAt(week.id) : null;
-    view.canPush = Boolean(view.repo?.canPush);
+    view.canPush = canEditSite(account);
   }
 
   if (screen.id === 'events') {
     // Черновик летописи живёт списком целиком — правят её пачкой, а не по полю.
     view.events = view.events ?? getEventsDraft() ?? eventsFromRaw(view.raw);
     view.eventsSaved = eventsDraftSavedAt();
-    view.canPush = Boolean(view.repo?.canPush);
+    view.canPush = canEditSite(account);
   }
 
   if (screen.id === 'alliances') {
     // Тот же приём, что и у летописи: черновик — весь список альянсов целиком.
     view.alliances = view.alliances ?? getAlliancesDraft() ?? alliancesFromRaw(view.raw);
     view.alliancesSaved = alliancesDraftSavedAt();
-    view.canPush = Boolean(view.repo?.canPush);
+    view.canPush = canEditSite(account);
   }
 
   if (screen.id === 'guidePage' || screen.id === 'president') {
     view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
     view.textsSaved = textsDraftSavedAt();
-    view.canPush = Boolean(view.repo?.canPush);
+    view.canPush = canEditSite(account);
   }
   if (screen.id === 'guidePage') {
     view.guideDraft = view.guideDraft ?? guideFromTexts(view.texts);
@@ -202,8 +221,15 @@ function render() {
     screens: SCREENS,
     activeId: screen.id,
     inner: screen.render(view, param),
-    login: view.user?.login ?? '',
-    canPush: Boolean(view.repo?.canPush),
+    login: account?.nick ?? '',
+    /*
+      Раньше рядом с логином показывался хвост токена — чтобы человек убедился,
+      что вошёл тем токеном, которым думал. Токенов больше нет, а полезный
+      вопрос остался: «какими правами я сейчас работаю». Роль отвечает на него
+      прямо, и её не надо прятать за точками.
+    */
+    role: roleWord(account),
+    canPush: canEditSite(account),
     weekIds: view.data.weeks.map((w) => w.id),
   });
 
@@ -212,7 +238,7 @@ function render() {
 
 function showLogin(error) {
   view = null;
-  root.innerHTML = renderLogin({ error });
+  root.innerHTML = renderLogin({ error, configured: isConfigured() });
 }
 
 function showError(message) {
@@ -229,33 +255,72 @@ function showError(message) {
     </div>`;
 }
 
-async function load() {
-  root.innerHTML = '<div class="loading">Читаем данные из репозитория…</div>';
+/**
+ * Экран «прав не хватает».
+ *
+ * Отдельно от ошибки: человек вошёл правильно, просто ему пока не выдали
+ * право редактора. Показывать здесь «не получилось» значило бы обвинить его
+ * в чужом решении — и он полез бы проверять пароль, которого дело не касается.
+ */
+function showNoAccess(account) {
+  root.innerHTML = `
+    <div class="adm-login">
+      <section class="adm-login__card">
+        <span class="eyebrow">Панель · Сервер 33</span>
+        <h1 class="adm-h1">Нет права редактора</h1>
+        <p class="adm-lead">
+          Вы вошли как <b>${esc(account.nick)}</b>, но править данные сайта пока
+          не можете. Право выдаёт администратор — на вкладке «Игроки», одним нажатием.
+        </p>
+        <p class="muted">Скажите ему свой ник: <code class="adm-mono">${esc(account.nick)}</code></p>
+        <div class="adm-login__form">
+          <a class="adm-btn adm-btn--primary" href="./index.html#/forum">Открыть форум</a>
+          <button type="button" class="adm-btn" data-retry>Проверить снова</button>
+          <button type="button" class="adm-btn" data-logout>Выйти</button>
+        </div>
+      </section>
+    </div>`;
+}
 
-  const [user, repo, file] = await Promise.all([whoAmI(), repoInfo(), readDataFile()]);
+async function load() {
+  root.innerHTML = '<div class="loading">Читаем данные…</div>';
+
+  const raw = await readDataset();
 
   /*
-    История правок — приятная, но не критичная деталь: если именно этот
-    запрос не прошёл, панель обязана открыться всё равно.
+    Журнал правок — приятная, но не критичная деталь: если именно этот запрос
+    не прошёл, панель обязана открыться всё равно. То же было и с историей
+    коммитов до переезда.
   */
-  let commit = null;
+  let changes = [];
   try {
-    commit = await lastCommit();
+    changes = await recentChanges(12);
   } catch {
-    commit = null;
+    changes = [];
   }
 
-  const data = mapDataset(file.raw);
+  const data = mapDataset(raw);
 
   view = {
-    user,
-    repo,
-    file: { path: file.path, size: file.size, sha: file.sha },
-    commit,
-    raw: file.raw,
+    account,
+    user: { login: account?.nick ?? '' },
+    /*
+      Панель показывает, откуда данные и сколько их. Раньше это был путь
+      к файлу и его размер; теперь размера файла нет, поэтому считаем объём
+      набора — он отвечает на тот же вопрос «много ли уже накоплено».
+    */
+    file: { path: 'база данных', size: JSON.stringify(raw).length, sha: '' },
+    changes,
+    raw,
+    /*
+      Копия исходных данных: с ней сравнивается результат правки, чтобы
+      в базу ушла только разница. Раньше эту роль играла версия файла (sha),
+      которую GitHub сверял при записи.
+    */
+    baseRaw: structuredClone(raw),
     data,
     weeks: data.weeks,
-    canPush: Boolean(repo.canPush),
+    canPush: canEditSite(account),
     // Тот же валидатор, которым проверяется сайт: панель не должна судить
     // о данных по своим правилам, иначе «в панели всё хорошо, а сайт пустой».
     problems: validateDataset(data),
@@ -264,23 +329,57 @@ async function load() {
   render();
 }
 
+/** Кто вошёл. Держится отдельно от view: нужен и до загрузки данных. */
+let account = null;
+
+/**
+ * Чем человек здесь занимается, одним словом.
+ *
+ * Права две штуки и они независимы, поэтому «администратор» и «редактор» —
+ * не ступени одной лестницы: редактор правит историю сервера, модератор
+ * разбирает жалобы, и это разные обязанности.
+ */
+function roleWord(acc) {
+  if (!acc) return '';
+  if (acc.role === 'admin') return 'администратор';
+  if (acc.role === 'moderator') return acc.canEditSite ? 'модератор, редактор' : 'модератор';
+  return acc.canEditSite ? 'редактор' : 'участник';
+}
+
 async function boot() {
-  if (!hasToken()) {
+  if (!isConfigured()) {
     showLogin();
     return;
   }
+
+  try {
+    account = await currentAccount();
+  } catch (err) {
+    account = null;
+    showError(String(err?.message ?? err));
+    return;
+  }
+
+  if (!account) {
+    showLogin();
+    return;
+  }
+
+  /*
+    Право проверяется здесь, а не только в базе. База всё равно откажет
+    в записи, но человек узнал бы об этом лишь нажав «Опубликовать» —
+    после того, как заполнил всю неделю. Отказ должен приходить до работы,
+    а не после.
+  */
+  if (!canEditSite(account)) {
+    showNoAccess(account);
+    return;
+  }
+
   try {
     await load();
   } catch (err) {
-    const message = String(err?.message ?? err);
-    // Плохой токен возвращает на вход, всё остальное — на экран ошибки
-    // с кнопкой повтора: сеть у аудитории отваливается регулярно.
-    if (/Токен не принят/.test(message)) {
-      clearToken();
-      showLogin(message);
-    } else {
-      showError(message);
-    }
+    showError(String(err?.message ?? err));
   }
 }
 
@@ -409,39 +508,59 @@ function showPublishResult(html, kind) {
   box.hidden = false;
 }
 
-/** Публикация: проверить, закоммитить, перечитать. */
-async function publish() {
-  const week = view.data.weeks.find((w) => w.id === view.weekId);
-  if (!week) return;
+/**
+ * ОБЩАЯ ПУБЛИКАЦИЯ ДЛЯ ВСЕХ ЭКРАНОВ.
+ *
+ * До переезда каждый экран публиковал по-своему: собирал весь файл заново,
+ * складывал своё сообщение коммита и отправлял в GitHub. Четыре почти
+ * одинаковых функции — четыре места, где можно забыть проверку валидатором
+ * или сброс черновика.
+ *
+ * Теперь публикация одна: сравнить с тем, что в базе, и записать разницу.
+ * Экранам остаётся сказать, что они изменили и куда показать результат.
+ *
+ * @param {{
+ *   candidate: any,          Данные после правки.
+ *   resultBox: string,       Куда писать отчёт.
+ *   onDone?: () => void,     Что сбросить после успеха (черновики).
+ *   button?: HTMLElement,
+ * }} opts
+ */
+async function publishDataset({ candidate, resultBox, onDone, button }) {
+  const show = (html, kind) => {
+    const box = root.querySelector(resultBox);
+    if (!box) return;
+    box.className = `adm-result adm-result--${kind}`;
+    box.innerHTML = html;
+    box.hidden = false;
+  };
 
-  const button = root.querySelector('[data-publish]');
+  const label = button?.textContent;
   if (button) {
     button.disabled = true;
     button.textContent = 'Публикуем…';
   }
-
   const restore = () => {
-    if (!button) return;
-    button.textContent = 'Опубликовать';
-    button.disabled = false;
+    if (button && button.isConnected) {
+      button.textContent = label;
+      button.disabled = false;
+    }
   };
 
   try {
-    const candidate = candidateRaw();
-
     /*
       Проверка ровно тем валидатором, которым проверяется сайт. Без неё панель
-      могла бы опубликовать формально корректный JSON, на котором сайт откроется
+      могла бы записать формально корректные данные, на которых сайт откроется
       пустым, — и обнаружилось бы это у посетителей, а не здесь.
     */
     const problems = validateDataset(mapDataset(candidate));
     if (problems.length) {
       /*
-        Сообщения валидатора экранируем: они собраны ИЗ данных и содержат
-        их куски — «недопустимый serverOutcome «...»». Вставить их в разметку
-        как есть означало бы дать данным исполняться в панели, где живёт токен.
+        Сообщения валидатора экранируем: они собраны ИЗ данных и содержат их
+        куски — «недопустимый outcome «...»». Вставить их в разметку как есть
+        означало бы дать данным исполняться в панели.
       */
-      showPublishResult(
+      show(
         `<b>Публикация отменена: данные не проходят проверку.</b>
          <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
          <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
@@ -451,35 +570,63 @@ async function publish() {
       return;
     }
 
-    const result = await writeDataFile({
-      text: serialize(candidate),
-      sha: view.file.sha,
-      message: commitMessage(week, view.marks),
-    });
+    /*
+      В базу уходит ТОЛЬКО разница. Отправлять всё целиком значило бы забить
+      журнал правок мусором («каждая публикация трогает всё») и затирать
+      работу второго редактора, который в это же время вносит другую неделю.
+    */
+    const changes = diffDataset(view.baseRaw, candidate);
+    if (!changes.length) {
+      show('<b>Изменений нет</b> — публиковать нечего.', 'warn');
+      restore();
+      return;
+    }
 
-    // Опубликовано — черновик больше не нужен, иначе он навсегда останется
-    // «незаконченным вводом» и будет пугать значком в шапке.
-    dropDraft(week.id);
+    const { done, failed } = await applyChanges(changes);
+
+    if (failed.length) {
+      /*
+        Часть записалась, часть нет. Молчать об этом нельзя: человек решит,
+        что сохранилось всё. Черновик при этом НЕ сбрасываем — повторное
+        нажатие допишет остальное.
+      */
+      show(
+        `<b>Записано частично: ${done} из ${changes.length}.</b>
+         <ul>${failed.slice(0, 5).map((f) => `<li>${esc(f.change.entity)} ${esc(f.change.id)}: ${esc(f.error)}</li>`).join('')}</ul>
+         <p class="muted">Черновик сохранён. Нажмите «Опубликовать» ещё раз — допишется остальное.</p>`,
+        'bad'
+      );
+      restore();
+      return;
+    }
+
+    onDone?.();
     await load();
 
-    showPublishResult(
-      `<b>Опубликовано.</b>
-       ${
-         safeUrl(result.commitUrl)
-           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
-           : `Коммит ${esc(result.commitSha)}`
-       }
-       <p class="muted">Сайт обновится в течение минуты — GitHub Pages пересобирает страницы после коммита.</p>`,
+    show(
+      `<b>Опубликовано.</b> ${esc(describeChanges(changes))}
+       <p class="muted">Сайт покажет изменения сразу — данные читаются из базы.</p>`,
       'ok'
     );
   } catch (err) {
-    const message = String(err?.message ?? err);
-    showPublishResult(
-      `<b>Не опубликовано.</b> ${esc(message)}`,
-      err?.conflict ? 'warn' : 'bad'
-    );
+    show(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, 'bad');
     restore();
   }
+}
+
+/** Публикация недели. */
+async function publish() {
+  const week = view.data.weeks.find((w) => w.id === view.weekId);
+  if (!week) return;
+
+  await publishDataset({
+    candidate: candidateRaw(),
+    resultBox: '[data-publish-result]',
+    button: root.querySelector('[data-publish]'),
+    // Опубликовано — черновик больше не нужен, иначе он навсегда останется
+    // «незаконченным вводом» и будет пугать значком в шапке.
+    onDone: () => dropDraft(week.id),
+  });
 }
 
 /* ── Хронология ──────────────────────────────────────────────────────────── */
@@ -621,10 +768,10 @@ async function publishEvents() {
       for (const item of ev._pendingImages) {
         if (button) button.textContent = `Загружаем фото ${uploaded.length + 1}/${ev._pendingImages.length}…`;
         const bytes = await item.blob.arrayBuffer();
-        uploaded.push(await uploadImageFile({
+        uploaded.push(await uploadPhoto({
           path: uploadPath('jpg'),
           bytes,
-          message: `хронология: фото для записи ${ev.id}`,
+          contentType: 'image/jpeg',
         }));
       }
       revokePendingImages(ev);
@@ -638,41 +785,19 @@ async function publishEvents() {
 
     const candidate = applyEvents(view.raw, view.events);
 
-    const problems = validateDataset(mapDataset(candidate));
-    if (problems.length) {
-      showEventsResult(
-        `<b>Публикация отменена: данные не проходят проверку.</b>
-         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
-         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
-        'bad'
-      );
-      restore();
-      return;
-    }
-
-    const result = await writeDataFile({
-      text: serialize(candidate),
-      sha: view.file.sha,
-      message: eventsCommitMessage(eventsDiff(view.raw, view.events)),
+    if (button) button.disabled = false;
+    await publishDataset({
+      candidate,
+      resultBox: '[data-events-result]',
+      button,
+      onDone: () => {
+        dropEventsDraft();
+        view.events = null;
+        view.eventDraft = null;
+      },
     });
-
-    dropEventsDraft();
-    view.events = null;
-    view.eventDraft = null;
-    await load();
-
-    showEventsResult(
-      `<b>Опубликовано.</b>
-       ${
-         safeUrl(result.commitUrl)
-           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
-           : `Коммит ${esc(result.commitSha)}`
-       }
-       <p class="muted">Сайт обновится в течение минуты.</p>`,
-      'ok'
-    );
   } catch (err) {
-    showEventsResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, err?.conflict ? 'warn' : 'bad');
+    showEventsResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, 'bad');
     restore();
   }
 }
@@ -774,57 +899,16 @@ function showAlliancesResult(html, kind) {
 
 /** Публикация альянсов — тот же путь, что у недели и хронологии: проверка, версия, коммит. */
 async function publishAlliances() {
-  const button = root.querySelector('[data-alliances-publish]');
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Публикуем…';
-  }
-  const restore = () => {
-    if (!button) return;
-    button.textContent = 'Опубликовать';
-    button.disabled = false;
-  };
-
-  try {
-    const candidate = applyAlliances(view.raw, view.alliances);
-
-    const problems = validateDataset(mapDataset(candidate));
-    if (problems.length) {
-      showAlliancesResult(
-        `<b>Публикация отменена: данные не проходят проверку.</b>
-         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
-         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
-        'bad'
-      );
-      restore();
-      return;
-    }
-
-    const result = await writeDataFile({
-      text: serialize(candidate),
-      sha: view.file.sha,
-      message: alliancesCommitMessage(alliancesDiff(view.raw, view.alliances)),
-    });
-
-    dropAlliancesDraft();
-    view.alliances = null;
-    view.allianceDraft = null;
-    await load();
-
-    showAlliancesResult(
-      `<b>Опубликовано.</b>
-       ${
-         safeUrl(result.commitUrl)
-           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
-           : `Коммит ${esc(result.commitSha)}`
-       }
-       <p class="muted">Сайт обновится в течение минуты.</p>`,
-      'ok'
-    );
-  } catch (err) {
-    showAlliancesResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, err?.conflict ? 'warn' : 'bad');
-    restore();
-  }
+  await publishDataset({
+    candidate: applyAlliances(view.raw, view.alliances),
+    resultBox: '[data-alliances-result]',
+    button: root.querySelector('[data-alliances-publish]'),
+    onDone: () => {
+      dropAlliancesDraft();
+      view.alliances = null;
+      view.allianceDraft = null;
+    },
+  });
 }
 
 /* ── Тексты ──────────────────────────────────────────────────────────────── */
@@ -902,63 +986,26 @@ function showTextsResult(html, kind) {
   box.hidden = false;
 }
 
-/** Публикация текстов — тот же путь, что у альянсов и хронологии: проверка, версия, коммит. */
+/** Публикация текстов — тот же путь, что у альянсов и хронологии. */
 async function publishTexts() {
-  const button = root.querySelector('[data-texts-publish]');
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Публикуем…';
-  }
-  const restore = () => {
-    if (!button) return;
-    button.textContent = 'Опубликовать';
-    button.disabled = false;
-  };
+  /*
+    Публикация должна брать последние введённые значения даже если человек
+    не нажал отдельную кнопку «Сохранить черновик»: он набрал текст и жмёт
+    «Опубликовать», а не «сохранить, потом опубликовать».
+  */
+  collectGuideDraftFromDom();
+  syncGuideDraft();
 
-  try {
-    // Публикация должна брать последние введённые значения даже если
-    // пользователь не нажал отдельную кнопку «Сохранить черновик».
-    collectGuideDraftFromDom();
-    syncGuideDraft();
-    const candidate = applyTexts(view.raw, view.texts);
-
-    const problems = validateDataset(mapDataset(candidate));
-    if (problems.length) {
-      showTextsResult(
-        `<b>Публикация отменена: данные не проходят проверку.</b>
-         <ul>${problems.slice(0, 8).map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
-         <p class="muted">Черновик сохранён, ничего не потеряно.</p>`,
-        'bad'
-      );
-      restore();
-      return;
-    }
-
-    const result = await writeDataFile({
-      text: serialize(candidate),
-      sha: view.file.sha,
-      message: textsCommitMessage(textsDiff(view.raw, view.texts)),
-    });
-
-    dropTextsDraft();
-    view.texts = null;
-    view.textDraft = null;
-    await load();
-
-    showTextsResult(
-      `<b>Опубликовано.</b>
-       ${
-         safeUrl(result.commitUrl)
-           ? `<a href="${esc(safeUrl(result.commitUrl))}" target="_blank" rel="noopener noreferrer">Коммит ${esc(result.commitSha)}</a>`
-           : `Коммит ${esc(result.commitSha)}`
-       }
-       <p class="muted">Сайт обновится в течение минуты.</p>`,
-      'ok'
-    );
-  } catch (err) {
-    showTextsResult(`<b>Не опубликовано.</b> ${esc(String(err?.message ?? err))}`, err?.conflict ? 'warn' : 'bad');
-    restore();
-  }
+  await publishDataset({
+    candidate: applyTexts(view.raw, view.texts),
+    resultBox: '[data-texts-result]',
+    button: root.querySelector('[data-texts-publish]'),
+    onDone: () => {
+      dropTextsDraft();
+      view.texts = null;
+      view.textDraft = null;
+    },
+  });
 }
 
 /* ── Роли руководства ───────────────────────────────────────────────────── */
@@ -1122,34 +1169,31 @@ function removeGuideRole(index) {
 /* ── Форум: игроки и жалобы ──────────────────────────────────────────────── */
 
 /**
- * ПАНЕЛЬ И ФОРУМ — ДВЕ РАЗНЫЕ СИСТЕМЫ ПРАВ.
+ * ЭКРАНЫ ФОРУМА В ПАНЕЛИ.
  *
- * Всё остальное в панели работает токеном GitHub: он и вход, и права. Над
- * форумом этот токен не властен вообще — там своя учётная запись, и проверяет
- * её база (см. supabase/schema.sql). Поэтому здесь возможна ситуация, которой
- * нет больше нигде в панели: человек вошёл, всё видит, но сбросить пароль
- * не может, потому что на форуме он не администратор.
+ * После переезда учётная запись одна, поэтому «вы вошли в панель, но на форуме
+ * не администратор» больше не бывает: вошедший здесь — тот же человек, что
+ * и на форуме, и роль у него одна.
  *
- * Отказ приходит из базы, а не из этого кода. Проверки роли ниже нужны только
- * чтобы не показывать кнопку, которая заведомо откажет.
+ * Но разделение прав осталось, и это осознанно: право править данные сайта
+ * (can_edit_site) и право модерации (role) — разные. Редактор, вносящий итоги
+ * VS, не обязан разбирать жалобы, поэтому вкладки «Жалобы» и «Игроки» могут
+ * оказаться ему недоступны. Отказ приходит из базы; проверки ниже нужны
+ * только чтобы не показывать кнопку, которая заведомо откажет.
  */
 async function loadForumScreen(screenId) {
   // Уже загружено — второй запрос при каждой перерисовке не нужен.
   if (view.forum?.loadedFor === screenId) return;
 
-  const configured = await forum.isReady().catch(() => false);
-  view.forum = { configured, loadedFor: screenId };
+  view.forum = { configured: isConfigured(), loadedFor: screenId, me: account };
 
-  if (!configured) {
+  if (!view.forum.configured) {
     render();
     return;
   }
 
   try {
-    view.forum.me = await forum.currentUser();
-
-    const isStaff = view.forum.me?.role === 'admin' || view.forum.me?.role === 'moderator';
-    if (isStaff) {
+    if (canModerate(account)) {
       if (screenId === 'players') view.forum.users = await forum.listUsers();
       else view.forum.reports = await forum.listReports();
     }
@@ -1313,9 +1357,9 @@ document.addEventListener('submit', async (e) => {
   if (!form) return;
   e.preventDefault();
 
-  const input = form.querySelector('input[name="token"]');
-  const token = String(input?.value ?? '').trim();
-  if (!token) return;
+  const nick = String(form.nick?.value ?? '').trim();
+  const password = String(form.password?.value ?? '');
+  if (!nick || !password) return;
 
   const button = form.querySelector('button[type="submit"]');
   if (button) {
@@ -1324,26 +1368,24 @@ document.addEventListener('submit', async (e) => {
   }
 
   try {
-    /*
-      Проверяем до сохранения, причём дважды и по-разному: /user отвечает
-      на «токен вообще живой», а /repos — на «этот токен видит этот
-      репозиторий». Второе без первого не проверить, а сохранить нерабочий
-      токен значит запереть человека на экране ошибки.
-    */
-    await whoAmI(token);
-    await repoInfo(token);
-    setToken(token);
+    account = await signIn(nick, password);
     await boot();
   } catch (err) {
     showLogin(String(err?.message ?? err));
   }
 });
 
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   if (!e.target.closest) return;
 
   if (e.target.closest('[data-logout]')) {
-    clearToken();
+    /*
+      Выход из панели выкидывает и с форума: учётная запись одна. Раньше это
+      были разные вещи — здесь отзывался токен GitHub, а сессия форума жила
+      своей жизнью.
+    */
+    await signOut();
+    account = null;
     showLogin();
     return;
   }
@@ -1383,6 +1425,40 @@ document.addEventListener('click', (e) => {
   }
   if (e.target.closest('[data-restrict-cancel]')) {
     closePlayerModal('[data-restrict-modal]');
+    return;
+  }
+
+  /*
+    Право редактора — без окна и без подтверждения. Действие обратимо одним
+    нажатием той же кнопки, поэтому спрашивать «вы уверены» значило бы просить
+    подтверждение у того, кто и так может отменить.
+  */
+  const editorBtn = e.target.closest('[data-player-editor]');
+  if (editorBtn) {
+    const nick = editorBtn.dataset.playerEditor;
+    const allow = editorBtn.dataset.playerAllow === '1';
+
+    editorBtn.disabled = true;
+    editorBtn.textContent = allow ? 'Выдаём…' : 'Убираем…';
+
+    try {
+      await setEditor(nick, allow);
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        allow
+          ? `<b>${esc(nick)} теперь редактор.</b> Может входить в панель и править данные сайта. GitHub для этого не нужен.`
+          : `<b>${esc(nick)} больше не редактор.</b> Панель для него закроется при следующем входе.`,
+        'ok'
+      );
+    } catch (err) {
+      if (editorBtn.isConnected) {
+        editorBtn.disabled = false;
+        editorBtn.textContent = allow ? 'Сделать редактором' : 'Убрать из редакторов';
+      }
+      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+    }
     return;
   }
 

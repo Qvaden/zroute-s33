@@ -99,7 +99,8 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь сбрасывают забытый пароль и закрывают возможность писать.
+          Здесь выдают право редактора, сбрасывают забытый пароль и закрывают
+          возможность писать.
         </p>
       </header>
 
@@ -107,11 +108,18 @@ export function renderPlayers(view) {
 
       <div class="adm-players">${rows}</div>
 
-      <p class="muted adm-players__note">
-        Пароль показывается один раз и только вам — передайте его человеку сами.
-        Сохранённого пароля не существует: база хранит не его, а необратимый
-        отпечаток, поэтому подсмотреть старый нельзя даже администратору.
-      </p>
+      <div class="adm-players__notes">
+        <p class="muted">
+          <b>Редактор</b> правит данные сайта: итоги VS, альянсы, хронологию, тексты.
+          Жалобы и запреты ему не доступны — это дело модерации, и обязанности
+          разделены нарочно: вносящий результаты не обязан разбирать споры.
+        </p>
+        <p class="muted">
+          Пароль показывается один раз и только вам — передайте его человеку сами.
+          Сохранённого пароля не существует: база хранит не его, а необратимый
+          отпечаток, поэтому подсмотреть старый нельзя даже администратору.
+        </p>
+      </div>
     </section>
 
     ${renderResetModal()}
@@ -122,6 +130,12 @@ export function renderPlayers(view) {
 function renderRow(user, me) {
   const isMe = user.id === me.id;
   const muted = user.mutedUntil && user.mutedUntil > new Date();
+  /*
+    Право редактора у администратора есть всегда и снятию не подлежит: иначе
+    владелец мог бы случайно отобрать доступ к истории у себя, а вернуть его
+    было бы можно только запросом в базу руками.
+  */
+  const isEditor = user.canEditSite || user.role === 'admin';
 
   const status = user.banned
     ? '<span class="adm-badge adm-badge--stop">запрет</span>'
@@ -133,7 +147,11 @@ function renderRow(user, me) {
     <div class="adm-player" data-player="${esc(user.id)}">
       <div class="adm-player__who">
         <b>${esc(user.nick)}</b>
-        <small>${esc(roleWord(user.role))} · с ${esc(shortDate(user.createdAt))}</small>
+        <small>
+          ${esc(roleWord(user.role))}
+          ${isEditor ? ' · <b class="adm-player__editor">редактор</b>' : ''}
+          · с ${esc(shortDate(user.createdAt))}
+        </small>
       </div>
 
       <div class="adm-player__state">
@@ -146,6 +164,26 @@ function renderRow(user, me) {
           isMe
             ? '<span class="muted">это вы</span>'
             : `
+              ${
+                /*
+                  ГЛАВНАЯ КНОПКА ЭТОГО ЭКРАНА.
+
+                  Раньше, чтобы пустить нового редактора, надо было выдать ему
+                  доступ к репозиторию и объяснить, что такое personal access
+                  token. На практике это означало, что редактор один — владелец.
+
+                  Теперь одно нажатие. Роль администратора при этом не выдаётся:
+                  править итоги VS и разбирать жалобы — разные обязанности,
+                  и смешивать их значило бы давать лишнее.
+                */
+                user.role === 'admin'
+                  ? ''
+                  : `<button type="button" class="adm-btn ${isEditor ? '' : 'adm-btn--primary'}"
+                             data-player-editor="${esc(user.nick)}"
+                             data-player-allow="${isEditor ? '' : '1'}">
+                       ${isEditor ? 'Убрать из редакторов' : 'Сделать редактором'}
+                     </button>`
+              }
               <button type="button" class="adm-btn"
                       data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
                 Сбросить пароль

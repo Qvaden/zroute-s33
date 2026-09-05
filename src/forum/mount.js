@@ -21,7 +21,9 @@
  */
 import { forum } from './index.js';
 import { renderForum, renderReportDialog, renderDeleteDialog } from '../pages/forum.js';
+import { renderUserPage } from '../pages/user.js';
 import { validateNick, validatePassword, validatePost, validateComment, deletionReason } from './rules.js';
+import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { CONFIG } from '../../config.js';
 
 /** Состояние страницы. Живёт между перерисовками, сбрасывается при уходе. */
@@ -42,17 +44,203 @@ const state = {
   pending: null,
 };
 
+/**
+ * Состояние страницы участника.
+ *
+ * Отдельно от ленты: это другая страница с другой жизнью. Смешать их в одном
+ * объекте значило бы, что уход с профиля в ленту оставляет за собой чужие
+ * поля — и лента однажды отрисуется с профилем внутри.
+ */
+const profileState = {
+  nick: '',
+  profile: null,
+  posts: [],
+  editing: false,
+  loading: false,
+  error: '',
+};
+
+/**
+ * ВЫБРАННЫЕ, НО ЕЩЁ НЕ ОТПРАВЛЕННЫЕ КАРТИНКИ.
+ *
+ * Ключ — «new» для нового поста или id поста для комментария. Держатся вне
+ * общего состояния, потому что это не данные, а промежуточный ввод: Blob
+ * не переживает перерисовку в виде строки и не должен попадать ни в разметку,
+ * ни в localStorage.
+ *
+ * Загружаются они ПОСЛЕ публикации: вложение ссылается на запись, значит
+ * запись должна существовать. Загрузка заранее оставляла бы в хранилище файлы,
+ * на которые никто не ссылается, если человек закрыл форму.
+ */
+const pendingShots = new Map();
+
 /** Данные сайта нужны для полосы хроники сверху. */
 let siteView = null;
 /** Куда рисуем. null — форум не на экране. */
 let host = null;
 let wired = false;
+/** Что показываем: ленту или страницу участника. */
+let mode = 'feed';
 
 /* ── Отрисовка ────────────────────────────────────────────────────────────── */
 
+/*
+  ЧТО ОБЯЗАНО ПЕРЕЖИТЬ ПЕРЕРИСОВКУ.
+
+  Страница пересобирается из строк целиком — так проще и не бывает рассинхрона
+  между счётчиком и подсветкой кнопки. Но у полной перерисовки есть цена,
+  и первая версия её не заплатила: НАБРАННЫЙ ТЕКСТ ПРОПАДАЛ.
+
+  Случай, который случится с каждым: человек пишет длинный комментарий,
+  по ходу ставит лайк соседнему посту — счётчик обновляется, страница
+  перерисовывается, текст исчезает. Никакой ошибки при этом не показано,
+  и понять, что произошло, нельзя.
+
+  То же с раскрытыми разделами: правила и форма поста складывались обратно
+  на каждое нажатие.
+
+  Поэтому перед перерисовкой снимаем состояние ввода, а после — возвращаем.
+  Собираем по имени поля и по адресу записи, а не по порядку: разметка
+  меняется, и «третий textarea» после перерисовки может оказаться другим.
+*/
+function captureInput() {
+  if (!host) return null;
+
+  const forms = {};
+  host.querySelectorAll('textarea, input:not([type="radio"]):not([type="password"]), select').forEach((el) => {
+    const key = fieldKey(el);
+    if (key) forms[key] = el.value;
+  });
+
+  // Раскрытые <details>: правила, форма поста.
+  const open = [];
+  host.querySelectorAll('details[open]').forEach((d) => {
+    const key = d.dataset.forumRules ? 'rules' : d.dataset.forumComposer ? 'composer' : null;
+    if (key) open.push(key);
+  });
+
+  /*
+    Пароль не сохраняем осознанно: держать его в памяти между перерисовками
+    незачем, а форма входа после успешного входа исчезает целиком.
+  */
+  return {
+    forms,
+    open,
+    focus: fieldKey(document.activeElement),
+    scroll: window.scrollY,
+  };
+}
+
+function restoreInput(snapshot) {
+  if (!snapshot || !host) return;
+
+  for (const [key, value] of Object.entries(snapshot.forms)) {
+    if (!value) continue;
+    const el = findByKey(key);
+    if (el) el.value = value;
+  }
+
+  for (const key of snapshot.open) {
+    const el = key === 'rules'
+      ? host.querySelector('[data-forum-rules]')
+      : host.querySelector('[data-forum-composer]');
+    if (el) el.open = true;
+  }
+
+  /*
+    Возвращаем и место в тексте: без этого курсор прыгает в начало, и человек
+    продолжает печатать не туда, где остановился.
+  */
+  if (snapshot.focus) {
+    const el = findByKey(snapshot.focus);
+    if (el) {
+      el.focus({ preventScroll: true });
+      if (typeof el.setSelectionRange === 'function' && el.value) {
+        const end = el.value.length;
+        try { el.setSelectionRange(end, end); } catch { /* select не умеет */ }
+      }
+    }
+  }
+
+  // Прокрутку возвращаем после отрисовки, иначе браузер её же и сбросит.
+  if (snapshot.scroll > 0) window.scrollTo(0, snapshot.scroll);
+}
+
+/**
+ * Имя поля, устойчивое к перерисовке: имя внутри формы плюс адрес записи,
+ * к которой форма относится. Порядок элементов для этого не годится —
+ * разметка между перерисовками меняется.
+ */
+function fieldKey(el) {
+  if (!el || !host || !host.contains(el) || !el.name) return null;
+
+  const commentForm = el.closest('[data-forum-comment-form]');
+  if (commentForm) return `comment:${commentForm.dataset.forumCommentForm}:${el.name}`;
+
+  const newPost = el.closest('[data-forum-new]');
+  if (newPost) return `new:${el.name}`;
+
+  const auth = el.closest('[data-forum-auth]');
+  if (auth) return `auth:${el.name}`;
+
+  const report = el.closest('[data-forum-report-form]');
+  if (report) return `report:${el.name}`;
+
+  return null;
+}
+
+function findByKey(key) {
+  if (!host) return null;
+  const [kind, a, b] = key.split(':');
+
+  if (kind === 'comment') {
+    return host.querySelector(`[data-forum-comment-form="${cssEscape(a)}"] [name="${b}"]`);
+  }
+  const form = host.querySelector(`[data-forum-${kind === 'new' ? 'new' : kind === 'auth' ? 'auth' : 'report-form'}]`);
+  return form?.querySelector(`[name="${a}"]`) ?? null;
+}
+
 function paint() {
   if (!host) return;
-  host.innerHTML = renderForum(siteView, state) + renderReportDialog() + renderDeleteDialog();
+  const snapshot = captureInput();
+
+  /*
+    Страница участника рисуется тем же механизмом, что лента: одно место
+    отрисовки на весь форум. Два разных пути привели бы к двум наборам
+    обработчиков и двум способам потерять набранный текст.
+  */
+  host.innerHTML = mode === 'user'
+    ? renderUserPage({ ...profileState, me: state.me })
+    : renderForum(siteView, state) + renderReportDialog() + renderDeleteDialog();
+
+  restoreInput(snapshot);
+  paintPendingShots();
+}
+
+/**
+ * Превью выбранных картинок.
+ *
+ * Дорисовывается после перерисовки, а не собирается в строку разметки: ссылки
+ * на Blob живут в памяти браузера и в строку не превращаются. Заодно так они
+ * не попадают в localStorage при сохранении черновика.
+ */
+function paintPendingShots() {
+  if (!host) return;
+
+  for (const [scope, files] of pendingShots) {
+    const list = host.querySelector(`[data-attach-list="${cssEscape(scope)}"]`);
+    if (!list) continue;
+
+    list.innerHTML = files
+      .map(
+        (f, i) => `<div class="forum-attach__item">
+          <img src="${f.preview}" alt="">
+          <button type="button" class="forum-attach__drop"
+                  data-attach-drop="${cssEscape(scope)}:${i}" title="Убрать">✕</button>
+        </div>`
+      )
+      .join('');
+  }
 }
 
 /**
@@ -71,6 +259,42 @@ function showError(selector, message) {
 function clearError(selector) {
   const box = host?.querySelector(selector);
   if (box) box.hidden = true;
+}
+
+/* ── Защита от двойных нажатий ────────────────────────────────────────────── */
+
+/*
+  ДВА НАЖАТИЯ — ДВА ПОСТА.
+
+  Запрос к базе идёт не мгновенно, а кнопка всё это время выглядит рабочей.
+  На телефоне при неспешной сети человек нажимает «Опубликовать» второй раз —
+  и получает две одинаковые записи, которые потом ещё и удалять надо.
+
+  Поэтому кнопка на время запроса выключается и говорит, чем занята. Это
+  не украшение: выключенная кнопка — единственное честное сообщение о том,
+  что нажатие принято, а ответа пока нет.
+*/
+async function withBusy(button, label, action) {
+  const original = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = label;
+  }
+  try {
+    return await action();
+  } finally {
+    /*
+      Кнопку возвращаем в исходное состояние даже при ошибке: иначе после
+      первой же неудачи форма остаётся мёртвой, и человеку остаётся только
+      перезагрузить страницу — вместе с набранным текстом.
+
+      Проверяем, что узел ещё на месте: перерисовка могла его выбросить.
+    */
+    if (button && button.isConnected) {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  }
 }
 
 /* ── Загрузка ─────────────────────────────────────────────────────────────── */
@@ -140,7 +364,7 @@ async function refreshOne(targetType, targetId) {
 
 /* ── Вход ─────────────────────────────────────────────────────────────────── */
 
-async function handleAuth(form, mode) {
+async function handleAuth(form, mode, submitter) {
   clearError('[data-forum-auth-error]');
 
   const nick = validateNick(form.nick.value);
@@ -149,13 +373,135 @@ async function handleAuth(form, mode) {
   const password = validatePassword(form.password.value);
   if (!password.ok) return showError('[data-forum-auth-error]', password.error);
 
+  await withBusy(submitter, mode === 'signup' ? 'Создаём…' : 'Входим…', async () => {
+    try {
+      state.me = mode === 'signup'
+        ? await forum.signUp(nick.value, password.value)
+        : await forum.signIn(nick.value, password.value);
+      await loadFeed();
+    } catch (err) {
+      showError('[data-forum-auth-error]', String(err?.message ?? err));
+    }
+  });
+}
+
+/* ── Картинки в форме ─────────────────────────────────────────────────────── */
+
+const MAX_SHOTS = 4;
+
+/**
+ * Добавить выбранные файлы к форме.
+ *
+ * Предел в четыре держит и база (триггером), и эта проверка. Дублирование
+ * осознанное: база защищает от запроса мимо сайта, а здесь человек узнаёт
+ * о пределе ДО того, как напишет пост и нажмёт «Опубликовать».
+ */
+function addShots(scope, files) {
+  const current = pendingShots.get(scope) ?? [];
+  const room = MAX_SHOTS - current.length;
+
+  if (room <= 0) {
+    showError(`[data-attach-error="${cssEscape(scope)}"]`,
+      `Больше ${MAX_SHOTS} картинок к одной записи приложить нельзя`);
+    return;
+  }
+
+  const taken = [...files].slice(0, room);
+  const skipped = files.length - taken.length;
+
+  for (const file of taken) {
+    if (!String(file.type).startsWith('image/')) {
+      showError(`[data-attach-error="${cssEscape(scope)}"]`, `«${file.name}» не картинка`);
+      continue;
+    }
+    current.push({ file, preview: URL.createObjectURL(file) });
+  }
+
+  pendingShots.set(scope, current);
+
+  if (skipped > 0) {
+    showError(`[data-attach-error="${cssEscape(scope)}"]`,
+      `Взято ${taken.length}: к записи можно приложить не больше ${MAX_SHOTS} картинок`);
+  } else {
+    clearError(`[data-attach-error="${cssEscape(scope)}"]`);
+  }
+
+  paintPendingShots();
+}
+
+/** Убрать одну выбранную картинку. */
+function dropShot(scope, index) {
+  const list = pendingShots.get(scope);
+  if (!list?.[index]) return;
+
+  // Ссылку на Blob освобождаем: иначе она держит файл в памяти до перезагрузки.
+  URL.revokeObjectURL(list[index].preview);
+  list.splice(index, 1);
+
+  if (list.length) pendingShots.set(scope, list);
+  else pendingShots.delete(scope);
+
+  clearError(`[data-attach-error="${cssEscape(scope)}"]`);
+  paintPendingShots();
+}
+
+/** Освободить все превью области: после публикации или при уходе со страницы. */
+function clearShots(scope) {
+  for (const item of pendingShots.get(scope) ?? []) URL.revokeObjectURL(item.preview);
+  pendingShots.delete(scope);
+}
+
+function clearAllShots() {
+  for (const scope of [...pendingShots.keys()]) clearShots(scope);
+}
+
+/**
+ * Загрузить выбранные картинки к уже созданной записи.
+ *
+ * Ошибку одной картинки не считаем провалом всей публикации: пост уже
+ * написан и опубликован, и терять его из-за неудачной загрузки третьего
+ * скриншота нельзя. О неудаче говорим, но пост остаётся.
+ *
+ * @returns {Promise<string>} пустая строка или текст о неудачах
+ */
+async function uploadShots(scope, targetType, targetId, onProgress) {
+  const list = pendingShots.get(scope) ?? [];
+  if (!list.length) return '';
+
+  const failed = [];
+  for (let i = 0; i < list.length; i++) {
+    onProgress?.(i + 1, list.length);
+    try {
+      await attachImage(targetType, targetId, list[i].file);
+    } catch (err) {
+      failed.push(String(err?.message ?? err));
+    }
+  }
+
+  clearShots(scope);
+  return failed.length ? `Не загрузились картинки: ${failed[0]}` : '';
+}
+
+/* ── Страница участника ───────────────────────────────────────────────────── */
+
+async function loadProfile(nick) {
+  mode = 'user';
+  profileState.nick = nick;
+  profileState.loading = true;
+  profileState.error = '';
+  profileState.editing = false;
+  paint();
+
   try {
-    state.me = mode === 'signup'
-      ? await forum.signUp(nick.value, password.value)
-      : await forum.signIn(nick.value, password.value);
-    await loadFeed();
+    profileState.profile = await getProfile(nick);
+    profileState.posts = profileState.profile
+      ? await getUserPosts(profileState.profile.id, 10)
+      : [];
   } catch (err) {
-    showError('[data-forum-auth-error]', String(err?.message ?? err));
+    profileState.error = String(err?.message ?? err);
+  } finally {
+    profileState.loading = false;
+    paint();
   }
 }
 
@@ -168,6 +514,41 @@ function wire() {
   document.addEventListener('click', async (e) => {
     if (!host || !e.target.closest) return;
     const t = e.target;
+
+    /* ── Картинки в форме ── */
+
+    const dropBtn = t.closest('[data-attach-drop]');
+    if (dropBtn && host.contains(dropBtn)) {
+      const [scope, index] = dropBtn.dataset.attachDrop.split(':');
+      dropShot(scope, Number(index));
+      return;
+    }
+
+    /* ── Профиль ── */
+
+    if (t.closest('[data-profile-edit]')) {
+      profileState.editing = !profileState.editing;
+      paint();
+      return;
+    }
+    if (t.closest('[data-profile-cancel]')) {
+      profileState.editing = false;
+      paint();
+      return;
+    }
+    if (t.closest('[data-avatar-clear]')) {
+      try {
+        await clearAvatar();
+        // Своя запись в состоянии тоже обновляется: аватарка стоит в шапке.
+        if (state.me) state.me.avatarUrl = '';
+        await loadProfile(profileState.nick);
+        profileState.editing = true;
+        paint();
+      } catch (err) {
+        showError('[data-avatar-error]', String(err?.message ?? err));
+      }
+      return;
+    }
 
     // Раздел.
     const cat = t.closest('[data-forum-cat]');
@@ -215,12 +596,31 @@ function wire() {
 
       // Повторное нажатие снимает реакцию — иначе поставленное не отменить.
       const next = item?.myReaction === reactionId ? null : reactionId;
+
+      /*
+        Реакцию показываем СРАЗУ, не дожидаясь базы. Нажатие на лайк должно
+        отзываться мгновенно: это движение, а не отправка формы, и задержка
+        в полсекунды читается как «не нажалось», после чего человек жмёт
+        второй раз.
+
+        Если база откажет, refreshOne вернёт настоящее значение обратно.
+      */
+      if (item) {
+        const counts = { ...(item.reactions ?? {}) };
+        if (item.myReaction) counts[item.myReaction] = Math.max(0, (counts[item.myReaction] ?? 1) - 1);
+        if (next) counts[next] = (counts[next] ?? 0) + 1;
+        item.reactions = counts;
+        item.myReaction = next;
+        paint();
+      }
+
       try {
         await forum.setReaction(targetType, targetId, next);
         await refreshOne(targetType, targetId);
       } catch (err) {
         state.error = String(err?.message ?? err);
-        paint();
+        // Возвращаем настоящее состояние: показанное было предположением.
+        await refreshOne(targetType, targetId);
       }
       return;
     }
@@ -275,6 +675,49 @@ function wire() {
     }
   });
 
+  /*
+    Выбор файла — событие change, а не click: click срабатывает при открытии
+    диалога, когда файла ещё нет.
+  */
+  document.addEventListener('change', async (e) => {
+    if (!host || !host.contains(e.target)) return;
+
+    const attachInput = e.target.closest('[data-attach-input]');
+    if (attachInput) {
+      addShots(attachInput.dataset.attachInput, attachInput.files ?? []);
+      /*
+        Поле очищаем: иначе выбор того же файла второй раз не даст события,
+        и человек решит, что кнопка перестала работать.
+      */
+      attachInput.value = '';
+      return;
+    }
+
+    const avatarInput = e.target.closest('[data-avatar-input]');
+    if (avatarInput) {
+      const file = avatarInput.files?.[0];
+      avatarInput.value = '';
+      if (!file) return;
+
+      clearError('[data-avatar-error]');
+      const label = avatarInput.closest('label');
+      const span = label?.querySelector('span');
+      const was = span?.textContent;
+      if (span) span.textContent = 'Загружаем…';
+
+      try {
+        const url = await uploadAvatar(file);
+        if (state.me) state.me.avatarUrl = url;
+        await loadProfile(profileState.nick);
+        profileState.editing = true;
+        paint();
+      } catch (err) {
+        if (span) span.textContent = was;
+        showError('[data-avatar-error]', String(err?.message ?? err));
+      }
+    }
+  });
+
   document.addEventListener('submit', async (e) => {
     if (!host || !host.contains(e.target)) return;
     const form = e.target;
@@ -283,7 +726,7 @@ function wire() {
     if (form.matches('[data-forum-auth]')) {
       e.preventDefault();
       const mode = e.submitter?.dataset.forumMode === 'signup' ? 'signup' : 'signin';
-      await handleAuth(form, mode);
+      await handleAuth(form, mode, e.submitter);
       return;
     }
 
@@ -299,18 +742,38 @@ function wire() {
       });
       if (!checked.ok) return showError('[data-forum-new-error]', checked.error);
 
-      try {
-        const created = await forum.createPost(checked.value);
-        form.reset();
-        state.category = 'all';
-        state.sort = 'fresh';
-        await loadFeed();
-        // Сразу открываем созданное: человек должен увидеть результат,
-        // а не искать свой пост в ленте.
-        location.hash = `#/forum/${created.id}`;
-      } catch (err) {
-        showError('[data-forum-new-error]', String(err?.message ?? err));
-      }
+      await withBusy(e.submitter, 'Публикуем…', async () => {
+        try {
+          const created = await forum.createPost(checked.value);
+
+          /*
+            Картинки грузятся ПОСЛЕ создания поста: вложение ссылается
+            на запись, значит запись должна существовать. Неудача загрузки
+            не отменяет пост — он уже написан и опубликован, и терять его
+            из-за третьего скриншота нельзя.
+          */
+          const shotError = await uploadShots('new', 'post', created.id, (i, n) => {
+            if (e.submitter) e.submitter.textContent = `Картинка ${i}/${n}…`;
+          });
+
+          /*
+            Форму очищаем ТОЛЬКО после успеха. Первая версия делала reset()
+            до запроса — и при отказе базы текст поста исчезал вместе
+            с сообщением об ошибке: человек терял написанное и не понимал,
+            за что.
+          */
+          form.reset();
+          state.category = 'all';
+          state.sort = 'fresh';
+          await loadFeed();
+          // Сразу открываем созданное: человек должен увидеть результат,
+          // а не искать свой пост в ленте.
+          location.hash = `#/forum/${created.id}`;
+          if (shotError) notice(shotError);
+        } catch (err) {
+          showError('[data-forum-new-error]', String(err?.message ?? err));
+        }
+      });
       return;
     }
 
@@ -323,13 +786,44 @@ function wire() {
       const checked = validateComment(form.body.value);
       if (!checked.ok) return showError('[data-forum-comment-error]', checked.error);
 
-      try {
-        await forum.addComment(commentForm.dataset.forumCommentForm, checked.value);
-        form.reset();
-        await loadThread(commentForm.dataset.forumCommentForm);
-      } catch (err) {
-        showError('[data-forum-comment-error]', String(err?.message ?? err));
-      }
+      await withBusy(e.submitter, 'Отправляем…', async () => {
+        try {
+          const postId = commentForm.dataset.forumCommentForm;
+          const created = await forum.addComment(postId, checked.value);
+
+          const shotError = created?.id
+            ? await uploadShots(postId, 'comment', created.id, (i, n) => {
+                if (e.submitter) e.submitter.textContent = `Картинка ${i}/${n}…`;
+              })
+            : '';
+
+          form.reset();
+          await loadThread(postId);
+          if (shotError) notice(shotError);
+        } catch (err) {
+          showError('[data-forum-comment-error]', String(err?.message ?? err));
+        }
+      });
+      return;
+    }
+
+    /* ── Профиль ── */
+    if (form.matches('[data-profile-form]')) {
+      e.preventDefault();
+      clearError('[data-profile-error]');
+
+      await withBusy(e.submitter, 'Сохраняем…', async () => {
+        try {
+          await saveProfile({
+            about: form.about.value,
+            allianceTag: form.allianceTag.value,
+          });
+          profileState.editing = false;
+          await loadProfile(profileState.nick);
+        } catch (err) {
+          showError('[data-profile-error]', String(err?.message ?? err));
+        }
+      });
       return;
     }
 
@@ -389,9 +883,42 @@ function wire() {
   // Закрытие окна по Esc: без этого на телефоне из него не выйти,
   // если кнопка «Отмена» ушла за край экрана.
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !host) return;
-    closeModal('[data-forum-report-modal]');
-    closeModal('[data-forum-delete-modal]');
+    if (!host) return;
+
+    if (e.key === 'Escape') {
+      closeModal('[data-forum-report-modal]');
+      closeModal('[data-forum-delete-modal]');
+      host.querySelectorAll('[data-forum-emoji-pop]').forEach((p) => { p.hidden = true; });
+      return;
+    }
+
+    /*
+      Ctrl+Enter отправляет комментарий и пост.
+
+      Про удобство на клавиатуре: в поле для многострочного текста Enter
+      обязан переносить строку, иначе абзац не набрать. Значит нужен второй
+      способ отправить, и Ctrl+Enter — тот, который уже знают по мессенджерам.
+      Cmd+Enter для тех, кто с Mac.
+    */
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      const area = e.target;
+      if (area?.tagName !== 'TEXTAREA' || !host.contains(area)) return;
+      const form = area.closest('form');
+      if (!form) return;
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  /*
+    Нажатие мимо окна закрывает его. На телефоне это основной способ:
+    кнопка «Отмена» может оказаться ниже края экрана, а тянуться к ней
+    большим пальцем неудобно.
+  */
+  document.addEventListener('click', (e) => {
+    if (!host || !e.target.classList) return;
+    if (e.target.matches('[data-forum-report-modal]')) closeModal('[data-forum-report-modal]');
+    if (e.target.matches('[data-forum-delete-modal]')) closeModal('[data-forum-delete-modal]');
   });
 }
 
@@ -399,7 +926,16 @@ function wire() {
 
 function openModal(selector) {
   const modal = host?.querySelector(selector);
-  if (modal) modal.hidden = false;
+  if (!modal) return;
+  modal.hidden = false;
+  /*
+    Прокрутку страницы под открытым окном запрещаем: иначе на телефоне
+    палец двигает страницу, а не список пунктов правил, и окно уезжает
+    из вида вместе с ней.
+  */
+  document.documentElement.classList.add('is-modal-open');
+  // Фокус внутрь окна: с клавиатуры иначе не добраться до кнопок.
+  modal.querySelector('input, button, textarea, select')?.focus({ preventScroll: true });
 }
 
 function closeModal(selector) {
@@ -408,6 +944,10 @@ function closeModal(selector) {
   modal.hidden = true;
   modal.querySelector('form')?.reset();
   modal.querySelectorAll('.forum-error').forEach((p) => { p.hidden = true; });
+
+  // Запрет прокрутки снимаем только когда закрыты оба окна.
+  const anyOpen = host?.querySelector('.forum-modal:not([hidden])');
+  if (!anyOpen) document.documentElement.classList.remove('is-modal-open');
 }
 
 /** Своё удаление и чужое — разные окна по смыслу, но одно по разметке. */
@@ -423,7 +963,10 @@ function openDeleteModal() {
   modal.querySelector('[data-forum-delete-own]').hidden = !own;
   modal.querySelector('[data-forum-delete-rules]').hidden = !needReason || own;
   modal.querySelector('[data-forum-delete-note]').hidden = !needReason || own;
+
   modal.hidden = false;
+  document.documentElement.classList.add('is-modal-open');
+  modal.querySelector('input, button')?.focus({ preventScroll: true });
 }
 
 /**
@@ -457,9 +1000,33 @@ function cssEscape(value) {
 export async function mountForum(container, view, postId = null) {
   host = container;
   siteView = view;
+  mode = 'feed';
   wire();
 
-  state.ready = await forum.isReady();
+  /*
+    Пока ждём ответа хранилища, показываем «загружаем». Без этого страница
+    остаётся пустой на всё время запроса — а на медленной сети это секунды,
+    и человек успевает решить, что форум не работает.
+  */
+  state.loading = true;
+  state.error = '';
+  paint();
+
+  try {
+    state.ready = await forum.isReady();
+  } catch (err) {
+    /*
+      Настройка не прочиталась — например, в config.js стоит служебный ключ,
+      и адаптер отказался работать. Это не «форум не настроен», а именно
+      ошибка, и показать надо её текст: он объясняет, что исправить.
+    */
+    state.ready = false;
+    state.error = String(err?.message ?? err);
+    state.loading = false;
+    paint();
+    return;
+  }
+
   state.shared = forum.capabilities.isShared;
   state.sourceName = forum.name;
 
@@ -483,9 +1050,66 @@ export async function mountForum(container, view, postId = null) {
   }
 }
 
+/**
+ * СТРАНИЦА УЧАСТНИКА.
+ *
+ * Отдельный вход, но тот же механизм отрисовки и те же обработчики: форум
+ * и профиль это одна страница с двумя видами, а не два приложения. Иначе
+ * пришлось бы дважды писать вход, дважды — сохранение набранного текста
+ * и дважды ловить одни и те же нажатия.
+ *
+ * @param {HTMLElement} container
+ * @param {string} nick Ник из адреса.
+ */
+export async function mountUser(container, nick) {
+  host = container;
+  wire();
+
+  if (!(await forum.isReady().catch(() => false))) {
+    mode = 'user';
+    profileState.profile = null;
+    profileState.nick = nick;
+    profileState.loading = false;
+    profileState.error = 'Форум ещё не подключён — профилей пока нет.';
+    paint();
+    return;
+  }
+
+  /*
+    Кто вошёл, нужно знать и здесь: от этого зависит, своя это страница
+    (с кнопкой правки) или чужая.
+  */
+  try {
+    state.me = await forum.currentUser();
+  } catch {
+    state.me = null;
+  }
+
+  await loadProfile(nick);
+}
+
 /** Ушли на другую вкладку: держать чужую разметку в руках незачем. */
 export function unmountForum() {
   host = null;
+  mode = 'feed';
   state.openPostId = null;
   state.comments = [];
+
+  profileState.profile = null;
+  profileState.posts = [];
+  profileState.editing = false;
+
+  /*
+    Ссылки на выбранные картинки освобождаем обязательно: иначе браузер держит
+    файлы в памяти до перезагрузки страницы, а на телефоне это несколько
+    мегабайт за каждую брошенную форму.
+  */
+  clearAllShots();
+
+  /*
+    Запрет прокрутки снимаем обязательно. Иначе уход со страницы при открытом
+    окне оставлял бы страницу навсегда неподвижной — и починить это можно
+    было бы только перезагрузкой.
+  */
+  document.documentElement.classList.remove('is-modal-open');
 }

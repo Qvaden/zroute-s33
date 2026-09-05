@@ -485,6 +485,14 @@ function postOut(row) {
     id: row.id,
     authorId: row.author_id,
     authorNick: row.author_nick,
+    /*
+      Аватарка и альянс приходят связью с профилем, а ник — копией в самой
+      записи. Разница осмысленная: ник в старом посте это «кто сказал тогда»,
+      а аватарка — «как человек выглядит сейчас», и сменив её он ожидает
+      увидеть новую везде, включая прошлые посты.
+    */
+    authorAvatar: row.author_avatar || '',
+    authorAlliance: row.author_alliance || '',
     category: row.category,
     title: row.title,
     body: row.body,
@@ -497,6 +505,7 @@ function postOut(row) {
     reactions: counts,
     myReaction: row.my_reaction || null,
     score,
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
   };
 }
 
@@ -586,12 +595,14 @@ function commentOut(row) {
     postId: row.post_id,
     authorId: row.author_id,
     authorNick: row.author_nick,
+    authorAvatar: row.author_avatar || '',
     body: row.body,
     createdAt: toDate(row.created_at) ?? new Date(),
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
     reactions: counts,
     myReaction: row.my_reaction || null,
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
   };
 }
 

@@ -9,17 +9,22 @@ const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн',
  * Сверху крупно — что делал сервер последним: брал чужую Столицу или отбивал
  * свою. Ниже стена трофеев с номерами взятых серверов, а за ней лента событий
  * для тех, кому нужны детали.
+ *
+ * Про подстановку по умолчанию: недоступная таблица результатов больше
+ * не закрывает сайт целиком, поэтому страница может законно получить пустоту.
  */
-export function renderTimeline({ events }) {
+export function renderTimeline({ events } = {}) {
+  const list = Array.isArray(events) ? events : [];
+
   /*
     Серверные события — захваты и защиты — это то, за чем на эту вкладку
     и заходят. Они живут среди обычных событий, а не у недели: кампания может
     тянуться через несколько недель, и один и тот же захват не должен
     записываться в двух местах.
   */
-  const server = serverEvents(events ?? []);
+  const server = serverEvents(list);
 
-  if (!events.length) {
+  if (!list.length) {
     return `
       <section class="hero hero--tl">
         <span class="eyebrow">Хроника завоеваний</span>
@@ -33,7 +38,28 @@ export function renderTimeline({ events }) {
       </section>`;
   }
 
-  const sorted = [...events].sort((a, b) => b.date - a.date);
+  /*
+    Записи без даты в ленту не попадают: дата — это ось, по которой строится
+    вся страница, а строка без неё встанет в произвольное место и попадёт
+    в фильтр не того месяца. Такая запись — состояние данных, а не события,
+    и молча пропустить её честнее, чем показать в случайном году.
+  */
+  const sorted = list
+    .filter((e) => e?.date instanceof Date && !Number.isNaN(e.date.getTime()))
+    .sort((a, b) => b.date - a.date);
+
+  if (!sorted.length) {
+    return `
+      <section class="hero hero--tl">
+        <span class="eyebrow">Хроника завоеваний</span>
+        <h2 class="tl__title">Записи есть, но без дат</h2>
+        <p class="guide__sub">
+          Летопись строится по датам, и записи без даты показать негде.
+          Проверьте столбец с датой в таблице.
+        </p>
+      </section>`;
+  }
+
   const captures = sorted.filter((e) => e.type === 'server_capture');
 
   return `
@@ -235,36 +261,135 @@ function renderEventGallery(event) {
   </div>`;
 }
 
+/**
+ * ЛЕНТА СОБЫТИЙ, СЛОЖЕННАЯ ПО МЕСЯЦАМ.
+ *
+ * ЗАЧЕМ СКЛАДЫВАТЬ. Записи копятся: захват, защита, война, слияние — за год
+ * их набирается сотня. Один длинный столбец на телефоне превращается
+ * в бесконечную прокрутку, где невозможно найти нужное и не видно, сколько
+ * всего есть.
+ *
+ * ПРАВИЛО: текущий месяц открыт, всё прошлое сложено в свои месяцы. Так
+ * «что происходит сейчас» видно сразу, а архив не мешает — но и не спрятан:
+ * заголовок месяца говорит, сколько внутри записей, и раскрывается нажатием.
+ *
+ * Почему граница по месяцу, а не «последние 10 записей». Месяц — единица,
+ * в которой человек думает о прошлом («это было в августе»), а «последние
+ * десять» ничего не значат: их может быть три за полгода или тридцать
+ * за неделю.
+ *
+ * ПОЧЕМУ <details>, А НЕ СВОЙ СКРИПТ. Раскрытие работает без JavaScript,
+ * значит и в собранном одним файлом превью, и при поиске по странице:
+ * браузер сам раскрывает <details>, когда ищет текст внутри.
+ */
 function renderFeed(events) {
+  /*
+    Текущий месяц считаем от САМОЙ СВЕЖЕЙ ЗАПИСИ, а не от сегодняшней даты.
+
+    Разница видна в тихий месяц: если последнее событие было в августе,
+    а сейчас октябрь, «текущим» по календарю оказался бы пустой октябрь —
+    и лента открылась бы полностью свёрнутой. Человек увидел бы список папок
+    и ни одной записи.
+  */
+  const freshest = events[0].date;
+  const openKey = ymKey(freshest);
+
+  /*
+    Группируем, сохраняя порядок: события уже отсортированы от свежих
+    к старым, и Map запоминает порядок вставки ключей.
+  */
+  const byMonth = new Map();
+  for (const e of events) {
+    const key = ymKey(e.date);
+    if (!byMonth.has(key)) byMonth.set(key, []);
+    byMonth.get(key).push(e);
+  }
+
   let lastYear = null;
-  const items = events
-    .map((e) => {
-      const year = e.date.getUTCFullYear();
-      const divider =
-        year !== lastYear ? `<li class="tl__year" data-tl-year="${year}"><span>${year}</span></li>` : '';
+  const blocks = [];
+
+  for (const [key, list] of byMonth) {
+    const year = Number(key.slice(0, 4));
+    const monthName = MONTH_NAME[Number(key.slice(5, 7)) - 1];
+
+    /*
+      Разделитель года — перед первым месяцем этого года. Он остаётся снаружи
+      месяцев: год это не папка, а отметка на оси времени.
+    */
+    if (year !== lastYear) {
+      blocks.push(`<li class="tl__year" data-tl-year="${year}"><span>${year}</span></li>`);
       lastYear = year;
+    }
 
-      const t = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
+    const items = list.map((e) => renderItem(e)).join('');
+    const isOpen = key === openKey;
 
-      return `${divider}
-      <li class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}"
-          data-tl-ym="${ymKey(e.date)}">
-        <div class="tl__marker">${e.serverNumber != null ? esc(String(e.serverNumber)) : '•'}</div>
-        <div class="tl__body">
-          <div class="tl__meta">
-            <span class="tl__type">${esc(t.label)}</span>
-            <time>${fmtDateFull(e.date)}</time>
-            ${e.durationDays ? `<span class="tl__dur">${plural(e.durationDays, 'день', 'дня', 'дней')}</span>` : ''}
-          </div>
-          <h3>${esc(e.title)}</h3>
-          ${e.summary ? `<p class="tl__summary">${esc(e.summary)}</p>` : ''}
-          ${e.body || eventImages(e).length ? `<details class="tl__details"><summary>Открыть событие</summary><div class="tl__details-body">${e.body ? `<p>${esc(e.body)}</p>` : ''}${renderEventGallery(e)}</div></details>` : ''}
-        </div>
-      </li>`;
-    })
-    .join('');
+    blocks.push(`
+      <li class="tl__month" data-tl-month="${esc(key)}">
+        <details class="tl__group" data-tl-group data-tl-default-open="${isOpen ? '1' : '0'}" ${isOpen ? 'open' : ''}>
+          <summary class="tl__group-head">
+            <span class="tl__group-name">${esc(monthName)}</span>
+            <span class="tl__group-count num">${list.length}</span>
+            <span class="tl__group-chev" aria-hidden="true">▾</span>
+          </summary>
+          <ul class="tl tl--group">${items}</ul>
+        </details>
+      </li>`);
+  }
 
   return `<section class="panel">
-    <ul class="tl" data-tl-list>${items}</ul>
+    <ul class="tl tl--months" data-tl-list>${blocks.join('')}</ul>
   </section>`;
+}
+
+/**
+ * Одна запись.
+ *
+ * КОМПАКТНЕЕ, ЧЕМ БЫЛО. Раньше под каждой записью висела строка «Открыть
+ * событие» — отдельный <details> с подписью. На ленте из тридцати записей это
+ * тридцать одинаковых строк, которые ничего не сообщают: место занимают,
+ * а прочитать по ним нечего.
+ *
+ * Теперь подробности раскрываются нажатием на саму запись, а о том, что
+ * внутри что-то есть, говорит значок в углу. Одна строка вместо двух на каждой
+ * записи — на телефоне это разница между «видно четыре события» и «видно шесть».
+ */
+function renderItem(e) {
+  const t = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
+  const images = eventImages(e);
+  const hasMore = Boolean(e.body) || images.length > 0;
+
+  const head = `
+    <div class="tl__marker">${e.serverNumber != null ? esc(String(e.serverNumber)) : '•'}</div>
+    <div class="tl__body">
+      <div class="tl__meta">
+        <span class="tl__type">${esc(t.label)}</span>
+        <time>${fmtDateFull(e.date)}</time>
+        ${e.durationDays ? `<span class="tl__dur">${plural(e.durationDays, 'день', 'дня', 'дней')}</span>` : ''}
+      </div>
+      <h3>${esc(e.title)}</h3>
+      ${e.summary ? `<p class="tl__summary">${esc(e.summary)}</p>` : ''}
+    </div>`;
+
+  const attrs = `class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}" data-tl-ym="${ymKey(e.date)}"`;
+
+  /*
+    Запись без подробностей не делаем раскрывающейся: нажатие, после которого
+    ничего не происходит, читается как поломка.
+  */
+  if (!hasMore) return `<li ${attrs}>${head}</li>`;
+
+  return `
+    <li ${attrs}>
+      <details class="tl__details">
+        <summary class="tl__row">
+          ${head}
+          <span class="tl__more" aria-hidden="true">${images.length ? `📷${images.length > 1 ? images.length : ''}` : '＋'}</span>
+        </summary>
+        <div class="tl__details-body">
+          ${e.body ? `<p>${esc(e.body)}</p>` : ''}
+          ${renderEventGallery(e)}
+        </div>
+      </details>
+    </li>`;
 }

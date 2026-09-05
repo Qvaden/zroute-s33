@@ -40,7 +40,7 @@ begin
   select id
     into keeper
     from public.forum_users
-   where lower(nick) = lower('ТВОЙ_НИК');
+   where lower(nick) = lower('Dxppelganger');
 
   if keeper is null then
     raise exception 'Ник не найден. Проверь написание в forum_users. Ничего не удалено.';

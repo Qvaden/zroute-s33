@@ -3,16 +3,36 @@ import { esc, formDots, plural } from '../ui/helpers.js?v=2';
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,
  * чтобы это ощущалось отдельной гонкой, а не вторым рейтингом.
+ *
+ * Про подстановку по умолчанию: недоступная таблица результатов больше
+ * не закрывает сайт целиком, поэтому страница может законно получить пустоту.
  */
-export function renderQuarter({ standings, quarter }) {
-  const active = standings.filter((r) => r.alliance.active).length;
-  const topThree = standings.slice(0, 3);
-  const cards = standings.map(quartCard).join('');
-  const periodLabel = quarter.startNumber == null
+export function renderQuarter({ standings, quarter } = {}) {
+  const list = Array.isArray(standings) ? standings : [];
+  const period = quarter ?? { weeks: [] };
+
+  if (!list.length) {
+    return `
+      <section class="panel">
+        <header class="panel__head">
+          <span class="eyebrow">Кварт</span>
+          <h2>Период ещё не начат</h2>
+        </header>
+        <p class="muted">
+          Кварт считается по последним четырём неделям. Он появится,
+          как только внесут первые итоги VS.
+        </p>
+      </section>`;
+  }
+
+  const active = list.filter((r) => r.alliance.active).length;
+  const topThree = list.slice(0, 3);
+  const cards = list.map(quartCard).join('');
+  const periodLabel = period.startNumber == null
     ? 'Период ещё не начат'
-    : `Недели ${quarter.startNumber}–${quarter.endNumber}`;
-  const periodNumber = quarter.number ? String(quarter.number).padStart(2, '0') : '—';
-  const progress = quarter.weeks.length;
+    : `Недели ${period.startNumber}–${period.endNumber}`;
+  const periodNumber = period.number ? String(period.number).padStart(2, '0') : '—';
+  const progress = (period.weeks ?? []).length;
 
   return `
     <section class="quart-page">

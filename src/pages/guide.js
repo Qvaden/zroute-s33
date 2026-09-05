@@ -14,15 +14,15 @@ import { parseGuidePage } from '../logic/guide-roles.js';
  * а не разработчик. Заголовки «## » превращаются в карточки — верстать
  * ничего не нужно.
  */
-export function renderGuide({ texts, standings, weeks, results }) {
-  const byKey = Object.fromEntries(texts.map((t) => [t.key, t]));
+export function renderGuide({ texts, standings, weeks, results } = {}) {
+  const byKey = Object.fromEntries((texts ?? []).map((t) => [t.key, t]));
   const page = parseGuidePage(byKey['guide-page'], {
     roles: parseGuidePage(byKey['guide-roles']).roles,
     principles: byKey['guide-principles'], week: byKey['guide-week'],
     donts: byKey['guide-donts'], benefits: byKey['guide-benefits'],
   });
   return `
-    ${renderProof(standings, weeks, results, page)}
+    ${renderProof(standings ?? [], weeks ?? [], results ?? [], page)}
     ${renderLeadershipRoles(page)}
     ${renderExtraBlocks(page.extraBlocks)}
     ${renderList({ title: page.benefitsTitle, body: page.benefitsBody }, page.benefitsTitle, 'week')}

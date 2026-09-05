@@ -19,7 +19,7 @@
 
 update public.forum_users
    set role = 'admin'
- where lower(nick) = lower('ТВОЙ_НИК');
+ where lower(nick) = lower('Dxppelganger');
 
 
 -- После этого на сайте надо выйти и войти снова: роль читается при входе,

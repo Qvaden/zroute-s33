@@ -23,7 +23,7 @@ import { presidentBoardFromTexts } from './logic/president-board.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
 import './ui/ladder-controls.js';
 import './ui/timeline-controls.js';
-import { mountForum, unmountForum } from './forum/mount.js';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js';
 
 /*
   РАЗДЕЛЫ.
@@ -86,8 +86,15 @@ function parseHash() {
 }
 
 function renderNav(activeId) {
+  /*
+    aria-current сообщает экранному диктору, где человек находится. Подсветка
+    цветом об этом говорит только тем, кто видит: без атрибута незрячий
+    слышит семь одинаковых ссылок и не знает, какая открыта.
+  */
   nav.innerHTML = ROUTES.map(
-    (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}">${r.label}</a>`
+    (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}"${
+      r.id === activeId ? ' aria-current="page"' : ''
+    }>${r.label}</a>`
   ).join('');
 }
 
@@ -102,6 +109,17 @@ function setSideOpen(open) {
   document.documentElement.classList.toggle('is-side-open', open);
   sideToggle?.setAttribute('aria-expanded', String(open));
   if (sideVeil) sideVeil.hidden = !open;
+
+  /*
+    Фокус переносим внутрь панели и обратно на кнопку. Без этого человек,
+    открывший меню с клавиатуры, остаётся фокусом на кнопке, а следующий Tab
+    уводит его в содержимое страницы — то есть меню открылось, но добраться
+    до вкладок нельзя.
+  */
+  if (open) side?.querySelector('.nav__link')?.focus({ preventScroll: true });
+  else if (document.activeElement && side?.contains(document.activeElement)) {
+    sideToggle?.focus({ preventScroll: true });
+  }
 }
 
 function isSideOpen() {
@@ -121,6 +139,15 @@ side?.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isSideOpen()) setSideOpen(false);
+});
+
+/*
+  Экран стал широким — панель видна всегда, и «открытое» состояние теряет
+  смысл. Если его не снять, останется висеть затемнение поверх страницы:
+  поворот телефона превращался в неработающий сайт.
+*/
+window.matchMedia('(min-width: 1040px)').addEventListener('change', (e) => {
+  if (e.matches) setSideOpen(false);
 });
 
 function renderPresidentBoard(texts = []) {
@@ -232,6 +259,18 @@ function render() {
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
     path = `/alliance/${param}`;
+  } else if (id === 'user' && param) {
+    /*
+      Страница участника: #/user/Ковыль. Своей вкладки у неё нет — приходят
+      сюда из ленты, нажав на ник, — поэтому в меню подсвечен форум.
+
+      Ник в адресе закодирован, а русские буквы браузер кодирует сам:
+      без decodeURIComponent пришло бы «%D0%9A%D0%BE...» вместо имени.
+    */
+    renderNav('forum');
+    app.innerHTML = '';
+    mountUser(app, decodeURIComponent(param));
+    path = '/user';
   } else {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
     renderNav(route.id);
@@ -268,7 +307,16 @@ function render() {
 
   setupMobileScrollReveal();
   setupParallax();
-  window.scrollTo(0, 0);
+
+  /*
+    Прокрутку наверх делаем для обычных страниц, но НЕ для форума с открытой
+    темой: ссылку на пост кидают в чат, и человек, перешедший по ней, должен
+    попасть на пост, а не в начало страницы. Форум сам возвращает прокрутку
+    после перерисовки, и внешний scrollTo здесь спорил бы с ним.
+  */
+  const keepScroll = id === 'forum' && param;
+  if (!keepScroll) window.scrollTo(0, 0);
+
   trackPageview(path);
 }
 

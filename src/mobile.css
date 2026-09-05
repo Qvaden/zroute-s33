@@ -1,0 +1,578 @@
+/*
+  ТЕЛЕФОН — ГЛАВНЫЙ ЭКРАН ЭТОГО САЙТА.
+
+  Отдельный файл, подключается ПОСЛЕ всех остальных. Так сделано осознанно:
+  styles-v8.css собран слоями поверх шести прошлых версий, и правка внутри него
+  задевает то, о чём не думал. Здесь же собрано одно — поведение на узком
+  экране, — и его видно целиком.
+
+  ПОЧЕМУ ПОНАДОБИЛСЯ. Сайт делался «сначала телефон», но проверялся сужением
+  окна на компьютере. Это не то же самое: в браузере на компьютере нет ни
+  выреза камеры, ни полосы жестов, ни клавиатуры на пол-экрана, ни разницы
+  между 100vh и видимой высотой. Живое видео с телефона показало, чего
+  не видно из окна.
+
+  ГЛАВНЫЙ ИСТОЧНИК БЕДЫ — сетки с фиксированными колонками. Строка рейтинга
+  просит 54px + auto + 1fr + auto плюс отступы; на экране 360px содержимое
+  не влезает, и браузер расширяет страницу вместо того, чтобы переносить.
+  Дальше вся страница едет в сторону, а масштаб «уплывает» — это и выглядит
+  как поломка.
+*/
+
+/* ── Нижняя граница: 380px и уже ──────────────────────────────────────────── */
+
+/*
+  360px — это ширина большинства недорогих Android, на которых играет
+  аудитория. iPhone SE — 375px. Всё, что ниже 380, обязано работать без
+  горизонтальной прокрутки, и это проверяется вручную, а не «на глаз».
+*/
+@media (max-width: 420px) {
+  /*
+    Отступы по краям: 18px с каждой стороны от 360 — это 10% ширины экрана
+    в никуда. Ужимаем до 12, содержимому нужнее.
+  */
+  .wrap { padding-left: 12px; padding-right: 12px; }
+  .site-head__inner { padding-left: 12px; padding-right: 12px; }
+
+  .panel, .hero { padding-left: 13px; padding-right: 13px; border-radius: 13px; }
+
+  /*
+    РЕЙТИНГ: три колонки вместо четырёх.
+
+    Очки уезжают под имя, а не жмутся в свою колонку справа. Так строка
+    перестаёт требовать больше ширины, чем есть, и цифры остаются читаемыми
+    вместо того, чтобы переноситься по одному символу.
+  */
+  .lad__row {
+    grid-template-columns: 38px 1fr auto;
+    grid-template-areas:
+      "place ident ident"
+      "place form  wl"
+      "place pts   pts";
+    gap: 2px 8px;
+    padding: 10px 4px;
+  }
+  .lad__pts { text-align: left; }
+  .lad__place b { font-size: 14px; }
+
+  /* Кварт: та же беда и то же решение. */
+  .quart-row { grid-template-columns: 44px 1fr auto; }
+
+  /*
+    Строка недели в карточке альянса: пять колонок на 360px невозможны.
+    Собираем в два яруса.
+  */
+  .vs__row {
+    grid-template-columns: 46px 1fr auto;
+    grid-template-areas:
+      "week dates dates"
+      "week badge total";
+  }
+
+  /* Плитки альянсов: две в ряд вместо трёх, иначе тег обрезается. */
+  .tiles { grid-template-columns: 1fr 1fr; }
+
+  /* Достижения: одно в ряд. Две карточки по 190px в 360px не влезают. */
+  .achievement-grid { grid-template-columns: 1fr; }
+
+  /* Фото в хронологии: две в ряд — по 120px минимум умещается ровно две. */
+  .tl__gallery { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Ничего не должно вылезать за край ────────────────────────────────────── */
+
+/*
+  СТРАХОВКА ОТ ГОРИЗОНТАЛЬНОЙ ПРОКРУТКИ.
+
+  overflow-x: hidden на body уже стоит в styles-v8.css, но он лечит следствие:
+  страница перестаёт ездить, а содержимое всё равно обрезано, и часть кнопок
+  недостижима. Поэтому здесь — причины.
+
+  Длинное слово без пробелов (ник, ссылка, тег альянса) растягивает своего
+  родителя, а тот — всю сетку. Перенос в любом месте некрасив, но читаемый
+  текст с переносом посреди слова лучше недостижимой половины экрана.
+*/
+@media (max-width: 760px) {
+  .lad__name, .lad__ident,
+  .podium__name, .leader__name,
+  .tile, .tag,
+  .forum-post__title, .forum-post__body,
+  .forum-comment__body, .forum-post__by b,
+  .tl__body h3, .tl__summary,
+  .quart-card__name, .ally__name {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+
+  /*
+    min-width: 0 на элементах сетки — не украшение. По умолчанию элемент
+    внутри grid и flex не сжимается меньше своего содержимого, и именно так
+    фиксированная колонка выдавливает страницу за край.
+  */
+  .lad__row > *, .quart-row > *, .vs__row > *,
+  .forum-post__head > *, .forum-me > * { min-width: 0; }
+
+  /*
+    Картинки шире экрана — вторая частая причина. Ограничение на все разом:
+    искать конкретную каждый раз дороже, чем закрыть класс задач.
+  */
+  img, svg, video { max-width: 100%; height: auto; }
+
+  /* Таблица очков в гайде: даём прокрутку внутри, а не всей странице. */
+  .proof__row { grid-template-columns: 74px 1fr auto; gap: 7px; }
+}
+
+/* ── Масштаб текста ───────────────────────────────────────────────────────── */
+
+/*
+  ЧТО ИМЕННО «УЕЗЖАЛО».
+
+  На iPhone Safari сам увеличивает шрифт в ландшафте, если не сказать иначе.
+  Выглядит это как «сайт поехал»: пропорции меняются, вёрстка ломается,
+  а человек ничего не делал — просто повернул телефон.
+
+  text-size-adjust: 100% отключает эту самодеятельность. НЕ путать с запретом
+  масштабирования пальцами: увеличить двумя пальцами по-прежнему можно,
+  и запрещать это нельзя — часть людей иначе не прочитает текст.
+*/
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/*
+  Крупные заголовки на телефоне. clamp с vw в знаменателе даёт на 360px
+  слишком мелко, а на 320px — совсем нечитаемо, потому что нижняя граница
+  подбиралась под окно компьютера.
+*/
+@media (max-width: 420px) {
+  .hero__num { font-size: 40px; }
+  .forum-chron__title { font-size: 20px; line-height: 1.15; }
+  .tl__title, .verdict__text { font-size: 19px; }
+  .adm-h1 { font-size: 21px; }
+}
+
+/* ── Клавиатура на экране ─────────────────────────────────────────────────── */
+
+/*
+  Появившаяся клавиатура занимает половину экрана, и 100vh перестаёт означать
+  «видимая высота»: нижняя часть окна оказывается ПОД клавиатурой. Кнопка
+  «Отправить» под полем ввода уезжает туда же — человек печатает и не может
+  отправить.
+
+  dvh («динамическая» высота) учитывает клавиатуру. Поддерживается не везде,
+  поэтому идёт вторым объявлением: старые браузеры возьмут первое.
+*/
+.forum-modal { height: 100vh; height: 100dvh; }
+.adm-modal { height: 100vh; height: 100dvh; }
+
+@media (max-width: 760px) {
+  /*
+    Поле ввода не должно быть выше половины экрана: иначе с открытой
+    клавиатурой не видно ни того, что пишешь, ни кнопки.
+  */
+  .forum-field textarea, .forum-reply textarea { max-height: 40vh; }
+}
+
+/* ── Попадание пальцем ────────────────────────────────────────────────────── */
+
+@media (hover: none) and (pointer: coarse) {
+  /*
+    44 пиксела — не догма из гайдлайнов, а наблюдаемый факт: по цели меньше
+    этого палец промахивается, человек жмёт второй раз и получает двойное
+    действие. Ниже — места, которые выглядят мелкими по замыслу; размер
+    добирается отступами, вид не меняется.
+  */
+  .nav__link { min-height: 46px; }
+  .seg__btn, .cal__btn { min-height: 40px; padding: 9px 13px; }
+  .wk { min-height: 44px; }
+  .lad__row { min-height: 52px; }
+  .tl__details summary { min-height: 44px; display: flex; align-items: center; }
+
+  /* Ссылка на карточку альянса: попасть по строке, а не по имени. */
+  .lad__row a { display: block; padding: 2px 0; }
+
+  /*
+    Наведения на телефоне не существует. Правила :hover при этом срабатывают
+    после нажатия и «залипают» до следующего касания в другом месте — строка
+    остаётся подсвеченной, и человек думает, что она выбрана.
+  */
+  .lad__row:hover { background: none; border-left-color: transparent; }
+  .lad__row:active { background: rgba(255,255,255,.05); }
+}
+
+/* ── Хронология: месяцы-папки и компактные записи ─────────────────────────── */
+
+/*
+  Записи сложены по месяцам: текущий раскрыт, прошлое свёрнуто. Иначе за год
+  набирается сотня записей в один столбец, и на телефоне это бесконечная
+  прокрутка, где ничего не найти.
+*/
+.tl--months { list-style: none; margin: 0; padding: 0; }
+.tl__month { list-style: none; }
+
+.tl__group { border-bottom: 1px solid var(--line-soft); }
+.tl__month:last-child .tl__group { border-bottom: none; }
+
+.tl__group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Папку открывают пальцем — цель должна быть высотой в палец. */
+  min-height: 46px;
+  padding: 4px 2px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tl__group-head::-webkit-details-marker { display: none; }
+.tl__group-head:hover .tl__group-name { color: var(--text); }
+
+.tl__group-name {
+  color: var(--dim);
+  font-family: Unbounded, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+  transition: color .16s var(--ease);
+}
+
+/*
+  Счётчик записей внутри. Он же отвечает на вопрос «стоит ли открывать»:
+  папка с одной записью и папка с двадцатью выглядят иначе.
+*/
+.tl__group-count {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mute);
+  font-size: 11px;
+}
+.tl__group-chev {
+  margin-left: auto;
+  color: var(--mute);
+  transition: transform .2s var(--ease);
+}
+.tl__group[open] .tl__group-chev { transform: rotate(180deg); }
+.tl__group[open] .tl__group-name { color: var(--accent); }
+
+.tl--group { list-style: none; margin: 0 0 10px; padding: 0; }
+
+/*
+  ЗАПИСЬ СТАЛА КОМПАКТНЕЕ.
+
+  Раньше под каждой висела строка «Открыть событие» — тридцать одинаковых
+  строк на ленте из тридцати записей, которые ничего не сообщали. Теперь
+  раскрывает сама запись, а о наличии подробностей говорит значок в углу.
+*/
+.tl__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tl__row::-webkit-details-marker { display: none; }
+
+/*
+  Значок «внутри есть ещё»: камера с числом фотографий или плюс, если только
+  текст. Он же и подсказка, и единственное, что осталось от прежней строки.
+*/
+.tl__more {
+  flex: none;
+  align-self: center;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--mute);
+  font-size: 11px;
+  transition: border-color .16s var(--ease), color .16s var(--ease);
+}
+.tl__row:hover .tl__more { border-color: rgba(255,255,255,.24); color: var(--dim); }
+.tl__details[open] .tl__more { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 420px) {
+  .tl__group-name { font-size: 12px; }
+  .tl__group-head { gap: 8px; }
+  /* Значок ужимаем до одного символа: место нужнее заголовку записи. */
+  .tl__more { padding: 3px 6px; font-size: 10.5px; }
+}
+
+/* ── Профиль участника ────────────────────────────────────────────────────── */
+
+.forum-profile__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.forum-profile__ident { flex: 1; min-width: 0; }
+.forum-profile__nick {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 28px);
+  overflow-wrap: anywhere;
+}
+.forum-profile__meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.forum-profile__role { color: var(--dim); }
+.forum-profile__ally {
+  padding: 2px 8px;
+  border: 1px solid rgba(255,201,60,.3);
+  border-radius: 999px;
+  color: var(--gold);
+  font-family: Unbounded, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.forum-profile__about {
+  margin: 10px 0 0;
+  color: var(--dim);
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.forum-profile__edit { flex: none; }
+
+/*
+  Аватарка. Размер задаётся классом, а не подгоняется на месте: одна и та же
+  картинка стоит в ленте, в комментариях и на странице профиля, и три разных
+  «примерно 36 пикселов» разъехались бы при первой правке.
+*/
+.forum-ava--lg {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  font-size: 34px;
+}
+.forum-ava--img {
+  object-fit: cover;
+  background: var(--raised-2);
+}
+
+.forum-profile__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.forum-profile__stat {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.02);
+  text-align: center;
+}
+.forum-profile__stat b {
+  display: block;
+  font-family: Unbounded, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+}
+.forum-profile__stat span {
+  display: block;
+  margin-top: 4px;
+  color: var(--mute);
+  font-size: 10.5px;
+}
+
+.forum-profile__posts { margin: 0; padding: 0; list-style: none; }
+.forum-profile__posts li {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.forum-profile__posts li:last-child { border-bottom: none; }
+.forum-profile__posts a {
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 500;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.forum-profile__posts a:hover { color: var(--accent); }
+.forum-profile__post-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 3px;
+  font-size: 11px;
+}
+.forum-profile__post-text { margin: 5px 0 0; font-size: 12.5px; line-height: 1.5; }
+
+/* Правка профиля. */
+.forum-profile-edit__ava {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.forum-profile-edit__ava-acts { display: grid; gap: 8px; justify-items: start; }
+.forum-profile-edit__ava-acts small { font-size: 11px; line-height: 1.45; max-width: 34ch; }
+
+/*
+  Кнопка выбора файла — это <label> с полем внутри. Скрытое поле нельзя
+  заменить кнопкой: браузер открывает диалог только по настоящему <input>.
+*/
+.forum-profile-edit__ava-acts label { cursor: pointer; }
+
+.forum-field input:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.forum-field small { display: block; margin-top: 5px; font-size: 11px; line-height: 1.45; }
+
+@media (max-width: 520px) {
+  /*
+    На телефоне карточка складывается в столбик: аватарка 88px и ник рядом
+    оставляют имени полосу шириной в два слова.
+  */
+  .forum-profile__top { flex-direction: column; gap: 12px; }
+  .forum-profile__edit { width: 100%; }
+  .forum-ava--lg { width: 72px; height: 72px; border-radius: 18px; font-size: 28px; }
+  .forum-profile__stats { gap: 7px; }
+  .forum-profile__stat { padding: 10px 6px; }
+  .forum-profile__stat b { font-size: 19px; }
+  .forum-profile__stat span { font-size: 9.5px; }
+  .forum-profile-edit__ava { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── Вложения в постах ────────────────────────────────────────────────────── */
+
+/*
+  Сетка под скриншоты. Одна картинка — во всю ширину, две и больше — по две
+  в ряд: скриншот интерфейса игры при трёх в ряд на телефоне становится
+  нечитаемым, и открывать его придётся всё равно.
+*/
+.forum-shots {
+  display: grid;
+  gap: 6px;
+  margin-top: 11px;
+}
+.forum-shots--multi { grid-template-columns: 1fr 1fr; }
+
+.forum-shots a {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+.forum-shots img {
+  display: block;
+  width: 100%;
+  /*
+    Высота ограничена: вертикальный скриншот иначе занимает три экрана,
+    и лента превращается в галерею. Полный вид — по нажатию.
+  */
+  max-height: 320px;
+  object-fit: cover;
+}
+.forum-shots--multi img { height: 130px; object-fit: cover; }
+
+.forum-shots__more {
+  display: grid;
+  place-items: center;
+  color: var(--dim);
+  font-size: 13px;
+}
+
+/* Выбранные, но ещё не отправленные картинки в форме. */
+.forum-attach {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.forum-attach__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--dim);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color .16s var(--ease), color .16s var(--ease);
+}
+.forum-attach__btn:hover { border-color: var(--accent); color: var(--text); }
+
+.forum-attach__list { display: flex; flex-wrap: wrap; gap: 7px; }
+.forum-attach__item {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.forum-attach__item img { width: 100%; height: 100%; object-fit: cover; }
+.forum-attach__drop {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: rgba(6,7,9,.78);
+  color: #ffb3ba;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.forum-attach__hint { color: var(--mute); font-size: 11px; }
+
+/*
+  Ник — ссылка на профиль. Подчёркивание не ставим: в ленте ников много,
+  и подчёркнутыми они превратили бы карточку в набор ссылок. Цвет и наведение
+  говорят достаточно.
+*/
+.forum-nick {
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.forum-nick:hover { color: var(--accent); }
+
+/* Тег альянса рядом с ником в ленте: мелко и сдержанно. */
+.forum-post__ally {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid rgba(255,201,60,.26);
+  border-radius: 999px;
+  color: var(--gold);
+  font-family: Unbounded, sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+/* ── Безопасные края ──────────────────────────────────────────────────────── */
+
+/*
+  Вырез камеры, скруглённые углы и полоса жестов. В ландшафте вырез уходит
+  влево или вправо, поэтому отступы нужны с обеих сторон, а не только сверху.
+*/
+@supports (padding: env(safe-area-inset-left)) {
+  @media (max-width: 1039px) {
+    .wrap {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
+    .site-head__inner {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
+    /* Последний блок страницы не должен упираться в полосу жестов. */
+    #app { padding-bottom: max(48px, calc(env(safe-area-inset-bottom) + 32px)); }
+  }
+}

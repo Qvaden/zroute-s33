@@ -75,6 +75,16 @@ function userOut(u) {
     id: u.id,
     nick: u.nick,
     role: u.role,
+    /*
+      Поля профиля есть и здесь — для паритета с рабочим адаптером. Аватарку
+      в локальном режиме загрузить некуда (хранилища нет), но страница профиля
+      обязана открываться и рисоваться: иначе её нельзя ни проверить, ни
+      показать, не подключив базу.
+    */
+    avatarUrl: u.avatarUrl || '',
+    about: u.about || '',
+    allianceTag: u.allianceTag || '',
+    canEditSite: Boolean(u.canEditSite) || u.role === 'admin',
     createdAt: toDate(u.createdAt) ?? new Date(),
     mutedUntil: toDate(u.mutedUntil),
     banned: Boolean(u.banned),
@@ -151,10 +161,18 @@ function reactionsFor(state, targetType, targetId) {
 
 function postOut(state, p) {
   const r = reactionsFor(state, 'post', p.id);
+  const author = state.users.find((u) => u.id === p.authorId);
   return {
     id: p.id,
     authorId: p.authorId,
     authorNick: p.authorNick,
+    /*
+      Аватарка и альянс берутся из профиля автора, а ник — копией в записи.
+      Разница та же, что в рабочем адаптере: ник это «кто сказал тогда»,
+      аватарка — «как человек выглядит сейчас».
+    */
+    authorAvatar: author?.avatarUrl || '',
+    authorAlliance: author?.allianceTag || '',
     category: p.category,
     title: p.title,
     body: p.body,
@@ -164,6 +182,8 @@ function postOut(state, p) {
     deleted: Boolean(p.deleted),
     deletedReason: p.deletedReason || '',
     commentCount: state.comments.filter((c) => c.postId === p.id && !c.deleted).length,
+    // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
+    attachments: [],
     ...r,
   };
 }
@@ -275,15 +295,18 @@ export async function deletePost(id, reason) {
 
 function commentOut(state, c) {
   const r = reactionsFor(state, 'comment', c.id);
+  const author = state.users.find((u) => u.id === c.authorId);
   return {
     id: c.id,
     postId: c.postId,
     authorId: c.authorId,
     authorNick: c.authorNick,
+    authorAvatar: author?.avatarUrl || '',
     body: c.body,
     createdAt: toDate(c.createdAt) ?? new Date(),
     deleted: Boolean(c.deleted),
     deletedReason: c.deletedReason || '',
+    attachments: [],
     ...r,
   };
 }

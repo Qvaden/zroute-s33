@@ -205,6 +205,20 @@ function renderRules() {
  * читается как поломка сайта, а честная строка — как состояние проекта.
  */
 function renderAccountBar(s) {
+  /*
+    Ошибка настройки идёт впереди всего: если адаптер отказался работать —
+    например, в config.js попал служебный ключ, — человек должен прочитать
+    именно это, а не «форум не подключён». Второе неверно и уводит от причины.
+  */
+  if (s.error && !s.ready) {
+    return `
+      <section class="panel error">
+        <span class="eyebrow">Форум не запустился</span>
+        <p>${esc(s.error)}</p>
+        <p class="muted">Что исправить — описано в <code>docs/FORUM.md</code>.</p>
+      </section>`;
+  }
+
   if (!s.ready) {
     return `
       <section class="panel forum-notice forum-notice--off">
@@ -242,11 +256,12 @@ function renderWhoAmI(s) {
     const muted = s.me.mutedUntil && s.me.mutedUntil > new Date();
     return `
       <div class="forum-me">
-        <span class="forum-ava" style="--ava:${esc(nickColor(s.me.nick))}">${esc(nickInitial(s.me.nick))}</span>
+        ${avatar(s.me.nick, s.me.avatarUrl)}
         <span class="forum-me__body">
-          <b>${esc(s.me.nick)}</b>
+          <b>${nickLink(s.me.nick)}</b>
           <small>${esc(roleLabel(s.me.role))}</small>
         </span>
+        <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
         <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
       </div>
       ${
@@ -334,6 +349,8 @@ function renderComposer(s) {
                     placeholder="Пустая строка разделяет абзацы. Ссылки вставляются как есть."></textarea>
         </label>
 
+        ${renderAttachRow('new')}
+
         <p class="forum-composer__rules muted">
           Публикуя пост, вы соглашаетесь с правилами выше. Нарушение —
           удаление с указанием пункта, повторное — запрет писать.
@@ -346,6 +363,36 @@ function renderComposer(s) {
         <p class="forum-error" data-forum-new-error hidden></p>
       </form>
     </details>`;
+}
+
+/**
+ * Строка прикрепления картинок.
+ *
+ * ПОЧЕМУ КАРТИНКИ ГРУЗЯТСЯ ПОСЛЕ ПУБЛИКАЦИИ, А НЕ ДО.
+ *
+ * Вложение ссылается на запись, значит запись должна существовать. Можно было
+ * бы загрузить файлы заранее и привязать потом, но тогда брошенная форма
+ * оставляла бы в хранилище файлы, на которые никто не ссылается, — и найти
+ * их позже было бы нечем.
+ *
+ * Поэтому здесь выбранные файлы только показываются превью, а уходят они
+ * следом за постом. Человеку это видно: кнопка говорит «Опубликовать»,
+ * и картинки появляются вместе с текстом.
+ *
+ * @param {'new'|string} scope 'new' для нового поста, id поста для комментария.
+ */
+function renderAttachRow(scope) {
+  return `
+    <div class="forum-attach" data-forum-attach="${esc(scope)}">
+      <label class="forum-attach__btn">
+        <span aria-hidden="true">🖼</span>
+        <span>Прикрепить картинку</span>
+        <input type="file" accept="image/*" multiple hidden data-attach-input="${esc(scope)}">
+      </label>
+      <div class="forum-attach__list" data-attach-list="${esc(scope)}"></div>
+      <small class="forum-attach__hint">До четырёх картинок. Сжимаются автоматически.</small>
+    </div>
+    <p class="forum-error" data-attach-error="${esc(scope)}" hidden></p>`;
 }
 
 /* ── Управление лентой ────────────────────────────────────────────────────── */
@@ -375,6 +422,56 @@ function renderFeedControls(s) {
                           data-forum-sort="${esc(o.id)}">${esc(o.label)}</button>`
         ).join('')}
       </div>
+    </div>`;
+}
+
+/**
+ * Метка участника: аватарка или буква в цветном квадрате.
+ *
+ * Буква не заглушка «пока не загрузил», а полноценный вариант: цвет считается
+ * из ника и всегда один, поэтому знакомого человека видно в ленте по цвету
+ * даже без фотографии.
+ *
+ * Ник — ссылка на профиль. Так устроены все форумы, и человек это пробует
+ * первым делом: нажать на имя, чтобы узнать, кто пишет.
+ */
+function avatar(nick, url, size = '') {
+  const cls = `forum-ava${size ? ` forum-ava--${size}` : ''}`;
+  if (url) {
+    return `<img class="${cls} forum-ava--img" src="${esc(url)}"
+                 alt="${esc(nick)}" loading="lazy" width="36" height="36">`;
+  }
+  return `<span class="${cls}" style="--ava:${esc(nickColor(nick))}">${esc(nickInitial(nick))}</span>`;
+}
+
+/** Ссылка на страницу участника. */
+function nickLink(nick) {
+  return `<a class="forum-nick" href="#/user/${encodeURIComponent(nick)}">${esc(nick)}</a>`;
+}
+
+/**
+ * Прикреплённые картинки.
+ *
+ * Одна — во всю ширину, несколько — по две в ряд. Скриншот интерфейса игры
+ * при трёх в ряд на телефоне становится нечитаемым, и открывать его придётся
+ * всё равно.
+ *
+ * Больше четырёх не бывает: предел держит база (см. supabase/profiles.sql).
+ */
+function renderShots(item) {
+  const shots = Array.isArray(item.attachments) ? item.attachments.filter((a) => a?.url) : [];
+  if (!shots.length) return '';
+
+  const multi = shots.length > 1;
+  return `
+    <div class="forum-shots ${multi ? 'forum-shots--multi' : ''}">
+      ${shots
+        .map(
+          (a, i) => `<a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">
+            <img src="${esc(a.url)}" alt="Скриншот ${i + 1}" loading="lazy">
+          </a>`
+        )
+        .join('')}
     </div>`;
 }
 
@@ -447,9 +544,11 @@ function renderPostCard(p, s) {
   return `
     <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}" data-forum-post="${esc(p.id)}">
       <header class="forum-post__head">
-        <span class="forum-ava" style="--ava:${esc(nickColor(p.authorNick))}">${esc(nickInitial(p.authorNick))}</span>
+        ${avatar(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
-          <b>${esc(p.authorNick)}</b>
+          <b>${nickLink(p.authorNick)}${
+            p.authorAlliance ? ` <span class="forum-post__ally">${esc(p.authorAlliance)}</span>` : ''
+          }</b>
           <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
             ${esc(timeAgo(p.createdAt))}${p.editedAt ? ' · изменён' : ''}
           </time>
@@ -465,6 +564,8 @@ function renderPostCard(p, s) {
       <div class="forum-post__body">
         ${isOpen ? postBody(p.body) : `<p>${esc(excerpt(p.body))}</p>`}
       </div>
+
+      ${renderShots(p)}
 
       ${
         !isOpen && p.body.length > 220
@@ -572,13 +673,14 @@ function renderComments(post, s) {
           }
           const isMine = s.me && s.me.id === c.authorId;
           return `<li class="forum-comment" data-forum-comment="${esc(c.id)}">
-            <span class="forum-ava forum-ava--sm" style="--ava:${esc(nickColor(c.authorNick))}">${esc(nickInitial(c.authorNick))}</span>
+            ${avatar(c.authorNick, c.authorAvatar, 'sm')}
             <div class="forum-comment__body">
               <div class="forum-comment__head">
-                <b>${esc(c.authorNick)}</b>
+                <b>${nickLink(c.authorNick)}</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>
               </div>
               ${postBody(c.body)}
+              ${renderShots(c)}
               <div class="forum-comment__foot">
                 ${renderReactions('comment', c, s)}
                 ${
@@ -611,6 +713,7 @@ function renderComments(post, s) {
           ? `<form class="forum-reply" data-forum-comment-form="${esc(post.id)}">
               <textarea name="body" rows="3" required maxlength="${L.commentMax}"
                         placeholder="Ответить по делу и по правилам"></textarea>
+              ${renderAttachRow(post.id)}
               <div class="forum-reply__actions">
                 <button type="submit" class="forum-btn">Ответить</button>
               </div>

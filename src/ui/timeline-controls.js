@@ -48,6 +48,43 @@
     });
 
     /*
+      МЕСЯЦЫ-ПАПКИ.
+
+      Записи сложены по месяцам (см. renderFeed), поэтому прятать надо не только
+      сами записи, но и папку целиком, если внутри после фильтра ничего
+      не осталось. Иначе получается «сентябрь (0)» — заголовок, за которым
+      пустота, и человек нажимает на него, ожидая содержимого.
+
+      Заодно раскрываем папку, в которой что-то нашлось: смысл фильтра
+      в том, чтобы увидеть найденное, а не искать его внутри свёрнутых месяцев.
+    */
+    each(list.querySelectorAll('[data-tl-month]'), function (month) {
+      var visible = 0;
+      each(month.querySelectorAll('[data-tl-type]'), function (li) {
+        if (!li.hidden) visible++;
+      });
+
+      month.hidden = visible === 0;
+
+      var group = month.querySelector('[data-tl-group]');
+      if (!group) return;
+
+      /*
+        Счётчик показывает, сколько видно СЕЙЧАС, а не сколько есть всего:
+        при фильтре «только захваты» цифра 12 рядом с тремя записями врёт.
+      */
+      var count = month.querySelector('.tl__group-count');
+      if (count) {
+        if (count.dataset.total == null) count.dataset.total = count.textContent;
+        count.textContent = currentType === 'all' ? count.dataset.total : String(visible);
+      }
+
+      // Фильтр включён — раскрываем найденное. Снят — возвращаем как было.
+      if (currentType !== 'all' || currentMonth) group.open = visible > 0;
+      else group.open = group.dataset.tlDefaultOpen === '1';
+    });
+
+    /*
       Разделители годов не должны висеть над пустотой: если после фильтра
       в году не осталось ни одного события, заголовок года тоже прячем.
     */

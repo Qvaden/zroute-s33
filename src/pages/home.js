@@ -10,7 +10,7 @@ import { byWeekStart } from '../data/week-order.js';
  * и показать, что подготовка сделана: все альянсы на месте, ждём первый VS.
  */
 function renderPreSeason(standings, allWeeks) {
-  const alliances = standings.map((r) => r.alliance).filter((a) => a.active);
+  const alliances = (standings ?? []).map((r) => r.alliance).filter((a) => a?.active);
 
   // Ближайшая неделя, которая ещё не закончилась.
   const today = new Date();
@@ -89,15 +89,21 @@ function renderPreSeason(standings, allWeeks) {
  * Главная — ответ на «зашёл и понял, у кого получается».
  * Всё главное должно читаться за пять секунд: номер недели, лидер сезона,
  * кто победил и кто проиграл. Остальное — ниже, для тех, кому интересно.
+ *
+ * Про подстановку по умолчанию: недоступная таблица результатов больше
+ * не закрывает сайт целиком — форум с ней не связан. Значит эта страница
+ * может законно получить пустоту, и падать ей нельзя.
  */
-export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
+export function renderHome({ summary, standings, movers, weeks, allWeeks } = {}) {
+  const list = Array.isArray(standings) ? standings : [];
+
   // Пока не внесён ни один результат, показывать нечего — но и «пусто» писать
   // нельзя: в этом состоянии сайт проживёт несколько дней после запуска,
   // и это первое, что увидят люди.
-  if (!summary) return renderPreSeason(standings, allWeeks ?? weeks);
+  if (!summary) return renderPreSeason(list, allWeeks ?? weeks ?? []);
 
   const { week, winners, losers, recorded } = summary;
-  const leader = standings[0];
+  const leader = list[0];
 
   const tiles = (list) =>
     list.length
@@ -123,7 +129,9 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
        <span class="muted">${r.place} место</span>
      </li>`;
 
-  const top5 = standings.filter((r) => r.alliance.active).slice(0, 5);
+  const top5 = list.filter((r) => r.alliance.active).slice(0, 5);
+  // Движение за неделю — необязательная часть: без него страница осмысленна.
+  const moved = movers ?? { up: [], down: [] };
 
   return `
     <section class="hero">
@@ -184,7 +192,7 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
       <section class="panel">
         <header class="panel__head"><h2>Вершина таблицы</h2></header>
         <ol class="podium">
-          ${standings
+          ${list
             .slice(0, 5)
             .map(
               (r, i) => `<li class="podium__item podium__item--${i + 1}">
@@ -204,13 +212,13 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks }) {
           <div>
             <h4 class="movers__title movers__title--up">Рейтинг поднялся</h4>
             <ul class="movers__list">${
-              movers.up.length ? movers.up.map(moverRow).join('') : '<li class="muted">без изменений</li>'
+              moved.up.length ? moved.up.map(moverRow).join('') : '<li class="muted">без изменений</li>'
             }</ul>
           </div>
           <div>
             <h4 class="movers__title movers__title--down">Рейтинг снизился</h4>
             <ul class="movers__list">${
-              movers.down.length ? movers.down.map(moverRow).join('') : '<li class="muted">без изменений</li>'
+              moved.down.length ? moved.down.map(moverRow).join('') : '<li class="muted">без изменений</li>'
             }</ul>
           </div>
         </div>
