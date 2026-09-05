@@ -855,19 +855,52 @@ console.log('\nJ. Админ-панель');
     ['тексты', (await import('../src/admin/screens/texts.js')).renderTexts],
   ];
 
+  /*
+    ЭКРАН НЕ ЧИТАЕТ ПОЛЕЙ, КОТОРЫХ ПАНЕЛЬ ЕМУ НЕ ДАЁТ.
+
+    Проверка по тексту, а не по вызову: вызов ловит только то, что упало
+    на конкретных данных, а обзор падал лишь при отсутствующем repo — то есть
+    всегда, но тест этого не видел, потому что подсовывал repo сам.
+
+    Ниже — поля эпохи GitHub. После переезда их не существует, и обращение
+    к ним означает, что экран остался в прошлом.
+  */
+  const adminScreenFiles = adminFiles.filter((f) => /screens\//.test(f));
+  const stale = [];
+  for (const f of adminScreenFiles) {
+    const code = stripComments(await readFile(f, 'utf8'));
+    for (const gone of ['view.repo', 'view.commit', 'repo.fullName', 'repo.canPush', 'commit.sha']) {
+      if (code.includes(gone)) stale.push(`${f} → ${gone}`);
+    }
+  }
+  equal('экраны панели не читают поля эпохи GitHub', stale.join(', '), '');
+
+  /*
+    ЭКРАНЫ ПАНЕЛИ ПРОВЕРЯЮТСЯ НА ТОМ, ЧТО ПАНЕЛЬ ИМ ДЕЙСТВИТЕЛЬНО ДАЁТ.
+
+    Здесь была подложена выдумка: объект с полями repo, commit и sha —
+    остатками эпохи, когда данные лежали в репозитории. Экраны эти поля
+    читали, тест их подсовывал, и всё сходилось.
+
+    А панель после переезда кладёт совсем другое. Обзор продолжал читать
+    view.repo.fullName и падал на первой строке — молча, вкладка просто
+    не открывалась. Тест этого не увидел, потому что проверял не то,
+    что собирает панель.
+
+    Поэтому состав полей ниже — копия того, что кладёт load() в main.js,
+    и ничего лишнего. Если панель начнёт давать другое, экраны сломаются
+    здесь, а не у человека.
+  */
   const viewFor = (data) => ({
-    user: { login: 'editor' },
-    repo: { fullName: 'Qvaden/zroute-s33', canPush: true, isPrivate: false },
-    file: { path: 'data/live.json', size: 98304, sha: 'abc123' },
-    commit: {
-      sha: 'abc1234',
-      message: 'данные из таблицы',
-      date: new Date('2026-07-29T21:40:00Z'),
-      authorName: 'github-actions[bot]',
-      authorLogin: '',
-    },
+    account: { nick: 'Qvaden', role: 'admin' },
+    user: { login: 'Qvaden' },
+    file: { path: 'база данных', size: 98304, sha: '' },
+    changes: [],
+    raw: {},
+    baseRaw: {},
     data,
     weeks: data.weeks,
+    canPush: true,
     problems: [],
   });
 

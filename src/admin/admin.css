@@ -204,6 +204,38 @@
   color: var(--dim);
 }
 
+/*
+  Журнал правок. Заменил карточку «последний коммит»: в репозитории журнал
+  вёл сам git, в базе его пишут триггеры.
+
+  Список, а не одна запись: правки идут по одной, и последняя часто — это
+  одна клетка. Одна запись отвечала на вопрос «кто трогал файл», список
+  отвечает на настоящий: «что здесь происходило».
+*/
+.adm-changes { margin: 0; padding: 0; list-style: none; }
+.adm-changes li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft, rgba(255,255,255,.06));
+  font-size: 13px;
+}
+.adm-changes li:last-child { border-bottom: none; }
+.adm-changes b { font-weight: 600; }
+.adm-changes__what { color: var(--dim); }
+.adm-changes i { font-size: 11.5px; font-style: normal; }
+/*
+  Кто и когда — на своей строке справа: на телефоне в одну строку это
+  не влезает, а перенос посреди «5 сентября, 21:40» читается как две даты.
+*/
+.adm-changes__who { margin-left: auto; font-size: 11.5px; white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .adm-changes__who { margin-left: 0; flex-basis: 100%; }
+}
+
 .adm-health b { display: block; font-size: 15px; margin-bottom: 6px; }
 .adm-health--ok b { color: var(--win); }
 .adm-health--bad b { color: var(--loss); }
