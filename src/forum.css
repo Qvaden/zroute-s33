@@ -277,12 +277,14 @@
 /* Надпись LIVE // SERVER 33 из styles-v8.css встала бы поверх статуса. */
 .site-head__inner::before { display: none; }
 #app::before { display: none; }
-.president-board { margin-left: auto; max-width: 460px; }
+/*
+  Место доски в шапке. Её вид (одна строка вместо блока на 90 пикселов)
+  задаётся в mobile.css — там же объяснено, почему.
+*/
 @media (max-width: 700px) {
-  .president-board { max-width: none; }
   /* На телефоне статус переносится под шапку: в строку он не влезает. */
   .site-head__inner { flex-wrap: wrap; }
-  .president-board { flex: 1 0 100%; }
+  .president-board { flex: 1 0 100%; max-width: none; }
 }
 
 /* ── Сводка сервера на форуме ─────────────────────────────────────────────── */
