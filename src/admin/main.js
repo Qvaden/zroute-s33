@@ -89,6 +89,10 @@ import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js';
 import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js';
 import { renderQuarter } from './screens/quarter.js';
 import { renderPresident } from './screens/president.js';
+import { renderPlayers } from './screens/players.js';
+import { renderModeration } from './screens/moderation.js';
+import { forum } from '../forum/index.js';
+import { deletionReason } from '../forum/rules.js';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -98,6 +102,13 @@ const SCREENS = [
   { id: 'events', label: 'Хронология', render: renderEvents },
   { id: 'guidePage', label: 'Малым алам', render: renderGuideRoles },
   { id: 'president', label: 'Президент', render: renderPresident },
+  /*
+    Два экрана форума. Они стоят особняком от всех остальных: те правят
+    data/live.json через GitHub, а эти разговаривают с базой форума. Токен
+    GitHub над форумом не властен вообще — права там проверяет сама база.
+  */
+  { id: 'moderation', label: 'Жалобы', render: renderModeration },
+  { id: 'players', label: 'Игроки', render: renderPlayers },
 ];
 
 const root = document.getElementById('admin');
@@ -175,6 +186,16 @@ function render() {
   }
   if (screen.id === 'president') {
     view.presidentDraft = view.presidentDraft ?? presidentBoardFromTexts(view.texts);
+  }
+
+  /*
+    Экраны форума догружают своё сами: список игроков и жалобы лежат в базе,
+    а не в data/live.json. Ждать их при каждой отрисовке нельзя — тогда любой
+    переход по панели упирался бы в запрос к форуму, включая экраны, которые
+    к форуму отношения не имеют.
+  */
+  if (screen.id === 'players' || screen.id === 'moderation') {
+    loadForumScreen(screen.id);
   }
 
   root.innerHTML = renderShell({
@@ -1098,9 +1119,196 @@ function removeGuideRole(index) {
   render();
 }
 
+/* ── Форум: игроки и жалобы ──────────────────────────────────────────────── */
+
+/**
+ * ПАНЕЛЬ И ФОРУМ — ДВЕ РАЗНЫЕ СИСТЕМЫ ПРАВ.
+ *
+ * Всё остальное в панели работает токеном GitHub: он и вход, и права. Над
+ * форумом этот токен не властен вообще — там своя учётная запись, и проверяет
+ * её база (см. supabase/schema.sql). Поэтому здесь возможна ситуация, которой
+ * нет больше нигде в панели: человек вошёл, всё видит, но сбросить пароль
+ * не может, потому что на форуме он не администратор.
+ *
+ * Отказ приходит из базы, а не из этого кода. Проверки роли ниже нужны только
+ * чтобы не показывать кнопку, которая заведомо откажет.
+ */
+async function loadForumScreen(screenId) {
+  // Уже загружено — второй запрос при каждой перерисовке не нужен.
+  if (view.forum?.loadedFor === screenId) return;
+
+  const configured = await forum.isReady().catch(() => false);
+  view.forum = { configured, loadedFor: screenId };
+
+  if (!configured) {
+    render();
+    return;
+  }
+
+  try {
+    view.forum.me = await forum.currentUser();
+
+    const isStaff = view.forum.me?.role === 'admin' || view.forum.me?.role === 'moderator';
+    if (isStaff) {
+      if (screenId === 'players') view.forum.users = await forum.listUsers();
+      else view.forum.reports = await forum.listReports();
+    }
+  } catch (err) {
+    view.forum.error = String(err?.message ?? err);
+  }
+
+  render();
+}
+
+/** Сообщение о результате рядом с тем действием, которое его вызвало. */
+function showForumResult(selector, html, kind = 'ok') {
+  const box = root.querySelector(selector);
+  if (!box) return;
+  box.className = `adm-result adm-result--${kind}`;
+  box.innerHTML = html;
+  box.hidden = false;
+}
+
+function openPlayerModal(selector, nick, targetId, extra = {}) {
+  const modal = root.querySelector(selector);
+  if (!modal) return;
+
+  modal.dataset.playerId = targetId;
+  const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick]');
+  if (nickBox) nickBox.textContent = nick;
+
+  for (const [key, value] of Object.entries(extra)) modal.dataset[key] = value;
+  modal.hidden = false;
+}
+
+function closePlayerModal(selector) {
+  const modal = root.querySelector(selector);
+  if (!modal) return;
+  modal.hidden = true;
+  modal.querySelector('form')?.reset();
+  modal.querySelectorAll('.adm-result').forEach((b) => { b.hidden = true; });
+}
+
+/**
+ * Пароль, который не стыдно передать голосом.
+ *
+ * Собран из слогов, а не из случайных байтов: «xK7#pQ2z» человек будет
+ * набирать в игре с телефона по одному символу и трижды опечатается.
+ * Стойкость даёт длина, а не набор символов — тот же довод, что в rules.js.
+ */
+function suggestPassword() {
+  const parts = ['вер', 'кам', 'лис', 'тор', 'сад', 'нор', 'дым', 'рек', 'зов', 'пик', 'мост', 'клён'];
+  const pick = () => parts[Math.floor(Math.random() * parts.length)];
+  const digits = String(Math.floor(Math.random() * 90) + 10);
+  return `${pick()}-${pick()}-${digits}`;
+}
+
+/** Жалоба разобрана: пометить и убрать из списка. */
+async function resolveReport(reportId) {
+  try {
+    await forum.resolveReport(reportId);
+    view.forum.loadedFor = null;
+    render();
+  } catch (err) {
+    showForumResult('[data-moderation-result]', esc(String(err?.message ?? err)), 'err');
+  }
+}
+
+/**
+ * Удаление по жалобе: сначала запись, потом отметка «разобрано».
+ *
+ * Порядок важен. Если сначала закрыть жалобу, а удаление не пройдёт (сеть,
+ * права), нарушение останется на сайте, а жалоба на него исчезнет из списка —
+ * то есть о нём больше никто не узнает.
+ */
+async function deleteByReport({ reportId, ruleId, targetType, targetId }) {
+  try {
+    const reason = deletionReason(ruleId);
+    if (targetType === 'post') await forum.deletePost(targetId, reason);
+    else await forum.deleteComment(targetId, reason);
+
+    await forum.resolveReport(reportId);
+
+    view.forum.loadedFor = null;
+    render();
+  } catch (err) {
+    showForumResult('[data-moderation-result]', esc(String(err?.message ?? err)), 'err');
+  }
+}
+
 /* ── События ── */
 
 document.addEventListener('submit', async (e) => {
+  /* ── Форум: сброс пароля ── */
+  const resetForm = e.target.closest('[data-reset-form]');
+  if (resetForm) {
+    e.preventDefault();
+    const modal = resetForm.closest('[data-reset-modal]');
+    const password = String(resetForm.password.value ?? '');
+
+    if (password.length < 8) {
+      showForumResult('[data-reset-error]', 'Пароль короче 8 символов', 'err');
+      return;
+    }
+
+    try {
+      await forum.resetPassword(modal.dataset.playerId, password);
+      const nick = modal.querySelector('[data-reset-nick]')?.textContent ?? '';
+      closePlayerModal('[data-reset-modal]');
+      /*
+        Пароль показываем здесь и только один раз: сохранённого пароля
+        не существует — база держит необратимый отпечаток, а не сам пароль.
+        Подсмотреть его позже нельзя даже администратору, поэтому передать
+        человеку надо сейчас.
+      */
+      showForumResult(
+        '[data-players-result]',
+        `Пароль для <b>${esc(nick)}</b> изменён. Новый пароль: <code>${esc(password)}</code> — передайте его сами, второй раз он не покажется.`,
+        'ok'
+      );
+    } catch (err) {
+      showForumResult('[data-reset-error]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  /* ── Форум: запрет писать ── */
+  const restrictForm = e.target.closest('[data-restrict-form]');
+  if (restrictForm) {
+    e.preventDefault();
+    const modal = restrictForm.closest('[data-restrict-modal]');
+    const userId = modal.dataset.playerId;
+    const duration = restrictForm.duration.value;
+    const ruleId = restrictForm.ruleId.value;
+    const note = String(restrictForm.note.value ?? '');
+
+    try {
+      if (duration === 'none') {
+        await forum.setRestriction(userId, { banned: false, mutedUntil: null, reason: '' });
+      } else if (duration === 'ban') {
+        await forum.setRestriction(userId, {
+          banned: true,
+          mutedUntil: null,
+          reason: deletionReason(ruleId, note),
+        });
+      } else {
+        const until = new Date(Date.now() + Number(duration) * 86400000);
+        await forum.setRestriction(userId, {
+          banned: false,
+          mutedUntil: until,
+          reason: deletionReason(ruleId, note),
+        });
+      }
+
+      closePlayerModal('[data-restrict-modal]');
+      view.forum.loadedFor = null;
+      render();
+    } catch (err) {
+      showForumResult('[data-restrict-error]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
   const form = e.target.closest('[data-login]');
   if (!form) return;
   e.preventDefault();
@@ -1141,6 +1349,58 @@ document.addEventListener('click', (e) => {
   }
   if (e.target.closest('[data-refresh]') || e.target.closest('[data-retry]')) {
     boot();
+    return;
+  }
+
+  /* ── Форум: игроки и жалобы ── */
+
+  if (e.target.closest('[data-forum-reload]')) {
+    // Сбрасываем метку загрузки, иначе экран решит, что данные уже есть.
+    if (view?.forum) view.forum.loadedFor = null;
+    render();
+    return;
+  }
+
+  const resetBtn = e.target.closest('[data-player-reset]');
+  if (resetBtn) {
+    openPlayerModal('[data-reset-modal]', resetBtn.dataset.playerNick, resetBtn.dataset.playerReset);
+    return;
+  }
+  if (e.target.closest('[data-reset-cancel]')) {
+    closePlayerModal('[data-reset-modal]');
+    return;
+  }
+  if (e.target.closest('[data-reset-suggest]')) {
+    const input = root.querySelector('[data-reset-form] input[name="password"]');
+    if (input) input.value = suggestPassword();
+    return;
+  }
+
+  const restrictBtn = e.target.closest('[data-player-restrict]');
+  if (restrictBtn) {
+    openPlayerModal('[data-restrict-modal]', restrictBtn.dataset.playerNick, restrictBtn.dataset.playerRestrict);
+    return;
+  }
+  if (e.target.closest('[data-restrict-cancel]')) {
+    closePlayerModal('[data-restrict-modal]');
+    return;
+  }
+
+  const dismiss = e.target.closest('[data-report-dismiss]');
+  if (dismiss) {
+    resolveReport(dismiss.dataset.reportDismiss);
+    return;
+  }
+
+  const reportDelete = e.target.closest('[data-report-delete]');
+  if (reportDelete) {
+    const [targetType, targetId] = reportDelete.dataset.reportTarget.split(':');
+    deleteByReport({
+      reportId: reportDelete.dataset.reportDelete,
+      ruleId: reportDelete.dataset.reportRule,
+      targetType,
+      targetId,
+    });
     return;
   }
 

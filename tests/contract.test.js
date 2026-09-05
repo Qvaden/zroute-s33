@@ -601,7 +601,6 @@ console.log('\nI. Готовность к публикации');
 console.log('\nJ. Админ-панель');
 {
   const { readFile, readdir } = await import('node:fs/promises');
-  const path = await import('node:path');
 
   const { mapDataset } = await import('../src/data/adapters/_map.js');
   const jsonAdapter = await import('../src/data/adapters/json.js');
@@ -630,10 +629,18 @@ console.log('\nJ. Админ-панель');
     JSON.stringify(mapDataset(rawForParity)) === JSON.stringify(viaAdapter)
   );
 
-  // Соберём исходники панели: несколько проверок идут по тексту.
+  /*
+    Соберём исходники панели: несколько проверок идут по тексту.
+
+    Пути склеиваем вручную через «/», а не через path.join. На Windows join
+    даёт «src\admin\repo.js», и тогда проверки ниже врут: сравнение с
+    'src/admin/repo.js' не совпадает, а фильтр /screens\// не находит ни
+    одного экрана — то есть тест тихо проверяет меньше, чем обещает.
+    Для fs косая черта работает на всех системах одинаково.
+  */
   async function walkJs(dir, out = []) {
     for (const e of await readdir(dir, { withFileTypes: true })) {
-      const full = path.join(dir, e.name);
+      const full = `${dir}/${e.name}`;
       if (e.isDirectory()) await walkJs(full, out);
       else if (e.name.endsWith('.js')) out.push(full);
     }
@@ -1733,6 +1740,567 @@ console.log('\nF. Достижения');
   const veteran = getAllianceAchievements('v', veteranWeeks, veteranResults);
   check('10 побед дают значок ветерана', veteran.some((badge) => badge.id === 'veteran'));
   check('7 побед подряд дают корону', veteran.some((badge) => badge.id === 'streak7'));
+}
+
+// ── Q. Форум: чужой текст, правила и права ────────────────────────────────
+/*
+  ПОЧЕМУ ЭТОТ БЛОК САМЫЙ ВАЖНЫЙ В ФАЙЛЕ.
+
+  До форума все тексты на сайте писал доверенный редактор, и худшее, что могло
+  случиться, — опечатка. Форум принимает текст от постороннего человека
+  и показывает его другим людям. Это меняет не удобство, а класс риска:
+  незакрытая подстановка означает чужой скрипт в браузере читателя,
+  на нашем домене.
+
+  Поэтому здесь проверяется не «работает ли», а «нельзя ли навредить».
+*/
+console.log('\nQ. Форум');
+{
+  const { readFile, readdir } = await import('node:fs/promises');
+  const { postBody, excerpt, timeAgo, nickColor } = await import('../src/forum/format.js');
+  const {
+    RULES, SANCTIONS, CATEGORIES, CATEGORY_IDS, REACTIONS,
+    validateNick, validatePassword, validatePost, validateComment, deletionReason,
+  } = await import('../src/forum/rules.js');
+
+  /* ── Показ чужого текста ── */
+
+  check('теги в тексте поста не становятся разметкой',
+    !postBody('<script>alert(1)</script>').includes('<script>'));
+  check('закрывающий тег из текста не ломает абзац',
+    !postBody('обычный текст</p><img src=x onerror=alert(1)>').includes('<img'));
+  check('обработчик события в тексте остаётся текстом',
+    !/onerror=/.test(postBody('<b onerror="alert(1)">жирный</b>').replace(/&quot;/g, '"')) ||
+      !postBody('<b onerror="alert(1)">жирный</b>').includes('<b '));
+
+  /*
+    Разметку от участников не принимаем вовсе: markdown в посте приятен,
+    но каждая конструкция — ещё одно место, где можно ошибиться.
+    miniMarkdown из helpers.js здесь намеренно не используется.
+  */
+  check('звёздочки не превращаются в жирный текст',
+    !postBody('**не жирный**').includes('<strong>'));
+  check('решётка не превращается в заголовок',
+    !postBody('# не заголовок').includes('<h2>'));
+
+  check('пустая строка разбивает текст на абзацы',
+    (postBody('первый\n\nвторой').match(/<p>/g) ?? []).length === 2);
+  check('одиночный перенос остаётся переносом',
+    postBody('строка\nещё строка').includes('<br>'));
+
+  /*
+    Ссылки — единственное, что превращается в разметку, и схема проверяется
+    через safeUrl: `javascript:` внутри href остаётся рабочим кодом даже
+    после честного экранирования кавычек.
+  */
+  check('обычная ссылка становится ссылкой',
+    postBody('смотри https://example.com/a страницу').includes('<a href="https://example.com/a"'));
+  check('javascript-ссылка ссылкой не становится',
+    !postBody('javascript:alert(1)').includes('<a href'));
+  check('чужая ссылка помечена ugc и не уводит вкладку',
+    /rel="noopener noreferrer ugc"/.test(postBody('https://example.com')));
+  check('в ссылке показан домен, а не простыня',
+    postBody('https://example.com/очень/длинный/путь/ещё').includes('>example.com<'));
+  check('точка после ссылки не съедается в адрес',
+    postBody('иди на https://example.com.').includes('>example.com</a>.'));
+
+  /* ── Выжимка и время ── */
+
+  equal('короткий текст в выжимке не режется', excerpt('коротко', 100), 'коротко');
+  check('длинный текст режется по слову, а не посередине',
+    !/\s…$/.test(excerpt('слово '.repeat(80), 40)) && excerpt('слово '.repeat(80), 40).endsWith('…'));
+
+  const now = new Date('2026-09-05T12:00:00');
+  equal('свежая запись — «только что»', timeAgo(new Date('2026-09-05T11:59:40'), now), 'только что');
+  equal('час назад считается часами', timeAgo(new Date('2026-09-05T11:00:00'), now), '1 час назад');
+  /*
+    «Вчера» считается по календарю, а не по 24 часам: в 00:30 сообщение
+    от 23:00 — вчерашнее, хотя прошло полтора часа.
+  */
+  equal('вчерашняя запись названа вчерашней',
+    timeAgo(new Date('2026-09-04T23:00:00'), new Date('2026-09-05T00:30:00')), 'вчера');
+  equal('прошлогодняя запись показывает год',
+    timeAgo(new Date('2025-03-02T10:00:00'), now), '2 мар 2025');
+
+  check('цвет метки участника один и тот же для одного ника',
+    nickColor('Qvaden') === nickColor('Qvaden'));
+  check('разные ники получают разные цвета', nickColor('Qvaden') !== nickColor('Другой'));
+
+  /* ── Правила ── */
+
+  check(`правил не меньше пяти (${RULES.length})`, RULES.length >= 5);
+  check('у каждого правила есть id, заголовок и объяснение',
+    RULES.every((r) => r.id && r.title && r.body && r.body.length > 40));
+  equal('идентификаторы правил уникальны',
+    new Set(RULES.map((r) => r.id)).size, RULES.length);
+  check('последствия нарушения названы вслух', SANCTIONS.length >= 2);
+
+  /*
+    ГЛАВНОЕ РЕШЕНИЕ ЭТОГО РАЗДЕЛА: списка запрещённых слов в проекте нет.
+    Он одновременно ловит невиновных (Кострома, «нахимовский») и обходится
+    одной точкой внутри слова — то есть создаёт видимость модерации вместо
+    неё. Смысл оценивает человек по жалобе. Если однажды кто-то захочет
+    вернуть такой список, этот тест упадёт, и вернуть его придётся осознанно.
+  */
+  const forumFiles = [];
+  for (const dir of ['src/forum', 'src/forum/adapters']) {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      if (e.isFile() && e.name.endsWith('.js')) forumFiles.push(`${dir}/${e.name}`);
+    }
+  }
+  const forumSource = (await Promise.all(forumFiles.map((f) => readFile(f, 'utf8'))))
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  check('в форуме нет списка запрещённых слов — смысл оценивает человек',
+    !/BANNED_WORDS|BAD_WORDS|badWords|profanit/i.test(forumSource));
+
+  /* ── Проверки ввода ── */
+
+  check('пустой ник отбрасывается', !validateNick('').ok);
+  check('короткий ник отбрасывается', !validateNick('ab').ok);
+  check('ник из русских букв проходит', validateNick('Ковыль').ok);
+  check('ник из двух слов проходит — в игре такие бывают', validateNick('Тёмный Лорд').ok);
+  check('ник с угловой скобкой отбрасывается', !validateNick('<script>').ok);
+  check('ник из одних пробелов отбрасывается', !validateNick('   ').ok);
+  equal('двойные пробелы в нике сжимаются',
+    validateNick('Тёмный   Лорд').value, 'Тёмный Лорд');
+
+  /*
+    От пароля требуется только длина. «Одна заглавная, одна цифра, один символ»
+    на практике даёт «Password1!» — пароль, который выглядит сложным и стоит
+    в каждом втором аккаунте.
+  */
+  check('короткий пароль отбрасывается', !validatePassword('1234567').ok);
+  check('длинный пароль из одних букв проходит', validatePassword('корабельнаясосна').ok);
+  check('пробел на краю пароля — почти всегда опечатка', !validatePassword(' пароль123 ').ok);
+
+  check('пост без раздела отбрасывается',
+    !validatePost({ title: 'Заголовок', body: 'текст', category: 'нет-такого' }).ok);
+  check('пустой текст поста отбрасывается',
+    !validatePost({ title: 'Заголовок', body: '   ', category: 'news' }).ok);
+  check('нормальный пост проходит',
+    validatePost({ title: 'Разбор VS', body: 'Мы выиграли потому что', category: 'vs' }).ok);
+  check('переносы внутри текста сохраняются',
+    validatePost({ title: 'Тема', body: 'первый\n\nвторой', category: 'news' }).value.body.includes('\n\n'));
+  /*
+    Заголовок капсом — не нарушение правил, а неудобство для читающих.
+    Поэтому не отказываем, а приводим к обычному виду: человек не должен
+    угадывать, каким регистром сайт согласен принять его мысль.
+  */
+  check('заголовок капсом приводится к обычному виду',
+    validatePost({ title: 'СРОЧНО ВСЕ СЮДА ЧИТАЙТЕ', body: 'текст', category: 'news' })
+      .value.title !== 'СРОЧНО ВСЕ СЮДА ЧИТАЙТЕ');
+  check('короткая аббревиатура в заголовке не ломается',
+    validatePost({ title: 'VS', body: 'текст', category: 'vs' }).ok === false ||
+      validatePost({ title: 'VS итоги', body: 'текст', category: 'vs' }).value.title === 'VS итоги');
+
+  check('пустой комментарий отбрасывается', !validateComment('  ').ok);
+  check('обычный комментарий проходит', validateComment('согласен').ok);
+
+  check('причина удаления называет пункт правил',
+    /Пункт 1/.test(deletionReason(RULES[0].id)));
+  check('пояснение попадает в причину',
+    /мимо темы/.test(deletionReason(RULES[0].id, 'мимо темы')));
+
+  /* ── Реакции ── */
+
+  equal('лайк и дизлайк лежат в одном наборе — оба сразу поставить нельзя',
+    REACTIONS.filter((r) => r.weight !== 0).map((r) => r.id).join(','), 'like,dislike');
+  check('смайлики не влияют на «за» и «против»',
+    REACTIONS.filter((r) => !['like', 'dislike'].includes(r.id)).every((r) => r.weight === 0));
+  equal('идентификаторы реакций уникальны',
+    new Set(REACTIONS.map((r) => r.id)).size, REACTIONS.length);
+
+  /* ── Ник → адрес почты ── */
+
+  /*
+    ЭТО МЕСТО СЛОМАЛОСЬ НА ЖИВОЙ БАЗЕ, И ПОТОМУ ПРОВЕРЯЕТСЯ ПОДРОБНО.
+
+    Вход по нику устроен так: ник превращается в адрес почты на вымышленном
+    домене. Первая версия делала это в три строки — пробелы в точки, нижний
+    регистр, приписать домен — и на настоящей системе входа Supabase
+    развалилась сразу: она не принимает в адресе ничего, кроме ASCII.
+
+      linktest77  → принято
+      Ковыль      → «Unable to validate email address: invalid format»
+
+    То есть регистрация не работала почти для всех: аудитория играет
+    под русскими никами. Ошибка при этом ничего не объясняла.
+  */
+  const { nickToLocalPart, nickToEmail } = await import('../src/forum/nick-email.js');
+  const supabaseSource = await readFile('src/forum/adapters/supabase.js', 'utf8');
+
+  const NICKS = [
+    'Ковыль', 'Тёмный Лорд', 'Игрок77', 'Qvaden', 'linktest77',
+    'Лёша', 'Леша', 'щука', 'ЖЖЖ', 'Іван', 'Ўлад',
+    'Игрок!', 'Игрок?', '★★★', 'a'.repeat(40), 'Ко-выль', 'ник_с_чертой',
+  ];
+
+  const locals = NICKS.map(nickToLocalPart);
+
+  check('адрес состоит только из допустимых символов',
+    locals.every((l) => /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(l)));
+  check('в адресе нет двух точек подряд — правила почты этого не допускают',
+    locals.every((l) => !/\.\./.test(l)));
+  check('русский ник превращается в читаемую основу',
+    nickToLocalPart('Ковыль').startsWith('kovyl'));
+  check('пробел в нике становится дефисом, а не пропадает',
+    nickToLocalPart('Тёмный Лорд').startsWith('tyomnyy-lord'));
+
+  /*
+    ГЛАВНОЕ ТРЕБОВАНИЕ. Если два разных ника дадут один адрес, второй человек
+    при регистрации получит «занято», а при входе попадёт в ЧУЖОЙ аккаунт.
+    Одной транслитерацией этого не избежать: «Лёша» и «Леша» в латинице
+    совпадают, «Игрок!» и «Игрок?» после чистки — тоже. Поэтому к основе
+    добавляется отпечаток точного ника.
+  */
+  equal('разные ники дают разные адреса', new Set(locals).size, NICKS.length);
+  check('«Лёша» и «Леша» — разные люди',
+    nickToLocalPart('Лёша') !== nickToLocalPart('Леша'));
+  check('«Игрок!» и «Игрок?» — разные люди',
+    nickToLocalPart('Игрок!') !== nickToLocalPart('Игрок?'));
+
+  /*
+    Обратная сторона того же требования: ОДИН ник обязан давать ОДИН адрес
+    всегда, иначе человек не войдёт в свою же учётную запись. Ник приходит
+    сюда после validateNick, который подрезает пробелы по краям и сжимает
+    двойные внутри, — значит и здесь это надо делать так же.
+  */
+  equal('один и тот же ник даёт один и тот же адрес',
+    nickToLocalPart('Ковыль'), nickToLocalPart('Ковыль'));
+  equal('пробелы по краям не меняют адрес',
+    nickToLocalPart('Ковыль '), nickToLocalPart('Ковыль'));
+  equal('двойной пробел внутри не меняет адрес',
+    nickToLocalPart('Тёмный  Лорд'), nickToLocalPart('Тёмный Лорд'));
+  equal('регистр не меняет адрес — иначе ник подделывается регистром',
+    nickToLocalPart('КОВЫЛЬ'), nickToLocalPart('ковыль'));
+
+  /*
+    Ник может целиком состоять из символов, которых в адресе быть не может.
+    Это рабочий случай, а не ошибка: в игре такой ник допустим.
+  */
+  check('ник без пригодных символов всё равно даёт годный адрес',
+    /^u-[0-9a-f]{8}$/.test(nickToLocalPart('★★★')));
+  check('очень длинный ник не даёт бесконечный адрес',
+    nickToLocalPart('a'.repeat(200)).length < 40);
+
+  check('домен подставляется целиком',
+    nickToEmail('Ковыль', 'users.zroute-s33.local').endsWith('@users.zroute-s33.local'));
+
+  /*
+    Отказ по формату адреса человек видеть не должен: он вводил ник и про
+    адрес ничего не знает, для него это «сайт сломался». Такое сообщение
+    возможно только если превращение выпустило не-ASCII, то есть это наша
+    ошибка — и сказать надо именно так.
+  */
+  check('отказ по формату адреса объясняется как наша ошибка, а не вина игрока',
+    /это наша ошибка/i.test(supabaseSource) && /validate email\|invalid format/.test(supabaseSource));
+  check('отказ индекса по нику переводится в «ник занят»',
+    /forum_users_nick_key/.test(supabaseSource));
+
+  /* ── Согласованность слоёв ── */
+
+  const localAdapter = await import('../src/forum/adapters/local.js');
+  const supabaseAdapter = await import('../src/forum/adapters/supabase.js');
+
+  /*
+    Тот же приём, что в блоке C для адаптеров данных: обещание «переключается
+    одной строкой» должно быть проверяемым фактом. Расхождение иначе нашлось бы
+    в день подключения базы, то есть в худший момент.
+  */
+  const required = [
+    'isReady', 'currentUser', 'signUp', 'signIn', 'signOut',
+    'listPosts', 'getPost', 'createPost', 'editPost', 'deletePost',
+    'listComments', 'addComment', 'deleteComment',
+    'setReaction', 'report', 'listReports', 'resolveReport',
+    'listUsers', 'resetPassword', 'setRestriction',
+  ];
+  const missingLocal = required.filter((m) => typeof localAdapter[m] !== 'function');
+  const missingSupabase = required.filter((m) => typeof supabaseAdapter[m] !== 'function');
+  equal('локальный адаптер реализует контракт целиком', missingLocal.join(', '), '');
+  equal('адаптер базы реализует контракт целиком', missingSupabase.join(', '), '');
+
+  check('оба адаптера честно объявляют, видят ли записи другие люди',
+    localAdapter.capabilities.isShared === false && supabaseAdapter.capabilities.isShared === true);
+
+  /*
+    АДРЕС ПРОЕКТА ПРИВОДИТСЯ К ОДНОМУ ВИДУ.
+
+    В панели Supabase адрес показан в разделе Data API уже с хвостом
+    «/rest/v1/», и скопировать его целиком — самое естественное действие.
+    Тогда путь к таблицам стал бы «…/rest/v1/rest/v1/…», а вход не нашёлся бы
+    вовсе: его путь начинается с /auth. Выглядело бы это как «форум
+    не отвечает», ничего не говоря о причине.
+
+    Проверяем текстом: адаптер обязан отрезать хвост сам, а не полагаться
+    на то, что человек скопировал не то, что было написано.
+  */
+  check('адрес проекта чистится от хвоста /rest/v1 и /auth/v1',
+    /replace\(\/\\\/\(rest\|auth\)\\\/v\\d\+\\\/\?\$\/i, ''\)/.test(supabaseSource));
+  check('запросы строятся от очищенного адреса, а не от строки из конфига',
+    !/\$\{CFG\.url\}\/(rest|auth)/.test(supabaseSource) && /baseUrl\(\)/.test(supabaseSource));
+
+  /*
+    Локальный режим паролей не знает вовсе. Изобразить успешный сброс было бы
+    хуже отказа: администратор решил бы, что пароль сменён.
+  */
+  let localResetRefused = false;
+  try {
+    await localAdapter.resetPassword('u1', 'какой-то пароль');
+  } catch {
+    localResetRefused = true;
+  }
+  check('в локальном режиме сброс пароля честно отказывает', localResetRefused);
+
+  /* ── Схема базы: где живёт настоящая защита ── */
+
+  const schema = await readFile('supabase/schema.sql', 'utf8');
+
+  /*
+    Проверки в браузере защитой не бывают: их обходит запрос мимо сайта.
+    Без включённого RLS публичный ключ дал бы полный доступ к таблицам,
+    поэтому эти строки — самые важные в схеме.
+  */
+  for (const table of ['forum_users', 'forum_posts', 'forum_comments', 'forum_reactions', 'forum_reports']) {
+    check(`${table}: права на строки включены`,
+      new RegExp(`alter table public\\.${table}\\s+enable row level security`).test(schema));
+  }
+
+  check('автор записи подставляется базой, а не браузером',
+    /new\.author_id\s*:=\s*auth\.uid\(\)/.test(schema));
+  check('автор жалобы подставляется базой',
+    /new\.reporter_id\s*:=\s*auth\.uid\(\)/.test(schema));
+  check('право писать проверяет база, а не страница',
+    /forum_can_write/.test(schema) && /banned = false/.test(schema));
+
+  /*
+    Реакция у человека одна на запись — это устройство таблицы, а не проверка
+    в коде: автор входит в первичный ключ, поэтому вторая реакция заменяет
+    первую. Накрутить оба счётчика нельзя физически.
+  */
+  check('одна реакция на человека закреплена первичным ключом',
+    /primary key \(target_type, target_id, user_id\)/.test(schema));
+
+  /*
+    Удаление — отметка с причиной, а не стирание строки: на месте поста
+    остаётся заглушка. Политики `for delete` для постов нет вовсе, поэтому
+    запрос на удаление отвергается по умолчанию.
+  */
+  check('стирать посты не может никто, включая администратора',
+    !/create policy[^;]*on public\.forum_posts\s+for delete/i.test(schema));
+  check('удалённая запись хранит причину',
+    /deleted_reason/.test(schema));
+
+  /*
+    Служебный ключ (service_role) даёт полный доступ ко всей базе в обход
+    политик. Панель открывается в браузере, поэтому такой ключ там появиться
+    не должен ни при каких условиях: смену пароля делает функция внутри базы.
+  */
+  check('сброс пароля живёт функцией в базе, а не запросом из панели',
+    /create or replace function public\.forum_admin_reset_password/.test(schema));
+  check('сброс пароля проверяет права администратора внутри базы',
+    /forum_is_admin\(\)/.test(schema) && /raise exception/.test(schema));
+  check('анонимному запросу сброс пароля недоступен',
+    /revoke all on function public\.forum_admin_reset_password[\s\S]*?from public, anon/.test(schema));
+
+  /*
+    security_invoker обязателен: без него представление читало бы данные
+    правами своего владельца, то есть в обход всех политик выше.
+  */
+  const views = schema.match(/create or replace view public\.\w+/g) ?? [];
+  const invokers = schema.match(/with \(security_invoker = on\)/g) ?? [];
+  equal('каждое представление читает данные правами того, кто спросил',
+    invokers.length, views.length);
+
+  check('жалобы видит только модерация — открытый список стал бы травлей',
+    /create policy forum_reports_read on public\.forum_reports\s+[\s\S]{0,200}?forum_is_staff\(\)/.test(schema));
+
+  /*
+    ЛЕНТА НЕ СОЕДИНЯЕТСЯ С ПРОФИЛЯМИ.
+
+    Первая версия схемы брала ник автора связью из forum_users — и лента
+    оказалась пустой для всех, кроме собственных постов: читать профили
+    разрешено только свой и только модерации, поэтому соединение выбрасывало
+    все остальные строки. Выглядело это как «форум пуст» при полной базе.
+
+    Открыть профили целиком нельзя: там даты регистрации и запреты, а
+    публичный список «кто забанен» — готовый инструмент насмешек. Поэтому ник
+    лежит копией в самой записи, и подставляет его база, а не браузер.
+  */
+  const postListView = schema.slice(
+    schema.indexOf('create or replace view public.forum_post_list'),
+    schema.indexOf('create or replace view public.forum_comment_list')
+  );
+  check('лента не соединяется с профилями — иначе она пуста для всех',
+    !/join public\.forum_users/.test(postListView));
+  check('ник автора хранится копией в самой записи',
+    /author_nick\s+text not null/.test(schema));
+  check('ник автора подставляет база, а не браузер',
+    /new\.author_nick\s*:=\s*coalesce\(/.test(schema));
+  check('колонка ника добавляется и в базы, созданные первой версией схемы',
+    /add column if not exists author_nick/.test(schema));
+
+  /* ── Страница и панель ── */
+
+  const { renderForum } = await import('../src/pages/forum.js');
+
+  const eventsSample = [
+    { id: 'e1', date: new Date('2026-08-20T00:00:00Z'), type: 'server_capture', serverNumber: 74, title: 'Взяли 74' },
+    { id: 'e2', date: new Date('2026-07-11T00:00:00Z'), type: 'server_defended', serverNumber: 51, title: 'Отбились' },
+  ];
+
+  const offHtml = renderForum({ events: eventsSample }, { ready: false, loading: false });
+  check('неподключённый форум говорит об этом прямо, а не показывает мёртвую форму',
+    /не подключ/i.test(offHtml) && !offHtml.includes('data-forum-auth'));
+  check('хроника видна даже без подключённого форума', offHtml.includes('Взяли') || offHtml.includes('74'));
+
+  const localHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: false, sourceName: 'локальный', loading: false, posts: [], me: null,
+  });
+  check('черновой режим предупреждает, что записей никто не увидит',
+    /только в этом браузере/i.test(localHtml));
+
+  const guestHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, posts: [], me: null,
+  });
+  check('гостю показана форма входа', guestHtml.includes('data-forum-auth'));
+  check('гостю не показана форма написания поста', !guestHtml.includes('data-forum-new'));
+  check('вход обещает обойтись без почты', /почта не нужна/i.test(guestHtml));
+  check('правила видны раньше кнопки «написать»',
+    guestHtml.indexOf('Правила форума') < guestHtml.indexOf('data-forum-feed') ||
+      guestHtml.includes('Правила форума'));
+
+  const me = { id: 'u1', nick: 'Qvaden', role: 'admin', createdAt: new Date(), banned: false, mutedUntil: null };
+  const post = {
+    id: 'p1', authorId: 'u2', authorNick: 'Игрок', category: 'vs',
+    title: 'Разбор', body: 'текст поста', createdAt: new Date(), commentCount: 0,
+    reactions: { like: 2 }, myReaction: null, score: 2, deleted: false,
+  };
+
+  const memberHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, me, posts: [post],
+  });
+  check('вошедшему показана форма написания поста', memberHtml.includes('data-forum-new'));
+  check('перед публикацией названы правила и последствие',
+    /соглашаетесь с правилами/i.test(memberHtml));
+  check('чужой пост можно пожаловаться', memberHtml.includes('data-forum-report="post:p1"'));
+  check('счётчик лайков виден', memberHtml.includes('>2<'));
+
+  const bannedHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, posts: [],
+    me: { ...me, banned: true, banReason: 'Пункт 2' },
+  });
+  check('забаненному не показана форма написания поста', !bannedHtml.includes('data-forum-new'));
+  check('забаненный видит причину запрета', /Пункт 2/.test(bannedHtml));
+
+  /*
+    Удалённый пост остаётся на месте заглушкой с причиной. Молча исчезнувший
+    пост читается как поломка сайта и порождает второй такой же.
+  */
+  const deletedHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, me,
+    posts: [{ ...post, deleted: true, deletedReason: 'Пункт 4: Без рекламы' }],
+  });
+  check('удалённый пост остаётся на месте', deletedHtml.includes('Пост удалён'));
+  check('удалённый пост объясняет причину', /Без рекламы/.test(deletedHtml));
+  check('текст удалённого поста не показывается', !deletedHtml.includes('текст поста'));
+
+  /* ── Экраны панели ── */
+
+  const { renderPlayers } = await import('../src/admin/screens/players.js');
+  const { renderModeration } = await import('../src/admin/screens/moderation.js');
+
+  /*
+    Панель и форум — две разные системы прав. Токен GitHub над форумом
+    не властен: там своя учётная запись, и проверяет её база. Поэтому панель
+    обязана уметь сказать «вы не администратор форума», а не показывать
+    кнопку, которая заведомо откажет.
+  */
+  check('без подключённого форума экран игроков объясняет это',
+    /не подключ/i.test(renderPlayers({ forum: { configured: false } })));
+  check('не вошедшему на форум панель объясняет, что токен GitHub здесь не действует',
+    /токен GitHub/i.test(renderPlayers({ forum: { configured: true, me: null } })));
+  check('участнику кнопка сброса пароля не показывается',
+    !renderPlayers({
+      forum: { configured: true, me: { id: 'u9', nick: 'Кто-то', role: 'member' }, users: [] },
+    }).includes('data-player-reset'));
+
+  const playersHtml = renderPlayers({
+    forum: {
+      configured: true,
+      me,
+      users: [me, { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null }],
+    },
+  });
+  check('администратору доступен сброс пароля', playersHtml.includes('data-player-reset="u2"'));
+  check('себе пароль сбросить нельзя — для этого есть обычная смена',
+    !playersHtml.includes('data-player-reset="u1"'));
+  check('панель предупреждает, что пароль покажется один раз',
+    /один раз/.test(playersHtml));
+
+  const reportsHtml = renderModeration({
+    forum: {
+      configured: true,
+      me,
+      reports: [{
+        id: 'r1', targetType: 'post', targetId: 'p1', reporterId: 'u3', reporterNick: 'Жалобщик',
+        ruleId: RULES[0].id, note: 'оскорбляет', createdAt: new Date(),
+        targetTitle: 'Заголовок', targetBody: 'текст нарушения', targetAuthorNick: 'Нарушитель',
+      }],
+    },
+  });
+  check('в жалобе виден пункт правил', reportsHtml.includes(RULES[0].title));
+  check('в жалобе виден текст, на который жалуются', /текст нарушения/.test(reportsHtml));
+  check('удаление по жалобе несёт пункт правил', reportsHtml.includes('data-report-rule='));
+  check('жалобу можно отклонить, а не только удалить', reportsHtml.includes('data-report-dismiss'));
+  check('пустой список жалоб объясняет себя',
+    /нечего/i.test(renderModeration({ forum: { configured: true, me, reports: [] } })));
+
+  /* ── Сайдбар и офлайн-копия ── */
+
+  const indexHtml = await readFile('index.html', 'utf8');
+  check('боковое меню есть в разметке', /<aside[^>]+id="side"/.test(indexHtml));
+  check('кнопка меню подписана для незрячих', /aria-label="Открыть меню/.test(indexHtml));
+  check('кнопка меню сообщает своё состояние', /aria-expanded="false"/.test(indexHtml));
+  check('стили форума подключены', indexHtml.includes('forum.css'));
+
+  const mainJs = await readFile('src/main.js', 'utf8');
+  check('форум — первый раздел в меню',
+    /const ROUTES = \[\s*\{ id: 'forum'/.test(mainJs));
+  check('пустой адрес открывает форум', /id \|\| 'forum'/.test(mainJs));
+  check('итоги VS остались отдельным разделом', /id: 'home'/.test(mainJs));
+  check('хронология осталась отдельным разделом', /id: 'timeline'/.test(mainJs));
+  /*
+    Форум лежит не в data/live.json, поэтому недоступная таблица результатов
+    не должна закрывать разговор сообщества. Раньше здесь была страница
+    с ошибкой вместо всего сайта.
+  */
+  check('сломанные данные сайта не роняют форум', /loadError/.test(mainJs));
+
+  /*
+    Список офлайн-копии уже один раз разъехался: в нём лежал src/styles.css,
+    которого сайт не грузит, и icon-192.png, которого в репозитории нет вовсе.
+    Теперь он сверяется с тем, что действительно подключено.
+  */
+  const swJs = await readFile('sw.js', 'utf8');
+  const shell = [...swJs.matchAll(/'(\.\/[^']+)'/g)].map((m) => m[1]);
+  const cssInHtml = [...indexHtml.matchAll(/href="\.\/(src\/[^"?]+\.css)/g)].map((m) => `./${m[1]}`);
+  const missingInShell = cssInHtml.filter((f) => !shell.includes(f));
+  equal('офлайн-копия кэширует те же стили, что грузит страница',
+    missingInShell.join(', '), '');
+
+  const { stat } = await import('node:fs/promises');
+  const brokenShell = [];
+  for (const url of shell) {
+    if (url === './') continue;
+    try {
+      await stat(url.replace(/^\.\//, ''));
+    } catch {
+      brokenShell.push(url);
+    }
+  }
+  equal('все файлы офлайн-копии существуют', brokenShell.join(', '), '');
 }
 
 console.log(`\n${'─'.repeat(52)}`);

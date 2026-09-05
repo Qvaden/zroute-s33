@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <title>Сервер 33 · Z Route: Redemption</title>
-  <meta name="description" content="Рейтинг альянсов 33 сервера по итогам VS: кто побеждает, а кто нет. Хронология захвата серверов и разбор для малых альянсов.">
+  <meta name="description" content="Форум сообщества 33 сервера Z Route: Redemption. Хроника захватов, рейтинг альянсов по итогам VS и разбор для малых альянсов.">
 
   <!-- Установка на телефон -->
   <link rel="manifest" href="./manifest.webmanifest">
@@ -56,6 +56,15 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=optional" rel="stylesheet"></noscript>
 
   <link rel="stylesheet" href="./src/styles-v8.css">
+  <!--
+    Форум и боковые вкладки — отдельным файлом.
+
+    styles-v8.css уже перевалил за сотню килобайт и дописан слоями поверх
+    прошлых версий. Складывать туда ещё и форум значит сделать его
+    окончательно неразбираемым: у форума своя, независимая от рейтинга
+    и хронологии, задача, и его правки не должны задевать таблицы.
+  -->
+  <link rel="stylesheet" href="./src/forum.css?v=1">
   <script>
     try {
       if (localStorage.getItem('s33-loader-seen') === '1') {
@@ -78,17 +87,59 @@
   </div>
   <header class="site-head">
     <div class="site-head__inner">
-      <a class="brand" href="#/home">
+      <!--
+        Кнопка меню. На широком экране вкладки стоят слева постоянно,
+        и кнопка не нужна — она скрыта стилями, а не убрана из разметки:
+        размер экрана меняется поворотом телефона, и решать это должен CSS.
+      -->
+      <button type="button" id="side-toggle" class="burger"
+              aria-controls="side" aria-expanded="false" aria-label="Открыть меню разделов">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+
+      <a class="brand brand--head" href="#/forum">
         <span class="brand__num">33</span>
         <span class="brand__text">
           <b>Сервер 33</b>
           <small>Z Route: Redemption</small>
         </span>
       </a>
+
       <div id="president-board" class="president-board" hidden></div>
-      <nav id="nav" class="nav"></nav>
     </div>
   </header>
+
+  <!--
+    БОКОВЫЕ ВКЛАДКИ.
+
+    Раньше разделы стояли строкой в шапке и уже не помещались: на телефоне
+    строка прокручивалась, и последние вкладки не было видно вовсе — человек
+    не знал, что они есть. Слева места хватает на любое их число, и каждая
+    подписана словом, а не обрезана.
+
+    На узком экране панель уезжает за левый край и выдвигается кнопкой:
+    отдавать треть экрана телефона под меню нельзя.
+  -->
+  <aside id="side" class="side" aria-label="Разделы сайта">
+    <a class="brand brand--side" href="#/forum">
+      <span class="brand__num">33</span>
+      <span class="brand__text">
+        <b>Сервер 33</b>
+        <small>Z Route: Redemption</small>
+      </span>
+    </a>
+
+    <nav id="nav" class="nav"></nav>
+
+    <div class="side__foot">
+      <span class="side__note">Неофициальный сайт сообщества</span>
+    </div>
+  </aside>
+
+  <!-- Затемнение под выдвинутой панелью: нажатие мимо меню его закрывает. -->
+  <div class="side-veil" id="side-veil" hidden></div>
 
   <main id="app" class="wrap"></main>
 
@@ -99,7 +150,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=12"></script>
+  <script type="module" src="./src/main.js?v=13"></script>
 
   <script>
     /*

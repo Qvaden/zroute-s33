@@ -1,0 +1,898 @@
+/*
+  ФОРУМ И БОКОВЫЕ ВКЛАДКИ.
+
+  Отдельный файл, а не дописка в styles-v8.css. Тот перевалил за сотню
+  килобайт и собран слоями поверх прошлых версий: правка в нём задевает
+  рейтинг, кварт и хронологию разом. У форума задача независимая, и держать
+  его отдельно дешевле, чем потом разбирать, что сломалось.
+
+  Токены не переопределяются: цвета, радиусы и шрифты берутся из :root
+  в styles-v8.css. Форум обязан выглядеть той же частью сайта, а не
+  вставленным куском.
+*/
+
+/* ── Боковые вкладки ──────────────────────────────────────────────────────── */
+
+/*
+  Ширина панели в переменной: от неё зависит и отступ содержимого, и сдвиг
+  при выдвижении. Две несогласованные цифры разъезжаются на первой правке.
+*/
+:root {
+  --side-w: 232px;
+}
+
+.side {
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--side-w);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 14px 16px;
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(17,19,24,.98), rgba(10,11,13,.99));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Полосу прокрутки в меню видно только при наведении: она тут почти всегда лишняя. */
+.side::-webkit-scrollbar { width: 6px; }
+.side::-webkit-scrollbar-thumb { border-radius: 3px; background: transparent; }
+.side:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+
+.brand--side { padding: 4px 8px 0; }
+
+/*
+  Вкладки столбиком. Тот же класс .nav, что раньше стоял в шапке: подсветка
+  активной вкладки, ссылки и разметка в main.js остались прежними — меняется
+  только раскладка.
+*/
+.side .nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  overflow: visible;
+}
+
+.side .nav__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/*
+  Активная вкладка: слева полоса вместо заливки кружком.
+  В столбце скруглённая пилюля выглядит вырванной из ряда, а вертикальная
+  черта читается как «вы здесь» и не спорит с формой списка.
+*/
+.side .nav__link.is-active {
+  position: relative;
+  color: #14100c;
+  background: linear-gradient(135deg, #ff9a4a, var(--accent));
+  box-shadow: 0 8px 22px -14px var(--accent);
+}
+.side .nav__link.is-active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: -14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+/* Форум первый в списке и главный — отделяем его от остальных разделов. */
+.side .nav__link[href="#/forum"] {
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 10px 10px 0 0;
+  font-weight: 600;
+}
+.side .nav__link[href="#/forum"].is-active {
+  border-bottom-color: transparent;
+  border-radius: 10px;
+}
+
+.side__foot {
+  margin-top: auto;
+  padding: 12px 12px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.side__note {
+  color: var(--mute);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+/*
+  Содержимое отступает на ширину панели. Отступ на body, а не на .wrap:
+  сдвинуться должны и шапка, и подвал, иначе шапка уедет под меню.
+*/
+@media (min-width: 1040px) {
+  body { padding-left: var(--side-w); }
+  /* Кнопка меню на широком экране не нужна: панель и так видна всегда. */
+  .burger, .side-veil { display: none !important; }
+}
+
+/* ── Узкий экран: панель выдвигается ──────────────────────────────────────── */
+
+@media (max-width: 1039px) {
+  .side {
+    /*
+      Убираем за левый край, а не прячем display: none. Скрытая панель
+      появлялась бы рывком, а сдвинутая — выезжает, и человек видит, откуда
+      она взялась.
+    */
+    transform: translateX(-100%);
+    transition: transform .26s var(--ease);
+    box-shadow: 24px 0 60px -30px rgba(0,0,0,.9);
+  }
+  .is-side-open .side { transform: translateX(0); }
+
+  /* Прокрутка страницы под открытым меню — верный способ потерять место. */
+  .is-side-open body { overflow: hidden; }
+
+  .side-veil {
+    position: fixed;
+    z-index: 44;
+    inset: 0;
+    background: rgba(6,7,9,.62);
+    backdrop-filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side { transition: none; }
+}
+
+.burger {
+  display: grid;
+  gap: 4px;
+  place-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.03);
+  cursor: pointer;
+}
+.burger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+  transition: transform .22s var(--ease), opacity .18s var(--ease);
+}
+.burger:hover { border-color: rgba(255,255,255,.2); }
+
+/* Открытое меню — крестик: та же кнопка закрывает, и это должно быть видно. */
+.is-side-open .burger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.is-side-open .burger span:nth-child(2) { opacity: 0; }
+.is-side-open .burger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/*
+  Шапка: кнопка, марка, статус президента. Правила из styles-v8.css для
+  .site-head__inner переопределяются осознанно — там раскладка была под
+  вкладки в строке, которых здесь больше нет.
+*/
+.site-head__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+}
+@media (min-width: 760px) {
+  .site-head__inner { padding: 8px 32px; }
+}
+.brand--head { padding: 4px 0; }
+/* Марка в шапке дублирует ту, что в панели. На широком экране прячем её. */
+@media (min-width: 1040px) {
+  .brand--head { display: none; }
+}
+/* Надпись LIVE // SERVER 33 из styles-v8.css встала бы поверх статуса. */
+.site-head__inner::before { display: none; }
+#app::before { display: none; }
+.president-board { margin-left: auto; max-width: 460px; }
+@media (max-width: 700px) {
+  .president-board { max-width: none; }
+  /* На телефоне статус переносится под шапку: в строку он не влезает. */
+  .site-head__inner { flex-wrap: wrap; }
+  .president-board { flex: 1 0 100%; }
+}
+
+/* ── Сводка сервера на форуме ─────────────────────────────────────────────── */
+
+.forum-chron { padding-bottom: 18px; }
+
+.forum-chron__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.forum-chron__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(53,208,127,.28);
+  border-radius: 999px;
+  color: var(--win);
+  font: 800 8.5px/1 Inter, sans-serif;
+  letter-spacing: .16em;
+}
+.forum-chron__live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--win);
+  box-shadow: 0 0 10px var(--win);
+  animation: forum-pulse 2s ease-in-out infinite;
+}
+@keyframes forum-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+.forum-chron__title {
+  font-size: clamp(21px, 3.4vw, 33px);
+  line-height: 1.1;
+}
+.forum-chron--loss .forum-chron__title { color: #ffd9d5; }
+.forum-chron--win .forum-chron__title { color: #d9ffe9; }
+
+.forum-chron__date {
+  margin: 8px 0 0;
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.forum-chron__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 18px 0 16px;
+}
+.forum-chron__stat {
+  padding: 11px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: rgba(255,255,255,.02);
+}
+.forum-chron__stat b {
+  display: block;
+  font-family: Unbounded, sans-serif;
+  font-size: 21px;
+  line-height: 1;
+}
+.forum-chron__stat span {
+  display: block;
+  margin-top: 4px;
+  color: var(--mute);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.forum-chron__feed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.forum-chron__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  font-size: 12px;
+}
+.forum-chron__item--win { border-color: rgba(53,208,127,.24); }
+.forum-chron__item--loss { border-color: rgba(255,71,87,.24); }
+.forum-chron__when { color: var(--mute); font-size: 10.5px; }
+.forum-chron__item--win .forum-chron__what { color: #9be9bd; }
+.forum-chron__item--loss .forum-chron__what { color: #ffb3ba; }
+
+.forum-chron__more {
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.forum-chron__more:hover { text-decoration: underline; }
+
+@media (max-width: 520px) {
+  .forum-chron__stats { grid-template-columns: 1fr 1fr; }
+  .forum-chron__stat:last-child { grid-column: span 2; }
+}
+
+/* ── Правила ──────────────────────────────────────────────────────────────── */
+
+.forum-rules { padding: 0; overflow: hidden; }
+
+.forum-rules__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+.forum-rules__summary::-webkit-details-marker { display: none; }
+.forum-rules__summary:hover { background: rgba(255,255,255,.02); }
+
+.forum-rules__mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 9px;
+  background: rgba(255,106,43,.12);
+  color: var(--accent);
+  font-family: Unbounded, sans-serif;
+  font-size: 15px;
+}
+.forum-rules__label { flex: 1; min-width: 0; }
+.forum-rules__label b { display: block; font-size: 14.5px; }
+.forum-rules__label small {
+  display: block;
+  margin-top: 2px;
+  color: var(--mute);
+  font-size: 11px;
+}
+.forum-rules__chev { color: var(--mute); transition: transform .2s var(--ease); }
+.forum-rules[open] .forum-rules__chev { transform: rotate(180deg); }
+
+.forum-rules__list {
+  margin: 0;
+  padding: 0 18px 4px 40px;
+  counter-reset: rule;
+}
+.forum-rules__item { margin-bottom: 13px; }
+.forum-rules__item b { font-size: 13.5px; }
+.forum-rules__item p {
+  margin: 3px 0 0;
+  color: var(--dim);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.forum-rules__sanctions {
+  margin: 4px 18px 0;
+  padding: 13px 15px;
+  border: 1px solid rgba(255,71,87,.18);
+  border-radius: 12px;
+  background: rgba(255,71,87,.04);
+}
+.forum-rules__sanctions ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  color: var(--dim);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.forum-rules__note { margin: 12px 18px 16px; font-size: 11.5px; line-height: 1.5; }
+
+/* ── Состояние форума и аккаунт ───────────────────────────────────────────── */
+
+.forum-notice__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.forum-notice__tag {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mute);
+  font-size: 10.5px;
+}
+.forum-notice p { margin: 0 0 8px; color: var(--dim); font-size: 13px; line-height: 1.55; }
+.forum-notice--off { border-color: rgba(255,201,60,.24); }
+.forum-notice--local { border-color: rgba(167,163,194,.2); }
+.forum-notice code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255,255,255,.06);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: .92em;
+}
+
+.forum-me {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.forum-me__body { flex: 1; min-width: 0; }
+.forum-me__body b { display: block; font-size: 14px; }
+.forum-me__body small { color: var(--mute); font-size: 11px; }
+
+.forum-blocked {
+  margin: 11px 0 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,71,87,.28);
+  border-radius: 10px;
+  background: rgba(255,71,87,.06);
+  color: #ffb3ba;
+  font-size: 12.5px;
+}
+
+/*
+  Метка участника вместо аватарки. Хранение картинок — первое, что упирается
+  в деньги, поэтому буква в цветном квадрате. Цвет считается из ника
+  (см. nickColor), и знакомого человека видно в ленте по цвету.
+*/
+.forum-ava {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--ava, #7a8494);
+  color: #10131a;
+  font-family: Unbounded, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+.forum-ava--sm { width: 28px; height: 28px; border-radius: 8px; font-size: 12px; }
+
+/* ── Поля и кнопки ────────────────────────────────────────────────────────── */
+
+.forum-field { display: block; margin-bottom: 12px; }
+.forum-field > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--dim);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.forum-field input,
+.forum-field select,
+.forum-field textarea,
+.forum-reply textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.025);
+  color: var(--text);
+  font-family: inherit;
+  /*
+    16px не для красоты: Safari на iPhone масштабирует всю страницу при
+    фокусе в поле с меньшим шрифтом, и человек оказывается в увеличенной
+    вёрстке, из которой сам не выйдет.
+  */
+  font-size: 16px;
+  line-height: 1.5;
+}
+.forum-field textarea,
+.forum-reply textarea { resize: vertical; min-height: 76px; }
+.forum-field input:focus,
+.forum-field select:focus,
+.forum-field textarea:focus,
+.forum-reply textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+}
+
+.forum-btn {
+  padding: 10px 17px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff9a4a, var(--accent));
+  color: #14100c;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .16s var(--ease), box-shadow .18s var(--ease);
+}
+.forum-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -12px var(--accent); }
+.forum-btn:active { transform: none; }
+.forum-btn--ghost {
+  background: rgba(255,255,255,.03);
+  border-color: var(--line);
+  color: var(--text);
+}
+.forum-btn--ghost:hover { border-color: rgba(255,255,255,.22); box-shadow: none; }
+.forum-btn--danger {
+  background: linear-gradient(135deg, #ff6b7a, var(--loss));
+  color: #fff;
+}
+.forum-btn--wide { display: block; width: 100%; margin: 4px 0 18px; }
+
+.forum-error {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,71,87,.3);
+  border-radius: 10px;
+  background: rgba(255,71,87,.07);
+  color: #ffb3ba;
+  font-size: 12.5px;
+}
+
+.forum-auth__head { margin-bottom: 12px; }
+.forum-auth__head small { display: block; margin-top: 3px; }
+.forum-auth__fields { display: grid; gap: 12px; }
+@media (min-width: 620px) {
+  .forum-auth__fields { grid-template-columns: 1fr 1fr; }
+  .forum-auth__fields .forum-field { margin-bottom: 0; }
+}
+.forum-auth__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.forum-auth__note { margin: 11px 0 0; font-size: 11.5px; line-height: 1.5; }
+
+/* ── Написать пост ────────────────────────────────────────────────────────── */
+
+.forum-composer { padding: 0; }
+.forum-composer__summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 15px 18px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14.5px;
+}
+.forum-composer__summary::-webkit-details-marker { display: none; }
+.forum-composer__plus {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(255,106,43,.14);
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1;
+}
+.forum-composer form { padding: 0 18px 18px; }
+.forum-composer__rules { margin: 4px 0 14px; font-size: 11.5px; line-height: 1.5; }
+.forum-composer__actions { display: flex; gap: 8px; }
+
+/* ── Управление лентой ────────────────────────────────────────────────────── */
+
+.ctl--forum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.ctl--forum .seg { flex-wrap: wrap; }
+.seg--sort { margin-left: auto; }
+@media (max-width: 620px) {
+  .seg--sort { margin-left: 0; }
+}
+
+/* ── Лента ────────────────────────────────────────────────────────────────── */
+
+.forum-feed { display: grid; gap: 14px; }
+
+.forum-post { margin-bottom: 0; }
+.forum-post--pinned { border-color: rgba(255,201,60,.28); }
+
+.forum-post__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+.forum-post__by { flex: 1; min-width: 0; }
+.forum-post__by b { display: block; font-size: 13.5px; }
+.forum-post__by time { color: var(--mute); font-size: 11px; }
+.forum-post__cat {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--dim);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.forum-post__pin { font-size: 13px; }
+
+.forum-post__title { margin: 0 0 9px; font-size: clamp(16px, 2.1vw, 20px); }
+.forum-post__title a { color: inherit; text-decoration: none; }
+.forum-post__title a:hover { color: var(--accent); }
+
+.forum-post__body { color: var(--dim); font-size: 13.5px; line-height: 1.62; }
+.forum-post__body p { margin: 0 0 9px; }
+.forum-post__body p:last-child { margin-bottom: 0; }
+.forum-post__body a { color: var(--accent); }
+
+.forum-post__expand {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.forum-post__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.forum-post__comments {
+  color: var(--dim);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.forum-post__comments:hover { color: var(--text); }
+.forum-post__acts { display: flex; gap: 4px; margin-left: auto; }
+
+.forum-act {
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--mute);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.forum-act:hover { border-color: var(--line); color: var(--text); }
+
+/* Удалённая запись остаётся на месте: см. рассуждение в forum/contract.js. */
+.forum-post--deleted { border-style: dashed; opacity: .78; }
+.forum-post__gone { display: flex; align-items: flex-start; gap: 11px; }
+.forum-post__gone-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  background: rgba(255,71,87,.12);
+  color: var(--loss);
+  font-size: 13px;
+}
+.forum-post__gone b { font-size: 13.5px; }
+.forum-post__gone p { margin: 2px 0 0; font-size: 12px; }
+
+.forum-empty, .forum-feed__error { text-align: center; }
+.forum-empty h2 { margin: 6px 0 8px; }
+.forum-feed__error .forum-btn { margin-top: 12px; }
+
+/* ── Реакции ──────────────────────────────────────────────────────────────── */
+
+.forum-react { display: flex; align-items: center; gap: 5px; }
+
+.forum-react__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.02);
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color .16s var(--ease), background .16s var(--ease), transform .14s var(--ease);
+}
+.forum-react__btn:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(255,255,255,.2); }
+.forum-react__btn:disabled { cursor: not-allowed; opacity: .55; }
+.forum-react__btn b { font-size: 12px; }
+
+/* Своя реакция подсвечена: иначе непонятно, поставил ты её или нет. */
+.forum-react__btn.is-on {
+  border-color: rgba(53,208,127,.42);
+  background: rgba(53,208,127,.1);
+  color: #9be9bd;
+}
+.forum-react__btn--down.is-on {
+  border-color: rgba(255,71,87,.42);
+  background: rgba(255,71,87,.1);
+  color: #ffb3ba;
+}
+.forum-react__btn--more.is-on {
+  border-color: rgba(255,201,60,.42);
+  background: rgba(255,201,60,.1);
+  color: #ffe1a3;
+}
+.forum-react__plus { color: var(--mute); font-size: 13px; }
+
+/*
+  Смайлики за одной кнопкой: их семь, и в строку на телефоне они заняли бы
+  экран целиком. Список открывается поверх, не раздвигая карточку.
+*/
+.forum-emoji { position: relative; }
+.forum-emoji__pop {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 7px);
+  left: 0;
+  display: flex;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised-2);
+  box-shadow: 0 16px 40px -20px rgba(0,0,0,.95);
+}
+.forum-emoji__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+.forum-emoji__item:hover { background: rgba(255,255,255,.06); }
+.forum-emoji__item.is-on { border-color: rgba(255,201,60,.4); background: rgba(255,201,60,.1); }
+.forum-emoji__item b { font-size: 11px; }
+
+/* У правого края списка не хватает места — открываем влево. */
+@media (max-width: 520px) {
+  .forum-emoji__pop { left: auto; right: 0; }
+}
+
+/* ── Обсуждение ───────────────────────────────────────────────────────────── */
+
+.forum-thread {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+.forum-thread__title { margin: 0 0 12px; font-size: 14px; }
+
+.forum-thread__list { margin: 0 0 14px; padding: 0; list-style: none; }
+
+.forum-comment {
+  display: flex;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.forum-comment:last-child { border-bottom: none; }
+.forum-comment--none, .forum-comment--deleted {
+  display: block;
+  padding: 10px 0;
+  font-size: 12.5px;
+}
+.forum-comment--deleted p { margin: 0; }
+
+.forum-comment__body { flex: 1; min-width: 0; }
+.forum-comment__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.forum-comment__head b { font-size: 13px; }
+.forum-comment__head time { color: var(--mute); font-size: 10.5px; }
+.forum-comment__body p {
+  margin: 0 0 6px;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.forum-comment__body a { color: var(--accent); }
+.forum-comment__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.forum-comment__foot .forum-react__btn { padding: 4px 8px; font-size: 12px; }
+
+.forum-reply__actions { margin-top: 9px; }
+.forum-reply__locked { margin: 0; font-size: 12.5px; }
+
+/* ── Окна ─────────────────────────────────────────────────────────────────── */
+
+.forum-modal {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(6,7,9,.72);
+  backdrop-filter: blur(3px);
+}
+.forum-modal[hidden] { display: none; }
+
+.forum-modal__box {
+  width: 100%;
+  max-width: 520px;
+  /*
+    Ограничение по высоте и прокрутка внутри: восемь пунктов правил на экране
+    телефона не помещаются, а окно, из которого не видно кнопку, — тупик.
+  */
+  max-height: min(88vh, 720px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, var(--raised-2), var(--surface));
+  box-shadow: 0 30px 80px -30px rgba(0,0,0,.95);
+}
+.forum-modal__box h3 { margin: 0 0 14px; font-size: 17px; }
+
+.forum-modal__rules { display: grid; gap: 6px; margin-bottom: 14px; }
+.forum-modal__rule {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.forum-modal__rule:hover { border-color: rgba(255,255,255,.2); }
+.forum-modal__rule input { margin-top: 3px; accent-color: var(--accent); }
+.forum-modal__rule b { display: block; font-size: 13px; }
+.forum-modal__rule small {
+  display: block;
+  margin-top: 3px;
+  color: var(--mute);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.forum-modal__rule:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(255,106,43,.06);
+}
+.forum-modal__actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/*
+  Короткое сообщение об успехе. Не alert: тот останавливает страницу
+  и на телефоне выглядит как ошибка сайта.
+*/
+.forum-toast {
+  position: fixed;
+  z-index: 70;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 36px);
+  padding: 11px 17px;
+  border: 1px solid rgba(53,208,127,.3);
+  border-radius: 999px;
+  background: rgba(16,32,24,.96);
+  color: #cdf5e0;
+  font-size: 13px;
+  box-shadow: 0 18px 44px -22px rgba(0,0,0,.9);
+  animation: forum-toast-in .26s var(--ease) both;
+}
+@keyframes forum-toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .forum-toast { animation: none; }
+}

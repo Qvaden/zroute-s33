@@ -23,8 +23,27 @@ import { presidentBoardFromTexts } from './logic/president-board.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
 import './ui/ladder-controls.js';
 import './ui/timeline-controls.js';
+import { mountForum, unmountForum } from './forum/mount.js';
 
+/*
+  РАЗДЕЛЫ.
+
+  Порядок здесь — это порядок в боковом меню, и он же расставляет приоритеты.
+  Форум стоит первым и открывается по умолчанию: сайт начинался как таблица
+  результатов, а стал местом, куда заходят разговаривать. Хроника сервера
+  теперь встречает человека на форуме короткой сводкой, а «Хронология»
+  осталась отдельной вкладкой со всем архивом — это разные вопросы:
+  «что сейчас» и «что было за всю историю».
+
+  Итоги VS никуда не убраны и остаются полноценной вкладкой: ради них сайт
+  и появился.
+
+  `live: true` помечает разделы, которые не просто рисуются строкой, а живут
+  во времени: ждут ответа базы, принимают ввод. Такому разделу мало вернуть
+  разметку — ему нужен свой запуск и остановка при уходе.
+*/
 const ROUTES = [
+  { id: 'forum', label: 'Форум', live: true },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -37,6 +56,9 @@ const app = document.getElementById('app');
 const nav = document.getElementById('nav');
 const presidentBoard = document.getElementById('president-board');
 const bootLoader = document.getElementById('boot-loader');
+const side = document.getElementById('side');
+const sideToggle = document.getElementById('side-toggle');
+const sideVeil = document.getElementById('side-veil');
 const isFirstVisit = !document.documentElement.classList.contains('s33-loader-seen');
 const bootStartedAt = performance.now();
 
@@ -60,7 +82,7 @@ let view = null;
  */
 function parseHash() {
   const [id, param] = location.hash.replace(/^#\/?/, '').split('/');
-  return { id: id || 'home', param: param || null };
+  return { id: id || 'forum', param: param || null };
 }
 
 function renderNav(activeId) {
@@ -68,6 +90,38 @@ function renderNav(activeId) {
     (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}">${r.label}</a>`
   ).join('');
 }
+
+/* ── Боковое меню ─────────────────────────────────────────────────────────── */
+
+/*
+  На узком экране панель выдвигается поверх страницы. Состояние держится
+  классом на <html>, а не на самой панели: затемнение, сдвиг содержимого
+  и запрет прокрутки под меню — это про всю страницу, а не про меню.
+*/
+function setSideOpen(open) {
+  document.documentElement.classList.toggle('is-side-open', open);
+  sideToggle?.setAttribute('aria-expanded', String(open));
+  if (sideVeil) sideVeil.hidden = !open;
+}
+
+function isSideOpen() {
+  return document.documentElement.classList.contains('is-side-open');
+}
+
+sideToggle?.addEventListener('click', () => setSideOpen(!isSideOpen()));
+sideVeil?.addEventListener('click', () => setSideOpen(false));
+
+/*
+  Переход по разделу закрывает меню. Без этого на телефоне человек нажимает
+  вкладку и остаётся смотреть на меню, а не на страницу, за которой пришёл.
+*/
+side?.addEventListener('click', (e) => {
+  if (e.target.closest('a')) setSideOpen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isSideOpen()) setSideOpen(false);
+});
 
 function renderPresidentBoard(texts = []) {
   if (!presidentBoard) return;
@@ -174,23 +228,42 @@ function render() {
   if (id === 'alliance' && param) {
     // Карточка альянса не своя вкладка, поэтому в меню подсвечиваем рейтинг,
     // откуда сюда и приходят.
+    unmountForum();
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
     path = `/alliance/${param}`;
   } else {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
     renderNav(route.id);
-    app.innerHTML = route.id === 'quarter'
-      ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
-      : route.id === 'bot'
-        ? route.render()
-        : route.render(view);
-    // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
-    // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
-    for (const fn of [window.__ladderApply, window.__timelineApply]) {
-      if (typeof fn === 'function') fn();
+
+    if (route.live) {
+      /*
+        Живому разделу нельзя просто подставить строку: он сам решает, что
+        показать, потому что ждёт ответа хранилища. Второй сегмент адреса —
+        открытая тема (#/forum/p_abc), поэтому ссылку на пост можно кинуть
+        в чат, и она откроется сразу на нём.
+
+        mountForum не ждём: он рисует «загружаем» сам и дорисовывает по мере
+        ответов. Ожидание здесь задержало бы прокрутку вверх и подсчёт
+        посещения на время запроса к базе.
+      */
+      app.innerHTML = '';
+      mountForum(app, view, param);
+      path = param ? `/forum/${param}` : '/forum';
+    } else {
+      unmountForum();
+      app.innerHTML = route.id === 'quarter'
+        ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
+        : route.id === 'bot'
+          ? route.render()
+          : route.render(view);
+      // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
+      // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
+      for (const fn of [window.__ladderApply, window.__timelineApply]) {
+        if (typeof fn === 'function') fn();
+      }
+      path = `/${route.id}`;
     }
-    path = `/${route.id}`;
   }
 
   setupMobileScrollReveal();
@@ -250,11 +323,32 @@ async function boot() {
     finishBootLoader();
   } catch (err) {
     console.error(err);
-    app.innerHTML = `<section class="panel error">
-      <h2>Не удалось загрузить данные</h2>
-      <p>${String(err.message ?? err)}</p>
-      <p class="muted">Источник: <b>${CONFIG.dataSource}</b>. Проверьте настройки в config.js.</p>
-    </section>`;
+
+    /*
+      ДАННЫЕ ОТВАЛИЛИСЬ, А ФОРУМ ОБЯЗАН РАБОТАТЬ.
+
+      Раньше здесь всё заканчивалось страницей с ошибкой: без data/live.json
+      показывать было нечего. Теперь главная вкладка — форум, и он с этим
+      файлом не связан вовсе: посты лежат в другом месте.
+
+      Поэтому вместо мёртвой страницы отдаём пустой набор данных. Рейтинг
+      и хронология честно окажутся пустыми и объяснят почему, а форум
+      откроется как обычно. Ронять разговор сообщества из-за недоступной
+      таблицы результатов — плохая сделка.
+    */
+    view = {
+      alliances: [], weeks: [], allWeeks: [], results: [], events: [], texts: [],
+      standings: [], quarterStandings: [],
+      quarter: { weeks: [], from: null, to: null },
+      summary: null, movers: { up: [], down: [] }, placeHistory: [], achievements: [],
+      problems: [],
+      loadError: String(err.message ?? err),
+    };
+
+    const badge = document.getElementById('source-badge');
+    if (badge) badge.textContent = 'недоступен';
+
+    render();
     finishBootLoader();
   }
 }
