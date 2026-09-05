@@ -2285,6 +2285,47 @@ console.log('\nQ. Форум');
   equal('каждое представление удаляется перед созданием — иначе повторный запуск падает',
     withoutDrop.join(', '), '');
 
+  /*
+    ЗАВИСИМОЕ УДАЛЯЕТСЯ ПЕРВЫМ.
+
+    Лента и комментарии ссылаются на forum_profiles, поэтому удалить профиль,
+    пока они существуют, нельзя:
+
+      cannot drop view forum_profiles because other objects depend on it
+
+    Postgres предлагает CASCADE, и это плохой совет для файла, который
+    запускают повторно: CASCADE снесёт всё зависимое молча, включая то, о чём
+    автор файла не думал. Однажды он унесёт нужное — и без единого сообщения.
+
+    Поэтому зависимые удаляются явно и раньше основы. Проверяем порядок:
+    удаление профиля не должно стоять выше удаления ленты.
+  */
+  const dropProfiles = profilesSql.indexOf('drop view if exists public.forum_profiles');
+  const dropFeed = profilesSql.indexOf('drop view if exists public.forum_post_list');
+  const dropComments = profilesSql.indexOf('drop view if exists public.forum_comment_list');
+  check('зависимые представления удаляются раньше того, от чего зависят',
+    dropFeed >= 0 && dropComments >= 0 && dropFeed < dropProfiles && dropComments < dropProfiles);
+  /*
+    Ищем CASCADE именно в удалении представлений. Два уточнения, каждое
+    из которых уже давало ложное срабатывание:
+
+    — «on delete cascade» у связей между таблицами — совсем другое дело
+      и нужен: удаляя учётную запись, её посты надо унести с собой, иначе
+      останутся ссылки в пустоту;
+
+    — комментарии выбрасываем. Разбор этой самой ошибки написан в схеме
+      прямо над исправленным местом, и текст сообщения Postgres содержит
+      слова «drop view ... CASCADE». Без чистки тест ловит объяснение
+      вместо кода — третий раз на тех же граблях.
+  */
+  const sqlCode = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*--.*$/gm, '');
+  const dropsWithCascade = [
+    ...sqlCode(profilesSql).matchAll(/drop\s+view[^;]*;/gi),
+    ...sqlCode(schema).matchAll(/drop\s+view[^;]*;/gi),
+  ].filter((m) => /cascade/i.test(m[0]));
+  equal('CASCADE не используется при удалении представлений — он снёс бы зависимое молча',
+    dropsWithCascade.length, 0);
+
   check('жалобы видит только модерация — открытый список стал бы травлей',
     /create policy forum_reports_read on public\.forum_reports\s+[\s\S]{0,200}?forum_is_staff\(\)/.test(schema));
 
