@@ -44,10 +44,10 @@ import { renderHome } from '../pages/home.js';
   GitHub — единственный путь назад. Панель его не использует.
 */
 import {
-  currentAccount, signIn, signOut, canEditSite, canModerate, isAdmin, isConfigured,
+  currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
 } from '../db/account.js';
 import {
-  readDataset, recentChanges, uploadPhoto, setEditor,
+  readDataset, recentChanges, uploadPhoto, setModerator,
 } from './store.js';
 import { diffDataset, applyChanges, describeChanges } from './publish.js';
 import { roleLabel } from '../forum/roles.js';
@@ -259,19 +259,20 @@ function showError(message) {
 /**
  * Экран «прав не хватает».
  *
- * Отдельно от ошибки: человек вошёл правильно, просто ему пока не выдали
- * право редактора. Показывать здесь «не получилось» значило бы обвинить его
- * в чужом решении — и он полез бы проверять пароль, которого дело не касается.
+ * Отдельно от ошибки: человек вошёл правильно, просто ему не выдали роль.
+ * Показывать здесь «не получилось» значило бы обвинить его в чужом решении —
+ * и он полез бы проверять пароль, которого дело не касается.
  */
 function showNoAccess(account) {
   root.innerHTML = `
     <div class="adm-login">
       <section class="adm-login__card">
         <span class="eyebrow">Панель · Сервер 33</span>
-        <h1 class="adm-h1">Нет права редактора</h1>
+        <h1 class="adm-h1">Панель закрыта</h1>
         <p class="adm-lead">
           Вы вошли как <b>${esc(account.nick)}</b>, но править данные сайта пока
-          не можете. Право выдаёт администратор — на вкладке «Игроки», одним нажатием.
+          не можете. Панель открыта владельцу и модераторам — роль выдаёт
+          владелец на вкладке «Игроки», одним нажатием.
         </p>
         <p class="muted">Скажите ему свой ник: <code class="adm-mono">${esc(account.nick)}</code></p>
         <div class="adm-login__form">
@@ -1416,33 +1417,33 @@ document.addEventListener('click', async (e) => {
   }
 
   /*
-    Право редактора — без окна и без подтверждения. Действие обратимо одним
+    Роль модератора — без окна и без подтверждения. Действие обратимо одним
     нажатием той же кнопки, поэтому спрашивать «вы уверены» значило бы просить
     подтверждение у того, кто и так может отменить.
   */
-  const editorBtn = e.target.closest('[data-player-editor]');
-  if (editorBtn) {
-    const nick = editorBtn.dataset.playerEditor;
-    const allow = editorBtn.dataset.playerAllow === '1';
+  const modBtn = e.target.closest('[data-player-moderator]');
+  if (modBtn) {
+    const nick = modBtn.dataset.playerModerator;
+    const allow = modBtn.dataset.playerAllow === '1';
 
-    editorBtn.disabled = true;
-    editorBtn.textContent = allow ? 'Выдаём…' : 'Убираем…';
+    modBtn.disabled = true;
+    modBtn.textContent = allow ? 'Назначаем…' : 'Снимаем…';
 
     try {
-      await setEditor(nick, allow);
+      await setModerator(nick, allow);
       view.forum.loadedFor = null;
       render();
       showForumResult(
         '[data-players-result]',
         allow
-          ? `<b>${esc(nick)} теперь редактор.</b> Может входить в панель и править данные сайта. GitHub для этого не нужен.`
-          : `<b>${esc(nick)} больше не редактор.</b> Панель для него закроется при следующем входе.`,
+          ? `<b>${esc(nick)} теперь модератор.</b> Может разбирать жалобы, удалять чужие записи и править данные сайта. GitHub для этого не нужен.`
+          : `<b>${esc(nick)} больше не модератор.</b> Права закроются при следующем входе.`,
         'ok'
       );
     } catch (err) {
-      if (editorBtn.isConnected) {
-        editorBtn.disabled = false;
-        editorBtn.textContent = allow ? 'Сделать редактором' : 'Убрать из редакторов';
+      if (modBtn.isConnected) {
+        modBtn.disabled = false;
+        modBtn.textContent = allow ? 'Сделать модератором' : 'Снять модератора';
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }

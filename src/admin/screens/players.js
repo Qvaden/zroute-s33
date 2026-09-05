@@ -5,22 +5,21 @@ import { roleBadge, roleLabel } from '../../forum/roles.js';
 /**
  * ЭКРАН «ИГРОКИ» — учётные записи форума.
  *
- * Здесь две вещи, которых нет больше нигде: сброс пароля и запрет писать.
+ * Здесь три вещи, которых нет больше нигде: назначение модератора, сброс
+ * пароля и запрет писать.
  *
- * ПОЧЕМУ СБРОС ПАРОЛЯ ВООБЩЕ НУЖЕН. Вход на форуме по нику и паролю, без
- * почты — так решено осознанно (см. config.js). Значит письма «восстановить
- * пароль» не существует, и единственный способ вернуть человеку доступ —
- * сделать это руками. Без этого экрана забытый пароль означал бы потерянный
- * аккаунт навсегда.
+ * ПОЧЕМУ СБРОС ПАРОЛЯ ВООБЩЕ НУЖЕН. Вход по нику и паролю, без почты — так
+ * решено осознанно (см. config.js). Значит письма «восстановить пароль»
+ * не существует, и единственный способ вернуть человеку доступ — сделать это
+ * руками. Без этого экрана забытый пароль означал бы потерянный аккаунт
+ * навсегда.
  *
- * ГДЕ ЖИВУТ ПРАВА. Не здесь. Токен GitHub, которым открыта панель, над форумом
- * не властен вообще: это разные системы. Сбросить пароль может только тот, кто
- * вошёл на форуме администратором, и проверяет это сама база — функция
- * forum_admin_reset_password в supabase/schema.sql. Панель лишь показывает
- * кнопку; отказ приходит из базы, а не отсюда.
+ * ГДЕ ЖИВУТ ПРАВА. Не здесь. Роли и пароли — дело владельца, и проверяет это
+ * сама база: функции forum_admin_reset_password и site_set_moderator.
+ * Панель лишь показывает кнопки; отказ приходит из базы, а не отсюда.
  *
  * Экран — чистая функция от данных, как и остальные: его можно отрисовать
- * без браузера и без доступа к форуму.
+ * без браузера и без доступа к базе.
  */
 export function renderPlayers(view) {
   const forum = view.forum ?? {};
@@ -64,7 +63,7 @@ export function renderPlayers(view) {
           права на форуме — это отдельная учётная запись, и проверяет их сама база.
         </p>
         <p class="muted">
-          Откройте сайт, войдите своим ником администратора и вернитесь сюда.
+          Откройте сайт, войдите своим ником владельца и вернитесь сюда.
         </p>
         <div class="adm-actions">
           <a class="adm-btn" href="./index.html#/forum">Открыть форум</a>
@@ -82,7 +81,8 @@ export function renderPlayers(view) {
         </header>
         <p class="adm-lead">
           Вы вошли как <b>${esc(forum.me.nick)}</b> (${esc(roleLabel(forum.me))}).
-          Пароли сбрасывает только администратор форума.
+          Роли назначает и пароли сбрасывает только владелец — это единственная
+          граница между вами.
         </p>
       </section>`;
   }
@@ -100,7 +100,7 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь выдают право редактора, сбрасывают забытый пароль и закрывают
+          Здесь назначают модераторов, сбрасывают забытый пароль и закрывают
           возможность писать.
         </p>
       </header>
@@ -111,14 +111,20 @@ export function renderPlayers(view) {
 
       <div class="adm-players__notes">
         <p class="muted">
-          <b>Редактор</b> правит данные сайта: итоги VS, альянсы, хронологию, тексты.
-          Жалобы и запреты ему не доступны — это дело модерации, и обязанности
-          разделены нарочно: вносящий результаты не обязан разбирать споры.
+          <b>Модератор</b> разбирает жалобы, удаляет чужие записи, выдаёт запреты
+          и правит данные сайта. Не может одного: назначать роли и сбрасывать
+          пароли — иначе он назначил бы владельцем себя, и разница между ролями
+          исчезла бы.
+        </p>
+        <p class="muted">
+          <b>Владелец один</b>, и это правило держит база, а не договорённость.
+          Передача сайта другому человеку делается запросом в базу, а не нажатием:
+          такое решение не должно приниматься случайно.
         </p>
         <p class="muted">
           Пароль показывается один раз и только вам — передайте его человеку сами.
           Сохранённого пароля не существует: база хранит не его, а необратимый
-          отпечаток, поэтому подсмотреть старый нельзя даже администратору.
+          отпечаток, поэтому подсмотреть старый нельзя даже владельцу.
         </p>
       </div>
     </section>
@@ -131,12 +137,8 @@ export function renderPlayers(view) {
 function renderRow(user, me) {
   const isMe = user.id === me.id;
   const muted = user.mutedUntil && user.mutedUntil > new Date();
-  /*
-    Право редактора у администратора есть всегда и снятию не подлежит: иначе
-    владелец мог бы случайно отобрать доступ к истории у себя, а вернуть его
-    было бы можно только запросом в базу руками.
-  */
-  const isEditor = user.canEditSite || user.role === 'admin';
+  const isOwner = user.role === 'admin';
+  const isModerator = user.role === 'moderator';
 
   const status = user.banned
     ? '<span class="adm-badge adm-badge--stop">запрет</span>'
@@ -148,9 +150,7 @@ function renderRow(user, me) {
     <div class="adm-player" data-player="${esc(user.id)}">
       <div class="adm-player__who">
         <b>${esc(user.nick)}${roleBadge(user, { short: true })}</b>
-        <small>
-          ${isEditor && user.role !== 'admin' ? 'редактор · ' : ''}с ${esc(shortDate(user.createdAt))}
-        </small>
+        <small>с ${esc(shortDate(user.createdAt))}</small>
       </div>
 
       <div class="adm-player__state">
@@ -162,40 +162,37 @@ function renderRow(user, me) {
         ${
           isMe
             ? '<span class="muted">это вы</span>'
-            : `
-              ${
-                /*
-                  ГЛАВНАЯ КНОПКА ЭТОГО ЭКРАНА.
+            : isOwner
+              ? '<span class="muted">владелец</span>'
+              : `
+                ${
+                  /*
+                    ГЛАВНАЯ КНОПКА ЭТОГО ЭКРАНА.
 
-                  Раньше, чтобы пустить нового редактора, надо было выдать ему
-                  доступ к репозиторию и объяснить, что такое personal access
-                  token. На практике это означало, что редактор один — владелец.
+                    Раньше, чтобы пустить помощника, надо было выдать ему доступ
+                    к репозиторию и объяснить, что такое personal access token.
+                    На практике это означало, что помощников нет.
 
-                  Теперь одно нажатие. Роль администратора при этом не выдаётся:
-                  править итоги VS и разбирать жалобы — разные обязанности,
-                  и смешивать их значило бы давать лишнее.
-                */
-                user.role === 'admin'
-                  ? ''
-                  : `<button type="button" class="adm-btn ${isEditor ? '' : 'adm-btn--primary'}"
-                             data-player-editor="${esc(user.nick)}"
-                             data-player-allow="${isEditor ? '' : '1'}">
-                       ${isEditor ? 'Убрать из редакторов' : 'Сделать редактором'}
-                     </button>`
-              }
-              <button type="button" class="adm-btn"
-                      data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                Сбросить пароль
-              </button>
-              ${
-                user.role === 'admin'
-                  ? ''
-                  : `<button type="button" class="adm-btn"
-                             data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"
-                             data-player-banned="${user.banned ? '1' : ''}">
-                       ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
-                     </button>`
-              }`
+                    Теперь одно нажатие. Роль владельца при этом не выдаётся:
+                    владелец один, и передача сайта делается осознанно,
+                    запросом в базу, а не нажатием рядом с обычной кнопкой.
+                  */
+                  ''
+                }
+                <button type="button" class="adm-btn ${isModerator ? '' : 'adm-btn--primary'}"
+                        data-player-moderator="${esc(user.nick)}"
+                        data-player-allow="${isModerator ? '' : '1'}">
+                  ${isModerator ? 'Снять модератора' : 'Сделать модератором'}
+                </button>
+                <button type="button" class="adm-btn"
+                        data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                  Сбросить пароль
+                </button>
+                <button type="button" class="adm-btn"
+                        data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"
+                        data-player-banned="${user.banned ? '1' : ''}">
+                  ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
+                </button>`
         }
       </div>
     </div>`;

@@ -124,20 +124,31 @@ create index if not exists site_audit_at_idx on public.site_audit (at desc);
 
 -- ── Право править данные сайта ──────────────────────────────────────────────
 --
--- Отдельный признак, а не роль. Это разные обязанности: тот, кто вносит итоги
--- VS, не обязан разбирать жалобы, а модератор форума не обязан иметь доступ
--- к истории сервера. Слепить их в одну роль значит выдавать лишнее, чтобы
--- дать нужное.
+-- Есть у владельца и у модератора.
+--
+-- Сначала это был отдельный признак can_edit_site: «тот, кто вносит итоги VS,
+-- не обязан разбирать жалобы». Разделение выглядело аккуратно, но оно из
+-- другого масштаба — оно экономит доверие там, где помощников десяток.
+-- Здесь их один-два, и отдельный признак означал лишь ещё одну сущность,
+-- которую надо помнить и выдавать по отдельности.
+--
+-- Доверяя человеку удаление чужих постов, странно не доверять ему внесение
+-- результатов VS. Поэтому право теперь у роли, а не у признака.
+--
+-- Колонка can_edit_site остаётся в таблице: у кого-то она уже выставлена,
+-- и удаление означало бы миграцию ради чистоты. Ниже она просто перестала
+-- влиять на права.
 
 alter table public.forum_users
   add column if not exists can_edit_site boolean not null default false;
 
 /*
-  У администратора право есть всегда, отдельно выдавать не нужно.
+  Забаненный не правит данные сайта, даже будучи модератором: бан означает
+  «этому человеку сейчас не доверяем», и половинчатое доверие тут хуже
+  ясного запрета.
 
-  Так закрыт неприятный случай: владелец снимает признак сам себе (случайно
-  или экспериментируя) и теряет доступ к истории сервера. Вернуть его можно
-  было бы только запросом в базу руками.
+  Владельца забанить нельзя вовсе (см. охранник в profiles.sql), поэтому
+  для него это условие ничего не меняет.
 */
 create or replace function public.site_can_edit()
 returns boolean
@@ -147,7 +158,7 @@ as $$
     select 1 from public.forum_users
     where id = auth.uid()
       and banned = false
-      and (role = 'admin' or can_edit_site = true)
+      and role in ('admin', 'moderator')
   );
 $$;
 
@@ -404,41 +415,58 @@ $$;
 -- Читать набор может кто угодно: это открытый сайт.
 grant execute on function public.site_dataset() to anon, authenticated;
 
--- ── Выдать право редактора ──────────────────────────────────────────────────
+-- ── Назначить модератора ────────────────────────────────────────────────────
 --
 -- Обычным запросом к forum_users этого не сделать: правку профилей разрешено
--- только модерации, а признак редактора — дело администратора. Функция
--- проверяет это сама, поэтому право «назначить редактора» можно отдать
--- в панель, не отдавая права «менять что угодно в профилях».
+-- модерации, а роли — только владельцу. Функция проверяет это сама, поэтому
+-- право «назначить модератора» можно отдать в панель, не отдавая права
+-- «менять что угодно в профилях».
+--
+-- Раньше функция называлась site_set_editor и выдавала отдельный признак
+-- редактора. Признака больше нет — роли сократились до трёх, и модератор
+-- правит данные сайта наравне с владельцем. Старое имя удаляется ниже, чтобы
+-- в базе не осталось функции, которая делает вид, что работает.
 
-create or replace function public.site_set_editor(target_nick text, allow boolean)
+drop function if exists public.site_set_editor(text, boolean);
+
+create or replace function public.site_set_moderator(target_nick text, allow boolean)
 returns void
 language plpgsql security definer set search_path = public
 as $$
 declare
   target_id uuid;
+  target_role text;
 begin
   if not public.forum_is_admin() then
-    raise exception 'Права редактора выдаёт только администратор';
+    raise exception 'Роли назначает только владелец';
   end if;
 
-  select id into target_id from public.forum_users where lower(nick) = lower(target_nick);
+  select id, role into target_id, target_role
+    from public.forum_users where lower(nick) = lower(target_nick);
+
   if target_id is null then
     raise exception 'Игрок «%» не найден. Он должен сначала зарегистрироваться на сайте.', target_nick;
   end if;
 
-  update public.forum_users set can_edit_site = allow where id = target_id;
+  -- Владелец один, и роль владельца через панель не выдаётся и не снимается.
+  if target_role = 'admin' then
+    raise exception 'Это владелец — роль владельца через панель не меняется';
+  end if;
+
+  update public.forum_users
+     set role = case when allow then 'moderator' else 'member' end
+   where id = target_id;
 
   insert into public.site_audit (actor_id, actor_nick, entity, entity_id, action, details)
   values (
     auth.uid(),
     (select nick from public.forum_users where id = auth.uid()),
     'forum_users', target_id::text,
-    case when allow then 'grant_editor' else 'revoke_editor' end,
+    case when allow then 'grant_moderator' else 'revoke_moderator' end,
     jsonb_build_object('nick', target_nick)
   );
 end;
 $$;
 
-revoke all on function public.site_set_editor(text, boolean) from public, anon;
-grant execute on function public.site_set_editor(text, boolean) to authenticated;
+revoke all on function public.site_set_moderator(text, boolean) from public, anon;
+grant execute on function public.site_set_moderator(text, boolean) to authenticated;

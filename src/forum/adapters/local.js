@@ -1,4 +1,4 @@
-/**
+﻿/**
  * АДАПТЕР ФОРУМА: локальный, в браузере.
  *
  * РЕЖИМ РАЗРАБОТКИ, и он честно об этом говорит. Всё лежит в localStorage
@@ -75,13 +75,6 @@ function userOut(u) {
     id: u.id,
     nick: u.nick,
     role: u.role,
-    /*
-      Первый зарегистрировавшийся в локальном режиме становится администратором
-      (иначе модерацию нельзя было бы даже посмотреть) — он же и владелец.
-      В рабочем режиме признак считает база как «первый администратор
-      по дате регистрации».
-    */
-    isOwner: u.role === 'admin' && read().users[0]?.id === u.id,
     /*
       Поля профиля есть и здесь — для паритета с рабочим адаптером. Аватарку
       в локальном режиме загрузить некуда (хранилища нет), но страница профиля
@@ -181,7 +174,6 @@ function postOut(state, p) {
     authorAvatar: author?.avatarUrl || '',
     authorAlliance: author?.allianceTag || '',
     authorRole: author?.role || 'member',
-    authorIsOwner: Boolean(author?.isOwner),
     category: p.category,
     title: p.title,
     body: p.body,
@@ -312,7 +304,6 @@ function commentOut(state, c) {
     authorNick: c.authorNick,
     authorAvatar: author?.avatarUrl || '',
     authorRole: author?.role || 'member',
-    authorIsOwner: Boolean(author?.isOwner),
     body: c.body,
     createdAt: toDate(c.createdAt) ?? new Date(),
     deleted: Boolean(c.deleted),

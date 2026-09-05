@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ФОРУМ — ГЛАВНАЯ ВКЛАДКА.
  *
  * Две части на одной странице, и порядок не случаен.
@@ -544,7 +544,7 @@ function renderPostCard(p, s) {
         ${avatar(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
           <b>${nickLink(p.authorNick)}${
-            roleBadge({ role: p.authorRole, isOwner: p.authorIsOwner }, { short: true })
+            roleBadge({ role: p.authorRole }, { short: true })
           }${
             p.authorAlliance ? ` <span class="forum-post__ally">${esc(p.authorAlliance)}</span>` : ''
           }</b>
@@ -676,7 +676,7 @@ function renderComments(post, s) {
             <div class="forum-comment__body">
               <div class="forum-comment__head">
                 <b>${nickLink(c.authorNick)}${
-                  roleBadge({ role: c.authorRole, isOwner: c.authorIsOwner }, { short: true })
+                  roleBadge({ role: c.authorRole }, { short: true })
                 }</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>
               </div>
