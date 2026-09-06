@@ -768,46 +768,56 @@ html {
 /* ── Метка роли ───────────────────────────────────────────────────────────── */
 
 /*
-  Подпись рядом с ником: владелец, администратор, модератор, редактор.
+  Подпись рядом с ником: владелец, модератор.
   Участник метки не получает вовсе — если подписать всех, подпись перестаёт
   значить что-либо и становится шумом в каждой строке ленты.
 
   Цвет приходит переменной из словаря (src/forum/roles.js), а не задаётся
   здесь по классу: тогда добавление роли — правка в одном месте, а не в двух.
+
+  РАЗМЕР. Первая версия была на треть крупнее: значок 10 пикселов, текст 9.5,
+  отступы 7. Рядом с ником 13.5 это выглядело не подписью, а вторым именем —
+  метка спорила с тем, к чему относится.
+
+  Метка обязана читаться, но не первой. Поэтому она мельче ника примерно
+  вдвое: заметно, что она есть, и ясно, что главное — ник.
 */
 .role-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 6px;
-  padding: 2px 7px;
-  border: 1px solid color-mix(in srgb, var(--role-tone) 34%, transparent);
+  gap: 3px;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--role-tone) 30%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--role-tone) 12%, transparent);
+  background: color-mix(in srgb, var(--role-tone) 10%, transparent);
   color: var(--role-tone);
   /* Не наследует полужирность родителя: метка не должна спорить с ником. */
   font-family: Inter, sans-serif;
-  font-size: 9.5px;
+  font-size: 8.5px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   text-transform: uppercase;
   white-space: nowrap;
   vertical-align: 1px;
 }
-.role-badge i { font-size: 10px; font-style: normal; line-height: 1; }
+.role-badge i { font-size: 8.5px; font-style: normal; line-height: 1; }
 .role-badge b { font-weight: 700; }
 
 /*
   Владелец. Единственная метка с заметным свечением — и это осознанно:
   если подсветить все, разница между ними исчезнет, а метка нужна именно
   чтобы отличать.
+
+  Свечение слабое нарочно. Первая версия была ярче и крупнее — и метка
+  перетягивала внимание с ника, хотя служит подписью к нему, а не заголовком.
 */
 .role-badge--owner {
-  border-color: rgba(255,201,60,.45);
-  background: linear-gradient(135deg, rgba(255,201,60,.2), rgba(255,201,60,.08));
-  box-shadow: 0 0 14px -6px rgba(255,201,60,.55), inset 0 1px rgba(255,255,255,.12);
+  border-color: rgba(255,201,60,.4);
+  background: linear-gradient(135deg, rgba(255,201,60,.16), rgba(255,201,60,.06));
+  box-shadow: 0 0 9px -5px rgba(255,201,60,.5), inset 0 1px rgba(255,255,255,.08);
 }
-.role-badge--owner i { filter: drop-shadow(0 0 4px rgba(255,201,60,.6)); }
+.role-badge--owner i { filter: drop-shadow(0 0 3px rgba(255,201,60,.45)); }
 
 /* В шапке форума метка стоит одна, без ника рядом — отступ слева не нужен. */
 .forum-me__body .role-badge { margin-left: 0; }
@@ -815,10 +825,10 @@ html {
 /* На странице профиля метка крупнее: там она часть представления человека. */
 .forum-profile__meta .role-badge {
   margin-left: 0;
-  padding: 3px 9px;
-  font-size: 10.5px;
+  padding: 2px 8px;
+  font-size: 9.5px;
 }
-.forum-profile__meta .role-badge i { font-size: 12px; }
+.forum-profile__meta .role-badge i { font-size: 10.5px; }
 
 @media (max-width: 420px) {
   /* В узкой строке ленты значка достаточно: слово уводит время в перенос. */
