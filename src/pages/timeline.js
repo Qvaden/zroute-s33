@@ -243,14 +243,18 @@ function renderFilters(events) {
       <button type="button" class="seg__btn is-on" data-tl-filter="all">Все</button>
       ${buttons}
     </div>
-    <label class="pick pick--tl">
+    <div class="pick pick--tl">
       <span class="pick__cap">Тип</span>
-      <select data-tl-pick>
-        <option value="all">Все</option>
-        ${types.map((t) => `<option value="${esc(t)}">${esc(EVENT_TYPE[t].filter)}</option>`).join('')}
-      </select>
-      <span class="pick__carat" aria-hidden="true"></span>
-    </label>
+      <button type="button" class="pick__btn" data-pick-open
+              aria-haspopup="listbox" aria-expanded="false" aria-label="Выбрать тип события">
+        <span class="pick__val">Все</span>
+        <span class="pick__carat" aria-hidden="true"></span>
+      </button>
+      <div class="pick__menu" role="listbox" aria-label="Тип события">
+        <button type="button" class="pick__opt" role="option" data-tl-filter="all" aria-selected="true">Все</button>
+        ${types.map((t) => `<button type="button" class="pick__opt" role="option" data-tl-filter="${esc(t)}">${esc(EVENT_TYPE[t].filter)}</button>`).join('')}
+      </div>
+    </div>
   </div>`;
 }
 

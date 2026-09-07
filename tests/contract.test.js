@@ -1275,6 +1275,12 @@ console.log('\nL. Летопись сервера: захватили, защи�
   check('война в летопись серверных событий не попала', !/data-tl-week="e2"/.test(html));
   check('но в ленте событий война осталась', html.includes('data-tl-type="war"'));
 
+  /* Выбор «Тип» на телефоне — свой список, а не системный select. */
+  check('тип фильтруется и выпадающим списком (телефон)',
+    html.includes('data-pick-open') && html.includes('data-tl-filter="all"'));
+  check('выпадающий список типа не системный select',
+    !/<select[^>]*data-tl-pick/.test(html));
+
   const held = renderTimeline({ events: [ev('e9', '2026-06-01', 'server_defended')] });
   check('успешная защита красится как победа', /verdict--win/.test(held));
   check('защита без номера подписана без выдуманного нападавшего',
@@ -2772,9 +2778,46 @@ console.log('\nQ. Форум');
     memberHtml.includes('contenteditable') && memberHtml.includes('data-placeholder'));
   check('чужой пост можно пожаловаться', memberHtml.includes('data-forum-report="post:p1"'));
   check('счётчик лайков виден', memberHtml.includes('>2<'));
-  /* Разделы управляются и кнопками, и выпадающим списком (телефон). */
+  /* Разделы управляются и кнопками, и выпадающим списком (телефон).
+     Список свой, а не системный <select>: системный на телефоне раскрывается
+     во весь экран и теряет страницу, по которой человек выбирал. */
   check('управление разделами работает и выпадающим списком',
-    memberHtml.includes('data-forum-cat-pick') && memberHtml.includes('value="all">Все'));
+    memberHtml.includes('data-pick-open') &&
+      memberHtml.includes('class="pick__menu"') &&
+      memberHtml.includes('data-forum-cat="all"'));
+  check('выпадающий список не системный select',
+    !/<select[^>]*data-forum-cat-pick/.test(memberHtml));
+  check('в списке заранее размечен выбранный раздел',
+    memberHtml.includes('data-forum-cat="all"') &&
+      memberHtml.includes('aria-selected="true"'));
+  check('в списке помечен текущий раздел и нет чужого',
+    (memberHtml.match(/data-forum-cat="[^"]*"[^>]*aria-selected="true"/g) || []).length === 1);
+
+  /* ── Контракт isReady(): обещание, а не голый boolean ── */
+
+  /*
+    Контракт адаптера (src/forum/contract.js) обещает isReady(): Promise.
+    supabase-адаптер долго отдавал синхронный boolean isConfigured(), а mount.js
+    звал на нём .catch — TypeError падал на странице участника, и профиль
+    не открывался ни у кого. Тест держит оба конца: сигнатуру адаптеров
+    и отсутствие .catch на isReady в mount.js.
+  */
+  {
+    for (const path of ['src/forum/adapters/local.js', 'src/forum/adapters/supabase.js']) {
+      const adapter = await import('../' + path);
+      const res = adapter.isReady();
+      check(`${path.split('/').pop()}: isReady() возвращает обещание`,
+        res && typeof res.then === 'function', `тип ответа: ${typeof res}`);
+      const val = await res;
+      check(`${path.split('/').pop()}: isReady() резолвится в boolean`, typeof val === 'boolean');
+    }
+    const mountSource = await readFile('src/forum/mount.js', 'utf8');
+    check('mount.js не зовёт .catch на isReady() (крах страницы профиля)',
+      !mountSource.includes('.isReady().catch'));
+    const supabaseSource2 = await readFile('src/forum/adapters/supabase.js', 'utf8');
+    check('supabase isReady() объявлен async — по контракту это обещание',
+      /export async function isReady/.test(supabaseSource2));
+  }
 
   const bannedHtml = renderForum({ events: eventsSample }, {
     ready: true, shared: true, loading: false, posts: [],
@@ -2871,9 +2914,9 @@ console.log('\nQ. Форум');
   /* Шапка на телефоне: кнопка слева, марка прижата к правому краю. */
   check('на телефоне шапка разводит кнопку и марку по краям',
     /@media \(max-width: 759px\)[\s\S]{0,500}\.site-head__inner \{\s*display: flex[\s\S]{0,120}justify-content: space-between/.test(mobileCss));
-  /* Шторка меню уже: на экране 375 она занимает не больше 58% ширины. */
+  /* Шторка меню уже: на экране 375 она занимает не больше 52% ширины. */
   check('шторка меню на телефоне уже, чем 232px',
-    /@media \(max-width: 1039px\)[\s\S]{0,400}\.side \{[^}]*min\(var\(--side-w\), 58vw\)/.test(mobileCss));
+    /@media \(max-width: 1039px\)[\s\S]{0,400}\.side \{[^}]*min\(var\(--side-w\), 52vw\)/.test(mobileCss));
 
   /*
     Стабильность: на телефоне страница не дёргается. min-height через svh не
@@ -2898,7 +2941,7 @@ console.log('\nQ. Форум');
     становятся выпадающим списком, короткие сегменты — плотнее.
   */
   check('выпадающий список разделов получил стили',
-    /\.pick \{[^}]*border-radius: 999px/.test(mobileCss));
+    /\.pick__btn \{[^}]*border-radius: 999px/.test(mobileCss) && /\.pick__menu\b/.test(mobileCss));
   check('на телефоне длинный сегмент разделов уступает место списку',
     /@media \(max-width: 759px\)[\s\S]{0,300}\.seg--cat,[\s\S]{0,100}\.seg--type \{ display: none/.test(mobileCss));
   check('на телефоне пан вбок отрезается, а не тянет страницу',

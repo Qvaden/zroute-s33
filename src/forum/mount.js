@@ -677,6 +677,18 @@ async function loadProfile(nick) {
   }
 }
 
+/* ── Выпадающий список разделов (телефон) ─────────────────────────────────── */
+
+function setPickOpen(pick, open) {
+  pick.classList.toggle('is-open', open);
+  pick.querySelector('[data-pick-open]')?.setAttribute('aria-expanded', String(open));
+}
+
+function closePicks() {
+  if (!host) return;
+  host.querySelectorAll('.pick.is-open').forEach((p) => setPickOpen(p, false));
+}
+
 /* ── Обработчики ──────────────────────────────────────────────────────────── */
 
 function wire() {
@@ -686,6 +698,19 @@ function wire() {
   document.addEventListener('click', async (e) => {
     if (!host || !host.contains(e.target) || !e.target.closest) return;
     const t = e.target;
+
+    /* ── Выпадающий список разделов: открыть/закрыть ── */
+
+    const pickBtn = t.closest('[data-pick-open]');
+    if (pickBtn && host.contains(pickBtn)) {
+      const pick = pickBtn.closest('.pick');
+      if (pick) {
+        const open = !pick.classList.contains('is-open');
+        closePicks();
+        if (open) setPickOpen(pick, true);
+      }
+      return;
+    }
 
     /* ── Картинки в форме ── */
 
@@ -743,6 +768,8 @@ function wire() {
     // Раздел.
     const cat = t.closest('[data-forum-cat]');
     if (cat && host.contains(cat)) {
+      // Выбор в выпадающем списке закрывает его; на сегментах безвредно.
+      closePicks();
       state.category = cat.dataset.forumCat;
       state.openPostId = null;
       await loadFeed();
@@ -1042,14 +1069,6 @@ function wire() {
       return;
     }
 
-    const catPick = e.target.closest('[data-forum-cat-pick]');
-    if (catPick && host.contains(catPick)) {
-      state.category = catPick.value;
-      state.openPostId = null;
-      await loadFeed();
-      return;
-    }
-
     const avatarInput = e.target.closest('[data-avatar-input]');
     if (avatarInput) {
       const file = avatarInput.files?.[0];
@@ -1287,6 +1306,7 @@ function wire() {
       closeModal('[data-forum-report-modal]');
       closeModal('[data-forum-delete-modal]');
       host.querySelectorAll('[data-forum-emoji-pop]').forEach((p) => { p.hidden = true; });
+      closePicks();
       return;
     }
 
@@ -1317,6 +1337,16 @@ function wire() {
     if (!host || !host.contains(e.target) || !e.target.classList) return;
     if (e.target.matches('[data-forum-report-modal]')) closeModal('[data-forum-report-modal]');
     if (e.target.matches('[data-forum-delete-modal]')) closeModal('[data-forum-delete-modal]');
+  });
+
+  /*
+    Клик мимо открытого выпадающего списка разделов закрывает его. Слушатель
+    живёт без проверки host: закрыть нужно и за кликом по боку страницы.
+    Esc закрывает список рядом с окнами — см. keydown выше.
+  */
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('.pick')) return;
+    closePicks();
   });
 }
 
@@ -1463,7 +1493,17 @@ export async function mountUser(container, nick) {
   host = container;
   wire();
 
-  if (!(await forum.isReady().catch(() => false))) {
+  let ready = false;
+  try {
+    // isReady() в адаптере — обещание, но страховаться от синхронного ответа
+    // дешевле, чем однажды поймать «голый boolean» в .catch() — ровно так
+    // профиль не открывался у всех, кто нажимал на ник.
+    ready = await forum.isReady();
+  } catch {
+    ready = false;
+  }
+
+  if (!ready) {
     mode = 'user';
     profileState.profile = null;
     profileState.nick = nick;

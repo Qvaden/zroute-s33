@@ -521,6 +521,10 @@ function renderFeedControls(s) {
     { id: 'talked', label: 'Обсуждаемое' },
   ];
 
+  // Текущий раздел для подписи выпадающего списка на телефоне.
+  const currentCat = [{ id: 'all', label: 'Все' }, ...CATEGORIES]
+    .find((c) => c.id === s.category) ?? { id: 'all', label: 'Все' };
+
   return `
     <div class="ctl ctl--forum">
       <label class="search forum-search">
@@ -539,16 +543,20 @@ function renderFeedControls(s) {
                           data-forum-cat="${esc(c.id)}" title="${esc(c.hint)}">${esc(c.label)}</button>`
         ).join('')}
       </div>
-      <label class="pick">
+      <div class="pick">
         <span class="pick__cap">Раздел</span>
-        <select data-forum-cat-pick>
-          <option value="all">Все</option>
-          ${CATEGORIES.map(
-            (c) => `<option value="${esc(c.id)}" ${s.category === c.id ? 'selected' : ''}>${esc(c.label)}</option>`
+        <button type="button" class="pick__btn" data-pick-open
+                aria-haspopup="listbox" aria-expanded="false" aria-label="Выбрать раздел">
+          <span class="pick__val">${esc(currentCat.label)}</span>
+          <span class="pick__carat" aria-hidden="true"></span>
+        </button>
+        <div class="pick__menu" role="listbox" aria-label="Раздел форума">
+          ${[{ id: 'all', label: 'Все' }, ...CATEGORIES].map(
+            (c) => `<button type="button" class="pick__opt" role="option" data-forum-cat="${esc(c.id)}"
+                    ${s.category === c.id ? 'aria-selected="true"' : ''}>${esc(c.label)}</button>`
           ).join('')}
-        </select>
-        <span class="pick__carat" aria-hidden="true"></span>
-      </label>
+        </div>
+      </div>
       <div class="seg seg--sort" role="group" aria-label="Порядок">
         ${SORTS.map(
           (o) => `<button type="button" class="seg__btn ${s.sort === o.id ? 'is-on' : ''}"

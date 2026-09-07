@@ -161,17 +161,59 @@
     applyFeed();
   }
 
+  /* ── Выпадающий список «Тип» (телефон) ─────────────────────────────────── */
+  function setPickOpen(pick, open) {
+    pick.classList.toggle('is-open', open);
+    var btn = pick.querySelector('[data-pick-open]');
+    if (btn) btn.setAttribute('aria-expanded', String(open));
+  }
+
+  function closePicks() {
+    each(document.querySelectorAll('.pick.is-open'), function (pick) {
+      setPickOpen(pick, false);
+    });
+  }
+
+  /** Подпись на кнопке и галочка в списке — за выбранным типом. */
+  function syncPick() {
+    var pick = document.querySelector('.pick--tl');
+    if (!pick) return;
+    var label = null;
+    each(pick.querySelectorAll('.pick__opt'), function (opt) {
+      var on = opt.dataset.tlFilter === currentType;
+      opt.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (on) label = opt.textContent;
+    });
+    var val = pick.querySelector('.pick__val');
+    if (val) val.textContent = label || 'Все';
+  }
+
   document.addEventListener('click', function (e) {
     if (!e.target.closest) return;
+
+    // Клик мимо открытого списка закрывает его.
+    if (!e.target.closest('.pick')) closePicks();
+
+    var openBtn = e.target.closest('[data-pick-open]');
+    if (openBtn) {
+      var pick = openBtn.closest('.pick');
+      if (pick) {
+        var wantOpen = !pick.classList.contains('is-open');
+        closePicks();
+        if (wantOpen) setPickOpen(pick, true);
+      }
+      return;
+    }
 
     var typeBtn = e.target.closest('[data-tl-filter]');
     if (typeBtn) {
       currentType = typeBtn.dataset.tlFilter;
-      each(document.querySelectorAll('[data-tl-filter]'), function (b) {
+      each(document.querySelectorAll('.seg [data-tl-filter]'), function (b) {
         b.classList.toggle('is-on', b === typeBtn);
       });
-      var pick = document.querySelector('[data-tl-pick]');
-      if (pick) pick.value = currentType;
+      // Выбор в списке закрывает его; на сегментах безвредно.
+      if (typeBtn.closest('.pick')) closePicks();
+      syncPick();
       applyFeed();
       return;
     }
@@ -202,14 +244,9 @@
     }
   });
 
-  document.addEventListener('change', function (e) {
-    var pick = e.target.closest('[data-tl-pick]');
-    if (!pick) return;
-    currentType = pick.value;
-    each(document.querySelectorAll('[data-tl-filter]'), function (b) {
-      b.classList.toggle('is-on', b.dataset.tlFilter === currentType);
-    });
-    applyFeed();
+  // Esc закрывает выпадающий список, если он раскрылся и загородил страницу.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closePicks();
   });
 
   // main.js дёргает после каждой отрисовки — страница появляется асинхронно.
@@ -223,8 +260,7 @@
     currentYear = 'all';
     currentMonth = null;
     currentWeek = null;
-    var pick = document.querySelector('[data-tl-pick]');
-    if (pick) pick.value = 'all';
+    syncPick();
     apply();
   };
 

@@ -1,6 +1,6 @@
-﻿import { CONFIG } from '../config.js?v=16';
-import { loadAll, capabilities, db } from './data/index.js?v=16';
-import { validateDataset } from './data/contract.js?v=16';
+﻿import { CONFIG } from '../config.js?v=17';
+import { loadAll, capabilities, db } from './data/index.js?v=17';
+import { validateDataset } from './data/contract.js?v=17';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,21 +9,21 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=16';
-import { renderHome } from './pages/home.js?v=16';
-import { renderLadder } from './pages/ladder.js?v=16';
-import { renderQuarter } from './pages/quarter-final.js?v=16';
-import { renderTimeline } from './pages/timeline.js?v=16';
-import { renderGuide } from './pages/guide.js?v=16';
-import { renderBot } from './pages/bot.js?v=16';
-import { renderAlliance } from './pages/alliance.js?v=16';
-import { computeAchievements } from './logic/achievements.js?v=16';
-import { esc } from './ui/helpers.js?v=16';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=16';
+} from './logic/standings.js?v=17';
+import { renderHome } from './pages/home.js?v=17';
+import { renderLadder } from './pages/ladder.js?v=17';
+import { renderQuarter } from './pages/quarter-final.js?v=17';
+import { renderTimeline } from './pages/timeline.js?v=17';
+import { renderGuide } from './pages/guide.js?v=17';
+import { renderBot } from './pages/bot.js?v=17';
+import { renderAlliance } from './pages/alliance.js?v=17';
+import { computeAchievements } from './logic/achievements.js?v=17';
+import { esc } from './ui/helpers.js?v=17';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=17';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=16';
-import './ui/timeline-controls.js?v=16';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=16';
+import './ui/ladder-controls.js?v=17';
+import './ui/timeline-controls.js?v=17';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=17';
 
 /*
   РАЗДЕЛЫ.
@@ -388,7 +388,8 @@ async function boot() {
       alliances: [], weeks: [], allWeeks: [], results: [], events: [], texts: [],
       standings: [], quarterStandings: [],
       quarter: { weeks: [], from: null, to: null },
-      summary: null, movers: { up: [], down: [] }, placeHistory: [], achievements: [],
+      summary: null, movers: { up: [], down: [] },
+      placeHistory: new Map(), achievements: new Map(),
       problems: [],
       loadError: String(err.message ?? err),
     };

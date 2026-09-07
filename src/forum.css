@@ -138,10 +138,13 @@
       не видно — человек оказывался в невидимом меню без выхода. Переключается
       скачком, поэтому при открытии панель видна сразу, а при закрытии
       исчезает только после того, как уедет.
+
+      ease-out сглаживает выезд сильнее, чем сайтовая кривая: у кривой сайта
+      старт резкий, а панель и без того длинная — движение получается толчком.
     */
     transform: translateX(-100%);
     visibility: hidden;
-    transition: transform .26s var(--ease), visibility .26s var(--ease);
+    transition: transform .32s var(--ease-out), visibility .32s var(--ease-out);
     box-shadow: 24px 0 60px -30px rgba(0,0,0,.9);
     /*
       Вырез под фронтальную камеру и полоса жестов: без этого верхние вкладки
@@ -160,12 +163,27 @@
   */
   .is-side-open, .is-side-open body { overflow: hidden; }
 
+  /*
+    Затемнение. Показывается и прячется плавно: резкое появление чёрного
+    слоя по щелчку выглядит как рывок, при котором страница «моргает».
+    visibility с задержкой оставляет слой на время выезда панели прочь,
+    чтобы не открывать сразу всё, что под ней.
+  */
   .side-veil {
     position: fixed;
     z-index: 44;
     inset: 0;
+    display: block;
     background: rgba(6,7,9,.62);
     backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .3s var(--ease-out), visibility 0s linear .3s;
+  }
+  .is-side-open .side-veil {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
   }
 }
 

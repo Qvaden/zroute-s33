@@ -75,7 +75,7 @@ function emailFor(nick) {
 }
 
 /** Готов ли форум к работе: настроена ли база. */
-export function isReady() {
+export async function isReady() {
   return isConfigured();
 }
 
