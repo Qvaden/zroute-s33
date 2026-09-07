@@ -675,17 +675,17 @@
   «красивости ради».
 */
 .forum-md {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  gap: 6px;
   margin: 8px 0 0;
 }
+.forum-md__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.forum-md__row--palette { gap: 5px; }
 .forum-md__btn {
   display: inline-grid;
   place-items: center;
-  min-width: 30px;
-  min-height: 30px;
+  min-width: 32px;
+  min-height: 32px;
   padding: 2px 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -699,16 +699,161 @@
   border-color: var(--accent);
   background: rgba(255,106,43,.08);
 }
+.forum-md__btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: rgba(255,106,43,.18);
+  color: var(--accent);
+}
 .forum-md__btn:active { transform: scale(.95); }
 .forum-md__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.forum-md__note {
+.forum-md__mark { font-size: 9px; vertical-align: sub; }
+.forum-md__capt {
   color: var(--mute);
-  font-size: 10.5px;
-  line-height: 1.45;
-  max-width: 320px;
+  font-size: 11px;
+  margin-right: 2px;
 }
-@media (max-width: 420px) {
-  .forum-md__note { max-width: none; }
+.forum-md__color {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: var(--swatch, #fff);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.forum-md__color--none {
+  background: conic-gradient(rgba(255,255,255,.1) 0 25%, transparent 0 50%,
+    rgba(255,255,255,.1) 0 75%, transparent 0 100%);
+  position: relative;
+}
+.forum-md__color--none::after {
+  content: '';
+  position: absolute;
+  inset: 50% 3px auto;
+  height: 1.5px;
+  background: var(--loss);
+  transform: rotate(-45deg);
+}
+.forum-md__color:hover { transform: scale(1.12); }
+
+/* ── Редактор текста ───────────────────────────────────────────────────────── */
+
+.forum-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.025);
+  color: var(--text);
+  font-family: inherit;
+  /*
+    16px не для красоты: Safari на iPhone масштабирует всю страницу при
+    фокусе в поле с меньшим шрифтом. Редактор — тоже поле, и правило держит
+    тот же порог.
+  */
+  font-size: 16px;
+  line-height: 1.6;
+  word-break: break-word;
+  caret-color: var(--accent);
+}
+.forum-reply .forum-editor { min-height: 72px; }
+.forum-editor:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+}
+.forum-editor:empty::before,
+.forum-editor.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--mute);
+  pointer-events: none;
+}
+
+/* Типографика внутри редактора и готовых записей: одна на всех. */
+.forum-editor p,
+.forum-editor blockquote,
+.forum-editor pre,
+.forum-editor ul,
+.forum-editor ol,
+.forum-editor h3,
+.forum-post__body p,
+.forum-post__body blockquote,
+.forum-post__body pre,
+.forum-post__body ul,
+.forum-post__body ol,
+.forum-post__body h3,
+.forum-comment__body blockquote,
+.forum-comment__body pre,
+.forum-comment__body ul,
+.forum-comment__body ol,
+.forum-comment__body h3 { margin: 0 0 9px; }
+.forum-editor p:last-child,
+.forum-editor blockquote:last-child,
+.forum-editor pre:last-child,
+.forum-editor ul:last-child,
+.forum-editor ol:last-child,
+.forum-editor h3:last-child,
+.forum-post__body :last-child,
+.forum-comment__body :last-child { margin-bottom: 0; }
+
+.forum-editor blockquote,
+.forum-post__body blockquote,
+.forum-comment__body blockquote {
+  margin: 0 0 9px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255,106,43,.06);
+  color: var(--dim);
+}
+.forum-editor blockquote p,
+.forum-post__body blockquote p,
+.forum-comment__body blockquote p { margin: 0; }
+
+.forum-editor pre,
+.forum-post__body pre,
+.forum-comment__body pre {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0,0,0,.32);
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.forum-editor code,
+.forum-post__body code,
+.forum-comment__body code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255,255,255,.07);
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: .9em;
+}
+.forum-editor pre code,
+.forum-post__body pre code,
+.forum-comment__body pre code { padding: 0; background: none; font-size: 1em; }
+
+.forum-editor ul,
+.forum-post__body ul,
+.forum-comment__body ul { padding-left: 20px; list-style: disc; }
+.forum-editor ol,
+.forum-post__body ol,
+.forum-comment__body ol { padding-left: 20px; list-style: decimal; }
+.forum-editor li,
+.forum-post__body li,
+.forum-comment__body li { margin-bottom: 3px; }
+
+.forum-editor h3,
+.forum-post__body h3,
+.forum-comment__body h3 {
+  font-size: 15px;
+  font-weight: 700;
 }
 
 /* ── Управление лентой ────────────────────────────────────────────────────── */

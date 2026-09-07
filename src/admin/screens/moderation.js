@@ -1,5 +1,6 @@
 import { esc } from '../../ui/helpers.js';
 import { RULES } from '../../forum/rules.js';
+import { postBody } from '../../forum/format.js';
 
 /**
  * ЭКРАН «ЖАЛОБЫ» — разбор нарушений на форуме.
@@ -133,11 +134,11 @@ function renderReport(r) {
 
       ${r.note ? `<p class="adm-report__note">«${esc(r.note)}»</p>` : ''}
 
-      <div class="adm-report__target">
-        <div class="adm-report__author">${esc(r.targetAuthorNick || 'автор неизвестен')}</div>
-        ${r.targetTitle ? `<b class="adm-report__title">${esc(r.targetTitle)}</b>` : ''}
-        <p class="adm-report__body">${esc(r.targetBody || '(текст недоступен)')}</p>
-      </div>
+<div class="adm-report__target">
+          <div class="adm-report__author">${esc(r.targetAuthorNick || 'автор неизвестен')}</div>
+          ${r.targetTitle ? `<b class="adm-report__title">${esc(r.targetTitle)}</b>` : ''}
+          <div class="adm-report__body">${r.targetBody ? postBody(r.targetBody) : esc('(текст недоступен)')}</div>
+        </div>
 
       <div class="adm-actions adm-report__acts">
         <a class="adm-btn" href="./index.html#/forum/${esc(r.targetPostId || r.targetId)}"

@@ -171,7 +171,8 @@ html {
     Поле ввода не должно быть выше половины экрана: иначе с открытой
     клавиатурой не видно ни того, что пишешь, ни кнопки.
   */
-  .forum-field textarea, .forum-reply textarea { max-height: 40vh; }
+  .forum-field textarea, .forum-reply textarea,
+  .forum-editor { max-height: 40vh; }
 }
 
 /* ── Попадание пальцем ────────────────────────────────────────────────────── */
@@ -952,6 +953,94 @@ html {
   .side { width: min(var(--side-w), 58vw); }
 }
 
+/* ── Разделы на телефоне: сегменты → выпадающий список ─────────────────────── */
+
+/*
+  ЗАЧЕМ СПИСОК. Полоска разделов форума (восемь плашек) на узком экране —
+  это либо строка, уезжающая за правый край (страница тогда пануется и слева
+  остаётся пустой фон), либо три яруса плашек над лентой. На телефоне выбор
+  раздела происходит реже, чем чтение, поэтому он должен занимать одну строку,
+  а не половину экрана.
+
+  Дубликат управления намеренный: на компьютере остаются кнопки-сегменты
+  (мгновеннее, всё видно сразу), на телефоне — один сегмент превращается
+  в аккуратный выпадающий список. Работа та же, состояния синхронизируются
+  обработчиками.
+*/
+.pick {
+  display: none;
+  position: relative;
+  flex: 1 1 180px;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  height: 37px;
+  padding: 0 32px 0 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .16s var(--ease), background .16s var(--ease);
+}
+.pick select {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  text-overflow: ellipsis;
+}
+/* Каретка своим треугольником, а не системной стрелкой: стрелка разного вида
+   в каждом браузере, треугольник один. */
+.pick__carat {
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -5px;
+  border-right: 1.6px solid var(--mute);
+  border-bottom: 1.6px solid var(--mute);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.pick__cap {
+  flex: none;
+  color: var(--mute);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.pick:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.pick select option {
+  color: var(--text);
+  background: var(--raised-2);
+}
+
+@media (max-width: 639px) {
+  .seg--cat,
+  .seg--type { display: none; }
+  .pick { display: flex; }
+}
+
+/* Сегменты, которые остались на телефоне, становятся плотнее: «Свежее /
+   Лучшее / Обсуждаемое» в одну строку вместо трёх. */
+@media (max-width: 480px) {
+  .seg { gap: 1px; padding: 2px; }
+  .seg__btn { padding: 6px 9px; font-size: 12px; }
+}
+
 /*
   СТАБИЛЬНОСТЬ: на телефоне страница не должна дёргаться.
 
@@ -974,6 +1063,13 @@ body { min-height: 100svh; }
   body::after,
   #app { animation: none; }
   html { scroll-behavior: auto; }
+  /*
+    Горизонтальный пан. overflow-x: hidden на body iOS не всегда уважает —
+    любой элемент шире экрана уводит страницу вбок, и справа остаётся пустой
+    фон. clip не создаёт прокручиваемый контейнер и срезает лишнее жёстче.
+  */
+  html,
+  body { overflow-x: clip; }
   .site-head {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

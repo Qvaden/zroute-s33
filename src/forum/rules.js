@@ -21,6 +21,7 @@
  * чтобы их можно было выполнить автоматически.
  */
 import { CONFIG } from '../../config.js';
+import { sanitizeHtml, textOf } from './format.js';
 
 const L = CONFIG.forum.limits;
 
@@ -214,24 +215,29 @@ export function validatePassword(raw) {
 /**
  * Черновик поста.
  *
- * Заголовок и текст обрезаются по краям, но внутри не трогаются: перенос
- * строки — это часть текста, который писал человек.
+ * Заголовок обрезается по краям, но внутри не трогается: перенос строки —
+ * это часть текста, который писал человек. Текст же — это уже HTML редактора,
+ * поэтому он СНАЧАЛА проходит через белый список sanitize.js и только потом
+ * сверяется с правилами. Длина — по видимому тексту: теги не должны уметь
+ * «накручивать» объём, а человек должен видеть в предупреждении честное
+ * количество символов, а не сырой HTML.
  *
  * @param {{title?: string, body?: string, category?: string}} draft
  */
 export function validatePost(draft) {
   const title = String(draft?.title ?? '').trim().replace(/\s+/g, ' ');
-  const body = String(draft?.body ?? '').replace(/\r\n/g, '\n').trim();
   const category = String(draft?.category ?? '');
+  const body = sanitizeHtml(String(draft?.body ?? '').replace(/\r\n/g, '\n'));
 
+  const visible = textOf(body);
   if (title.length < L.titleMin) {
     return { ok: false, error: `Заголовок короче ${L.titleMin} символов` };
   }
   if (title.length > L.titleMax) {
     return { ok: false, error: `Заголовок длиннее ${L.titleMax} символов` };
   }
-  if (body.length < L.bodyMin) return { ok: false, error: 'Текст поста пустой' };
-  if (body.length > L.bodyMax) {
+  if (visible.length < L.bodyMin) return { ok: false, error: 'Текст поста пустой' };
+  if (visible.length > L.bodyMax) {
     return { ok: false, error: `Текст длиннее ${L.bodyMax} символов` };
   }
   if (!CATEGORY_IDS.includes(category)) {
@@ -251,9 +257,10 @@ export function validatePost(draft) {
 
 /** @param {string} raw */
 export function validateComment(raw) {
-  const value = String(raw ?? '').replace(/\r\n/g, '\n').trim();
-  if (!value) return { ok: false, error: 'Комментарий пустой' };
-  if (value.length > L.commentMax) {
+  const value = sanitizeHtml(String(raw ?? '').replace(/\r\n/g, '\n'));
+  const visible = textOf(value);
+  if (visible.length === 0) return { ok: false, error: 'Комментарий пустой' };
+  if (visible.length > L.commentMax) {
     return { ok: false, error: `Комментарий длиннее ${L.commentMax} символов` };
   }
   return { ok: true, value };

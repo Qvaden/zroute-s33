@@ -1,6 +1,6 @@
-﻿import { CONFIG } from '../config.js?v=15';
-import { loadAll, capabilities, db } from './data/index.js?v=15';
-import { validateDataset } from './data/contract.js?v=15';
+﻿import { CONFIG } from '../config.js?v=16';
+import { loadAll, capabilities, db } from './data/index.js?v=16';
+import { validateDataset } from './data/contract.js?v=16';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,21 +9,21 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=15';
-import { renderHome } from './pages/home.js?v=15';
-import { renderLadder } from './pages/ladder.js?v=15';
-import { renderQuarter } from './pages/quarter-final.js?v=15';
-import { renderTimeline } from './pages/timeline.js?v=15';
-import { renderGuide } from './pages/guide.js?v=15';
-import { renderBot } from './pages/bot.js?v=15';
-import { renderAlliance } from './pages/alliance.js?v=15';
-import { computeAchievements } from './logic/achievements.js?v=15';
-import { esc } from './ui/helpers.js?v=15';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=15';
+} from './logic/standings.js?v=16';
+import { renderHome } from './pages/home.js?v=16';
+import { renderLadder } from './pages/ladder.js?v=16';
+import { renderQuarter } from './pages/quarter-final.js?v=16';
+import { renderTimeline } from './pages/timeline.js?v=16';
+import { renderGuide } from './pages/guide.js?v=16';
+import { renderBot } from './pages/bot.js?v=16';
+import { renderAlliance } from './pages/alliance.js?v=16';
+import { computeAchievements } from './logic/achievements.js?v=16';
+import { esc } from './ui/helpers.js?v=16';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=16';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=15';
-import './ui/timeline-controls.js?v=15';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=15';
+import './ui/ladder-controls.js?v=16';
+import './ui/timeline-controls.js?v=16';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=16';
 
 /*
   РАЗДЕЛЫ.

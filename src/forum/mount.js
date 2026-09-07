@@ -24,6 +24,8 @@ import { renderForum, renderReportDialog, renderDeleteDialog } from '../pages/fo
 import { renderUserPage } from '../pages/user.js';
 import { validateNick, validatePassword, validatePost, validateComment, deletionReason } from './rules.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
+import { textOf } from './format.js';
+import { esc } from '../ui/helpers.js';
 import { CONFIG } from '../../config.js';
 
 /** Состояние страницы. Живёт между перерисовками, сбрасывается при уходе. */
@@ -110,9 +112,9 @@ function captureInput() {
   if (!host) return null;
 
   const forms = {};
-  host.querySelectorAll('textarea, input:not([type="radio"]):not([type="password"]), select').forEach((el) => {
+  host.querySelectorAll('textarea, input:not([type="radio"]):not([type="password"]), select, [data-editor]').forEach((el) => {
     const key = fieldKey(el);
-    if (key) forms[key] = el.value;
+    if (key) forms[key] = el.matches('[contenteditable]') ? el.innerHTML : el.value;
   });
 
   // Раскрытые <details>: правила, форма поста.
@@ -140,7 +142,7 @@ function restoreInput(snapshot) {
   for (const [key, value] of Object.entries(snapshot.forms)) {
     if (!value) continue;
     const el = findByKey(key);
-    if (el) el.value = value;
+    if (el) setFieldValue(el, value);
   }
 
   for (const key of snapshot.open) {
@@ -213,6 +215,46 @@ function findByKey(key) {
   }
   const form = host.querySelector(`[data-forum-${kind === 'new' ? 'new' : kind === 'auth' ? 'auth' : 'report-form'}]`);
   return form?.querySelector(`[name="${a}"]`) ?? null;
+}
+
+/**
+ * Вернуть полю сохранённое значение после перерисовки. Поле обычного ввода
+ * пишется через .value, редактор — внутренней разметкой (это уже очищенная
+ * строка, editorHtml); класс пустоты обновляется, чтобы плейсхолдер не вис.
+ */
+function setFieldValue(el, value) {
+  if (!el) return;
+  if (el.matches('[contenteditable]')) {
+    el.innerHTML = value;
+    syncEditorEmpty(el);
+  } else {
+    el.value = value;
+  }
+}
+
+/** Редактор пуст, когда в нём не осталось видимого текста. */
+function syncEditorEmpty(editor) {
+  editor.classList.toggle('is-empty', textOf(editor.innerHTML).length === 0);
+}
+
+/** Текст формы: HTML из редактора, если он есть, иначе значение поля. */
+function formBody(form) {
+  const editor = form.querySelector('[data-editor]');
+  if (editor) return editor.innerHTML;
+  return form.body?.value ?? '';
+}
+
+/**
+ * Полный сброс формы: стандартный reset сбрасывает только настоящие поля
+ * ввода, пустой редактор ему не виден. После публикации обе части остаются
+ * чистыми — иначе второй пост получил бы текст первого.
+ */
+function resetForm(form) {
+  form.reset();
+  form.querySelectorAll('[data-editor]').forEach((el) => {
+    el.innerHTML = '';
+    syncEditorEmpty(el);
+  });
 }
 
 function paint() {
@@ -500,41 +542,89 @@ function clearAllShots() {
   for (const scope of [...pendingShots.keys()]) clearShots(scope);
 }
 
-/**
- * Кнопка форматирования: оборачивает выделение в маркеры.
+/*
+ * ФОРМАТИРОВАНИЕ РЕДАКТОРА.
  *
- * Если выделенного нет, вставляет слово-образец с курсором внутри — иначе
- * «ничего не произошло» читалось бы как поломка. Повторное нажатие на уже
- * обёрнутое снимает обёртку: так можно попробовать и передумать.
- *
- * @param {HTMLTextAreaElement} area
- * @param {string} marker
+ * Кнопки панели дергают document.execCommand — стандартный механизм жирного
+ * курсива и цветов в contenteditable. Он же возвращает состояние: кнопка
+ * «Жирный» держится нажатой, пока курсор внутри жирного текста. Это и есть
+ * «сразу видно»: здесь нет маркеров, которые надо ждать, пока отрисуются.
  */
-function wrapMarkdown(area, marker) {
-  const start = area.selectionStart ?? area.value.length;
-  const end = area.selectionEnd ?? start;
-  const value = area.value;
 
-  const wasWrapped =
-    value.slice(Math.max(0, start - marker.length), start) === marker &&
-    value.slice(end, end + marker.length) === marker;
+/** Редактор, в котором сейчас курсор. */
+function activeEditor() {
+  const a = document.activeElement;
+  return a && a.matches?.('[contenteditable]') ? a : null;
+}
 
-  const selected = value.slice(start, end);
-  const body = wasWrapped ? selected : selected || 'текст';
+/** Редактор той формы, где стоит кнопка. */
+function editorFor(btn) {
+  return btn.closest('form')?.querySelector('[data-editor]') ?? null;
+}
 
-  const next = wasWrapped
-    ? value.slice(0, start - marker.length) + body + value.slice(end + marker.length)
-    : value.slice(0, start) + marker + body + marker + value.slice(end);
+/**
+ * Применить команду форматирования.
+ *
+ * Сначала фокус в редактируемый блок: без него браузер применит команду
+ * неизвестно куда или не применит совсем. Кнопки панели не забирают фокус
+ * (mousedown на них гасится), поэтому выделение к моменту клика на месте.
+ *
+ * @param {HTMLElement} editor
+ * @param {string} cmd имя команды без 'execCommand'
+ * @param {string} [value]
+ */
+function applyFormat(editor, cmd, value) {
+  if (!editor || typeof document.execCommand !== 'function') return;
+  editor.focus({ preventScroll: true });
 
-  area.value = next;
-
-  const cursor = wasWrapped ? start - marker.length : start + marker.length;
-  if (typeof area.setSelectionRange === 'function') {
-    try {
-      area.setSelectionRange(cursor, cursor + body.length);
-    } catch { /* select не умеет */ }
+  if (cmd === 'color') {
+    // Сброс через 'inherit': санитайзер такую обёртку выбросит на сохранении.
+    document.execCommand('foreColor', false, value || 'inherit');
+    return;
   }
-  area.focus({ preventScroll: true });
+  if (cmd === 'code') {
+    wrapInline(editor, 'code');
+    return;
+  }
+  if (cmd === 'formatBlock') {
+    // Некоторые браузеры принимают тег только в угловых скобках.
+    const name = value || 'h3';
+    document.execCommand('formatBlock', false, name.startsWith('<') ? name : `<${name}>`);
+    return;
+  }
+  document.execCommand(cmd, false, null);
+}
+
+/**
+ * Обернуть выделение в инлайн-тег (code), а если выделения нет — вставить
+ * образец и поставить курсор внутрь. Текст подставляется текстовым узлом:
+ * символы '<' из выделения не могут стать разметкой.
+ */
+function wrapInline(editor, tag) {
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0 || !sel.anchorNode || !editor.contains(sel.anchorNode)) {
+    if (typeof document.execCommand === 'function') {
+      document.execCommand('insertHTML', false, textSample(tag));
+    }
+    return;
+  }
+
+  const range = sel.getRangeAt(0);
+  const text = range.toString() || 'текст';
+  range.deleteContents();
+
+  const node = range.startContainer.ownerDocument.createElement(tag);
+  node.textContent = text;
+  range.insertNode(node);
+
+  range.setStartAfter(node);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function textSample(tag) {
+  return `<${tag}>текст</${tag}>`;
 }
 
 /**
@@ -607,14 +697,20 @@ function wire() {
     }
 
     /*
-      Панель форматирования. Кнопка оборачивает выделенное в маркеры разметки,
-      повторное нажатие — снимает их. Разметку понимает format.js, хранится
-      же текст как набран: маркеры остаются частью текста записи.
+      Панель форматирования. Кнопка применяет команду к редактору своей формы,
+      стиль виден сразу — маркеров разметки больше нет. `color` отдельная
+      команда: ей нужен свой аргумент (цвет), остальным — тег блока.
     */
-    const mdBtn = t.closest('[data-md]');
+    const mdBtn = t.closest('[data-editor-cmd]');
     if (mdBtn && host.contains(mdBtn)) {
-      const area = mdBtn.closest('form')?.querySelector('textarea[name="body"]');
-      if (area) wrapMarkdown(area, mdBtn.dataset.md);
+      const editor = editorFor(mdBtn);
+      if (editor) applyFormat(editor, mdBtn.dataset.editorCmd, mdBtn.dataset.editorValue);
+      return;
+    }
+    const colorBtn = t.closest('[data-editor-color]');
+    if (colorBtn && host.contains(colorBtn)) {
+      const editor = editorFor(colorBtn);
+      if (editor) applyFormat(editor, 'color', colorBtn.dataset.editorColor || 'inherit');
       return;
     }
 
@@ -691,21 +787,35 @@ function wire() {
         : state.comments.find((c) => c.id === targetId);
       if (!item || !state.openPostId) return;
 
-      const area = host.querySelector(
-        `[data-forum-comment-form="${cssEscape(state.openPostId)}"] [name="body"]`
+      const editor = host.querySelector(
+        `[data-forum-comment-form="${cssEscape(state.openPostId)}"] [data-editor]`
       );
-      if (!area) return;
+      if (!editor) return;
 
       const L = CONFIG.forum.limits;
-      const first = String(item.body ?? '')
-        .split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
-      // Длинный текст не вываливаем целиком: ответ должен остаться ответом.
+      const first = textOf(item.body).split(/\s+/).filter(Boolean).join(' ');
       const preview = first.length > 300 ? first.slice(0, 297).trimEnd() + '…' : first;
-      const quote = `> ${item.authorNick}:\n${preview}`;
-      const next = area.value.trim() ? `${area.value.trimEnd()}\n\n${quote}` : quote;
-      area.value = next.slice(0, L.commentMax);
-      area.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      area.focus({ preventScroll: true });
+      const room = L.commentMax - textOf(editor.innerHTML).length;
+      // Нет места — просто не вставляем, чтобы человек не понял её потом по лимиту.
+      if (room < 20) return;
+
+      const head = `${item.authorNick}: `;
+      const fits = room >= head.length + preview.length;
+      const cut = room - head.length - 1;
+      const body = fits ? preview : cut > 0 ? preview.slice(0, cut) + '…' : '';
+      if (!body) return;
+
+      const quote = `<blockquote><p><strong>${esc(item.authorNick)}:</strong> ${esc(body)}</p></blockquote>`;
+      editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      editor.focus({ preventScroll: true });
+      if (typeof document.execCommand === 'function') {
+        document.execCommand('insertHTML', false, quote);
+      } else {
+        const tpl = editor.ownerDocument.createElement('template');
+        tpl.innerHTML = quote;
+        editor.appendChild(tpl.content);
+      }
+      syncEditorEmpty(editor);
       return;
     }
 
@@ -829,6 +939,13 @@ function wire() {
   let searchTimer;
   document.addEventListener('input', (e) => {
     if (!host || !host.contains(e.target)) return;
+
+    const editor = e.target.closest?.('[data-editor]');
+    if (editor) {
+      syncEditorEmpty(editor);
+      return;
+    }
+
     const search = e.target.closest('[data-forum-search]');
     if (!search) return;
 
@@ -838,6 +955,69 @@ function wire() {
       state.openPostId = null;
       await loadFeed();
     }, 300);
+  });
+
+  /*
+    Лимит редактора держим сами: у contenteditable нет maxlength. Печатать
+    дальше предела не даём (beforeinput успевает перехватить), а вставка
+    идёт только текстом без формата — иначе человек случайно притащит
+    в пост чужую вёрстку с картинками.
+  */
+  document.addEventListener('beforeinput', (e) => {
+    if (!host || !host.contains(e.target)) return;
+    const editor = e.target.closest?.('[data-editor]');
+    if (!editor || (e.inputType !== 'insertText' && e.inputType !== 'insertCompositionText')) return;
+
+    const limit = Number(editor.dataset.limit);
+    if (!limit) return;
+    const extra = (e.data ?? '').length;
+    if (!extra) return;
+    if (textOf(editor.innerHTML).length + extra > limit) e.preventDefault();
+  });
+
+  document.addEventListener('paste', (e) => {
+    const editor = e.target.closest?.('[data-editor]');
+    if (!editor || !host?.contains(editor) || !e.clipboardData) return;
+    e.preventDefault();
+
+    const text = e.clipboardData.getData('text/plain') ?? '';
+    if (!text) return;
+
+    const limit = Number(editor.dataset.limit) || Infinity;
+    const room = Math.max(0, limit - textOf(editor.innerHTML).length);
+    const part = room ? text.slice(0, room) : '';
+    if (part && typeof document.execCommand === 'function') {
+      document.execCommand('insertText', false, part);
+    }
+    syncEditorEmpty(editor);
+  });
+
+  /*
+    Кнопки панели не должны забирать фокус из редактора: иначе выделение
+    исчезнет и команда применится впустую. focus() на самом element, но
+    предупреждённого mousedown этого шага не требует — selection просто
+    остаётся на месте.
+  */
+  document.addEventListener('mousedown', (e) => {
+    if (!host || !host.contains(e.target)) return;
+    if (e.target.closest?.('[data-editor-cmd], [data-editor-color]')) e.preventDefault();
+  });
+
+  /*
+    Кнопки «Жирный» и прочие держатся нажатыми, пока стиль действует: человек
+    видит состояние без переключения.
+  */
+  document.addEventListener('selectionchange', () => {
+    if (!host || typeof document.queryCommandState !== 'function') return;
+    const editor = activeEditor();
+    if (!editor || !host.contains(editor)) return;
+    for (const btn of host.querySelectorAll('[data-editor-cmd]')) {
+      if (!host.contains(btn)) continue;
+      if (!['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript'].includes(btn.dataset.editorCmd)) continue;
+      let state2 = false;
+      try { state2 = document.queryCommandState(btn.dataset.editorCmd); } catch { /* старый браузер */ }
+      btn.setAttribute('aria-pressed', state2 ? 'true' : 'false');
+    }
   });
 
   document.addEventListener('change', async (e) => {
@@ -859,6 +1039,14 @@ function wire() {
         и человек решит, что кнопка перестала работать.
       */
       attachInput.value = '';
+      return;
+    }
+
+    const catPick = e.target.closest('[data-forum-cat-pick]');
+    if (catPick && host.contains(catPick)) {
+      state.category = catPick.value;
+      state.openPostId = null;
+      await loadFeed();
       return;
     }
 
@@ -914,7 +1102,7 @@ function wire() {
 
       const checked = validatePost({
         title: form.title.value,
-        body: form.body.value,
+        body: formBody(form),
         category: form.category.value,
       });
       if (!checked.ok) return showError('[data-forum-new-error]', checked.error);
@@ -939,7 +1127,7 @@ function wire() {
             с сообщением об ошибке: человек терял написанное и не понимал,
             за что.
           */
-          form.reset();
+          resetForm(form);
           state.category = 'all';
           state.sort = 'fresh';
           await loadFeed();
@@ -960,7 +1148,7 @@ function wire() {
       e.preventDefault();
       clearError('[data-forum-comment-error]');
 
-      const checked = validateComment(form.body.value);
+      const checked = validateComment(formBody(commentForm));
       if (!checked.ok) return showError('[data-forum-comment-error]', checked.error);
 
       await withBusy(submitter, 'Отправляем…', async () => {
@@ -974,7 +1162,7 @@ function wire() {
               })
             : '';
 
-          form.reset();
+          resetForm(commentForm);
           await loadThread(postId);
           if (shotError) notice(shotError);
         } catch (err) {
@@ -992,7 +1180,7 @@ function wire() {
       const id = form.dataset.forumEditForm;
       const checked = validatePost({
         title: form.title.value,
-        body: form.body.value,
+        body: formBody(form),
         category: form.category.value,
       });
       if (!checked.ok) return showError('[data-forum-edit-error]', checked.error);

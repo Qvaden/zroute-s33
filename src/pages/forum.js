@@ -22,7 +22,7 @@
 import { esc, plural } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
-import { postBody, excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { postBody, excerpt, editorHtml, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { roleBadge, roleLabel } from '../forum/roles.js';
 import { CONFIG } from '../../config.js';
 
@@ -316,29 +316,67 @@ function renderWhoAmI(s) {
 /**
  * Панель форматирования для полей текста.
  *
- * Четыре кнопки, не больше: каждую обёртку обязан понимать и построитель
- * разметки в format.js. Список стилей это единственный источник правды —
- * если однажды добавить пятый, поменять надо будет только этот массив.
+ * Кнопки работают через document.execCommand — их тройка «тег + значение
+ * команды» это единственный источник правды. Добавить стиль — значит добавить
+ * строку в один из массивов ниже; разбирать ничего не нужно.
+ *
+ * Текст хранится как HTML, который собрал редактор, и при показе проходит
+ * через белый список тегов в sanitize.js. Поэтому жирный, цвет и прочее
+ * превращаются в вид сразу, не дожидаясь отправки формы.
  */
-const MD_STYLES = [
-  { mark: '**', label: 'Ж', title: 'Жирный: **текст**' },
-  { mark: '*', label: 'К', title: 'Курсив: *текст*' },
-  { mark: '__', label: 'У', title: 'Подчёркнутый: __текст__' },
-  { mark: '~~', label: 'З', title: 'Зачёркнутый: ~~текст~~' },
+const MD_COMMANDS = [
+  { cmd: 'bold', label: 'Ж', title: 'Жирный' },
+  { cmd: 'italic', label: 'К', title: 'Курсив' },
+  { cmd: 'underline', label: 'Ч', title: 'Подчёркнутый' },
+  { cmd: 'strikeThrough', label: 'З', title: 'Зачёркнутый' },
+  { cmd: 'code', label: '&lt;/&gt;', title: 'Инлайн-код: выделенный текст как код' },
+  { cmd: 'subscript', label: 'X<span class="forum-md__mark">2</span>', title: 'Нижний индекс' },
+  { cmd: 'superscript', label: 'X<span class="forum-md__mark">²</span>', title: 'Верхний индекс' },
+];
+
+const MD_BLOCKS = [
+  { cmd: 'formatBlock', value: 'h3', label: 'Заголовок', title: 'Заголовок абзаца' },
+  { cmd: 'formatBlock', value: 'blockquote', label: '❝ Цитата', title: 'Цитировать абзац' },
+  { cmd: 'formatBlock', value: 'pre', label: 'Код-блок', title: 'Отдельный блок с кодом' },
+  { cmd: 'insertUnorderedList', label: '• Список', title: 'Маркированный список' },
+  { cmd: 'insertOrderedList', label: '1. Список', title: 'Нумерованный список' },
+];
+
+/*
+ * Цвета текста. Ровно столько, сколько читается на тёмном фоне сайта: всё,
+ * что темнее этого набора, на почти чёрном фоне не видно человеческим глазом.
+ */
+const MD_COLORS = [
+  '#ff6b6b', '#ff9a4a', '#ffc93c', '#4fd98a', '#5ce0dd',
+  '#6fa8ff', '#b78cff', '#9aa4b2', '#ffffff',
 ];
 
 function renderMdBar() {
+  const line = (list) =>
+    list
+      .map(
+        (c) => `<button type="button" class="forum-md__btn"
+                 data-editor-cmd="${esc(c.cmd)}"${c.value ? ` data-editor-value="${esc(c.value)}"` : ''}
+                 title="${esc(c.title)}" aria-label="${esc(c.title)}">${c.label}</button>`
+      )
+      .join('');
+
+  const palette = MD_COLORS.map(
+    (h) => `<button type="button" class="forum-md__color" data-editor-color="${esc(h)}"
+             title="Цвет текста" aria-label="Цвет текста ${esc(h)}" style="--swatch:${esc(h)}"></button>`
+  ).join('');
+
   return `
     <div class="forum-md" role="toolbar" aria-label="Форматирование текста">
-      ${MD_STYLES.map(
-        (s) => `<button type="button" class="forum-md__btn"
-                 data-md="${esc(s.mark)}" title="${esc(s.title)}"
-                 aria-label="${esc(s.title)}">${esc(s.label)}</button>`
-      ).join('')}
-      <small class="forum-md__note">
-        Держите звездочки по краям выделенного: **жирный**, *курсив*,
-        __подчёркнутый__, ~~зачёркнутый~~
-      </small>
+      <div class="forum-md__row">${line(MD_COMMANDS)}</div>
+      <div class="forum-md__row">${line(MD_BLOCKS)}</div>
+      <div class="forum-md__row forum-md__row--palette">
+        <span class="forum-md__capt">Цвет текста</span>
+        ${palette}
+        <button type="button" class="forum-md__color forum-md__color--none"
+                data-editor-color="inherit" title="Вернуть цвет по умолчанию"
+                aria-label="Вернуть цвет по умолчанию"></button>
+      </div>
     </div>`;
 }
 
@@ -373,8 +411,9 @@ function renderComposer(s) {
 
         <label class="forum-field">
           <span>Текст</span>
-          <textarea name="body" rows="7" required maxlength="${L.bodyMax}"
-                    placeholder="Пустая строка разделяет абзацы. Ссылки вставляются как есть."></textarea>
+          <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+               name="body" data-editor data-limit="${L.bodyMax}"
+               data-placeholder="Писать можно сразу как надо: выделили — стало жирным или цветным, прямо в поле."></div>
         </label>
 
         ${renderMdBar()}
@@ -452,10 +491,12 @@ function renderEditForm(p) {
                value="${esc(p.title)}">
       </label>
 
-      <label class="forum-field">
-        <span>Текст</span>
-        <textarea name="body" rows="7" required maxlength="${L.bodyMax}">${esc(p.body)}</textarea>
-      </label>
+<label class="forum-field">
+          <span>Текст</span>
+          <div class="forum-editor" contenteditable="true" role="textbox" aria-multiline="true"
+               name="body" data-editor data-limit="${L.bodyMax}"
+               data-placeholder="Править можно прямо здесь — стили применяются сразу">${editorHtml(p.body)}</div>
+        </label>
 
       ${renderMdBar()}
 
@@ -490,7 +531,7 @@ function renderFeedControls(s) {
                value="${esc(s.query ?? '')}" data-forum-search
                autocomplete="off" spellcheck="false">
       </label>
-      <div class="seg" role="group" aria-label="Раздел форума">
+      <div class="seg seg--cat" role="group" aria-label="Раздел форума">
         <button type="button" class="seg__btn ${s.category === 'all' ? 'is-on' : ''}"
                 data-forum-cat="all">Все</button>
         ${CATEGORIES.map(
@@ -498,6 +539,16 @@ function renderFeedControls(s) {
                           data-forum-cat="${esc(c.id)}" title="${esc(c.hint)}">${esc(c.label)}</button>`
         ).join('')}
       </div>
+      <label class="pick">
+        <span class="pick__cap">Раздел</span>
+        <select data-forum-cat-pick>
+          <option value="all">Все</option>
+          ${CATEGORIES.map(
+            (c) => `<option value="${esc(c.id)}" ${s.category === c.id ? 'selected' : ''}>${esc(c.label)}</option>`
+          ).join('')}
+        </select>
+        <span class="pick__carat" aria-hidden="true"></span>
+      </label>
       <div class="seg seg--sort" role="group" aria-label="Порядок">
         ${SORTS.map(
           (o) => `<button type="button" class="seg__btn ${s.sort === o.id ? 'is-on' : ''}"
@@ -831,8 +882,9 @@ function renderComments(post, s) {
       ${
         s.me && !s.me.banned
           ? `<form class="forum-reply" data-forum-comment-form="${esc(post.id)}">
-              <textarea name="body" rows="3" required maxlength="${L.commentMax}"
-                        placeholder="Ответить по делу и по правилам"></textarea>
+              <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+                   name="body" data-editor data-limit="${L.commentMax}"
+                   data-placeholder="Ответить по делу и по правилам"></div>
               ${renderMdBar()}
               ${renderAttachRow(post.id)}
               <div class="forum-reply__actions">

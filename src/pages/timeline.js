@@ -231,18 +231,26 @@ function renderTrophies(captures, all) {
 
 function renderFilters(events) {
   const present = [...new Set(events.map((e) => e.type))];
-  const buttons = EVENT_TYPE_ORDER
-    .filter((t) => present.includes(t))
+  const types = EVENT_TYPE_ORDER.filter((t) => present.includes(t));
+  const buttons = types
     .map(
       (t) => `<button type="button" class="seg__btn" data-tl-filter="${t}">${esc(EVENT_TYPE[t].filter)}</button>`
     )
     .join('');
 
   return `<div class="ctl ctl--tl">
-    <div class="seg" role="group" aria-label="Тип события">
+    <div class="seg seg--type" role="group" aria-label="Тип события">
       <button type="button" class="seg__btn is-on" data-tl-filter="all">Все</button>
       ${buttons}
     </div>
+    <label class="pick pick--tl">
+      <span class="pick__cap">Тип</span>
+      <select data-tl-pick>
+        <option value="all">Все</option>
+        ${types.map((t) => `<option value="${esc(t)}">${esc(EVENT_TYPE[t].filter)}</option>`).join('')}
+      </select>
+      <span class="pick__carat" aria-hidden="true"></span>
+    </label>
   </div>`;
 }
 

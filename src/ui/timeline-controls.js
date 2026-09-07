@@ -170,6 +170,8 @@
       each(document.querySelectorAll('[data-tl-filter]'), function (b) {
         b.classList.toggle('is-on', b === typeBtn);
       });
+      var pick = document.querySelector('[data-tl-pick]');
+      if (pick) pick.value = currentType;
       applyFeed();
       return;
     }
@@ -200,6 +202,16 @@
     }
   });
 
+  document.addEventListener('change', function (e) {
+    var pick = e.target.closest('[data-tl-pick]');
+    if (!pick) return;
+    currentType = pick.value;
+    each(document.querySelectorAll('[data-tl-filter]'), function (b) {
+      b.classList.toggle('is-on', b.dataset.tlFilter === currentType);
+    });
+    applyFeed();
+  });
+
   // main.js дёргает после каждой отрисовки — страница появляется асинхронно.
   window.__timelineApply = function () {
     /*
@@ -211,6 +223,8 @@
     currentYear = 'all';
     currentMonth = null;
     currentWeek = null;
+    var pick = document.querySelector('[data-tl-pick]');
+    if (pick) pick.value = 'all';
     apply();
   };
 

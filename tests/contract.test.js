@@ -1971,28 +1971,37 @@ console.log('\nQ. Форум');
       !postBody('<b onerror="alert(1)">жирный</b>').includes('<b '));
 
   /*
-    Разметка — белый список ровно из четырёх конструкций: жирный, курсив,
-    подчёркнутый, зачёркнутый. Всё остальное остаётся как набрано, включая
-    заголовки и списки: каждая добавленная конструкция — ещё одно место,
-    где можно ошибиться. miniMarkdown из helpers.js здесь не используется.
+    РАЗМЕТКА РЕДАКТОРА. Человек форматирует прямо в поле (contenteditable),
+    на хранение уходит HTML, показ чистит его белым списком sanitize.js.
+    Проверяется не синтаксис — его больше нет — а честность HTML на выходе:
+    стили редактора живы, чужой HTML становится текстом, звёздочки остаются
+    буквами. Мини-разметка из helpers.js здесь не используется.
   */
-  check('жирный текст от участника работает',
-    postBody('**жирный**').includes('<strong>жирный</strong>'));
-  check('курсив от участника работает',
-    postBody('*курсив*').includes('<em>курсив</em>'));
-  check('подчёркнутый текст работает',
-    postBody('__подчёркнутый__').includes('<u>подчёркнутый</u>'));
-  check('зачёркнутый текст работает',
-    postBody('~~зачёркнутый~~').includes('<s>зачёркнутый</s>'));
-  check('курсив внутри жирного работает',
-    postBody('**смотри *сюда* сейчас**').includes('<strong>смотри <em>сюда</em> сейчас</strong>'));
-  check('незакрытые звёздочки разметкой не становятся',
-    !postBody('**не закрыл').includes('<strong>'));
+  check('жирный текст редактора сохраняется',
+    postBody('<strong>жирный</strong>').includes('<strong>жирный</strong>'));
+  check('курсив сохраняется',
+    postBody('<em>курсив</em>').includes('<em>курсив</em>'));
+  check('подчёркнутый сохраняется',
+    postBody('<u>подчёркнутый</u>').includes('<u>подчёркнутый</u>'));
+  check('зачёркнутый сохраняется',
+    postBody('<s>зачёркнутый</s>').includes('<s>зачёркнутый</s>'));
+  check('вложенные стили сохраняются',
+    postBody('<strong>смотри <em>сюда</em> сейчас</strong>')
+      .includes('<strong>смотри <em>сюда</em> сейчас</strong>'));
+  check('звёздочки остаются текстом, а не разметкой',
+    postBody('**не разметка**') === '<p>**не разметка**</p>');
+  check('цвет текста пропускается из белого набора',
+    postBody('<span style="color: rgb(229, 83, 75)">кр</span>')
+      .includes('<span style="color:rgb(229, 83, 75)">кр</span>'));
+  check('стиль вне белого набора (позиция, тень) выбрасывается',
+    !postBody('<span style="position:fixed">к</span>').includes('position'));
+  check('сломанный HTML приводится к честному виду',
+    postBody('<strong>без конца') === '<p><strong>без конца</strong></p>');
   check('теги, введённые в разметке, остаются текстом',
-    !postBody('**<b onerror="alert(1)">x</b>**').includes('<b '));
-  /* Заголовки в белый список не входят: раздел форума — это категория. */
+    !postBody('<strong><script>alert(1)</script></strong>').includes('<script>'));
+  /* Заголовки в посте — текст: раздел форума задаётся категорией. */
   check('решётка не превращается в заголовок',
-    !postBody('# не заголовок').includes('<h2>'));
+    !postBody('# не заголовок').includes('<h'));
 
   check('пустая строка разбивает текст на абзацы',
     (postBody('первый\n\nвторой').match(/<p>/g) ?? []).length === 2);
@@ -2020,8 +2029,8 @@ console.log('\nQ. Форум');
   equal('короткий текст в выжимке не режется', excerpt('коротко', 100), 'коротко');
   check('длинный текст режется по слову, а не посередине',
     !/\s…$/.test(excerpt('слово '.repeat(80), 40)) && excerpt('слово '.repeat(80), 40).endsWith('…'));
-  check('выжимка убирает маркеры форматирования',
-    excerpt('**жирный** и ~~зачёркнутый~~', 100) === 'жирный и зачёркнутый');
+  check('выжимка убирает разметку',
+    excerpt('<strong>жирный</strong> и <s>зачёркнутый</s>', 100) === 'жирный и зачёркнутый');
 
   const now = new Date('2026-09-05T12:00:00');
   equal('свежая запись — «только что»', timeAgo(new Date('2026-09-05T11:59:40'), now), 'только что');
@@ -2378,17 +2387,21 @@ console.log('\nQ. Форум');
     /data-forum-edit-form/.test(mountSource) && /edit:\$\{id\}/.test(mountSource));
   check('поиск по ленте держит паузу и сам перерисовывает список',
     /data-forum-search/.test(mountSource) && /setTimeout/.test(mountSource));
-  check('цитата собирается из имени и текста, а не вставляется как есть',
-    /data-forum-quote/.test(mountSource) && /> \$\{item\.authorNick\}/.test(mountSource));
+  check('цитата собирается из имени и текста и встаёт блоком',
+    /data-forum-quote/.test(mountSource) && /blockquote/.test(mountSource) && /\$\{esc\(item\.authorNick\)\}:/.test(mountSource));
 
   /*
-    Панель форматирования: кнопки оборачивают выделенное в маркеры, а текст
-    хранится как набран — форматирование происходит при показе (format.js).
+    Панель форматирования: кнопки дёргают document.execCommand — жирный, цвет
+    и прочее видно в редакторе сразу, разметка при показе не собирается.
   */
-  check('кнопки форматирования оборачивают выделенное в маркеры',
-    /data-md/.test(mountSource) && /wrapMarkdown/.test(mountSource));
-  check('обёртка снимается повторным нажатием',
-    /wasWrapped/.test(mountSource));
+  check('панель форматирования работает командами редактора',
+    mountSource.includes('data-editor-cmd') && mountSource.includes('document.execCommand'));
+  check('цвета применяются кнопками палитры',
+    mountSource.includes('data-editor-color') && mountSource.includes('foreColor'));
+  check('предел длины держит сам редактор',
+    mountSource.includes('beforeinput') && mountSource.includes('paste'));
+  check('кнопка стиля держится, пока стиль действует',
+    mountSource.includes('queryCommandState'));
 
   /* ── Схема базы: где живёт настоящая защита ── */
 
@@ -2754,9 +2767,14 @@ console.log('\nQ. Форум');
   check('перед публикацией названы правила и последствие',
     /соглашаетесь с правилами/i.test(memberHtml));
   check('форма поста предлагает форматирование',
-    memberHtml.includes('data-md') && memberHtml.includes('forum-md'));
+    memberHtml.includes('data-editor') && memberHtml.includes('forum-md'));
+  check('текст вводится в редактор, стили видны сразу',
+    memberHtml.includes('contenteditable') && memberHtml.includes('data-placeholder'));
   check('чужой пост можно пожаловаться', memberHtml.includes('data-forum-report="post:p1"'));
   check('счётчик лайков виден', memberHtml.includes('>2<'));
+  /* Разделы управляются и кнопками, и выпадающим списком (телефон). */
+  check('управление разделами работает и выпадающим списком',
+    memberHtml.includes('data-forum-cat-pick') && memberHtml.includes('value="all">Все'));
 
   const bannedHtml = renderForum({ events: eventsSample }, {
     ready: true, shared: true, loading: false, posts: [],
@@ -2869,9 +2887,22 @@ console.log('\nQ. Форум');
   check('на телефоне выключен blur под липкой шапкой',
     /@media \(hover: none\) and \(pointer: coarse\)[\s\S]{0,600}backdrop-filter: none/.test(mobileCss));
 
-  /* Панель форматирования в стилях форума есть. */
+  /* Панель форматирования и редактор получили стили. */
   check('панель форматирования получила стили',
     /\.forum-md\b/.test(forumCss) && /\.forum-md__btn\b/.test(forumCss));
+  check('редактор получил стили и плейсхолдер',
+    /\.forum-editor/.test(forumCss) && /\.forum-editor:empty/.test(forumCss));
+
+  /*
+    Полоска разделов на телефоне не должна уезжать за край: длинные списки
+    становятся выпадающим списком, короткие сегменты — плотнее.
+  */
+  check('выпадающий список разделов получил стили',
+    /\.pick \{[^}]*border-radius: 999px/.test(mobileCss));
+  check('на телефоне длинный сегмент разделов уступает место списку',
+    /@media \(max-width: 639px\)[\s\S]{0,300}\.seg--cat,[\s\S]{0,100}\.seg--type \{ display: none/.test(mobileCss));
+  check('на телефоне пан вбок отрезается, а не тянет страницу',
+    /overflow-x: clip/.test(mobileCss));
 
   const mainJs = await readFile('src/main.js', 'utf8');
   check('форум — первый раздел в меню',
