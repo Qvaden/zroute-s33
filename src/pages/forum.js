@@ -492,11 +492,11 @@ function renderEditForm(p) {
       </label>
 
 <label class="forum-field">
-          <span>Текст</span>
-          <div class="forum-editor" contenteditable="true" role="textbox" aria-multiline="true"
-               name="body" data-editor data-limit="${L.bodyMax}"
-               data-placeholder="Править можно прямо здесь — стили применяются сразу">${editorHtml(p.body)}</div>
-        </label>
+        <span>Текст</span>
+        <div class="forum-editor" contenteditable="true" role="textbox" aria-multiline="true"
+             name="body" data-editor data-limit="${L.bodyMax}"
+             data-placeholder="Править можно прямо здесь — стили применяются сразу">${editorHtml(p.body)}</div>
+      </label>
 
       ${renderMdBar()}
 

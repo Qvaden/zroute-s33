@@ -58,67 +58,6 @@ function renderLeadershipRoles(page) {
     <p class="roles-credit">${esc(page.credit)}</p>`;
 }
 
-function legacyLeadershipRoles() {
-  const roles = [
-    {
-      icon: '👑', title: 'Глава альянса', tone: 'gold',
-      intro: 'Задаёт общее направление действий и развития альянса.',
-      items: ['Переговоры с союзом сервера.', 'Вынесение решений с учётом мнений R4.', 'Назначение и контроль работы R4.'],
-    },
-    {
-      icon: '⚜️', title: 'Дворецкий', tone: 'orange',
-      intro: 'Отвечает за информирование и организацию событий альянса.',
-      items: ['Засада и Осада: оповещения в чате и запуск.', 'Оповещение о регистрации на Пандору.', 'VS-информирование: ответы, контроль отстающих и помощь игрокам.'],
-      assistant: true,
-    },
-    {
-      icon: '🏛️', title: 'Богиня', tone: 'violet',
-      intro: 'Отвечает за Поезд, доску объявлений и важные сообщения.',
-      items: ['Поезд: списки поездок, машинисты и VIP-пассажиры.', 'Контроль актуальности доски объявлений.', 'Шаблоны объявлений и срочные новости союза или сервера.'],
-      assistant: true,
-    },
-    {
-      icon: '🛡️', title: 'Рекрутер', tone: 'cyan',
-      intro: 'Отвечает за игровой состав альянса.',
-      items: ['Поиск и привлечение новых игроков.', 'Анализ активности, состав и рейтинги/антирейтинги.', 'Согласование трансферов и ротация актива с академией.'],
-    },
-    {
-      icon: '🪖', title: 'Полководец', tone: 'red',
-      intro: 'Отвечает за организацию военных действий альянса.',
-      items: ['Тактика и проведение Пандоры.', 'Организация рейда VS по субботам.', 'Захват и оборона Капитолия в Безумии с учётом союзников.', 'Планирование остальных военных мероприятий.'],
-      assistant: true,
-    },
-  ];
-
-  return `
-    <section class="roles-panel panel">
-      <header class="panel__head roles-panel__head">
-        <span class="eyebrow">Alliance // Command</span>
-        <h2>${esc(page.rolesTitle)}</h2>
-        <p class="guide__lead">${esc(page.rolesSubtitle)}</p>
-      </header>
-      <div class="roles-grid">
-        ${roles.map((role) => `
-          <article class="role-card role-card--${role.tone}">
-            <div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${role.icon}</span><span class="role-card__tag">${role.title.trim().toLowerCase() === 'глава альянса' ? 'R5' : 'R4'}</span></div>
-            <h3>${role.title}</h3>
-            <p class="role-card__intro">${role.intro}</p>
-            <ul>${role.items.map((item) => `<li>${item}</li>`).join('')}</ul>
-            ${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}
-          </article>`).join('')}
-      </div>
-    </section>
-    <section class="roles-notice panel">
-      <div class="roles-notice__mark">!</div>
-      <div>
-        <span class="eyebrow">Важно // Balance</span>
-        <h3>Распределяем нагрузку, а не героизм</h3>
-        <p>Часть обязанностей может передаваться от одного R4 другому — не придумываем лишнюю работу и не смотрим, как один игрок тянет всё на себе. Иначе он выгорит, и развитие альянса остановится.</p>
-        <p>Помощник может поддерживать двух офицеров. По мере роста объёма работы помощников станет четыре — по одному для каждого офицера.</p>
-      </div>
-    </section>`;
-}
-
 /**
  * Доказательная часть: сравнение верхней и нижней трети таблицы
  * по трём показателям. Считается из тех же данных, что и рейтинг.

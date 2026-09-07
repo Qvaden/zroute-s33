@@ -2965,6 +2965,160 @@ console.log('\nQ. Форум');
   equal('все файлы офлайн-копии существуют', brokenShell.join(', '), '');
 }
 
+// ── S. Чистые функции без DOM: помощники, роли, страницы, графики ──────────
+console.log('\nS. Чистые функции');
+{
+  /* ── helpers: экранирование и даты ── */
+  const h = await import('../src/ui/helpers.js');
+
+  equal('esc', h.esc('a<b>&"\'c'), 'a&lt;b&gt;&amp;&quot;&#39;c');
+  equal('esc(null)', h.esc(null), '');
+  equal('esc(undefined)', h.esc(undefined), '');
+  equal('esc(0)', h.esc(0), '0');
+
+  equal('safeUrl: обычная ссылка остаётся', h.safeUrl('https://example.com/a?b=c'), 'https://example.com/a?b=c');
+  equal('safeUrl: javascript выброшен', h.safeUrl('javascript:alert(1)'), '');
+  equal('safeUrl: пробелы срезаются', h.safeUrl('  https://x.ru  '), 'https://x.ru');
+  equal('safeUrl: пусто → пусто', h.safeUrl(undefined), '');
+
+  const d = new Date('2026-09-07T00:00:00Z');
+  equal('fmtDate', h.fmtDate(d), '7 сен');
+  equal('fmtDateFull', h.fmtDateFull(d), '7 сен 2026');
+  equal('fmtDate: битая дата → пусто', h.fmtDate(new Date('не число')), '');
+
+  /* ── helpers: формы слов ── */
+  const oneFewMany = h.pluralWord.bind(null);
+  equal('1 → one', oneFewMany(1, 'победа', 'победы', 'побед'), 'победа');
+  equal('2 → few', oneFewMany(2, 'победа', 'победы', 'побед'), 'победы');
+  equal('5 → many', oneFewMany(5, 'победа', 'победы', 'побед'), 'побед');
+  equal('11 → many (не one)', oneFewMany(11, 'победа', 'победы', 'побед'), 'побед');
+  equal('21 → one (по последней цифре)', oneFewMany(21, 'победа', 'победы', 'побед'), 'победа');
+  equal('12 → many (не few)', oneFewMany(12, 'победа', 'победы', 'побед'), 'побед');
+  equal('plur..al с числом', h.plural(5, 'победа', 'победы', 'побед'), '5 побед');
+
+  check('deltaBadge: без движения — плоский прочерк',
+    h.deltaBadge(0).includes('delta--flat') && !h.deltaBadge(null).includes('▲'));
+  check('deltaBadge: рост — стрелка вверх с модулем', h.deltaBadge(3).includes('▲3') && h.deltaBadge(3).includes('delta--up'));
+  check('deltaBadge: падение — стрелка вниз с модулем', h.deltaBadge(-2).includes('▼2') && h.deltaBadge(-2).includes('delta--down'));
+
+  /* ── helpers: мини-разметка ── */
+  check('miniMarkdown: жирный и курсив', h.miniMarkdown('**ж** и *к*').includes('<strong>ж</strong>') && h.miniMarkdown('**ж** и *к*').includes('<em>к</em>'));
+  check('miniMarkdown: теги как текст', !h.miniMarkdown('<b>x</b>').includes('<b>'));
+  check('miniMarkdown: список', (() => {
+    const html = h.miniMarkdown('- a\n- b');
+    return html.includes('<ul>') && html.includes('<li>a</li>') && html.includes('</ul>');
+  })());
+  check('miniMarkdown: заголовки', h.miniMarkdown('## Раздел\nтекст').includes('<h3>Раздел</h3>'));
+  check('sparkline: меньше двух точек — пусто', h.sparkline([5]) === '' && h.sparkline(undefined) === '');
+  check('sparkline: рисует svg', h.sparkline([1, 2, 5]).includes('<svg class="spark"'));
+  check('formDots: без формы — подпись', h.formDots([]).includes('нет данных'));
+  check('formDots: исходы и пустые недели', h.formDots(['win', null, 'loss']).includes('dot--win') && h.formDots(['win', null, 'loss']).includes('dot--pending'));
+
+  /* SplitSections раскладывает карточки на странице руководства. */
+  const sections = h.splitSections('вступление\n\n## Глава 1\nтело 1\n\n## Глава 2\nтело 2');
+  equal('splitSections: вступление плюс две карточки', sections.length, 3);
+  equal('splitSections: названия', sections.map((s) => s.title).join('|'), '|Глава 1|Глава 2');
+  equal('splitSections: вступление до заголовка', h.splitSections('вступление\n## Глава\nтело')[0].title, '');
+  equal('splitSections: пустой текст', h.splitSections('').length, 0);
+
+  /* ── roles: словарь ролей ── */
+  const { roleKey, roleLabel, roleBadge } = await import('../src/forum/roles.js');
+  equal('roleKey: владелец в базе — admin', roleKey({ role: 'admin' }), 'owner');
+  equal('roleKey: модератор', roleKey({ role: 'moderator' }), 'moderator');
+  equal('roleKey: остальные — участник', roleKey({ role: null }), 'member');
+  equal('roleKey: без аккаунта — участник', roleKey(null), 'member');
+  equal('roleLabel: владелец', roleLabel({ role: 'admin' }), 'владелец');
+  equal('roleBadge: участник без метки', roleBadge({ role: 'member' }), '');
+  equal('roleBadge: без аккаунта без метки', roleBadge(null), '');
+  check('roleBadge: владелец с короной',
+    roleBadge({ role: 'admin' }).includes('role-badge--owner') && roleBadge({ role: 'admin' }).includes('👑'));
+  check('roleBadge: модератор коротко', roleBadge({ role: 'moderator' }, { short: true }).includes('модератор'));
+
+  /* ── president-board: круговорот JSON ── */
+  const pb = await import('../src/logic/president-board.js');
+  const pbParsed = pb.parsePresidentBoard({ body: '{"name":"Люк","enabled":false,"note":"новое"}' });
+  equal('president: включается/выключается', pbParsed.enabled, false);
+  equal('president: имя', pbParsed.name, 'Люк');
+  equal('president: note', pbParsed.note, 'новое');
+  equal('president: битый JSON — значения по умолчанию', pb.parsePresidentBoard({ body: 'не json' }).name, 'Имя президента');
+  equal('president: пустой объект — значения по умолчанию', pb.parsePresidentBoard({}).name, 'Имя президента');
+  equal('president: сериализация-круг возвращает то же', pb.parsePresidentBoard({ body: pb.serializePresidentBoard({ name: 'Кира', enabled: false }) }).name, 'Кира');
+  equal('president: нужный ключ из texts', pb.presidentBoardFromTexts([{ key: 'president-board', body: '{"label":"ПРЕЗИДЕНТ СЕРВЕРА"}' }]).label, 'ПРЕЗИДЕНТ СЕРВЕРА');
+  equal('president: не тот ключ — по умолчанию', pb.presidentBoardFromTexts([{ key: 'другое', body: '{"label":"x"}' }]).label, 'ПРЕЗИДЕНТ СЕРВЕРА');
+  equal('president: текстов нет — по умолчанию', pb.presidentBoardFromTexts([]).enabled, true);
+
+  /* ── guide-roles: страница руководства ── */
+  const gr = await import('../src/logic/guide-roles.js');
+  equal('guide: не JSON — пять ролей по умолчанию', gr.parseGuidePage('не json').roles.length, 5);
+  equal('guide: роли не массив — по умолчанию', gr.parseGuidePage('{"roles":"не массив"}').roles.length, 5);
+  equal('guide: credit из JSON', gr.parseGuidePage('{"roles":[],"credit":"кто-то"}').credit, 'кто-то');
+  equal('guide: legacy-раздел принципов', gr.parseGuidePage(null, { principles: { title: 'Вступление', body: 'тело' } }).principlesTitle, 'Вступление');
+  check('guide: role приводится к чисту', (() => {
+    const page = gr.parseGuidePage('{"roles":[{"icon":"#","title":"  Офицер ","tone":"gold","intro":"  описание  ","items":["дело"," ",""],"assistant":true}]}');
+    return page.roles[0].title === 'Офицер' && page.roles[0].intro === 'описание' &&
+      page.roles[0].items.join(',') === 'дело' && page.roles[0].assistant === true;
+  })());
+  check('guide: serialize → parse круг', (() => {
+    const page = gr.parseGuidePage('{"roles":[{"icon":"#","title":"Офицер","tone":"cyan","intro":"i","items":["a"],"assistant":false}]}');
+    const again = gr.parseGuidePage({ body: gr.serializeGuideRoles(page) });
+    return again.roles[0].title === 'Офицер' && again.roles[0].items.join(',') === 'a';
+  })());
+  equal('guide: пустая роль для редактора', gr.blankGuideRole().title, 'Новая роль');
+  equal('guide: пустая роль со вставкой', gr.blankGuideRole().icon, '✦');
+
+  /* ── standings: движение и история мест ── */
+  const st = await import('../src/logic/standings.js');
+  const movers = st.computeMovers(
+    [{ id: 1, delta: 3 }, { id: 2, delta: -1 }, { id: 3, delta: 0 }, { id: 4, delta: null }, { id: 5, delta: 7 }],
+    2
+  );
+  equal('movers: вверх без нулей и null', movers.up.map((r) => r.id).join(','), '5,1');
+  equal('movers: вниз', movers.down.map((r) => r.id).join(','), '2');
+  equal('movers: лимит работает', movers.up.length, 2);
+
+  const histAlliances = [{ id: 'a', tag: 'A', name: 'А', active: true }, { id: 'b', tag: 'B', name: 'Б', active: true }];
+  const histWeeks = [
+    { id: 'W1', number: 1 }, { id: 'W2', number: 2 },
+  ];
+  const histResults = [
+    { weekId: 'W1', allianceId: 'a', outcome: 'win' },
+    { weekId: 'W1', allianceId: 'b', outcome: 'loss' },
+    { weekId: 'W2', allianceId: 'a', outcome: 'win' },
+    { weekId: 'W2', allianceId: 'b', outcome: 'loss' },
+  ];
+  const history = st.computePlaceHistory(histAlliances, [...histWeeks].reverse(), histResults, { win: 2, loss: 0 });
+  equal('history: места по неделям', history.get('a').join(','), '1,1');
+  equal('history: места второго', history.get('b').join(','), '2,2');
+
+  const windowOutcomes = st.computeWindowForm('a', histWeeks, [{ weekId: 'W2', allianceId: 'a', outcome: 'win' }]);
+  equal('windowForm: пустая неделя сохраняется', windowOutcomes.join(','), ',win');
+
+  /* ── chart: SVG-графики ── */
+  const chart = await import('../src/ui/chart.js');
+  const twoWeeks = [{ id: 'w1', number: 1 }, { id: 'w2', number: 2 }];
+  equal('areaChart: мало точек → пусто', chart.areaChart([1], twoWeeks, '#f00'), '');
+  equal('areaChart: нет данных → пусто', chart.areaChart(undefined, twoWeeks, '#f00'), '');
+  check('areaChart: большой график', chart.areaChart([0, 10, 8], twoWeeks, '#f00').includes('ch--big'));
+  check('areaChart: эталонная линия', chart.areaChart([0, 10], twoWeeks, '#f00', { reference: [0, 5] }).includes('средний по серверу'));
+  check('areaChart: цвет экранируется и не открывает атрибут',
+    !chart.areaChart([0, 10], twoWeeks, 'red" onload="x').includes(' onload="'));
+  equal('placeChart: мало точек → пусто', chart.placeChart([1], twoWeeks, 4, '#00f'), '');
+  check('placeChart: движение по местам', chart.placeChart([2, 1], twoWeeks, 4, '#00f').includes('ch__ytick'));
+  equal('raceChart: пустой список → пусто', chart.raceChart([], twoWeeks), '');
+  equal('raceChart: мало недель → пусто', chart.raceChart([{ alliance: { tag: 'A' }, series: [0, 1] }], [twoWeeks[0]]), '');
+  const race = chart.raceChart(
+    [
+      { alliance: { tag: 'A', color: '#111' }, series: [0, 10] },
+      { alliance: { tag: 'B', color: '#222' }, series: [0, 10] },
+    ],
+    twoWeeks
+  );
+  check('raceChart: подписи двух альянсов', (race.match(/class="ch__label"/g) ?? []).length === 2);
+  check('raceChart: сдвинутые подписи соединяются чёрточкой', race.includes('<line x1='));
+  const raceEsc = chart.raceChart([{ alliance: { tag: '<b>x</b>' }, series: [0, 10] }], twoWeeks);
+  check('raceChart: тег в имени не становится разметкой', !raceEsc.includes('<b>x') && raceEsc.includes('&lt;b&gt;x&lt;/b&gt;'));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

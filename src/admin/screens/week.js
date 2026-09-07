@@ -101,8 +101,8 @@ export function renderWeek(view, param) {
       ${
         canPush
           ? ''
-          : `<p class="adm-warn">У токена нет права на запись, поэтому клетки не нажимаются.
-               Нужно право «Contents: Read and write».</p>`
+          : `<p class="adm-warn">У вас нет права на запись, поэтому клетки не нажимаются.
+               Исправления вносят редакторы сайта — право выдаёт владелец на вкладке «Игроки».</p>`
       }
 
       <div class="adm-cells">${cells}</div>

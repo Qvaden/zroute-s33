@@ -1,4 +1,4 @@
-﻿/**
+/**
  * АДМИН-ПАНЕЛЬ.
  *
  * Отдельная точка входа, а не раздел сайта. Причины две: посетитель не должен
@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=9';
-import { esc, safeUrl } from '../ui/helpers.js?v=9';
-import { mapDataset } from '../data/adapters/_map.js?v=9';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=9';
-import { validateDataset } from '../data/contract.js?v=9';
+import { CONFIG } from '../../config.js?v=10';
+import { esc } from '../ui/helpers.js?v=10';
+import { mapDataset } from '../data/adapters/_map.js?v=10';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=10';
+import { validateDataset } from '../data/contract.js?v=10';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=9';
-import { renderHome } from '../pages/home.js?v=9';
+} from '../logic/standings.js?v=10';
+import { renderHome } from '../pages/home.js?v=10';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,29 +57,26 @@ import { renderHome } from '../pages/home.js?v=9';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=9';
+} from '../db/account.js?v=10';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=9';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=9';
-import { roleLabel } from '../forum/roles.js?v=9';
-import { prepareImage, uploadPath } from './image.js?v=9';
+} from './store.js?v=10';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=10';
+import { roleLabel } from '../forum/roles.js?v=10';
+import { prepareImage, uploadPath } from './image.js?v=10';
 import {
   applyMarks,
   applyEvents,
   applyAlliances,
   marksFromRaw,
   diffMarks,
-  commitMessage,
   eventsFromRaw,
   eventsDiff,
-  eventsCommitMessage,
   eventProblems,
   blankEvent,
   nextEventId,
   alliancesFromRaw,
   alliancesDiff,
-  alliancesCommitMessage,
   allianceProblems,
   allianceResultsCount,
   blankAlliance,
@@ -87,11 +84,9 @@ import {
   textsFromRaw,
   applyTexts,
   textsDiff,
-  textsCommitMessage,
   textProblems,
   blankText,
-  serialize,
-} from './edit.js?v=9';
+} from './edit.js?v=10';
 import {
   getDraft,
   saveDraft,
@@ -109,22 +104,22 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=9';
-import { renderShell } from './shell.js?v=9';
-import { renderLogin } from './login.js?v=9';
-import { renderOverview } from './screens/overview.js?v=9';
-import { renderWeek, describe } from './screens/week.js?v=9';
-import { renderAlliances } from './screens/alliances.js?v=9';
-import { renderEvents } from './screens/events.js?v=9';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=9';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=9';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=9';
-import { renderQuarter } from './screens/quarter.js?v=9';
-import { renderPresident } from './screens/president.js?v=9';
-import { renderPlayers } from './screens/players.js?v=9';
-import { renderModeration } from './screens/moderation.js?v=9';
-import { forum } from '../forum/index.js?v=9';
-import { deletionReason } from '../forum/rules.js?v=9';
+} from './draft.js?v=10';
+import { renderShell } from './shell.js?v=10';
+import { renderLogin } from './login.js?v=10';
+import { renderOverview } from './screens/overview.js?v=10';
+import { renderWeek, describe } from './screens/week.js?v=10';
+import { renderAlliances } from './screens/alliances.js?v=10';
+import { renderEvents } from './screens/events.js?v=10';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=10';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=10';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=10';
+import { renderQuarter } from './screens/quarter.js?v=10';
+import { renderPresident } from './screens/president.js?v=10';
+import { renderPlayers } from './screens/players.js?v=10';
+import { renderModeration } from './screens/moderation.js?v=10';
+import { forum } from '../forum/index.js?v=10';
+import { deletionReason } from '../forum/rules.js?v=10';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1562,7 +1557,7 @@ document.addEventListener('click', async (e) => {
   }
 
   if (e.target.closest('[data-events-reset]')) {
-    (view.events ?? []).forEach(revokePendingImage);
+    (view.events ?? []).forEach(revokePendingImages);
     dropEventsDraft();
     view.events = eventsFromRaw(view.raw);
     view.eventDraft = null;
@@ -1752,9 +1747,6 @@ document.addEventListener('input', (e) => {
       render();
     }
   }
-
-  const guideCredit = e.target.closest?.('[data-guide-credit]');
-  if (guideCredit && view?.guideDraft) view.guideDraft.credit = e.target.value;
 
   const guideRole = e.target.closest?.('[data-guide-role]');
   const guideExtra = e.target.closest?.('[data-guide-extra]');

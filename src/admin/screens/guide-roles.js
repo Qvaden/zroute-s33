@@ -47,7 +47,7 @@ export function renderGuideRoles(view) {
       ${textarea('Текст «Что даёт крупный альянс»', 'benefitsBody', page.benefitsBody, disabled, 8)}
       <header class="panel__head guide-editor__section-head"><h2>Финальная сноска</h2></header>
       ${field('Маленькая благодарность внизу страницы', 'credit', page.credit, disabled)}
-      ${view.canPush ? '' : '<p class="adm-warn">У токена нет права на запись — редактирование и публикация недоступны.</p>'}
+      ${view.canPush ? '' : '<p class="adm-warn">У вас нет права на запись — редактирование и публикация недоступны. Право выдаёт владелец на вкладке «Игроки».</p>'}
       <div class="adm-publish"><div class="adm-publish__state muted" data-guide-state>Изменения сохраняются в черновик браузера.</div><div class="adm-publish__actions"><button type="button" class="adm-btn" data-guide-reset ${disabled}>Сбросить</button><button type="button" class="adm-btn adm-btn--primary" data-guide-save ${disabled}>Сохранить черновик</button><button type="button" class="adm-btn adm-btn--primary" data-texts-publish ${disabled}>Опубликовать всю страницу</button></div></div><div class="adm-result" data-texts-result hidden></div>
       ${renderColorModal()}
     </section>`;

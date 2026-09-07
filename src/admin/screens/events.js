@@ -60,8 +60,8 @@ export function renderEvents(view) {
       ${
         canPush
           ? ''
-          : `<p class="adm-warn">У токена нет права на запись — летопись можно только смотреть.
-               Нужно право «Contents: Read and write».</p>`
+          : `<p class="adm-warn">У вас нет права на запись — летопись можно только смотреть.
+               Исправления вносят редакторы сайта — право выдаёт владелец на вкладке «Игроки».</p>`
       }
 
       ${list.length ? `<ul class="adm-evs">${list.map((e) => row(e, canPush)).join('')}</ul>` : empty()}

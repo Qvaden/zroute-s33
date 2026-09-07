@@ -50,7 +50,7 @@ export function renderShell({ screens, activeId, inner, login = '', role = '', c
         ${
           canPush
             ? ''
-            : '<span class="adm-badge" title="У токена нет права Contents: Read and write">только чтение</span>'
+            : '<span class="adm-badge" title="Нет права на публикацию — читать можно, менять нельзя">только чтение</span>'
         }
         ${
           drafts.length
@@ -74,7 +74,7 @@ export function renderShell({ screens, activeId, inner, login = '', role = '', c
     <main class="adm-main">${inner}</main>
 
     <footer class="adm-foot">
-      <span>Данные читаются напрямую из репозитория · сервера у панели нет</span>
+      <span>Данные живут в базе · отдельного сервера у панели нет</span>
       <a href="./index.html">Открыть сайт</a>
     </footer>`;
 }
