@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -52,6 +52,18 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!--
+    Соединение к базе разогреваем заранее: первый же запрос страницы идёт
+    в Supabase за данными рейтинга и лентой форума. DNS и TLS через preconnect
+    занимают всю связку, и без них данные начинают качаться на сотни мс позже.
+  -->
+  <link rel="preconnect" href="https://ebumybzkrhhyinpjpeuk.supabase.co" crossorigin>
+  <!--
+    Модули нестабильны в кэше и их много — 42 файла на 375 КБ. modulepreload
+    просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
+    ждать, пока разберётся HTML до конца страницы.
+  -->
+  <link rel="modulepreload" href="./src/main.js?v=19">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -178,7 +190,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=17"></script>
+  <script type="module" src="./src/main.js?v=19"></script>
 
   <script>
     /*

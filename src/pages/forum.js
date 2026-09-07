@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ФОРУМ — ГЛАВНАЯ ВКЛАДКА.
  *
  * Две части на одной странице, и порядок не случаен.
@@ -88,32 +88,45 @@ export function renderForum(view, state = {}) {
  * «что было за всю историю» и «что сейчас».
  */
 function renderChronicleBand(events) {
-  const list = serverEvents(events);
+  const server = serverEvents(events);
+  // Полоса живёт всей летописью: последняя запись — это последняя запись
+  // вообще, а не только последний захват или защита. Статистика ниже
+  // по-прежнему считается по серверным исходам.
+  const all = (events ?? [])
+    .filter((e) => e.date instanceof Date && !Number.isNaN(e.date.getTime()))
+    .sort((a, b) => b.date - a.date);
 
-  if (!list.length) {
+  if (!all.length) {
     return `
       <section class="hero forum-chron forum-chron--empty">
         <span class="eyebrow">Сводка сервера</span>
         <h1 class="forum-chron__title">Сервер 33 · сообщество</h1>
         <p class="muted">
-          Хроника захватов и защит появится здесь, как только внесут первую запись.
+          Хроника появится здесь, как только внесут первую запись.
           Форум ниже работает независимо от неё.
         </p>
       </section>`;
   }
 
-  const last = list[0];
-  const meta = EVENT_TYPE[last.type];
+  const last = all[0];
+  const meta = EVENT_TYPE[last.type] ?? EVENT_TYPE.other;
+  const kind = meta.kind ?? null;
 
-  const captures = list.filter((e) => e.type === 'server_capture').length;
-  const defended = list.filter((e) => e.type === 'server_defended').length;
+  const captures = server.filter((e) => e.type === 'server_capture').length;
+  const defended = server.filter((e) => e.type === 'server_defended').length;
 
   // Пять свежих: больше на телефоне уже требует прокрутки, а полоса должна
   // читаться целиком.
-  const recent = list.slice(0, 5);
+  const recent = all.slice(0, 5);
+
+  // Заголовок — самая последняя запись. У исходов вердикт уже сформулирован
+  // («Захватили Столицу сервера 36»), у остальных типов это название записи.
+  const title = meta.verdict
+    ? verdictText(last.type, last.serverNumber)
+    : (last.title || pillText(last.type, last.serverNumber));
 
   return `
-    <section class="hero forum-chron forum-chron--${esc(meta.kind)}">
+    <section class="hero forum-chron${kind ? ` forum-chron--${esc(kind)}` : ''}">
       <div class="forum-chron__head">
         <span class="eyebrow">Сводка сервера</span>
         <span class="forum-chron__live">
@@ -121,7 +134,7 @@ function renderChronicleBand(events) {
         </span>
       </div>
 
-      <h1 class="forum-chron__title">${esc(verdictText(last.type, last.serverNumber))}</h1>
+      <h1 class="forum-chron__title">${esc(title)}</h1>
       <p class="forum-chron__date">
         ${last.date.getUTCDate()} ${esc(MONTH_SHORT[last.date.getUTCMonth()])}, ${last.date.getUTCFullYear()}
         ${last.durationDays ? `<span class="hero__sep">·</span> ${esc(plural(last.durationDays, 'день', 'дня', 'дней'))}` : ''}
@@ -135,17 +148,21 @@ function renderChronicleBand(events) {
           <b class="num">${defended}</b><span>${defended === 1 ? 'защита своей' : 'защит своей'}</span>
         </div>
         <div class="forum-chron__stat">
-          <b class="num">${list.length}</b><span>${esc(plural(list.length, 'запись в летописи', 'записи в летописи', 'записей в летописи').replace(/^\d+\s/, ''))}</span>
+          <b class="num">${all.length}</b><span>${esc(plural(all.length, 'запись в летописи', 'записи в летописи', 'записей в летописи').replace(/^\d+\s/, ''))}</span>
         </div>
       </div>
 
       <ul class="forum-chron__feed">
         ${recent
           .map((e) => {
-            const m = EVENT_TYPE[e.type];
-            return `<li class="forum-chron__item forum-chron__item--${esc(m.kind)}">
+            const m = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
+            const k = m.kind ?? null;
+            const what = m.verdict
+              ? pillText(e.type, e.serverNumber)
+              : (e.title || pillText(e.type, e.serverNumber));
+            return `<li class="forum-chron__item${k ? ` forum-chron__item--${esc(k)}` : ''}">
               <span class="forum-chron__when num">${e.date.getUTCDate()} ${esc(MONTH_SHORT[e.date.getUTCMonth()])}</span>
-              <span class="forum-chron__what">${esc(pillText(e.type, e.serverNumber))}</span>
+              <span class="forum-chron__what">${esc(what)}</span>
             </li>`;
           })
           .join('')}

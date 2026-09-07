@@ -703,8 +703,13 @@ function wire() {
 
     const pickBtn = t.closest('[data-pick-open]');
     if (pickBtn && host.contains(pickBtn)) {
+      /*
+        Хронологии свои пикеры, форуму свои: оба обработчика живут на document
+        и ловят один и тот же клик. Пикер типа в Хронологии открывает её
+        обработчик, а наш закрыл бы обратно — поэтому чужие списки пропускаем.
+      */
       const pick = pickBtn.closest('.pick');
-      if (pick) {
+      if (pick && !pick.classList.contains('pick--tl')) {
         const open = !pick.classList.contains('is-open');
         closePicks();
         if (open) setPickOpen(pick, true);

@@ -1,6 +1,6 @@
-﻿import { CONFIG } from '../config.js?v=17';
-import { loadAll, capabilities, db } from './data/index.js?v=17';
-import { validateDataset } from './data/contract.js?v=17';
+import { CONFIG } from '../config.js?v=19';
+import { loadAll, capabilities, db } from './data/index.js?v=19';
+import { validateDataset } from './data/contract.js?v=19';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,21 +9,21 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=17';
-import { renderHome } from './pages/home.js?v=17';
-import { renderLadder } from './pages/ladder.js?v=17';
-import { renderQuarter } from './pages/quarter-final.js?v=17';
-import { renderTimeline } from './pages/timeline.js?v=17';
-import { renderGuide } from './pages/guide.js?v=17';
-import { renderBot } from './pages/bot.js?v=17';
-import { renderAlliance } from './pages/alliance.js?v=17';
-import { computeAchievements } from './logic/achievements.js?v=17';
-import { esc } from './ui/helpers.js?v=17';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=17';
+} from './logic/standings.js?v=19';
+import { renderHome } from './pages/home.js?v=19';
+import { renderLadder } from './pages/ladder.js?v=19';
+import { renderQuarter } from './pages/quarter-final.js?v=19';
+import { renderTimeline } from './pages/timeline.js?v=19';
+import { renderGuide } from './pages/guide.js?v=19';
+import { renderBot } from './pages/bot.js?v=19';
+import { renderAlliance } from './pages/alliance.js?v=19';
+import { computeAchievements } from './logic/achievements.js?v=19';
+import { esc } from './ui/helpers.js?v=19';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=19';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=17';
-import './ui/timeline-controls.js?v=17';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=17';
+import './ui/ladder-controls.js?v=19';
+import './ui/timeline-controls.js?v=19';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=19';
 
 /*
   РАЗДЕЛЫ.
@@ -64,7 +64,7 @@ const bootStartedAt = performance.now();
 
 function finishBootLoader() {
   if (!bootLoader || !isFirstVisit) return;
-  const wait = Math.max(0, 420 - (performance.now() - bootStartedAt));
+  const wait = Math.max(0, 180 - (performance.now() - bootStartedAt));
   window.setTimeout(() => {
     bootLoader.classList.add('is-hidden');
     document.documentElement.classList.add('s33-loader-seen');

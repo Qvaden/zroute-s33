@@ -197,11 +197,15 @@
     var openBtn = e.target.closest('[data-pick-open]');
     if (openBtn) {
       var pick = openBtn.closest('.pick');
-      if (pick) {
-        var wantOpen = !pick.classList.contains('is-open');
-        closePicks();
-        if (wantOpen) setPickOpen(pick, true);
-      }
+      /*
+        Чужие списки не трогаем: у форума свой делегат на document, и оба
+        обработчика ловят один и тот же клик. Форумная кнопка уже раскрыта
+        хронологией — второй удар по ней закрывает обратно.
+      */
+      if (!pick || !pick.classList.contains('pick--tl')) return;
+      var wantOpen = !pick.classList.contains('is-open');
+      closePicks();
+      if (wantOpen) setPickOpen(pick, true);
       return;
     }
 

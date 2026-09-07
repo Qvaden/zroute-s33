@@ -63,7 +63,7 @@ export function renderTimeline({ events } = {}) {
   const captures = sorted.filter((e) => e.type === 'server_capture');
 
   return `
-    ${renderServerSection(server)}
+    ${renderServerSection(sorted)}
     ${captures.length || sorted.length ? renderTrophies(captures, sorted) : ''}
     ${sorted.length ? renderFilters(sorted) : ''}
     ${sorted.length ? renderFeed(sorted) : ''}
@@ -82,6 +82,10 @@ const MONTH_NAME = [
 /**
  * ЧТО ДЕЛАЛ СЕРВЕР — крупный вердикт и летопись под ним.
  *
+ * Список — вся летопись целиком (свежие сверху), а не только захваты
+ * и защиты: самый последний вердикт и первая плашка должны отвечать
+ * на вопрос «что в летописи происходит прямо сейчас».
+ *
  * Вердикт показывает не обязательно последнее событие: по нажатию на любую
  * плашку он переключается на неё. Календарь (год → месяц) фильтрует и плашки,
  * и ленту событий ниже — «сентябрь» означает сентябрь везде.
@@ -95,15 +99,18 @@ function renderServerSection(list) {
 
   const cards = list
     .map((e, i) => {
-      const m = EVENT_TYPE[e.type];
+      const m = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
+      // У исходов вердикт готов («Захватили Столицу сервера 36»), у остальных
+      // типов — это название записи, как в ленте ниже.
+      const text = m.verdict ? verdictText(e.type, e.serverNumber) : (e.title || pillText(e.type, e.serverNumber));
       return `
-        <div class="verdict verdict--${m.kind}" data-tl-verdict="${esc(e.id)}" ${i === 0 ? '' : 'hidden'}>
+        <div class="verdict${m.kind ? ` verdict--${esc(m.kind)}` : ''}" data-tl-verdict="${esc(e.id)}" ${i === 0 ? '' : 'hidden'}>
           <div class="verdict__week">
             <span>${esc(MONTH_SHORT[e.date.getUTCMonth()])}</span>
             <b class="num">${e.date.getUTCDate()}</b>
           </div>
           <div class="verdict__body">
-            <h2 class="verdict__text">${esc(verdictText(e.type, e.serverNumber))}</h2>
+            <h2 class="verdict__text">${esc(text)}</h2>
             <p class="verdict__dates">
               ${esc(fmtDateFull(e.date))}
               ${e.durationDays ? `<span class="hero__sep">·</span> ${plural(e.durationDays, 'день', 'дня', 'дней')}` : ''}
@@ -133,9 +140,9 @@ function renderServerSection(list) {
   */
   const pills = list
     .map((e) => {
-      const m = EVENT_TYPE[e.type];
+      const m = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
       return `<li>
-        <button type="button" class="wk wk--${m.kind} wk--${m.action}"
+        <button type="button" class="wk${m.kind ? ` wk--${esc(m.kind)}` : ''}${m.action ? ` wk--${esc(m.action)}` : ''}"
                 data-tl-week="${esc(e.id)}" data-tl-ym="${ymKey(e.date)}"
                 title="${esc(fmtDateFull(e.date))}">
           <span class="wk__num num">${esc(fmtDate(e.date))}</span>
