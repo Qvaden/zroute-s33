@@ -670,7 +670,16 @@ select
   case r.target_type
     when 'post' then (select author_nick from public.forum_posts where id = r.target_id)
     else (select author_nick from public.forum_comments where id = r.target_id)
-  end as target_author_nick
+  end as target_author_nick,
+  /*
+    Пост, в котором сидит цель жалобы. Для жалобы на пост это сама цель,
+    для жалобы на комментарий — родительский пост: на него ведёт ссылка
+    «Открыть на сайте».
+  */
+  case r.target_type
+    when 'post' then r.target_id
+    else (select post_id from public.forum_comments where id = r.target_id)
+  end as target_post_id
 from public.forum_reports r
 join public.forum_users reporter on reporter.id = r.reporter_id;
 

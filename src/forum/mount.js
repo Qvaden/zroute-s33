@@ -324,6 +324,7 @@ async function loadFeed({ append = false } = {}) {
 async function loadThread(postId) {
   state.openPostId = postId;
   state.comments = [];
+  state.loading = false;
   paint();
 
   try {
@@ -342,6 +343,7 @@ async function loadThread(postId) {
   } catch (err) {
     state.error = String(err?.message ?? err);
   }
+  state.loading = false;
   paint();
 }
 
@@ -512,7 +514,7 @@ function wire() {
   wired = true;
 
   document.addEventListener('click', async (e) => {
-    if (!host || !e.target.closest) return;
+    if (!host || !host.contains(e.target) || !e.target.closest) return;
     const t = e.target;
 
     /* ── Картинки в форме ── */
@@ -916,7 +918,7 @@ function wire() {
     большим пальцем неудобно.
   */
   document.addEventListener('click', (e) => {
-    if (!host || !e.target.classList) return;
+    if (!host || !host.contains(e.target) || !e.target.classList) return;
     if (e.target.matches('[data-forum-report-modal]')) closeModal('[data-forum-report-modal]');
     if (e.target.matches('[data-forum-delete-modal]')) closeModal('[data-forum-delete-modal]');
   });

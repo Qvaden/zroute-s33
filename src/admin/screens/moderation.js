@@ -140,8 +140,9 @@ function renderReport(r) {
       </div>
 
       <div class="adm-actions adm-report__acts">
-        <a class="adm-btn" href="./index.html#/forum/${esc(r.targetType === 'post' ? r.targetId : '')}"
-           target="_blank" rel="noopener">Открыть на сайте</a>
+        <a class="adm-btn" href="./index.html#/forum/${esc(r.targetPostId || r.targetId)}"
+           target="_blank" rel="noopener"
+           title="${r.targetPostId ? 'Открыть пост, в котором сидит нарушение' : 'Открыть пост'}">Открыть на сайте</a>
         <button type="button" class="adm-btn adm-btn--primary"
                 data-report-delete="${esc(r.id)}"
                 data-report-target="${esc(r.targetType)}:${esc(r.targetId)}"

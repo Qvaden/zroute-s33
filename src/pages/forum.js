@@ -26,7 +26,7 @@ import { postBody, excerpt, timeAgo, fullTime, nickColor, nickInitial } from '..
 import { roleBadge, roleLabel } from '../forum/roles.js';
 import { CONFIG } from '../../config.js';
 
-const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
 /**
  * @typedef {Object} ForumViewState
@@ -121,7 +121,7 @@ function renderChronicleBand(events) {
 
       <h1 class="forum-chron__title">${esc(verdictText(last.type, last.serverNumber))}</h1>
       <p class="forum-chron__date">
-        ${esc(MONTH_SHORT[last.date.getUTCMonth()])} ${last.date.getUTCDate()}, ${last.date.getUTCFullYear()}
+        ${last.date.getUTCDate()} ${esc(MONTH_SHORT[last.date.getUTCMonth()])}, ${last.date.getUTCFullYear()}
         ${last.durationDays ? `<span class="hero__sep">·</span> ${esc(plural(last.durationDays, 'день', 'дня', 'дней'))}` : ''}
       </p>
 

@@ -579,3 +579,43 @@ select
   ), '[]'::jsonb) as attachments
 from public.forum_comments c
 left join public.forum_profiles prof on prof.id = c.author_id;
+
+-- ── Жалобы с родительским постом ────────────────────────────────────────────
+--
+-- Панель модерации показывает для каждой жалобы ссылку «Открыть на сайте».
+-- Для жалобы на комментарий ссылка должна вести в пост, где тот сидит, — вот
+-- target_post_id: для поста это сама цель, для комментария — родительский пост.
+-- Без этого ссылка приводила на пустую страницу.
+
+drop view if exists public.forum_report_list;
+
+create view public.forum_report_list
+with (security_invoker = on) as
+select
+  r.id,
+  r.target_type,
+  r.target_id,
+  r.reporter_id,
+  reporter.nick as reporter_nick,
+  r.rule_id,
+  r.note,
+  r.created_at,
+  r.resolved,
+  case r.target_type
+    when 'post' then (select title from public.forum_posts where id = r.target_id)
+    else ''
+  end as target_title,
+  case r.target_type
+    when 'post' then (select left(body, 400) from public.forum_posts where id = r.target_id)
+    else (select left(body, 400) from public.forum_comments where id = r.target_id)
+  end as target_body,
+  case r.target_type
+    when 'post' then (select author_nick from public.forum_posts where id = r.target_id)
+    else (select author_nick from public.forum_comments where id = r.target_id)
+  end as target_author_nick,
+  case r.target_type
+    when 'post' then r.target_id
+    else (select post_id from public.forum_comments where id = r.target_id)
+  end as target_post_id
+from public.forum_reports r
+join public.forum_users reporter on reporter.id = r.reporter_id;

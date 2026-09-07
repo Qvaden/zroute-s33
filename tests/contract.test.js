@@ -2127,6 +2127,12 @@ console.log('\nQ. Форум');
   */
   const { nickToLocalPart, nickToEmail } = await import('../src/forum/nick-email.js');
   const supabaseSource = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  /*
+    Транспорт (вход, таблицы, сессия, очистка адреса) — общий на весь проект
+    и живёт в src/db/client.js, а адаптер форума его использует. Поэтому
+    проверки того, как это устроено внутри, смотрим в clientSource.
+  */
+  const clientSource = await readFile('src/db/client.js', 'utf8');
 
   const NICKS = [
     'Ковыль', 'Тёмный Лорд', 'Игрок77', 'Qvaden', 'linktest77',
@@ -2192,9 +2198,9 @@ console.log('\nQ. Форум');
     ошибка — и сказать надо именно так.
   */
   check('отказ по формату адреса объясняется как наша ошибка, а не вина игрока',
-    /это наша ошибка/i.test(supabaseSource) && /validate email\|invalid format/.test(supabaseSource));
+    /это наша ошибка/i.test(clientSource) && /validate email\|invalid format/.test(clientSource));
   check('отказ индекса по нику переводится в «ник занят»',
-    /forum_users_nick_key/.test(supabaseSource));
+    /forum_users_nick_key/.test(clientSource));
 
   /*
     КТО Я — ЭТО ПРОВЕРКА ИДЕНТИФИКАТОРА, А НЕ ПРАВ ДОСТУПА.
@@ -2207,10 +2213,14 @@ console.log('\nQ. Форум');
 
     Совпадение ответов на «кто я» и «что мне можно читать» было случайным.
   */
+  /*
+    «Кто я» решает общий клиент через `currentUserId` (sub из токена).
+    Проверяем, что адаптер форума делегирует ему, а не ищет первую строку.
+  */
   check('«кто я» спрашивается по идентификатору из токена, а не первой строкой',
     /id=eq\.\$\{encodeURIComponent\(myId\)\}/.test(supabaseSource));
   check('идентификатор берётся из токена сессии',
-    /userIdFromToken/.test(supabaseSource) && /payload\?\.sub/.test(supabaseSource));
+    /currentUserId\(\)/.test(supabaseSource) && /\.sub\b/.test(clientSource));
   check('в запросе профиля нет ставки на «первую строку»',
     !/'\/forum_users\?select=\*&limit=1'/.test(supabaseSource));
   /*
@@ -2219,7 +2229,7 @@ console.log('\nQ. Форум');
     падал бы на части ников случайным образом.
   */
   check('base64url приводится к обычному base64 перед разбором',
-    /replace\(\/-\/g, '\+'\)\.replace\(\/_\/g, '\/'\)/.test(supabaseSource));
+    /replace\(\/-\/g, '\+'\)\.replace\(\/_\/g, '\/'\)/.test(clientSource));
 
   /* ── Согласованность слоёв ── */
 
@@ -2259,9 +2269,9 @@ console.log('\nQ. Форум');
     на то, что человек скопировал не то, что было написано.
   */
   check('адрес проекта чистится от хвоста /rest/v1 и /auth/v1',
-    /replace\(\/\\\/\(rest\|auth\)\\\/v\\d\+\\\/\?\$\/i, ''\)/.test(supabaseSource));
+    /replace\(\/\\\/\(rest\|auth\|storage\)\\\/v\\d\+\\\/\?\$\/i, ''\)/.test(clientSource));
   check('запросы строятся от очищенного адреса, а не от строки из конфига',
-    !/\$\{CFG\.url\}\/(rest|auth)/.test(supabaseSource) && /baseUrl\(\)/.test(supabaseSource));
+    !/\$\{CFG\.url\}\/(rest|auth)/.test(clientSource) && /baseUrl\(\)/.test(clientSource));
 
   /*
     Локальный режим паролей не знает вовсе. Изобразить успешный сброс было бы

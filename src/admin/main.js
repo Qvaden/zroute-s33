@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=8';
-import { esc, safeUrl } from '../ui/helpers.js?v=8';
-import { mapDataset } from '../data/adapters/_map.js?v=8';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=8';
-import { validateDataset } from '../data/contract.js?v=8';
+import { CONFIG } from '../../config.js?v=9';
+import { esc, safeUrl } from '../ui/helpers.js?v=9';
+import { mapDataset } from '../data/adapters/_map.js?v=9';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=9';
+import { validateDataset } from '../data/contract.js?v=9';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=8';
-import { renderHome } from '../pages/home.js?v=8';
+} from '../logic/standings.js?v=9';
+import { renderHome } from '../pages/home.js?v=9';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=8';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=8';
+} from '../db/account.js?v=9';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=8';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=8';
-import { roleLabel } from '../forum/roles.js?v=8';
-import { prepareImage, uploadPath } from './image.js?v=8';
+} from './store.js?v=9';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=9';
+import { roleLabel } from '../forum/roles.js?v=9';
+import { prepareImage, uploadPath } from './image.js?v=9';
 import {
   applyMarks,
   applyEvents,
@@ -91,7 +91,7 @@ import {
   textProblems,
   blankText,
   serialize,
-} from './edit.js?v=8';
+} from './edit.js?v=9';
 import {
   getDraft,
   saveDraft,
@@ -109,22 +109,22 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=8';
-import { renderShell } from './shell.js?v=8';
-import { renderLogin } from './login.js?v=8';
-import { renderOverview } from './screens/overview.js?v=8';
-import { renderWeek, describe } from './screens/week.js?v=8';
-import { renderAlliances } from './screens/alliances.js?v=8';
-import { renderEvents } from './screens/events.js?v=8';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=8';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=8';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=8';
-import { renderQuarter } from './screens/quarter.js?v=8';
-import { renderPresident } from './screens/president.js?v=8';
-import { renderPlayers } from './screens/players.js?v=8';
-import { renderModeration } from './screens/moderation.js?v=8';
-import { forum } from '../forum/index.js?v=8';
-import { deletionReason } from '../forum/rules.js?v=8';
+} from './draft.js?v=9';
+import { renderShell } from './shell.js?v=9';
+import { renderLogin } from './login.js?v=9';
+import { renderOverview } from './screens/overview.js?v=9';
+import { renderWeek, describe } from './screens/week.js?v=9';
+import { renderAlliances } from './screens/alliances.js?v=9';
+import { renderEvents } from './screens/events.js?v=9';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=9';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=9';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=9';
+import { renderQuarter } from './screens/quarter.js?v=9';
+import { renderPresident } from './screens/president.js?v=9';
+import { renderPlayers } from './screens/players.js?v=9';
+import { renderModeration } from './screens/moderation.js?v=9';
+import { forum } from '../forum/index.js?v=9';
+import { deletionReason } from '../forum/rules.js?v=9';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -535,7 +535,7 @@ async function publishDataset({ candidate, resultBox, onDone, button }) {
     box.hidden = false;
   };
 
-  const label = button?.textContent;
+  const label = button?.dataset.restoreLabel || button?.textContent;
   if (button) {
     button.disabled = true;
     button.textContent = 'Публикуем…';
@@ -782,6 +782,9 @@ async function publishEvents() {
       saveEventsDraft(stripTransient(view.events));
     }
     if (button) button.textContent = 'Публикуем…';
+    // publishDataset захватил бы уже занятую надпись «Публикуем…» и вернул бы
+    // её кнопке после отмены. Говорим явно, во что возвращать.
+    if (button) button.dataset.restoreLabel = 'Опубликовать';
 
     const candidate = applyEvents(view.raw, view.events);
 
@@ -1193,9 +1196,12 @@ async function loadForumScreen(screenId) {
   }
 
   try {
-    if (canModerate(account)) {
-      if (screenId === 'players') view.forum.users = await forum.listUsers();
-      else view.forum.reports = await forum.listReports();
+    if (screenId === 'players') {
+      // Игроки — вкладка владельца: только он управляет людьми. Модератору
+      // тащить весь список бессмысленно — ему он всё равно не покажется.
+      if (canManagePeople(account)) view.forum.users = await forum.listUsers();
+    } else if (canModerate(account)) {
+      view.forum.reports = await forum.listReports();
     }
   } catch (err) {
     view.forum.error = String(err?.message ?? err);
@@ -1327,6 +1333,12 @@ document.addEventListener('submit', async (e) => {
     const note = String(restrictForm.note.value ?? '');
 
     try {
+      // Пункт правил нужен, только когда мера что-то ограничивает.
+      // «Снять все ограничения» обходится и без него.
+      if (duration !== 'none' && !ruleId) {
+        throw new Error('Выберите пункт правил: игрок должен знать причину');
+      }
+
       if (duration === 'none') {
         await forum.setRestriction(userId, { banned: false, mutedUntil: null, reason: '' });
       } else if (duration === 'ban') {

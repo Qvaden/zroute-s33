@@ -255,7 +255,12 @@ function renderRestrictModal() {
         <form data-restrict-form>
           <label class="adm-field">
             <span>Пункт правил</span>
-            <select name="ruleId" required>
+            <!--
+              Обязателен, только когда мера что-то ограничивает (тишина, запрет).
+              «Снять все ограничения» пункт не требует: к нарушению на этом шаге
+              никто не обращается.
+            -->
+            <select name="ruleId">
               ${RULES.map(
                 (r, i) => `<option value="${esc(r.id)}">${i + 1}. ${esc(r.title)}</option>`
               ).join('')}

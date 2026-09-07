@@ -403,6 +403,10 @@ export async function report({ targetType, targetId, ruleId, note = '' }) {
     id: newId('r'),
     targetType,
     targetId,
+    // Родительский пост: по нему строится ссылка «Открыть на сайте».
+    targetPostId: targetType === 'comment'
+      ? s.comments.find((c) => c.id === targetId)?.postId ?? null
+      : targetId,
     reporterId: me.id,
     reporterNick: me.nick,
     ruleId,

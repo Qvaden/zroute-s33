@@ -522,6 +522,8 @@
 .adm-result--ok b { color: var(--win); }
 .adm-result--bad { border-color: color-mix(in srgb, var(--loss) 40%, transparent); }
 .adm-result--bad b { color: var(--loss); }
+.adm-result--err { border-color: color-mix(in srgb, var(--loss) 40%, transparent); }
+.adm-result--err b { color: var(--loss); }
 .adm-result--warn { border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
 .adm-result--warn b { color: var(--gold); }
 
