@@ -3257,6 +3257,133 @@ console.log('\nS. Чистые функции');
   check('raceChart: тег в имени не становится разметкой', !raceEsc.includes('<b>x') && raceEsc.includes('&lt;b&gt;x&lt;/b&gt;'));
 }
 
+{
+  /* ── Уровни и достижения форума (rank.js) ── */
+  const { pointsOf, levelOf, progressOf, achievementsOf, doneCount, LEVELS } = await import('../src/forum/rank.js');
+
+  equal('points: пустой профиль даёт ноль', pointsOf({}), 0);
+  equal('points: пост = 10', pointsOf({ postCount: 1 }), 10);
+  equal('points: ответ = 3', pointsOf({ commentCount: 2 }), 6);
+  equal('points: согласие = 2', pointsOf({ likesReceived: 3 }), 6);
+  equal('points: всё вместе', pointsOf({ postCount: 2, commentCount: 1, likesReceived: 5 }), 33);
+
+  equal('level: новичок с нуля', levelOf({}).title, 'Новичок');
+  equal('level: порог 20 поднимает до Писаря', levelOf({ likesReceived: 10 }).title, 'Писарь');
+  equal('level: 60 — Летописец', levelOf({ commentCount: 20 }).title, 'Летописец');
+  equal('level: последний уровень — Легенда', LEVELS[LEVELS.length - 1].title, 'Легенда');
+  equal('level: за границей верхнего порога — Легенда', levelOf({ postCount: 100 }).title, 'Легенда');
+
+  const p = progressOf({ commentCount: 10 }); // 30 точек, уровень 2 (от 20)
+  equal('progress: до следующего уровня считается от своего порога', p.to, 60);
+  equal('progress: доля заполнена', p.pct, 25);
+  const top = progressOf({ postCount: 100 }); // 1000 — выше Легенды
+  equal('progress: на последнем уровне нет следующего', top.to, 0);
+  equal('progress: на последнем уровне поле заполнено', top.pct, 100);
+
+  const freshDate = new Date();
+  const young = achievementsOf({ postCount: 0, commentCount: 0, likesReceived: 0 });
+  equal('achievements: у новичка ноль выполненных',
+    doneCount({ postCount: 0, commentCount: 0, likesReceived: 0 }), 0);
+  check('achievements: новичок не ошибается в счётчике',
+    young.filter((a) => a.done).length === 0);
+
+  const onePost = achievementsOf({ postCount: 1, commentCount: 0, likesReceived: 0 });
+  check('achievements: первый пост отмечается', onePost.find((a) => a.id === 'first_post').done);
+  check('achievements: десять постов — не сразу', !onePost.find((a) => a.id === 'ten_posts').done);
+  check('achievements: все имеют подпись', onePost.every((a) => typeof a.hint === 'string' && a.hint.length > 0));
+
+  const withAv = achievementsOf({ avatarUrl: '/x.png' });
+  check('achievements: аватарка даёт значок', withAv.find((a) => a.id === 'has_avatar').done);
+
+  const old = achievementsOf({ createdAt: new Date(Date.now() - 40 * 24 * 3600e3) });
+  check('achievements: месяц на форуме даёт значок', old.find((a) => a.id === 'month_old').done);
+  const notOld = achievementsOf({ createdAt: new Date(Date.now() - 1000) });
+  check('achievements: свежий человек не получает значок месяца', !notOld.find((a) => a.id === 'month_old').done);
+
+  check('achievements: набор значков полный', (await import('../src/forum/rank.js')).achievementsOf({}).length === 6);
+
+  /* ── «Самое обсуждаемое» и приветствие на странице форума ── */
+  const { renderForum } = await import('../src/pages/forum.js');
+  const mkPost = (i, extra = {}) => ({
+    id: `p${i}`, authorId: 'u', authorNick: 'Кто-то', authorAvatar: '', authorAlliance: '',
+    authorRole: 'user', category: 'news', title: `Тема ${i}`, body: 'текст',
+    createdAt: new Date(), editedAt: undefined, pinned: false, deleted: false,
+    deletedReason: '', commentCount: 0, reactions: {}, myReaction: null, score: 0,
+    attachments: [], ...extra,
+  });
+  const posts = [mkPost(1, { commentCount: 4, score: 3 }), mkPost(2), mkPost(3, { commentCount: 7 })];
+  const hot = posts.filter((p) => p.commentCount > 0 && !p.deleted);
+
+  const guestHtml = renderForum({ events: [] }, {
+    ready: true, shared: true, sourceName: 's', me: null, posts, hot, total: 3,
+    category: 'all', sort: 'fresh', loading: false, error: '', openPostId: null,
+    comments: [], query: '',
+  });
+  check('горячие темы: блок рисуется, когда есть о чём',
+    /data-forum-hot/.test(guestHtml));
+  const hotBlock = guestHtml.match(/<section class="forum-hot"[\s\S]*?<\/section>/)?.[0] ?? '';
+  check('горячие темы: отвечают темы только с ответами',
+    /Тема 3/.test(hotBlock) && !/Тема 2/.test(hotBlock));
+  check('горячие темы: заголовок про обсуждение',
+    /Самое обсуждаемое/.test(guestHtml));
+  check('приветствие: гостю рисуется',
+    /data-forum-welcome/.test(guestHtml));
+
+  const memberHtml = renderForum({ events: [] }, {
+    ready: true, shared: true, sourceName: 's', me: { id: 'u', nick: 'Кто-то', role: 'user', createdAt: new Date() },
+    posts, hot, total: 3, category: 'all', sort: 'fresh', loading: false,
+    error: '', openPostId: null, comments: [], query: '',
+  });
+  check('приветствие: вошедшему не рисуется', !/data-forum-welcome/.test(memberHtml));
+  check('горячие темы: вошедшему остаются', /data-forum-hot/.test(memberHtml));
+
+  const noHot = renderForum({ events: [] }, {
+    ready: true, shared: true, sourceName: 's', me: null, posts, hot: [], total: 3,
+    category: 'all', sort: 'fresh', loading: false, error: '', openPostId: null,
+    comments: [], query: '',
+  });
+  check('горячие темы: пустой список ничего не рисует', !/data-forum-hot/.test(noHot));
+
+  /* ── Уровень и значки на странице участника ── */
+  const { renderUserPage } = await import('../src/pages/user.js');
+  const profile = {
+    id: 'u', nick: 'Кто-то', avatarUrl: '', about: '', allianceTag: '', role: 'user',
+    createdAt: new Date(), postCount: 3, commentCount: 8, likesReceived: 5,
+  };
+  const userHtml = renderUserPage({ profile, posts, me: null, nick: 'Кто-то' });
+  check('профиль: блок уровня есть', /forum-rank/.test(userHtml));
+  check('профиль: название уровня показывается',
+    /Летописец/.test(userHtml)); // 3*10+8*3+5*2=64 → уровень 3
+  check('профиль: прогресс до следующего уровня считается',
+    /до следующего уровня/.test(userHtml));
+  check('профиль: значки рисуются все шесть',
+    (userHtml.match(/<span class="forum-rank__ach\b/g) ?? []).length === 6);
+  check('профиль: подпись «X из 6» есть', /из 6 достижений/.test(userHtml));
+
+  // Значение достижения экранируется — иначе накрученный ник открыл бы атрибут.
+  const evil = achievementsOf({ postCount: 1, commentCount: 0, likesReceived: 0 }).find((a) => a.id === 'first_post');
+  check('achievements: подпись не должна зависеть от текста профиля', typeof evil.hint === 'string' && !/"/.test(evil.hint));
+}
+
+/* ── Источник: «Самое обсуждаемое» тянется вместе с лентой ── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const mountSource = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSource = await readFile('src/pages/forum.js', 'utf8');
+  const userSource = await readFile('src/pages/user.js', 'utf8');
+
+  check('лента тянет горячие темы через sort=talked',
+    /listPosts\(\{ sort: 'talked', limit: 3 \}\)/.test(mountSource));
+  check('горячие темы не роняют ленту при ошибке',
+    /catch\s*\{\s*state\.hot\s*=\s*state\.hot/.test(mountSource));
+  check('удалённые темы не попадают в горячие',
+    /!p\.deleted\s*&&\s*p\.commentCount\s*>\s*0/.test(mountSource));
+  check('гостю рисуется призыв, вошедшему нет',
+    /!s\.ready \|\| !s\.posts\.length \|\| s\.me/.test(pagesSource));
+  check('профиль считает уровень и значки из тех же функций',
+    /rank\.js/.test(userSource) && /достижений/.test(userSource));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

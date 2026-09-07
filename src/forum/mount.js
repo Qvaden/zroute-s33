@@ -47,6 +47,8 @@ const state = {
   editingPostId: null,
   /** Что удаляем или на что жалуемся, пока открыто окно. */
   pending: null,
+  /** «Самое обсуждаемое» — три темы для блока горячих. */
+  hot: [],
 };
 
 /**
@@ -373,6 +375,20 @@ async function loadFeed({ append = false } = {}) {
     });
     state.posts = append ? [...state.posts, ...posts] : posts;
     state.total = total;
+
+    /*
+      «Самое обсуждаемое» тянем вместе со свежей лентой, а не отдельно: это
+      та же лента, отсортированная по ответам. Неудача здесь не роняет страницу —
+      блок просто остаётся с прошлыми темами, а не пропадает.
+    */
+    if (!append) {
+      try {
+        const hot = await forum.listPosts({ sort: 'talked', limit: 3 });
+        state.hot = (hot.posts ?? []).filter((p) => !p.deleted && p.commentCount > 0);
+      } catch {
+        state.hot = state.hot;
+      }
+    }
   } catch (err) {
     state.error = String(err?.message ?? err);
   } finally {
@@ -718,6 +734,22 @@ function wire() {
     }
 
     /* ── Картинки в форме ── */
+
+    /*
+      «Войти и начать тему» в приветствии ведёт к форме входа: форма ниже по
+      странице, а на телефоне баннер вообще за экраном. Это переход, а не
+      действие — после него человек сам решает, куда идти.
+    */
+    const welcomeAuth = t.closest('[data-forum-welcome-auth]');
+    if (welcomeAuth && host.contains(welcomeAuth)) {
+      const form = host.querySelector('[data-forum-auth]');
+      if (form) {
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const nick = form.querySelector('input[name="nick"]');
+        nick?.focus({ preventScroll: true });
+      }
+      return;
+    }
 
     const dropBtn = t.closest('[data-attach-drop]');
     if (dropBtn && host.contains(dropBtn)) {

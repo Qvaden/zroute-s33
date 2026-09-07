@@ -15,6 +15,7 @@
 import { esc } from '../ui/helpers.js';
 import { excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { roleBadge, roleLabel } from '../forum/roles.js';
+import { levelOf, progressOf, achievementsOf, doneCount } from '../forum/rank.js';
 
 /**
  * @param {{
@@ -63,6 +64,7 @@ export function renderUserPage(state = {}) {
     ${renderCard(profile, isMe, editing)}
     ${editing && isMe ? renderEditForm(profile) : ''}
     ${renderStats(profile)}
+    ${renderRank(profile)}
     ${renderPosts(profile, posts)}`;
 }
 
@@ -195,6 +197,41 @@ function renderStats(p) {
         )
         .join('')}
     </div>`;
+}
+
+/* ── Уровень и достижения ────────────────────────────────────────────────── */
+
+function renderRank(p) {
+  const cur = levelOf(p);
+  const prog = progressOf(p);
+  const achs = achievementsOf(p);
+  const done = doneCount(p);
+  const total = achs.length;
+
+  return `
+    <section class="panel forum-rank">
+      <header class="forum-rank__head">
+        <span class="eyebrow">Активность</span>
+        <span class="forum-rank__level">Уровень ${cur.level}: <b>${esc(cur.title)}</b></span>
+      </header>
+
+      ${prog.to
+        ? `<div class="forum-rank__bar">
+          <div class="forum-rank__fill" style="width:${prog.pct}%"></div>
+          <span class="forum-rank__label">${prog.points} из ${prog.to} точек до следующего уровня</span>
+        </div>`
+        : `<p class="forum-rank__label forum-rank__label--top">Максимальный уровень</p>`}
+
+      <div class="forum-rank__achs">
+        ${achs
+          .map(
+            (a) => `<span class="forum-rank__ach ${a.done ? 'forum-rank__ach--done' : ''}"
+                           title="${esc(a.hint)}">${esc(a.title)}</span>`
+          )
+          .join('')}
+      </div>
+      <p class="forum-rank__sum muted">${done} из ${total} достижений</p>
+    </section>`;
 }
 
 /* ── Посты участника ──────────────────────────────────────────────────────── */

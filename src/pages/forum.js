@@ -64,11 +64,14 @@ export function renderForum(view, state = {}) {
     comments: [],
     query: '',
     editingPostId: null,
+    hot: [],
     ...state,
   };
 
   return `
     ${renderChronicleBand(view?.events ?? [])}
+    ${renderWelcome(s)}
+    ${renderHotTopics(s)}
     ${renderRules()}
     ${renderAccountBar(s)}
     ${renderComposer(s)}
@@ -169,6 +172,69 @@ function renderChronicleBand(events) {
       </ul>
 
       <a class="forum-chron__more" href="#/timeline">Вся летопись сервера <b>→</b></a>
+    </section>`;
+}
+
+/* ── Приветственный баннер ─────────────────────────────────────────────────── */
+
+/**
+ * Приветствие новичка.
+ *
+ * Показывается только гостю, который ещё не вошёл, и только когда на форуме
+ * есть что читать. Пустая лента и баннер «первым напиши» уже объясняют всё,
+ * что нужно; второй баннер поверх был бы шумом.
+ */
+function renderWelcome(s) {
+  if (!s.ready || !s.posts.length || s.me) return '';
+
+  const total = s.total ?? s.posts.length;
+  return `
+    <section class="panel forum-welcome" data-forum-welcome>
+      <span class="forum-welcome__mark" aria-hidden="true">👋</span>
+      <div class="forum-welcome__body">
+        <b>Добро пожаловать на форум сервера 33</b>
+        <p class="muted">
+          Здесь уже ${esc(plural(total, 'тема', 'темы', 'тем'))}. Заходите обсудить
+          игру, альянсы и всё, что происходит на сервере.
+        </p>
+      </div>
+      <button type="button" class="forum-btn forum-btn--ghost" data-forum-welcome-auth>
+        Войти и начать тему
+      </button>
+    </section>`;
+}
+
+/**
+ * «Самое обсуждаемое» — горячие темы под сводкой сервера.
+ *
+ * Считаются здесь, а не в базе: лента уже держит число ответов и «согласий»
+ * на каждый пост, и «горячее» — это то, что уже обсуждали по-настоящему.
+ * Удалённые посты и пустые обсуждения не попадают — иначе сюда пролезал бы
+ * удалённый или заброшенный мусор.
+ */
+function renderHotTopics(s) {
+  if (!s.hot.length) return '';
+  return `
+    <section class="forum-hot" data-forum-hot aria-label="Самое обсуждаемое">
+      <header class="forum-hot__head">
+        <span class="forum-hot__fire" aria-hidden="true">🔥</span>
+        <b>Самое обсуждаемое</b>
+      </header>
+      <ul class="forum-hot__list">
+        ${s.hot
+          .map(
+            (p) => `<li class="forum-hot__item">
+              <a href="#/forum/${esc(p.id)}">
+                <span class="forum-hot__title">${esc(p.title)}</span>
+                <span class="forum-hot__meta muted">
+                  💬 ${p.commentCount ? esc(plural(p.commentCount, 'ответ', 'ответа', 'ответов')) : 'в обсуждении'}
+                  ${p.score ? `· ${p.score > 0 ? '+' : ''}${p.score}` : ''}
+                </span>
+              </a>
+            </li>`
+          )
+          .join('')}
+      </ul>
     </section>`;
 }
 

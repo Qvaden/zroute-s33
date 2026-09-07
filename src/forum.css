@@ -1262,3 +1262,98 @@
 @media (max-width: 1039px) {
   .site-foot { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
 }
+
+/* ── Приветственный баннер ────────────────────────────────────────────────── */
+.forum-welcome {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 14px 16px;
+}
+.forum-welcome__mark { font-size: 22px; line-height: 1; flex: none; }
+.forum-welcome__body { min-width: 0; }
+.forum-welcome__body b { display: block; font-size: 15px; }
+.forum-welcome__body p { margin: 3px 0 0; font-size: 13px; }
+.forum-welcome .forum-btn { flex: none; margin-left: auto; white-space: nowrap; }
+
+/* ── Горячие темы: «Самое обсуждаемое» ────────────────────────────────────── */
+.forum-hot {
+  margin: 12px 0 0;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 62%);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.forum-hot__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  letter-spacing: .02em;
+}
+.forum-hot__fire { font-size: 15px; line-height: 1; }
+.forum-hot__list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
+.forum-hot__item a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.forum-hot__item a:hover { background: rgba(255, 255, 255, .035); }
+.forum-hot__title { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.forum-hot__meta { font-size: 11.5px; flex: none; }
+
+/* ── Уровень и достижения на странице участника ───────────────────────────── */
+.forum-rank { margin-top: 14px; }
+.forum-rank__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.forum-rank__level { font-size: 12.5px; color: var(--dim); }
+.forum-rank__level b { color: var(--accent); font-weight: 800; letter-spacing: .02em; }
+.forum-rank__bar {
+  position: relative;
+  height: 8px;
+  margin: 12px 0 0;
+  background: var(--raised);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.forum-rank__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  max-width: 100%;
+  background: linear-gradient(90deg, var(--accent), #ffa04a);
+  border-radius: 999px;
+}
+.forum-rank__label { display: block; margin: 7px 0 0; font-size: 12px; color: var(--mute); }
+.forum-rank__label--top { margin-top: 12px; }
+.forum-rank__achs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 14px 0 0;
+}
+.forum-rank__ach {
+  padding: 5px 10px 6px;
+  background: var(--raised);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  cursor: default;
+}
+.forum-rank__ach--done {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  border-style: solid;
+  color: var(--text);
+}
+.forum-rank__sum { margin: 10px 0 0; font-size: 12px; }
