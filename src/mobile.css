@@ -186,6 +186,16 @@ html {
   .nav__link { min-height: 46px; }
   .seg__btn, .cal__btn { min-height: 40px; padding: 9px 13px; }
   .wk { min-height: 44px; }
+
+  /*
+    ШРИФТ ПОЛЕЙ НЕ МЕНЬШЕ 16px.
+
+    Safari на iPhone масштабирует ВСЮ страницу при фокусе в поле со шрифтом
+    меньше 16px — и выйти из этого увеличения можно только руками. Полные
+    формы форума (16px в forum.css) это уже учитывают; поле поиска оставалось
+    на 14px и было единственным местом на сайте, где страница «прыгала».
+  */
+  .search input { font-size: 16px; }
   .lad__row { min-height: 52px; }
   .tl__details summary { min-height: 44px; display: flex; align-items: center; }
 

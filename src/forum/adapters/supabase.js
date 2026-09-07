@@ -261,9 +261,9 @@ function postOut(row) {
   };
 }
 
-/** @param {{category?: string, sort?: string, limit?: number, offset?: number}} [opts] */
+/** @param {{category?: string, sort?: string, limit?: number, offset?: number, q?: string}} [opts] */
 export async function listPosts(opts = {}) {
-  const { category = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0 } = opts;
+  const { category = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
 
   const ORDER = {
     fresh: 'pinned.desc,created_at.desc',
@@ -282,6 +282,16 @@ export async function listPosts(opts = {}) {
   params.set('offset', String(offset));
   if (category !== 'all' && CATEGORY_IDS.includes(category)) {
     params.set('category', `eq.${category}`);
+  }
+  /*
+    Поиск по названию и тексту. ilike ищет без учёта регистра, звёздочки —
+    подстановочные знаки PostgREST, как у LIKE в Postgres. Введённые человеком
+    «*» в запросе ведут себя так же — это не баг, а то же правило, что
+    в поиске любой базы.
+  */
+  const query = String(q ?? '').trim();
+  if (query) {
+    params.set('or', `(title.ilike.*${query}*,body.ilike.*${query}*)`);
   }
 
   const rows = await rest(`/forum_post_list?${params}`);
@@ -317,6 +327,11 @@ export async function editPost(id, patch) {
   const body = { edited_at: new Date().toISOString() };
   if (patch.title != null) body.title = patch.title;
   if (patch.body != null) body.body = patch.body;
+  if (patch.category != null) {
+    // Раздел проверяем и здесь: база откажет, но своя ошибка понятнее.
+    if (!CATEGORY_IDS.includes(patch.category)) throw new Error('Неизвестный раздел');
+    body.category = patch.category;
+  }
 
   await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body });
   const full = await getPost(id);

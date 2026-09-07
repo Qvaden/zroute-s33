@@ -119,10 +119,10 @@
  * @property {(nick: string, password: string) => Promise<ForumUser>} signUp
  * @property {(nick: string, password: string) => Promise<ForumUser>} signIn
  * @property {() => Promise<void>} signOut
- * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number}) => Promise<{posts: ForumPost[], total: number}>} listPosts
+ * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string}) => Promise<{posts: ForumPost[], total: number}>} listPosts
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(draft: {title: string, body: string, category: string}) => Promise<ForumPost>} createPost
- * @property {(id: string, patch: {title?: string, body?: string}) => Promise<ForumPost>} editPost
+ * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(postId: string) => Promise<ForumComment[]>} listComments
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment

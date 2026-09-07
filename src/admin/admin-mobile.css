@@ -113,6 +113,21 @@
   .adm-field { margin-bottom: 16px; }
 
   /*
+    ШРИФТ ПОЛЕЙ НЕ МЕНЬШЕ 16px.
+
+    admin.css держит поля на 14–14.5px — удобно на компьютере, но на iPhone
+    при фокусе в такое поле Safari масштабирует всю панель (см. test тот же
+    порог в mobile.css). Приходится вручную сужать обратно. 16px — тот размер,
+    при котором автоувеличения нет вовсе.
+  */
+  .adm-field input,
+  .adm-field textarea,
+  .adm-field select,
+  .adm-form .adm-field input,
+  .adm-form .adm-field textarea,
+  .adm-form .adm-field select { font-size: 16px; }
+
+  /*
     Сетка формы события: два столбца на телефоне давали поля шириной в четыре
     символа — в них не видно ни даты, ни номера сервера.
   */

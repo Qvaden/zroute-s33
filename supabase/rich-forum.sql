@@ -619,3 +619,48 @@ select
   end as target_post_id
 from public.forum_reports r
 join public.forum_users reporter on reporter.id = r.reporter_id;
+
+-- ── Раздел «Флудилка» и предел картинок: правки поверх старой базы ───────────
+--
+-- Два блока ниже ИДЕМПОТЕНТНЫ: их можно запускать повторно сколько угодно
+-- раз. Они не пересоздают то, что делает schema.sql / profiles.sql при чистой
+-- установке, а доводят ЖИВУЮ базу, где те уже отработали, до новой версии:
+--   * разделу «Флудилка» нужно расширенное ограничение на category;
+--   * лимиту картинок — триггер с новым числом и текстом.
+--
+-- Если база ставится с нуля (schema.sql + profiles.sql из текущего каталога),
+-- эти блоки тоже безопасны: drop … if exists ничего не сломает, create
+-- … or replace просто перезапишет функцию той же версии.
+
+-- Ограничение раздела в живом столбце называется по-накатанному —
+-- forum_posts_category_check. Снимаем старое и навешиваем то же имя
+-- с флудилкой в списке: имя не меняется, значит не меняется и всё,
+-- что на него ссылается.
+alter table public.forum_posts
+  drop constraint if exists forum_posts_category_check;
+
+alter table public.forum_posts
+  add constraint forum_posts_category_check
+  check (category in ('news','vs','chronicle','ally','help','offtop','flood'));
+
+-- Лимит картинок. В живой базе старая функция была поставлена с «не больше
+-- четырёх»; теперь число одно на проект и повторяет config.js.
+create or replace function public.forum_attachment_limit()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if (
+    select count(*) from public.forum_attachments
+     where target_type = new.target_type and target_id = new.target_id
+  ) >= 12 then
+    raise exception 'К одной записи можно приложить не больше двенадцати картинок';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_attachments_limit on public.forum_attachments;
+create trigger forum_attachments_limit
+  before insert on public.forum_attachments
+  for each row execute function public.forum_attachment_limit();

@@ -62,6 +62,8 @@ export function renderForum(view, state = {}) {
     error: '',
     openPostId: null,
     comments: [],
+    query: '',
+    editingPostId: null,
     ...state,
   };
 
@@ -387,9 +389,51 @@ function renderAttachRow(scope) {
         <input type="file" accept="image/*" multiple hidden data-attach-input="${esc(scope)}">
       </label>
       <div class="forum-attach__list" data-attach-list="${esc(scope)}"></div>
-      <small class="forum-attach__hint">До четырёх картинок. Сжимаются автоматически.</small>
+      <small class="forum-attach__hint">До ${CONFIG.forum.limits.attachmentsMax} картинок. Сжимаются автоматически.</small>
     </div>
     <p class="forum-error" data-attach-error="${esc(scope)}" hidden></p>`;
+}
+
+/**
+ * Форма правки своего поста: встаёт на место заголовка и текста карточки.
+ *
+ * Те же поля, что у нового поста, — человек правит то же самое. Ссылка на
+ * саму запись, а не на форму: превью прикреплённых картинок живёт по области
+ * `edit:${id}` и после перерисовки не теряется.
+ */
+function renderEditForm(p) {
+  const L = CONFIG.forum.limits;
+  return `
+    <form class="forum-edit" data-forum-edit-form="${esc(p.id)}">
+      <label class="forum-field">
+        <span>Раздел</span>
+        <select name="category" required>
+          ${CATEGORIES.map(
+            (c) => `<option value="${esc(c.id)}" ${c.id === p.category ? 'selected' : ''}>${esc(c.label)} — ${esc(c.hint)}</option>`
+          ).join('')}
+        </select>
+      </label>
+
+      <label class="forum-field">
+        <span>Заголовок</span>
+        <input type="text" name="title" required
+               minlength="${L.titleMin}" maxlength="${L.titleMax}"
+               value="${esc(p.title)}">
+      </label>
+
+      <label class="forum-field">
+        <span>Текст</span>
+        <textarea name="body" rows="7" required maxlength="${L.bodyMax}">${esc(p.body)}</textarea>
+      </label>
+
+      ${renderAttachRow(`edit:${p.id}`)}
+
+      <div class="forum-edit__actions">
+        <button type="submit" class="forum-btn">Сохранить</button>
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-edit-cancel>Отмена</button>
+      </div>
+      <p class="forum-error" data-forum-edit-error hidden></p>
+    </form>`;
 }
 
 /* ── Управление лентой ────────────────────────────────────────────────────── */
@@ -405,6 +449,14 @@ function renderFeedControls(s) {
 
   return `
     <div class="ctl ctl--forum">
+      <label class="search forum-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+        </svg>
+        <input type="search" name="query" placeholder="Найти запись…"
+               value="${esc(s.query ?? '')}" data-forum-search
+               autocomplete="off" spellcheck="false">
+      </label>
       <div class="seg" role="group" aria-label="Раздел форума">
         <button type="button" class="seg__btn ${s.category === 'all' ? 'is-on' : ''}"
                 data-forum-cat="all">Все</button>
@@ -453,7 +505,8 @@ function nickLink(nick) {
  * при трёх в ряд на телефоне становится нечитаемым, и открывать его придётся
  * всё равно.
  *
- * Больше четырёх не бывает: предел держит база (см. supabase/profiles.sql).
+ * Больше ${CONFIG.forum.limits.attachmentsMax} не бывает: предел держит база
+ * (см. supabase/profiles.sql) и тот же предел стоит в config.js.
  */
 function renderShots(item) {
   const shots = Array.isArray(item.attachments) ? item.attachments.filter((a) => a?.url) : [];
@@ -490,6 +543,14 @@ function renderFeed(s) {
   }
 
   if (!s.posts.length) {
+    if (s.query) {
+      return `<section class="panel forum-empty">
+        <span class="eyebrow">Поиск по форуму</span>
+        <h2>Ничего не нашлось</h2>
+        <p class="muted">Ни в названиях, ни в тексте записей по «${esc(s.query)}»
+          ничего не нашлось. Попробуйте короче или без опечаток.</p>
+      </section>`;
+    }
     return `<section class="panel forum-empty">
       <span class="eyebrow">${s.category === 'all' ? 'Пока пусто' : 'В этом разделе пусто'}</span>
       <h2>Ни одного поста</h2>
@@ -537,6 +598,8 @@ function renderPostCard(p, s) {
   const isOpen = s.openPostId === p.id;
   const canModerate = s.me && (s.me.role === 'admin' || s.me.role === 'moderator');
   const isMine = s.me && s.me.id === p.authorId;
+  const editing = s.editingPostId === p.id;
+  const canReply = Boolean(isOpen && s.me && !s.me.banned);
 
   return `
     <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}" data-forum-post="${esc(p.id)}">
@@ -556,8 +619,12 @@ function renderPostCard(p, s) {
         ${p.pinned ? '<span class="forum-post__pin" title="Закреплён">📌</span>' : ''}
       </header>
 
+      ${
+        editing
+          ? renderEditForm(p)
+          : `
       <h2 class="forum-post__title">
-        <a href="#/forum/${esc(p.id)}">${esc(p.title)}</a>
+        ${isOpen ? esc(p.title) : `<a href="#/forum/${esc(p.id)}">${esc(p.title)}</a>`}
       </h2>
 
       <div class="forum-post__body">
@@ -570,6 +637,7 @@ function renderPostCard(p, s) {
         !isOpen && p.body.length > 220
           ? `<a class="forum-post__expand" href="#/forum/${esc(p.id)}">Читать целиком</a>`
           : ''
+      }`
       }
 
       <footer class="forum-post__foot">
@@ -579,9 +647,20 @@ function renderPostCard(p, s) {
         </a>
         <span class="forum-post__acts">
           ${
+            isMine
+              ? `<button type="button" class="forum-act" data-forum-edit="${esc(p.id)}">Редактировать</button>`
+              : ''
+          }
+          ${
             isMine || canModerate
               ? `<button type="button" class="forum-act" data-forum-del-post="${esc(p.id)}"
                          title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
+              : ''
+          }
+          ${
+            canReply
+              ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
+                         title="Вставить текст поста в ответ">Цитировать</button>`
               : ''
           }
           ${
@@ -671,6 +750,7 @@ function renderComments(post, s) {
             </li>`;
           }
           const isMine = s.me && s.me.id === c.authorId;
+          const canQuote = Boolean(s.me && !s.me.banned);
           return `<li class="forum-comment" data-forum-comment="${esc(c.id)}">
             ${avatar(c.authorNick, c.authorAvatar, 'sm')}
             <div class="forum-comment__body">
@@ -684,6 +764,12 @@ function renderComments(post, s) {
               ${renderShots(c)}
               <div class="forum-comment__foot">
                 ${renderReactions('comment', c, s)}
+                ${
+                  canQuote
+                    ? `<button type="button" class="forum-act" data-forum-quote="comment:${esc(c.id)}"
+                               title="Вставить текст комментария в ответ">Цитировать</button>`
+                    : ''
+                }
                 ${
                   isMine || canModerate
                     ? `<button type="button" class="forum-act" data-forum-del-comment="${esc(c.id)}">Удалить</button>`

@@ -40,6 +40,9 @@ const state = {
   error: '',
   openPostId: null,
   comments: [],
+  query: '',
+  /** Какой пост сейчас в режиме правки; null — правки нет. */
+  editingPostId: null,
   /** Что удаляем или на что жалуемся, пока открыто окно. */
   pending: null,
 };
@@ -174,6 +177,9 @@ function restoreInput(snapshot) {
 function fieldKey(el) {
   if (!el || !host || !host.contains(el) || !el.name) return null;
 
+  // Поиск по ленте живёт вне форм, но терять набранное при перерисовке нельзя.
+  if (el.matches('[data-forum-search]')) return 'search';
+
   const commentForm = el.closest('[data-forum-comment-form]');
   if (commentForm) return `comment:${commentForm.dataset.forumCommentForm}:${el.name}`;
 
@@ -186,15 +192,24 @@ function fieldKey(el) {
   const report = el.closest('[data-forum-report-form]');
   if (report) return `report:${el.name}`;
 
+  const editForm = el.closest('[data-forum-edit-form]');
+  if (editForm) return `edit:${editForm.dataset.forumEditForm}:${el.name}`;
+
   return null;
 }
 
 function findByKey(key) {
   if (!host) return null;
+
+  if (key === 'search') return host.querySelector('[data-forum-search]');
+
   const [kind, a, b] = key.split(':');
 
   if (kind === 'comment') {
     return host.querySelector(`[data-forum-comment-form="${cssEscape(a)}"] [name="${b}"]`);
+  }
+  if (kind === 'edit') {
+    return host.querySelector(`[data-forum-edit-form="${cssEscape(a)}"] [name="${b}"]`);
   }
   const form = host.querySelector(`[data-forum-${kind === 'new' ? 'new' : kind === 'auth' ? 'auth' : 'report-form'}]`);
   return form?.querySelector(`[name="${a}"]`) ?? null;
@@ -302,12 +317,15 @@ async function withBusy(button, label, action) {
 async function loadFeed({ append = false } = {}) {
   state.loading = !append;
   state.error = '';
+  // Любое движение по ленте закрывает открытую правку: форма живёт в карточке.
+  if (!append) state.editingPostId = null;
   if (!append) paint();
 
   try {
     const { posts, total } = await forum.listPosts({
       category: state.category,
       sort: state.sort,
+      q: state.query,
       limit: CONFIG.forum.pageSize,
       offset: append ? state.posts.length : 0,
     });
@@ -324,6 +342,7 @@ async function loadFeed({ append = false } = {}) {
 async function loadThread(postId) {
   state.openPostId = postId;
   state.comments = [];
+  state.editingPostId = null;
   state.loading = false;
   paint();
 
@@ -408,22 +427,27 @@ async function handleAuth(form, mode, submitter) {
 
 /* ── Картинки в форме ─────────────────────────────────────────────────────── */
 
-const MAX_SHOTS = 4;
+/*
+  Предел вложений задан одним числом в config.js и повторён триггером базы
+  (supabase/profiles.sql). Здесь человек узнаёт о пределе ДО того, как напишет
+  пост и нажмёт «Опубликовать», а база охраняет от запросов мимо сайта.
+*/
+const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;
 
 /**
  * Добавить выбранные файлы к форме.
  *
- * Предел в четыре держит и база (триггером), и эта проверка. Дублирование
- * осознанное: база защищает от запроса мимо сайта, а здесь человек узнаёт
- * о пределе ДО того, как напишет пост и нажмёт «Опубликовать».
+ * @param {string} scope    'new', id поста или 'edit:<id>'.
+ * @param {FileList|File[]} files
+ * @param {number} [existing] Сколько картинок уже у записи (для правки).
  */
-function addShots(scope, files) {
+function addShots(scope, files, existing = 0) {
   const current = pendingShots.get(scope) ?? [];
-  const room = MAX_SHOTS - current.length;
+  const room = MAX_SHOTS - existing - current.length;
 
   if (room <= 0) {
     showError(`[data-attach-error="${cssEscape(scope)}"]`,
-      `Больше ${MAX_SHOTS} картинок к одной записи приложить нельзя`);
+      `К записи можно приложить не больше ${MAX_SHOTS} картинок`);
     return;
   }
 
@@ -588,6 +612,54 @@ function wire() {
       return;
     }
 
+    // Правка своего поста: разворачиваем форму на месте карточки.
+    if (t.closest('[data-forum-edit]')) {
+      const id = t.closest('[data-forum-edit]').dataset.forumEdit;
+      state.editingPostId = id;
+      paint();
+      return;
+    }
+    if (t.closest('[data-forum-edit-cancel]')) {
+      const editForm = t.closest('[data-forum-edit-form]');
+      const id = editForm?.dataset.forumEditForm;
+      state.editingPostId = null;
+      // Брошенные превью правки освобождаем — иначе они висят до ухода.
+      if (id) clearShots(`edit:${id}`);
+      paint();
+      return;
+    }
+
+    /*
+      Ответ с цитатой. Вместо того чтобы самому искать на экране нужную строку
+      и переписывать её руками, человек нажимает «Цитировать» — и в поле под
+      постом появляется текст записи с именем автора. Классическая механика
+      форумов: спор не начинается заново каждый раз, когда ушёл на второй экран.
+    */
+    if (t.closest('[data-forum-quote]')) {
+      const [targetType, targetId] = t.closest('[data-forum-quote]').dataset.forumQuote.split(':');
+      const item = targetType === 'post'
+        ? state.posts.find((p) => p.id === targetId)
+        : state.comments.find((c) => c.id === targetId);
+      if (!item || !state.openPostId) return;
+
+      const area = host.querySelector(
+        `[data-forum-comment-form="${cssEscape(state.openPostId)}"] [name="body"]`
+      );
+      if (!area) return;
+
+      const L = CONFIG.forum.limits;
+      const first = String(item.body ?? '')
+        .split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
+      // Длинный текст не вываливаем целиком: ответ должен остаться ответом.
+      const preview = first.length > 300 ? first.slice(0, 297).trimEnd() + '…' : first;
+      const quote = `> ${item.authorNick}:\n${preview}`;
+      const next = area.value.trim() ? `${area.value.trimEnd()}\n\n${quote}` : quote;
+      area.value = next.slice(0, L.commentMax);
+      area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      area.focus({ preventScroll: true });
+      return;
+    }
+
     // Показать ещё.
     if (t.closest('[data-forum-more]')) {
       await loadFeed({ append: true });
@@ -700,12 +772,39 @@ function wire() {
     Выбор файла — событие change, а не click: click срабатывает при открытии
     диалога, когда файла ещё нет.
   */
+  /* ── Поиск по ленте ────────────────────────────────────────────────────────
+    Ищем в названии и тексте записей. Держим паузу: при каждой букве лезть
+    в базу — значит дёргать её на темп набора. Ключ 'search' в findByKey
+    возвращает инпут после перерисовки, поэтому запрос не теряется.
+  */
+  let searchTimer;
+  document.addEventListener('input', (e) => {
+    if (!host || !host.contains(e.target)) return;
+    const search = e.target.closest('[data-forum-search]');
+    if (!search) return;
+
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(async () => {
+      state.query = search.value.trim();
+      state.openPostId = null;
+      await loadFeed();
+    }, 300);
+  });
+
   document.addEventListener('change', async (e) => {
     if (!host || !host.contains(e.target)) return;
 
     const attachInput = e.target.closest('[data-attach-input]');
     if (attachInput) {
-      addShots(attachInput.dataset.attachInput, attachInput.files ?? []);
+      const scope = attachInput.dataset.attachInput;
+      let existing = 0;
+      // При правке превью прибавляются к уже загруженным картинкам записи:
+      // комнату под новые считаем от общего лимита.
+      if (scope.startsWith('edit:')) {
+        const postId = scope.slice(5);
+        existing = state.posts.find((p) => p.id === postId)?.attachments?.length ?? 0;
+      }
+      addShots(scope, attachInput.files ?? [], existing);
       /*
         Поле очищаем: иначе выбор того же файла второй раз не даст события,
         и человек решит, что кнопка перестала работать.
@@ -831,6 +930,39 @@ function wire() {
           if (shotError) notice(shotError);
         } catch (err) {
           showError('[data-forum-comment-error]', String(err?.message ?? err));
+        }
+      });
+      return;
+    }
+
+    // Правка поста.
+    if (form.matches('[data-forum-edit-form]')) {
+      e.preventDefault();
+      clearError('[data-forum-edit-error]');
+
+      const id = form.dataset.forumEditForm;
+      const checked = validatePost({
+        title: form.title.value,
+        body: form.body.value,
+        category: form.category.value,
+      });
+      if (!checked.ok) return showError('[data-forum-edit-error]', checked.error);
+
+      await withBusy(submitter, 'Сохраняем…', async () => {
+        try {
+          await forum.editPost(id, checked.value);
+
+          const shotError = await uploadShots(`edit:${id}`, 'post', id, (i, n) => {
+            if (submitter) submitter.textContent = `Картинка ${i}/${n}…`;
+          });
+
+          state.editingPostId = null;
+          // После правки — туда же, где человек был: тред или лента.
+          if (state.openPostId === id) await loadThread(id);
+          else await loadFeed();
+          if (shotError) notice(shotError);
+        } catch (err) {
+          showError('[data-forum-edit-error]', String(err?.message ?? err));
         }
       });
       return;
@@ -1123,6 +1255,8 @@ export function unmountForum() {
   mode = 'feed';
   state.openPostId = null;
   state.comments = [];
+  state.query = '';
+  state.editingPostId = null;
 
   profileState.profile = null;
   profileState.posts = [];

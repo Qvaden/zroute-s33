@@ -56,7 +56,7 @@ create table if not exists public.forum_posts (
     и нет; если появится — надо будет обновлять копии, и это придётся помнить.
   */
   author_nick    text not null default '',
-  category       text not null check (category in ('news','vs','chronicle','ally','help','offtop')),
+  category       text not null check (category in ('news','vs','chronicle','ally','help','offtop','flood')),
   title          text not null check (char_length(title) between 3 and 140),
   body           text not null check (char_length(body) between 1 and 8000),
   created_at     timestamptz not null default now(),

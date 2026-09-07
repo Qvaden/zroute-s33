@@ -2100,6 +2100,17 @@ console.log('\nQ. Форум');
   check('пояснение попадает в причину',
     /мимо темы/.test(deletionReason(RULES[0].id, 'мимо темы')));
 
+  /* ── Разделы, включая флудилку ── */
+
+  equal('все разделы на месте, флудилка последняя',
+    CATEGORIES.map((c) => c.id).join(','), 'news,vs,chronicle,ally,help,offtop,flood');
+  check('у флудилки есть короткое имя и пояснение',
+    CATEGORIES.some((c) => c.id === 'flood' && c.label === 'Флудилка' && /не по игре/i.test(c.hint)));
+  check('идентификаторы разделов уникальны',
+    new Set(CATEGORIES.map((c) => c.id)).size === CATEGORIES.length);
+  check('в флудилку можно писать',
+    validatePost({ title: 'Про всё подряд', body: 'поиграть', category: 'flood' }).ok);
+
   /* ── Реакции ── */
 
   equal('лайк и дизлайк лежат в одном наборе — оба сразу поставить нельзя',
@@ -2285,6 +2296,75 @@ console.log('\nQ. Форум');
   }
   check('в локальном режиме сброс пароля честно отказывает', localResetRefused);
 
+  /* ── Правка поста и поиск: локальный режим ── */
+
+  const loc = localAdapter;
+  // Адаптер хранит сессию в localStorage; в Node его нет — даём in-memory.
+  const storage = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (storage.has(k) ? storage.get(k) : null),
+    setItem: (k, v) => storage.set(k, String(v)),
+    removeItem: (k) => storage.delete(k),
+  };
+  await loc.signUp('писатель_для_тестов');
+  const madeVs = await loc.createPost({ title: 'Разбор матча VS', body: 'всё по полочкам', category: 'vs' });
+  await loc.createPost({ title: 'Болтовня', body: 'как же дела', category: 'flood' });
+
+  const moved = await loc.editPost(madeVs.id, { category: 'flood', title: 'Разбор матча (перенесено)' });
+  check('правка поста меняет раздел и заголовок',
+    moved.category === 'flood' && moved.title.endsWith('перенесено)'));
+  check('правка поста не трогает автора', moved.authorId === madeVs.authorId);
+
+  equal('поиск находит по слову из текста',
+    (await loc.listPosts({ q: 'полочкам' })).posts.length, 1);
+  equal('поиск находит по слову из заголовка',
+    (await loc.listPosts({ q: 'болтовня' })).posts.length, 1);
+  equal('поиск не зависит от регистра',
+    (await loc.listPosts({ q: 'РАЗБОР' })).posts.length, 1);
+  equal('поиск без совпадений возвращает пусто',
+    (await loc.listPosts({ q: 'небывальщина' })).posts.length, 0);
+
+  /*
+    Раздел проверяется и в браузере (validatePost), и в адаптерах: база свою
+    ошибку вернёт, но «Неизвестный раздел» понятнее «violates check constraint».
+  */
+  let badCategory = false;
+  try {
+    await loc.editPost(madeVs.id, { category: 'nope' });
+  } catch {
+    badCategory = true;
+  }
+  check('правка с неизвестным разделом отклоняется', badCategory);
+
+  /* ── Поиск и правка: источник базы ── */
+
+  /*
+    Поиск в базе — параметр or= с ilike по названию и тексту: фильтрует сам
+    Postgres, лента целиком в браузер не едет.
+  */
+  check('поиск в базе идёт параметром or, а не локальной вырезкой ленты',
+    /title\.ilike\.\*\$\{query\}\*,body\.ilike\.\*\$\{query\}\*/.test(supabaseSource));
+  check('адаптер базы проверяет раздел при правке, а не доверяет строке',
+    /if \(patch\.category != null\)[\s\S]*CATEGORY_IDS\.includes\(patch\.category\)/.test(supabaseSource));
+  check('адаптер базы ставит отметку времени правки',
+    /edited_at/.test(supabaseSource) && /editPost/.test(supabaseSource));
+
+  /* ── Лимит картинок: одно число в конфиге и пара к нему ── */
+
+  const forumConfig = (await import('../config.js')).CONFIG.forum.limits.attachmentsMax;
+  check('лимит картинок задан и больше четырёх',
+    Number.isInteger(forumConfig) && forumConfig > 4 && forumConfig <= 20);
+
+  const mountSource = await readFile('src/forum/mount.js', 'utf8');
+  check('браузер берёт предел из конфига, а не из зашитой четвёрки',
+    /const MAX_SHOTS = CONFIG\.forum\.limits\.attachmentsMax/.test(mountSource) && !/\bMAX_SHOTS = 4\b/.test(mountSource));
+  check('у правки поста есть форма, а у формы — комнаты',
+    /data-forum-edit-form/.test(mountSource) && /edit:\$\{id\}/.test(mountSource));
+  check('поиск по ленте держит паузу и сам перерисовывает список',
+    /data-forum-search/.test(mountSource) && /setTimeout/.test(mountSource));
+  check('цитата собирается из имени и текста, а не вставляется как есть',
+    /data-forum-quote/.test(mountSource) && /> \$\{item\.authorNick\}/.test(mountSource));
+
   /* ── Схема базы: где живёт настоящая защита ── */
 
   const schema = await readFile('supabase/schema.sql', 'utf8');
@@ -2358,6 +2438,8 @@ console.log('\nQ. Форум');
     invokers.length, views.length);
 
   const profilesSql = await readFile('supabase/profiles.sql', 'utf8');
+  check('предел картинок в триггере базы совпадает с конфигом',
+    new RegExp(`>=\\s*${CONFIG.forum.limits.attachmentsMax}\\b`).test(profilesSql));
   const profileView = profilesSql.slice(
     profilesSql.indexOf('create view public.forum_profiles'),
     profilesSql.indexOf('grant select on public.forum_profiles')

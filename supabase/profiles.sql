@@ -300,7 +300,9 @@ create trigger forum_attachments_author
 
   Предел нужен не из скупости: без него один человек залил бы гигабайт
   скриншотов в один пост, и бесплатное хранилище кончилось бы для всех.
-  Четыре — столько, сколько влезает в один взгляд на телефоне.
+  Двенадцать — заметно больше прежних четырёх, но всё ещё конечное число:
+  совершенно безграничная загрузка на бесплатном хранилище кончилась бы
+  им же. Значение повторяет CONFIG.forum.limits.attachmentsMax в config.js.
 */
 create or replace function public.forum_attachment_limit()
 returns trigger
@@ -310,8 +312,8 @@ begin
   if (
     select count(*) from public.forum_attachments
      where target_type = new.target_type and target_id = new.target_id
-  ) >= 4 then
-    raise exception 'К одной записи можно приложить не больше четырёх картинок';
+  ) >= 12 then
+    raise exception 'К одной записи можно приложить не больше двенадцати картинок';
   end if;
   return new;
 end;

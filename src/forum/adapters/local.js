@@ -200,10 +200,18 @@ function postOut(state, p) {
  */
 export async function listPosts(opts = {}) {
   const s = read();
-  const { category = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0 } = opts;
+  const { category = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
 
   let list = s.posts.map((p) => postOut(s, p));
   if (category !== 'all') list = list.filter((p) => p.category === category);
+  /*
+    Поиск по названию и тексту. Регистр не важен — так же ведёт себя
+    ilike в рабочем адаптере, и два режима не должны расходиться в этом.
+  */
+  const query = String(q ?? '').trim().toLowerCase();
+  if (query) {
+    list = list.filter((p) => `${p.title}\n${p.body}`.toLowerCase().includes(query));
+  }
 
   const byFresh = (a, b) => b.createdAt - a.createdAt;
   const SORTS = {
@@ -269,6 +277,11 @@ export async function editPost(id, patch) {
 
   if (patch.title != null) post.title = patch.title;
   if (patch.body != null) post.body = patch.body;
+  if (patch.category != null) {
+    // Раздел проверяем и здесь: база откажет, но своя ошибка понятнее.
+    if (!CATEGORY_IDS.includes(patch.category)) throw new Error('Неизвестный раздел');
+    post.category = patch.category;
+  }
   post.editedAt = new Date().toISOString();
   write(s);
   return postOut(s, post);

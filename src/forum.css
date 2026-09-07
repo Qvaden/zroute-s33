@@ -660,6 +660,14 @@
 .forum-composer__rules { margin: 4px 0 14px; font-size: 11.5px; line-height: 1.5; }
 .forum-composer__actions { display: flex; gap: 8px; }
 
+/*
+  Форма правки живёт ВНУТРИ карточки поста: карточка не уезжает и человек
+  видит, что именно правит. Заголовок и текст поста на время правки заменяются
+  формой, кнопки действий в подвале остаются на месте.
+*/
+.forum-edit { padding: 2px 0 6px; }
+.forum-edit__actions { display: flex; gap: 8px; margin-top: 4px; }
+
 /* ── Управление лентой ────────────────────────────────────────────────────── */
 
 .ctl--forum {
