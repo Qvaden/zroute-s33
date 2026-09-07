@@ -194,12 +194,6 @@ function renderRow(user, me) {
                         data-player-banned="${user.banned ? '1' : ''}">
                   ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
                 </button>
-                <button type="button" class="adm-btn"
-                        data-player-ban="${esc(user.id)}"
-                        data-player-ban-action="${user.banned ? '' : '1'}"
-                        data-player-nick="${esc(user.nick)}">
-                  ${user.banned ? 'Разбанить' : 'Забанить'}
-                </button>
                 <button type="button" class="adm-btn adm-btn--danger"
                         data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
                   Удалить навсегда

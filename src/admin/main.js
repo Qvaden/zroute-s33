@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=11';
-import { esc } from '../ui/helpers.js?v=11';
-import { mapDataset } from '../data/adapters/_map.js?v=11';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=11';
-import { validateDataset } from '../data/contract.js?v=11';
+import { CONFIG } from '../../config.js?v=12';
+import { esc } from '../ui/helpers.js?v=12';
+import { mapDataset } from '../data/adapters/_map.js?v=12';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=12';
+import { validateDataset } from '../data/contract.js?v=12';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=11';
-import { renderHome } from '../pages/home.js?v=11';
+} from '../logic/standings.js?v=12';
+import { renderHome } from '../pages/home.js?v=12';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=11';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=11';
+} from '../db/account.js?v=12';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=11';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=11';
-import { roleLabel } from '../forum/roles.js?v=11';
-import { prepareImage, uploadPath } from './image.js?v=11';
+} from './store.js?v=12';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=12';
+import { roleLabel } from '../forum/roles.js?v=12';
+import { prepareImage, uploadPath } from './image.js?v=12';
 import {
   applyMarks,
   applyEvents,
@@ -86,7 +86,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=11';
+} from './edit.js?v=12';
 import {
   getDraft,
   saveDraft,
@@ -104,22 +104,22 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=11';
-import { renderShell } from './shell.js?v=11';
-import { renderLogin } from './login.js?v=11';
-import { renderOverview } from './screens/overview.js?v=11';
-import { renderWeek, describe } from './screens/week.js?v=11';
-import { renderAlliances } from './screens/alliances.js?v=11';
-import { renderEvents } from './screens/events.js?v=11';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=11';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=11';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=11';
-import { renderQuarter } from './screens/quarter.js?v=11';
-import { renderPresident } from './screens/president.js?v=11';
-import { renderPlayers } from './screens/players.js?v=11';
-import { renderModeration } from './screens/moderation.js?v=11';
-import { forum } from '../forum/index.js?v=11';
-import { deletionReason } from '../forum/rules.js?v=11';
+} from './draft.js?v=12';
+import { renderShell } from './shell.js?v=12';
+import { renderLogin } from './login.js?v=12';
+import { renderOverview } from './screens/overview.js?v=12';
+import { renderWeek, describe } from './screens/week.js?v=12';
+import { renderAlliances } from './screens/alliances.js?v=12';
+import { renderEvents } from './screens/events.js?v=12';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=12';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=12';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=12';
+import { renderQuarter } from './screens/quarter.js?v=12';
+import { renderPresident } from './screens/president.js?v=12';
+import { renderPlayers } from './screens/players.js?v=12';
+import { renderModeration } from './screens/moderation.js?v=12';
+import { forum } from '../forum/index.js?v=12';
+import { deletionReason } from '../forum/rules.js?v=12';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1461,46 +1461,6 @@ document.addEventListener('click', async (e) => {
   }
   if (e.target.closest('[data-restrict-cancel]')) {
     closePlayerModal('[data-restrict-modal]');
-    return;
-  }
-
-  /*
-    БАН — ОДНО НАЖАТИЕ, как и смена роли модератора: действие обратимо той же
-    кнопкой, поэтому окно с подтверждением было бы лишним вопросом тому, кто
-    и так может отменить. Точную причину и пункт правил выбирают в окне
-    «Ограничить»; здесь — общая формулировка.
-  */
-  const banBtn = e.target.closest('[data-player-ban]');
-  if (banBtn) {
-    const userId = banBtn.dataset.playerBan;
-    const ban = banBtn.dataset.playerBanAction === '1';
-    const nick = banBtn.dataset.playerNick;
-
-    banBtn.disabled = true;
-    banBtn.textContent = ban ? 'Баним…' : 'Снимаем бан…';
-
-    try {
-      await forum.setRestriction(userId, {
-        banned: ban,
-        mutedUntil: ban ? null : undefined,
-        reason: ban ? 'Нарушение правил форума' : '',
-      });
-      view.forum.loadedFor = null;
-      render();
-      showForumResult(
-        '[data-players-result]',
-        ban
-          ? `<b>${esc(nick)} забанен.</b> Писать больше не сможет. Причину уточнить или снять бан можно кнопкой «Разбанить».`
-          : `<b>${esc(nick)} разбанен.</b> Права вернутся при следующем входе.`,
-        'ok'
-      );
-    } catch (err) {
-      if (banBtn.isConnected) {
-        banBtn.disabled = false;
-        banBtn.textContent = ban ? 'Забанить' : 'Разбанить';
-      }
-      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
-    }
     return;
   }
 

@@ -933,9 +933,10 @@ console.log('\nJ. Админ-панель');
   const bareSiteImports = [...siteMain.matchAll(/from '(\.[^']+\.js)'/g)].map((m) => m[1]);
   equal('у каждого импорта сайта есть версия', bareSiteImports.join(', '), '');
 
-  check('панель вешает бан на одну кнопку', adminMain.includes("[data-player-ban]"));
   check('панель вешает удаление аккаунта и окно подтверждения никем',
     adminMain.includes('[data-player-delete]') && adminMain.includes('[data-delete-player-form]'));
+  check('у быстрой кнопки бана нет обработчика — осталась только модалка «Ограничить»',
+    !adminMain.includes('[data-player-ban]'));
 
   /*
     ЭКРАНЫ ПАНЕЛИ ПРОВЕРЯЮТСЯ НА ТОМ, ЧТО ПАНЕЛЬ ИМ ДЕЙСТВИТЕЛЬНО ДАЁТ.
@@ -3007,10 +3008,10 @@ console.log('\nQ. Форум');
     },
   });
   check('администратору доступен сброс пароля', playersHtml.includes('data-player-reset="u2"'));
-  check('администратору доступен бан одной кнопкой', playersHtml.includes('data-player-ban="u2"'));
+  check('администратору доступно ограничение писать', playersHtml.includes('data-player-restrict="u2"'));
   check('администратору доступно удаление аккаунта', playersHtml.includes('data-player-delete="u2"'));
-  check('себе бан не показывается — для этого есть настройки',
-    !playersHtml.includes('data-player-ban="u1"'));
+  check('отдельной кнопки бана нет — запрет идёт через модалку «Ограничить»',
+    !playersHtml.includes('data-player-ban="'));
   check('себе удаление не показывается',
     !playersHtml.includes('data-player-delete="u1"'));
   check('удаление аккаунта просит ввести ник — случайное нажатие не стирает человека',
