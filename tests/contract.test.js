@@ -2911,12 +2911,18 @@ console.log('\nQ. Форум');
   check('метка роли заметно мельче ника',
     /\.role-badge \{[^}]*font-size: 6\.5px/.test(mobileCss));
 
-  /* Шапка на телефоне: кнопка слева, марка прижата к правому краю. */
+  /*
+    Шапка на телефоне: кнопка слева, марка прижата к правому краю. Раскладка
+    обязана быть явной строкой: styles-v8.css на узком экране оставил шапке
+    flex-direction: column, и без переопределения кнопка вставала по центру,
+    а марка уезжала влево. Диапазон до 1039px — телефон в альбомной
+    ориентации шире 759px, а шапка всё равно разводит кнопку и марку.
+  */
   check('на телефоне шапка разводит кнопку и марку по краям',
-    /@media \(max-width: 759px\)[\s\S]{0,500}\.site-head__inner \{\s*display: flex[\s\S]{0,120}justify-content: space-between/.test(mobileCss));
+    /@media \(max-width: 1039px\)[\s\S]{0,400}\.site-head__inner \{\s*display: flex;\s*flex-direction: row[\s\S]{0,120}justify-content: space-between/.test(mobileCss));
   /* Шторка меню уже: на экране 375 она занимает не больше 52% ширины. */
   check('шторка меню на телефоне уже, чем 232px',
-    /@media \(max-width: 1039px\)[\s\S]{0,400}\.side \{[^}]*min\(var\(--side-w\), 52vw\)/.test(mobileCss));
+    /\.side \{[^}]*min\(var\(--side-w\), 52vw\)/.test(mobileCss));
 
   /*
     Стабильность: на телефоне страница не дёргается. min-height через svh не

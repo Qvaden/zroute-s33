@@ -37,6 +37,27 @@ const SESSION_KEY = 'zr33.session';
 */
 const LEGACY_SESSION_KEY = 'zr33.forum.session';
 
+/*
+  База отвечает секунды, а зависший запрос — навсегда. Без общего таймаута
+  пропавшая сеть оставляла сайт на «Загружаем данные…» до перезагрузки:
+  fetch не сдаётся сам, когда соединение молчит. Таймаут превращает молчание
+  в обычную ошибку, и страница рассказывает о ней и продолжает жить.
+
+  Загрузка фото не под таймаутом: она идёт отдельным путём (uploadFile),
+  где человек сам ждёт прогресс, и спешить не нужно.
+*/
+const REQUEST_TIMEOUT = 12000;
+
+async function fetchWithTimeout(url, init = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Настроен ли доступ к базе. */
 export function isConfigured() {
   return Boolean(CFG.url && CFG.anonKey);
@@ -246,13 +267,17 @@ export async function auth(path, { method = 'POST', body, token } = {}) {
 
   let res;
   try {
-    res = await fetch(`${baseUrl()}/auth/v1${path}`, {
+    res = await fetchWithTimeout(`${baseUrl()}/auth/v1${path}`, {
       method,
       headers: { ...keyHeaders(token), 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
     });
-  } catch {
-    throw new Error('Не удалось связаться с базой. Проверьте интернет.');
+  } catch (err) {
+    throw new Error(
+      err?.name === 'AbortError'
+        ? 'База не отвечает. Проверьте интернет и попробуйте ещё раз.'
+        : 'Не удалось связаться с базой. Проверьте интернет.'
+    );
   }
 
   const text = await res.text();
@@ -325,7 +350,7 @@ export async function rest(path, { method = 'GET', body, prefer, headers = {}, r
 
   let res;
   try {
-    res = await fetch(`${baseUrl()}/rest/v1${path}`, {
+    res = await fetchWithTimeout(`${baseUrl()}/rest/v1${path}`, {
       method,
       headers: {
         ...keyHeaders(token),
@@ -336,8 +361,12 @@ export async function rest(path, { method = 'GET', body, prefer, headers = {}, r
       body: body ? JSON.stringify(body) : undefined,
       cache: 'no-store',
     });
-  } catch {
-    throw new Error('Не удалось связаться с базой. Проверьте интернет.');
+  } catch (err) {
+    throw new Error(
+      err?.name === 'AbortError'
+        ? 'База не отвечает. Проверьте интернет и попробуйте ещё раз.'
+        : 'Не удалось связаться с базой. Проверьте интернет.'
+    );
   }
 
   const text = await res.text();
