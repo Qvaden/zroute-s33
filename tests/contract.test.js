@@ -2870,7 +2870,7 @@ console.log('\nQ. Форум');
 
   /* Шапка на телефоне: кнопка слева, марка прижата к правому краю. */
   check('на телефоне шапка разводит кнопку и марку по краям',
-    /@media \(max-width: 700px\)[\s\S]{0,400}\.site-head__inner \{\s*justify-content: space-between/.test(mobileCss));
+    /@media \(max-width: 759px\)[\s\S]{0,500}\.site-head__inner \{\s*display: flex[\s\S]{0,120}justify-content: space-between/.test(mobileCss));
   /* Шторка меню уже: на экране 375 она занимает не больше 58% ширины. */
   check('шторка меню на телефоне уже, чем 232px',
     /@media \(max-width: 1039px\)[\s\S]{0,400}\.side \{[^}]*min\(var\(--side-w\), 58vw\)/.test(mobileCss));
@@ -2900,7 +2900,7 @@ console.log('\nQ. Форум');
   check('выпадающий список разделов получил стили',
     /\.pick \{[^}]*border-radius: 999px/.test(mobileCss));
   check('на телефоне длинный сегмент разделов уступает место списку',
-    /@media \(max-width: 639px\)[\s\S]{0,300}\.seg--cat,[\s\S]{0,100}\.seg--type \{ display: none/.test(mobileCss));
+    /@media \(max-width: 759px\)[\s\S]{0,300}\.seg--cat,[\s\S]{0,100}\.seg--type \{ display: none/.test(mobileCss));
   check('на телефоне пан вбок отрезается, а не тянет страницу',
     /overflow-x: clip/.test(mobileCss));
 
