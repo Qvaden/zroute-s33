@@ -51,6 +51,7 @@
  * @property {boolean} [deleted]
  * @property {string}  [deletedReason]
  * @property {number}  commentCount
+ * @property {number}  views          Сколько раз открывали тему.
  * @property {Record<string, number>} reactions  Сколько каких реакций.
  * @property {string|null} myReaction  Что поставил текущий участник.
  * @property {number}  score          Согласны минус не согласны.
@@ -121,6 +122,7 @@
  * @property {() => Promise<void>} signOut
  * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string}) => Promise<{posts: ForumPost[], total: number}>} listPosts
  * @property {(id: string) => Promise<ForumPost|null>} getPost
+ * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(draft: {title: string, body: string, category: string}) => Promise<ForumPost>} createPost
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
@@ -135,6 +137,7 @@
  * @property {() => Promise<ForumUser[]>} listUsers
  * @property {(userId: string, password: string) => Promise<void>} resetPassword
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
+ * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
  */
 
 export {};

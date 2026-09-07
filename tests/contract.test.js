@@ -933,6 +933,10 @@ console.log('\nJ. Админ-панель');
   const bareSiteImports = [...siteMain.matchAll(/from '(\.[^']+\.js)'/g)].map((m) => m[1]);
   equal('у каждого импорта сайта есть версия', bareSiteImports.join(', '), '');
 
+  check('панель вешает бан на одну кнопку', adminMain.includes("[data-player-ban]"));
+  check('панель вешает удаление аккаунта и окно подтверждения никем',
+    adminMain.includes('[data-player-delete]') && adminMain.includes('[data-delete-player-form]'));
+
   /*
     ЭКРАНЫ ПАНЕЛИ ПРОВЕРЯЮТСЯ НА ТОМ, ЧТО ПАНЕЛЬ ИМ ДЕЙСТВИТЕЛЬНО ДАЁТ.
 
@@ -2622,9 +2626,10 @@ console.log('\nQ. Форум');
     Ищем CASCADE именно в удалении представлений. Два уточнения, каждое
     из которых уже давало ложное срабатывание:
 
-    — «on delete cascade» у связей между таблицами — совсем другое дело
-      и нужен: удаляя учётную запись, её посты надо унести с собой, иначе
-      останутся ссылки в пустоту;
+    — «on delete set null» у связи постов с автором — совсем другое дело.
+      Удаляя учётную запись, посты надо ОСТАВИТЬ (ник лежит копией в самой
+      записи, и читатель не должен терять дискуссию из-за чужой пропажи).
+      Это отдельная история, и к удалению представлений отношения не имеет;
 
     — комментарии выбрасываем. Разбор этой самой ошибки написан в схеме
       прямо над исправленным местом, и текст сообщения Postgres содержит
@@ -2638,6 +2643,37 @@ console.log('\nQ. Форум');
   ].filter((m) => /cascade/i.test(m[0]));
   equal('CASCADE не используется при удалении представлений — он снёс бы зависимое молча',
     dropsWithCascade.length, 0);
+
+  /* ── Счётчик просмотров ── */
+
+  check('счётчик просмотров заведён в таблицу постов',
+    /forum_posts\s*\([\s\S]*?views\s+integer\s+not\s+null\s+default\s+0/m.test(schema));
+  check('счётчик просмотров есть и у старых баз (миграция)',
+    /alter table public\.forum_posts add column if not exists views integer not null default 0/.test(schema));
+  for (const name of ['schema.sql', 'profiles.sql', 'rich-forum.sql']) {
+    const src = await readFile(`supabase/${name}`, 'utf8');
+    check(`${name}: лента отдаёт счётчик просмотров`,
+      /p\.views,\s*\n\s*\(select count\(\*\) from public\.forum_comments/.test(src));
+  }
+  check('просмотр считает функция в базе, а не клиент',
+    /create or replace function public\.forum_register_view\(target_post uuid\)/.test(schema));
+  check('счётчик просмотров открыт и гостю',
+    /grant execute on function public\.forum_register_view\(uuid\) to authenticated, anon/.test(schema));
+  check('просмотр не считает удалённые темы',
+    /views = views \+ 1\s*\n\s*where id = target_post\s*\n\s*and deleted = false/.test(schema));
+
+  /* ── Удаление аккаунта из панели ── */
+
+  check('удаление аккаунта — функция в базе (править пользователей из сайта нельзя)',
+    /create or replace function public\.forum_admin_delete_user\(\s*target_user uuid\s*\)/.test(schema));
+  check('удаление аккаунта доступно только вошедшим',
+    /revoke all on function public\.forum_admin_delete_user\(uuid\) from public, anon/.test(schema) &&
+      /grant execute on function public\.forum_admin_delete_user\(uuid\) to authenticated/.test(schema));
+  check('удаление аккаунта запрещает владелец и сам себя',
+    /target_user = auth\.uid\(\)/.test(schema) && /role from public\.forum_users where id = target_user\) = 'admin'/.test(schema));
+  check('удаление аккаунта рвёт только связь: посты и комментарии остаются',
+    /forum_posts\s*\([\s\S]*?author_id\s+uuid references public\.forum_users \(id\) on delete set null/m.test(schema) &&
+      /forum_comments\s*\([\s\S]*?author_id\s+uuid references public\.forum_users \(id\) on delete set null/m.test(schema));
 
   check('жалобы видит только модерация — открытый список стал бы травлей',
     /create policy forum_reports_read on public\.forum_reports\s+[\s\S]{0,200}?forum_is_staff\(\)/.test(schema));
@@ -2852,7 +2888,7 @@ console.log('\nQ. Форум');
   const post = {
     id: 'p1', authorId: 'u2', authorNick: 'Игрок', category: 'vs',
     title: 'Разбор', body: 'текст поста', createdAt: new Date(), commentCount: 0,
-    reactions: { like: 2 }, myReaction: null, score: 2, deleted: false,
+    reactions: { like: 2 }, myReaction: null, score: 2, deleted: false, views: 7,
   };
 
   const memberHtml = renderForum({ events: eventsSample }, {
@@ -2867,6 +2903,7 @@ console.log('\nQ. Форум');
     memberHtml.includes('contenteditable') && memberHtml.includes('data-placeholder'));
   check('чужой пост можно пожаловаться', memberHtml.includes('data-forum-report="post:p1"'));
   check('счётчик лайков виден', memberHtml.includes('>2<'));
+  check('в карточке виден счётчик просмотров', memberHtml.includes('👁 7'));
   /* Разделы управляются и кнопками, и выпадающим списком (телефон).
      Список свой, а не системный <select>: системный на телефоне раскрывается
      во весь экран и теряет страницу, по которой человек выбирал. */
@@ -2906,6 +2943,21 @@ console.log('\nQ. Форум');
     const supabaseSource2 = await readFile('src/forum/adapters/supabase.js', 'utf8');
     check('supabase isReady() объявлен async — по контракту это обещание',
       /export async function isReady/.test(supabaseSource2));
+
+    for (const path of ['src/forum/adapters/local.js', 'src/forum/adapters/supabase.js']) {
+      const adapter = await import('../' + path);
+      check(`${path.split('/').pop()}: объявляет registerView()`, typeof adapter.registerView === 'function');
+      check(`${path.split('/').pop()}: объявляет adminDeleteUser()`, typeof adapter.adminDeleteUser === 'function');
+    }
+    check('при открытии темы регистрируется просмотр',
+      mountSource.includes('forum.registerView(postId)'));
+    const loadThreadBlock = mountSource.match(/async function loadThread[\s\S]*?\n}/)?.[0] ?? '';
+    check('перерисовка ленты просмотр не считает — засчитал бы сам себе',
+      loadThreadBlock.length > 0 && !loadThreadBlock.includes('registerView'));
+    check('supabase client считает просмотры функцией в базе',
+      /rpc\/forum_register_view/.test(supabaseSource2));
+    check('supabase client удаляет аккаунт функцией в базе',
+      /rpc\/forum_admin_delete_user/.test(supabaseSource2));
   }
 
   const bannedHtml = renderForum({ events: eventsSample }, {
@@ -2955,6 +3007,16 @@ console.log('\nQ. Форум');
     },
   });
   check('администратору доступен сброс пароля', playersHtml.includes('data-player-reset="u2"'));
+  check('администратору доступен бан одной кнопкой', playersHtml.includes('data-player-ban="u2"'));
+  check('администратору доступно удаление аккаунта', playersHtml.includes('data-player-delete="u2"'));
+  check('себе бан не показывается — для этого есть настройки',
+    !playersHtml.includes('data-player-ban="u1"'));
+  check('себе удаление не показывается',
+    !playersHtml.includes('data-player-delete="u1"'));
+  check('удаление аккаунта просит ввести ник — случайное нажатие не стирает человека',
+    playersHtml.includes('data-delete-player-form') && /Введите ник игрока/.test(playersHtml));
+  check('окно удаления честно говорит, что посты и комментарии останутся',
+    /Посты и комментарии/.test(playersHtml) && /останутся/.test(playersHtml));
   check('себе пароль сбросить нельзя — для этого есть обычная смена',
     !playersHtml.includes('data-player-reset="u1"'));
   check('панель предупреждает, что пароль покажется один раз',

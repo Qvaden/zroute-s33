@@ -947,6 +947,10 @@
   text-decoration: none;
 }
 .forum-post__comments:hover { color: var(--text); }
+.forum-post__views {
+  color: var(--dim);
+  font-size: 12.5px;
+}
 .forum-post__acts { display: flex; gap: 4px; margin-left: auto; }
 
 .forum-act {

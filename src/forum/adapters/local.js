@@ -182,6 +182,7 @@ function postOut(state, p) {
     pinned: Boolean(p.pinned),
     deleted: Boolean(p.deleted),
     deletedReason: p.deletedReason || '',
+    views: Number(p.views || 0),
     commentCount: state.comments.filter((c) => c.postId === p.id && !c.deleted).length,
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
@@ -233,6 +234,20 @@ export async function getPost(id) {
   return p ? postOut(s, p) : null;
 }
 
+/**
+ * Один просмотр темы.
+ *
+ * Считается только здесь, а не в getPost: тот зовётся и для пересортировки
+ * ленты, и после реакции или правки, и каждая перерисовка не должна засчитывать
+ * новый просмотр. Регистрирует переход страница — в одном месте (см. mount.js).
+ */
+export async function registerView(postId) {
+  const s = read();
+  const post = s.posts.find((p) => p.id === postId);
+  if (post && !post.deleted) post.views = (post.views || 0) + 1;
+  write(s);
+}
+
 /** Кто сейчас пишет, и имеет ли он право. Общая проверка для поста и комментария. */
 function requireWriter(state) {
   const me = state.users.find((u) => u.id === state.me);
@@ -260,6 +275,7 @@ export async function createPost(draft) {
     createdAt: new Date().toISOString(),
     pinned: false,
     deleted: false,
+    views: 0,
   };
   s.posts.push(post);
   write(s);
@@ -509,5 +525,28 @@ export async function setRestriction(userId, opts) {
     user.mutedUntil = opts.mutedUntil ? new Date(opts.mutedUntil).toISOString() : null;
   }
   if (opts.reason != null) user.banReason = String(opts.reason);
+  write(s);
+}
+
+/**
+ * УДАЛЕНИЕ АККАУНТА.
+ *
+ * Профиль исчезает, а его посты и комментарии остаются: ник лежит копией
+ * в самой записи, и авторская связь рвётся (пустой id), как и в базе.
+ */
+export async function adminDeleteUser(userId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me || (me.role !== 'admin' && me.role !== 'moderator')) {
+    throw new Error('Недостаточно прав');
+  }
+  const target = s.users.find((u) => u.id === userId);
+  if (!target) throw new Error('Игрок не найден');
+  if (target.role === 'admin') throw new Error('Владельца удалить нельзя');
+
+  s.users = s.users.filter((u) => u.id !== userId);
+  for (const p of s.posts) if (p.authorId === userId) p.authorId = null;
+  for (const c of s.comments) if (c.authorId === userId) c.authorId = null;
+  if (s.me === userId) s.me = null;
   write(s);
 }

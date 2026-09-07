@@ -493,6 +493,7 @@ select
   p.pinned,
   p.deleted,
   p.deleted_reason,
+  p.views,
   (select count(*) from public.forum_comments c
      where c.post_id = p.id and c.deleted = false) as comment_count,
   coalesce(

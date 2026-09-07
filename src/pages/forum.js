@@ -820,6 +820,7 @@ function renderPostCard(p, s) {
         <a class="forum-post__comments" href="#/forum/${esc(p.id)}">
           💬 ${p.commentCount ? esc(plural(p.commentCount, 'ответ', 'ответа', 'ответов')) : 'ответить'}
         </a>
+        <span class="forum-post__views">👁 ${Number(p.views || 0)}</span>
         <span class="forum-post__acts">
           ${
             isMine

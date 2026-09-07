@@ -253,6 +253,7 @@ function postOut(row) {
     pinned: Boolean(row.pinned),
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
+    views: Number(row.views || 0),
     commentCount: Number(row.comment_count || 0),
     reactions: counts,
     myReaction: row.my_reaction || null,
@@ -306,6 +307,24 @@ export async function getPost(id) {
   const rows = await rest(`/forum_post_list?select=*&id=eq.${encodeURIComponent(id)}&limit=1`);
   const row = Array.isArray(rows) ? rows[0] : null;
   return row ? postOut(row) : null;
+}
+
+/**
+ * Один просмотр темы.
+ *
+ * Отдельная функция, а не инкремент внутри getPost: getPost зовётся и для
+ * пересортировки ленты, и после реакции, и после правки — каждая такая
+ * перерисовка не должна считать новый просмотр. Просмотр — это переход
+ * в тему, и его регистрирует страница в одном месте (см. mount.js).
+ *
+ * Инкремент делает функция в базе (forum_register_view): по правилам строк
+ * чужой пост вообще нельзя править, а счётчик должен расти у любого.
+ */
+export async function registerView(postId) {
+  await rest('/rpc/forum_register_view', {
+    method: 'POST',
+    body: { target_post: postId },
+  });
 }
 
 export async function createPost(draft) {
@@ -529,4 +548,19 @@ export async function setRestriction(userId, opts) {
   if (opts.reason != null) body.ban_reason = String(opts.reason);
 
   await rest(`/forum_users?id=eq.${encodeURIComponent(userId)}`, { method: 'PATCH', body });
+}
+
+/**
+ * УДАЛЕНИЕ АККАУНТА.
+ *
+ * Так же, как сброс пароля, это живёт функцией в базе (forum_admin_delete_user):
+ * удалять строки напрямую может только служебный ключ, а его на сайте нет.
+ * Функция проверяет, что вызвавший — администратор, и только потом удаляет.
+ * Посты и комментарии игрока при этом остаются: ник лежит копией в записи.
+ */
+export async function adminDeleteUser(userId) {
+  await rest('/rpc/forum_admin_delete_user', {
+    method: 'POST',
+    body: { target_user: userId },
+  });
 }

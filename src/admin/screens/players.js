@@ -100,8 +100,8 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь назначают модераторов, сбрасывают забытый пароль и закрывают
-          возможность писать.
+          Здесь назначают модераторов, сбрасывают забытый пароль, закрывают
+          возможность писать и удаляют чужие аккаунты.
         </p>
       </header>
 
@@ -130,7 +130,8 @@ export function renderPlayers(view) {
     </section>
 
     ${renderResetModal()}
-    ${renderRestrictModal()}`;
+    ${renderRestrictModal()}
+    ${renderDeleteModal()}`;
 }
 
 /** Одна строка списка. */
@@ -192,6 +193,16 @@ function renderRow(user, me) {
                         data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"
                         data-player-banned="${user.banned ? '1' : ''}">
                   ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
+                </button>
+                <button type="button" class="adm-btn"
+                        data-player-ban="${esc(user.id)}"
+                        data-player-ban-action="${user.banned ? '' : '1'}"
+                        data-player-nick="${esc(user.nick)}">
+                  ${user.banned ? 'Разбанить' : 'Забанить'}
+                </button>
+                <button type="button" class="adm-btn adm-btn--danger"
+                        data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                  Удалить навсегда
                 </button>`
         }
       </div>
@@ -299,6 +310,43 @@ function renderRestrictModal() {
           <br>
           <b>Запрет</b> — то же самое, но без срока: снимать только вручную.
         </p>
+      </div>
+    </div>`;
+}
+
+/**
+ * Окно удаления аккаунта.
+ *
+ * В единственной операции форума, которая необратима, ник вводится руками:
+ * случайное нажатие не должно стирать человека. Пароль и запрет — поправимые
+ * действия, удаление — нет, и это единственное окно, где подтверждение
+ * обязано быть осознанным.
+ *
+ * Посты и комментарии при этом остаются: ник лежит копией в самой записи,
+ * и удаление аккаунта рвёт только связь с автором.
+ */
+function renderDeleteModal() {
+  return `
+    <div class="adm-modal" data-delete-modal hidden>
+      <div class="adm-modal__box" role="dialog" aria-modal="true" aria-label="Удаление аккаунта">
+        <h3>Удалить аккаунт <b data-delete-nick></b></h3>
+        <p class="muted">
+          Навсегда и без возврата: вход, страница участника, его реакции,
+          голоса и поданные им жалобы исчезнут. Посты и комментарии
+          <b>останутся</b> на форуме — ник в них сохранён копией.
+        </p>
+        <form data-delete-player-form>
+          <label class="adm-field">
+            <span>Введите ник игрока для подтверждения</span>
+            <input type="text" name="confirm" autocomplete="off"
+                   placeholder="Отмена, если сомневаетесь">
+          </label>
+          <div class="adm-actions">
+            <button type="submit" class="adm-btn adm-btn--danger">Удалить навсегда</button>
+            <button type="button" class="adm-btn" data-delete-player-cancel>Отмена</button>
+          </div>
+          <div class="adm-result" data-delete-error hidden></div>
+        </form>
       </div>
     </div>`;
 }

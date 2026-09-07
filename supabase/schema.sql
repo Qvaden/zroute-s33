@@ -38,7 +38,7 @@ create unique index if not exists forum_users_nick_key
 
 create table if not exists public.forum_posts (
   id             uuid primary key default gen_random_uuid(),
-  author_id      uuid not null references public.forum_users (id) on delete cascade,
+  author_id      uuid references public.forum_users (id) on delete set null,
   /*
     Ник автора лежит КОПИЕЙ рядом с постом, а не берётся связью из профиля.
 
@@ -64,11 +64,31 @@ create table if not exists public.forum_posts (
   pinned         boolean not null default false,
   deleted        boolean not null default false,
   deleted_reason text not null default '',
-  deleted_at     timestamptz
+  deleted_at     timestamptz,
+  views          integer not null default 0
 );
 
--- Для баз, созданных первой версией схемы: колонки там ещё нет.
+-- Для баз, созданных первой версией схемы: колонок там ещё нет.
 alter table public.forum_posts add column if not exists author_nick text not null default '';
+alter table public.forum_posts add column if not exists views integer not null default 0;
+
+/*
+  АВТОР МОЖЕТ ИСЧЕЗНУТЬ, А ЗАПИСЬ — ОСТАТЬСЯ.
+
+  Раньше связь была `on delete cascade`: удаляя учётную запись, посты уносило
+  с собой. Теперь, когда ник лежит копией в самой записи, удаление аккаунта
+  рвёт только связь (`on delete set null`, колонка допускает пусто), а текст
+  и подпись остаются на месте. Так и должен вести себя форум: исчезнувший
+  человек не должен уносить с собой чужую дискуссию.
+
+  Эти строки нужны и свежим базам (таблица уже создана выше с той же связью),
+  и старым, где связь была каскадной. Повторный запуск безопасен: удаление
+  и пересоздание констрейнта — идемпотентно.
+*/
+alter table public.forum_posts drop constraint if exists forum_posts_author_id_fkey;
+alter table public.forum_posts alter column author_id drop not null;
+alter table public.forum_posts add constraint forum_posts_author_id_fkey
+  foreign key (author_id) references public.forum_users (id) on delete set null;
 
 create index if not exists forum_posts_feed_idx
   on public.forum_posts (pinned desc, created_at desc);
@@ -78,7 +98,7 @@ create index if not exists forum_posts_cat_idx
 create table if not exists public.forum_comments (
   id             uuid primary key default gen_random_uuid(),
   post_id        uuid not null references public.forum_posts (id) on delete cascade,
-  author_id      uuid not null references public.forum_users (id) on delete cascade,
+  author_id      uuid references public.forum_users (id) on delete set null,
   -- Копией, по той же причине, что и у поста.
   author_nick    text not null default '',
   body           text not null check (char_length(body) between 1 and 2000),
@@ -89,6 +109,12 @@ create table if not exists public.forum_comments (
 );
 
 alter table public.forum_comments add column if not exists author_nick text not null default '';
+
+-- Та же мысль, что у постов: комментарий переживает исчезнувшего автора.
+alter table public.forum_comments drop constraint if exists forum_comments_author_id_fkey;
+alter table public.forum_comments alter column author_id drop not null;
+alter table public.forum_comments add constraint forum_comments_author_id_fkey
+  foreign key (author_id) references public.forum_users (id) on delete set null;
 
 create index if not exists forum_comments_post_idx
   on public.forum_comments (post_id, created_at);
@@ -604,6 +630,7 @@ select
   p.pinned,
   p.deleted,
   p.deleted_reason,
+  p.views,
   (select count(*) from public.forum_comments c
      where c.post_id = p.id and c.deleted = false) as comment_count,
   coalesce(
@@ -623,6 +650,37 @@ select
     0
   ) as score
 from public.forum_posts p;
+
+-- ── Просмотры ────────────────────────────────────────────────────────────────
+--
+-- Счётчик открытых тем. Число хранится в колонке и растёт на единицу при
+-- каждом открытии поста — страница зовёт эту функцию, когда человек перешёл
+-- в тему.
+--
+-- ОТКРЫТИЕ, А НЕ ЧТЕНИЕ ЛЕНТЫ. Лента показывается всем и при каждой загрузке
+-- форума; считать её просмотрами означало бы накручивать счётчик самому себе
+-- при любой перерисовке. Просмотр — это переход на сам пост.
+--
+-- security definer нужен, чтобы обойти правила строк: чужой пост инкрементить
+-- адаптер не может напрямую (править чужие записи нельзя вовсе). Служебных
+-- прав функция при этом не выдаёт — внутри неё нет ничего, кроме счётчика.
+
+create or replace function public.forum_register_view(target_post uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  update public.forum_posts
+     set views = views + 1
+   where id = target_post
+     and deleted = false;
+end;
+$$;
+
+-- Просмотр не пишет ничего личного — счётчик можно увеличивать из любого
+-- браузера, в том числе гостю. Счётчик и сам по себе не защита, а счёт.
+revoke all on function public.forum_register_view(uuid) from public, anon;
+grant execute on function public.forum_register_view(uuid) to authenticated, anon;
 
 drop view if exists public.forum_comment_list;
 
@@ -751,6 +809,52 @@ $$;
 -- делает сама функция; здесь закрываем её от анонимных запросов.
 revoke all on function public.forum_admin_reset_password(uuid, text) from public, anon;
 grant execute on function public.forum_admin_reset_password(uuid, text) to authenticated;
+
+-- ── УДАЛЕНИЕ АККАУНТА ────────────────────────────────────────────────────────
+--
+-- Той же схемой, что и сброс пароля: функцию в базе, а не запрос из панели.
+-- Удаление строки профиля напрямую доступно только служебному ключу, и такой
+-- ключ в панели появиться не должен; функция проверяет, что вызвавший —
+-- администратор, и только потом удаляет.
+--
+-- ЧТО ПРОИСХОДИТ С ЗАПИСЯМИ. Посты и комментарии ОСТАЮТСЯ: ник лежит копией
+-- в самой записи, а связь автора рвётся (`on delete set null` на author_id).
+-- Уходят вместе с аккаунтом только его следы: реакции, голоса в опросах,
+-- вложения, уведомления и поданные им жалобы — они каскадно удаляются при
+-- удалении строки профиля.
+
+create or replace function public.forum_admin_delete_user(
+  target_user uuid
+)
+returns void
+language plpgsql security definer set search_path = public, auth, extensions
+as $$
+begin
+  if not public.forum_is_admin() then
+    raise exception 'Удалять аккаунты может только владелец';
+  end if;
+
+  if target_user = auth.uid() then
+    raise exception 'Свой аккаунт так не удаляется';
+  end if;
+
+  if not exists (select 1 from public.forum_users where id = target_user) then
+    raise exception 'Игрок не найден';
+  end if;
+
+  if (select role from public.forum_users where id = target_user) = 'admin' then
+    raise exception 'Владельца удалить нельзя';
+  end if;
+
+  -- Строку входа удаляем вместе с профилем: одно нажатие должно закрыть и то,
+  -- и другое, а разнести их значило бы оставить полуживую учётную запись.
+  delete from auth.users
+   where id = target_user;
+end;
+$$;
+
+revoke all on function public.forum_admin_delete_user(uuid) from public, anon;
+grant execute on function public.forum_admin_delete_user(uuid) to authenticated;
 
 -- ── ЧТО ДЕЛАТЬ ДАЛЬШЕ ───────────────────────────────────────────────────────
 --
