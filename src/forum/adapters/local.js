@@ -305,6 +305,36 @@ export async function deletePost(id, reason) {
   write(s);
 }
 
+/**
+ * Закрепление — модерация: свои темы так нельзя двигать в топ.
+ *
+ * Лимит тот же, что и в базе (CONFIG.forum.limits.pinsMax): браузер
+ * предупреждает заранее, а настоящая защита — в триггере supabase/schema.sql.
+ * Здесь проверка для понятного сообщения, а не для безопасности — в локальном
+ * режиме запрос мимо сайта обойти некому.
+ */
+export async function setPinned(id, pinned) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+  if (me.role !== 'admin' && me.role !== 'moderator') throw new Error('Недостаточно прав');
+
+  const post = s.posts.find((p) => p.id === id);
+  if (!post) throw new Error('Пост не найден');
+  if (post.deleted) throw new Error('Удалённый пост закрепить нельзя');
+
+  pinned = Boolean(pinned);
+  if (pinned && !post.pinned) {
+    const pinnedCount = s.posts.filter((p) => p.pinned && !p.deleted && p.id !== id).length;
+    if (pinnedCount >= CONFIG.forum.limits.pinsMax) {
+      throw new Error('Закреплено уже три темы — сначала открепите одну');
+    }
+  }
+  post.pinned = pinned;
+  write(s);
+  return postOut(s, post);
+}
+
 /* ── Комментарии ──────────────────────────────────────────────────────────── */
 
 function commentOut(state, c) {

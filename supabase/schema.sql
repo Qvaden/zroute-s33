@@ -360,6 +360,19 @@ begin
   end if;
 
   if public.forum_is_staff() then
+    /*
+      Закреплений в топе не больше трёх. Число повторяет
+      CONFIG.forum.limits.pinsMax на клиенте — поменять в двух местах:
+      здесь и там. Триггер security definer видит все строки таблицы,
+      поэтому лимит держится и для запросов мимо сайта.
+    */
+    if new.pinned and not old.pinned then
+      if (select count(*) from public.forum_posts
+          where pinned and not deleted and id <> new.id) >= 3 then
+        raise exception 'Закреплено уже три темы — сначала открепите одну'
+          using errcode = 'check_violation';
+      end if;
+    end if;
     return new;
   end if;
 

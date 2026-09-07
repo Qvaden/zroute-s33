@@ -936,6 +936,34 @@ function wire() {
       return;
     }
 
+    // Закрепление темы (модерация).
+    const pinBtn = t.closest('[data-forum-pin]');
+    if (pinBtn && host.contains(pinBtn)) {
+      const id = pinBtn.dataset.forumPin;
+      const post = state.posts.find((p) => p.id === id);
+      const next = !post?.pinned;
+
+      /*
+        Ставим сразу, а не после ответа базы: переключение должно отозваться
+        мгновенно. Если база откажет (лимит, права), loadFeed вернёт настоящее
+        состояние обратно.
+      */
+      if (post) {
+        post.pinned = next;
+        paint();
+      }
+
+      try {
+        await forum.setPinned(id, next);
+        // Порядок ленты меняется (закреплённые всегда сверху) — перерисовываем её.
+        await loadFeed();
+      } catch (err) {
+        state.error = String(err?.message ?? err);
+        await loadFeed();
+      }
+      return;
+    }
+
     // Удаление.
     const delPost = t.closest('[data-forum-del-post]');
     if (delPost && host.contains(delPost)) {

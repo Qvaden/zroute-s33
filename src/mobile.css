@@ -279,7 +279,7 @@ html {
 .tl__row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
   list-style: none;
   -webkit-tap-highlight-color: transparent;
@@ -287,27 +287,27 @@ html {
 .tl__row::-webkit-details-marker { display: none; }
 
 /*
-  Значок «внутри есть ещё»: камера с числом фотографий или плюс, если только
-  текст. Он же и подсказка, и единственное, что осталось от прежней строки.
+  Раскрывающийся хвост: тонкий уголок в углу записи, без кружка «плюс».
+  О его существовании говорят наклон у стрелки и цвет при открытии.
 */
-.tl__more {
+.tl__chev {
   flex: none;
   align-self: center;
-  padding: 3px 7px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  margin: 0 1px 0 5px;
   color: var(--mute);
   font-size: 11px;
-  transition: border-color .16s var(--ease), color .16s var(--ease);
+  line-height: 1;
+  transition: transform .18s var(--ease), color .18s var(--ease);
 }
-.tl__row:hover .tl__more { border-color: rgba(255,255,255,.24); color: var(--dim); }
-.tl__details[open] .tl__more { border-color: var(--accent); color: var(--accent); }
+.tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent); }
 
 @media (max-width: 420px) {
   .tl__group-name { font-size: 12px; }
   .tl__group-head { gap: 8px; }
-  /* Значок ужимаем до одного символа: место нужнее заголовку записи. */
-  .tl__more { padding: 3px 6px; font-size: 10.5px; }
+  /* Уголок ужимаем до одного символа: место нужнее заголовку записи. */
+  .tl__chev { margin-left: 3px; font-size: 10.5px; }
+  .tl__item .tl__title { font-size: 14.5px; }
+  .tl__meta { font-size: 11px; }
 }
 
 /* ── Профиль участника ────────────────────────────────────────────────────── */

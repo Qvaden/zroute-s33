@@ -22,6 +22,13 @@
   /* Выбранная вручную неделя. null — показываем самую свежую из видимых. */
   var currentWeek = null;
 
+  /*
+    Сколько свежих плашек видно сразу, остальные — за кнопкой «Показать все».
+    expandedWeeks — нажал человек кнопку и смотрит весь список целиком.
+  */
+  var WEEKS_SHOWN = 4;
+  var expandedWeeks = false;
+
   function each(list, fn) {
     Array.prototype.forEach.call(list, fn);
   }
@@ -109,10 +116,17 @@
 
     var visible = [];
     each(pills, function (btn) {
-      var ok = inRange(btn.dataset.tlYm);
-      var li = btn.parentElement;
-      if (li) li.hidden = !ok;
-      if (ok) visible.push(btn);
+      if (inRange(btn.dataset.tlYm)) visible.push(btn);
+    });
+
+    /*
+      Список режем до нескольких самых свежих — записей со временем десятки,
+      и лента в шапке съедает экран. Кнопка открывает остальное; пока она
+      не нажата, видно только первые WEEKS_SHOWN плашек (свежие сверху).
+    */
+    var shown = expandedWeeks ? visible : visible.slice(0, WEEKS_SHOWN);
+    each(pills, function (btn) {
+      btn.parentElement.hidden = shown.indexOf(btn) === -1;
     });
 
     /*
@@ -135,8 +149,62 @@
       card.hidden = card.dataset.tlVerdict !== target;
     });
 
+    /*
+      Кнопка подстраивается под фильтр: число в ней — сколько плашек спрятано
+      сейчас, а не сколько всего в летописи. Нажата — становится «Свернуть».
+    */
+    var more = document.querySelector('[data-tl-more]');
+    if (more) {
+      var hiddenCount = visible.length - WEEKS_SHOWN;
+      more.hidden = hiddenCount <= 0;
+      more.setAttribute('aria-expanded', String(expandedWeeks));
+      more.textContent = expandedWeeks ? 'Свернуть список' : 'Показать все (' + hiddenCount + ')';
+    }
+
     var none = document.querySelector('[data-tl-noweeks]');
     if (none) none.hidden = visible.length !== 0;
+  }
+
+  /**
+   * Переход от вердикта в шапке к записи в ленте ниже.
+   *
+   * Фильтры могли спрятать цель (тип, год, месяц) — тогда сначала снимаем их,
+   * чтобы переходить было к чему. Отказ от сохранения выбора осознанный:
+   * прыжок полезен, когда записи НЕ видно, а когда она и так на экране,
+   * фильтры трогать не нужно.
+   */
+  function jumpToEvent(id) {
+    var target = document.querySelector('[data-tl-id="' + id + '"]');
+    if (!target) return;
+
+    if (target.hidden) {
+      showAllEvents();
+      target = document.querySelector('[data-tl-id="' + id + '"]');
+      if (!target) return;
+    }
+
+    // Запись в свёрнутом месяце не видна — раскрываем папку заранее.
+    var group = target.closest('[data-tl-group]');
+    if (group && !group.open) group.open = true;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Вспышка показывает, куда прыгнули, — иначе взгляд ищет сам.
+    target.classList.add('is-flash');
+    setTimeout(function () { target.classList.remove('is-flash'); }, 1100);
+  }
+
+  /** Снять фильтры и показать список целиком — для прыжка к записи. */
+  function showAllEvents() {
+    currentType = 'all';
+    currentYear = 'all';
+    currentMonth = null;
+    expandedWeeks = false;
+    each(document.querySelectorAll('.seg [data-tl-filter]'), function (b) {
+      b.classList.toggle('is-on', b.dataset.tlFilter === 'all');
+    });
+    syncPick();
+    apply();
   }
 
   /** Месяцы показываем только для выбранного года — иначе их будет двенадцать на год. */
@@ -241,6 +309,20 @@
       return;
     }
 
+    var moreBtn = e.target.closest('[data-tl-more]');
+    if (moreBtn) {
+      expandedWeeks = !expandedWeeks;
+      applyWeeks();
+      return;
+    }
+
+    // Вердикт в шапке — кликабельный переход к записи в ленте ниже.
+    var openCard = e.target.closest('[data-tl-open]');
+    if (openCard) {
+      jumpToEvent(openCard.dataset.tlOpen);
+      return;
+    }
+
     var weekBtn = e.target.closest('[data-tl-week]');
     if (weekBtn) {
       currentWeek = weekBtn.dataset.tlWeek;
@@ -248,9 +330,17 @@
     }
   });
 
-  // Esc закрывает выпадающий список, если он раскрылся и загородил страницу.
+  // Esc закрывает выпадающий список, если он раскрылся и загородил страницу;
+  // Enter и пробел на вердикте работают как клик (div-сслыка на запись).
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closePicks();
+    if (e.key === 'Escape') { closePicks(); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest) {
+      var open = e.target.closest('[data-tl-open]');
+      if (open) {
+        e.preventDefault();
+        jumpToEvent(open.dataset.tlOpen);
+      }
+    }
   });
 
   // main.js дёргает после каждой отрисовки — страница появляется асинхронно.
@@ -264,6 +354,7 @@
     currentYear = 'all';
     currentMonth = null;
     currentWeek = null;
+    expandedWeeks = false;
     syncPick();
     apply();
   };

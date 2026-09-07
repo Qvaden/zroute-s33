@@ -1739,3 +1739,178 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @keyframes quart-gold-medal-float{0%,100%{transform:translateY(0) scale(1);filter:drop-shadow(0 0 7px color-mix(in srgb,var(--quart-acid) 38%,transparent))}50%{transform:translateY(-5px) scale(1.045);filter:drop-shadow(0 0 14px color-mix(in srgb,var(--quart-acid) 72%,transparent))}}
 .quart-podium-card--gold .quart-podium-card__medal{display:inline-block;transform-origin:center;animation:quart-gold-medal-float 2.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){.quart-podium-card--gold .quart-podium-card__medal{animation:none}}
+
+/* ── Хронология: лента как спокойный список ────────────────────────────────
+   Прежний вид — рамочные квадратики с номерами, бегущая полоса слева, кружок
+   «плюс/минус» и блик при наведении — читался пёстро. Теперь запись: тихая
+   цветная точка исхода, подпись типа с датой, название и короткое описание,
+   а раскрывающийся хвост обозначает один тонкий уголок. Это перекрывает
+   правила выше намеренно целиком: старые классы-заглушки остаются в разметке
+   прошлых поколений, и проще переопределить вид, чем разбирать каждый селектор.
+*/
+.tl::before { content: none; }
+
+.tl__item {
+  gap: 12px;
+  padding: 2px 0 20px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+  transition: none;
+}
+.tl__item::after { content: none; }
+.tl__item > *, .tl__item .tl__row > * { position: static; z-index: auto; }
+.tl__item:hover, .tl__item:active { transform: none; border-color: transparent; }
+
+.tl__row, summary.tl__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  list-style: none;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+summary.tl__row { cursor: pointer; }
+.tl__row::-webkit-details-marker { display: none; }
+
+.tl__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.tl__item--server_capture .tl__dot,
+.tl__item--server_defended .tl__dot { background: var(--win); }
+.tl__item--capture_failed .tl__dot,
+.tl__item--server_lost .tl__dot,
+.tl__item--war .tl__dot { background: var(--loss); }
+
+.tl__body {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding-top: 1px;
+}
+
+.tl__item .tl__title {
+  display: block;
+  margin: 0;
+  color: var(--text);
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.tl__meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 7px;
+  margin-top: 3px;
+  color: var(--mute);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.tl__type {
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--electric);
+  overflow-wrap: anywhere;
+}
+.tl__sep { color: var(--line); font-size: 10px; }
+.tl__meta-note { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.tl__item--server_capture .tl__type,
+.tl__item--server_defended .tl__type { color: var(--win); }
+.tl__item--capture_failed .tl__type,
+.tl__item--server_lost .tl__type,
+.tl__item--war .tl__type { color: var(--loss); }
+
+.tl__item .tl__summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 5px 0 0;
+  color: var(--dim);
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tl__details { margin: 0; border: 0; flex: 1; min-width: 0; }
+.tl__details > summary::before { content: none; }
+.tl__details-body {
+  padding: 2px 0 16px 21px;
+  color: var(--dim);
+  animation: timeline-details-in .22s var(--ease-out) both;
+}
+.tl__details-body p { margin: 0; font-size: 13.5px; line-height: 1.65; overflow-wrap: anywhere; }
+.tl__details-body .tl__gallery { margin-top: 12px; }
+
+.tl__chev {
+  flex: none;
+  align-self: center;
+  margin: 0 2px 0 6px;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1;
+  transition: transform .18s var(--ease), color .18s var(--ease);
+}
+.tl__row:hover .tl__chev { color: var(--dim); }
+.tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tl__details-body { animation: none; }
+  .tl__chev { transition: none; }
+}
+/* ── Плашки вердиктов: список режем до нескольких свежих ───────────────────── */
+.wks__more {
+  display: inline-flex;
+  align-items: center;
+  margin: 10px 0 0;
+  padding: 5px 11px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .14s var(--ease), border-color .14s var(--ease);
+}
+.wks__more:hover { color: var(--text); border-color: var(--mute); }
+.wks__more[hidden] { display: none; }
+
+/* Вердикт в шапке ведёт к записи в ленте — значит, он кликабелен. */
+.verdict { cursor: pointer; }
+.verdict:hover .verdict__text {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--text) 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+/* Куда прыгнули из вердикта: короткая вспышка вокруг записи. */
+.tl__item.is-flash { animation: tl-flash 1.1s var(--ease); }
+@keyframes tl-flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  35% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tl__item.is-flash { animation: none; }
+}

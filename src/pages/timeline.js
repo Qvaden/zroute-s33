@@ -3,6 +3,9 @@ import { EVENT_TYPE, EVENT_TYPE_ORDER, serverEvents, verdictText, pillText } fro
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
+/* Сколько свежих плашек в шапке видно сразу, остальные — за «Показать все». */
+const WEEKS_SHOWN = 4;
+
 /**
  * Хронология: «прикольно будет смотреть, когда какая Столица была взята».
  *
@@ -104,7 +107,9 @@ function renderServerSection(list) {
       // типов — это название записи, как в ленте ниже.
       const text = m.verdict ? verdictText(e.type, e.serverNumber) : (e.title || pillText(e.type, e.serverNumber));
       return `
-        <div class="verdict${m.kind ? ` verdict--${esc(m.kind)}` : ''}" data-tl-verdict="${esc(e.id)}" ${i === 0 ? '' : 'hidden'}>
+        <div class="verdict${m.kind ? ` verdict--${esc(m.kind)}` : ''}" data-tl-open="${esc(e.id)}"
+             data-tl-verdict="${esc(e.id)}" ${i === 0 ? '' : 'hidden'}
+             title="Перейти к записи в ленте" role="link" tabindex="0">
           <div class="verdict__week">
             <span>${esc(MONTH_SHORT[e.date.getUTCMonth()])}</span>
             <b class="num">${e.date.getUTCDate()}</b>
@@ -137,11 +142,17 @@ function renderServerSection(list) {
   /*
     Подпись плашки собирает словарь: у атаки и у защиты номер значит разное,
     и «отбились от 51» нельзя склеить теми же кусками, что «взяли 74».
+
+    Плашек со временем становится десятки, и лента в шапке съедает экран,
+    поэтому по умолчанию показываем только несколько самых свежих, а остальные
+    прячем за кнопкой «Показать все». Скрипт режет список после фильтра по
+    году и месяцу, поэтому кнопка жива и в «сентябре», где плашек может быть
+    больше четырёх.
   */
   const pills = list
-    .map((e) => {
+    .map((e, i) => {
       const m = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
-      return `<li>
+      return `<li${i >= WEEKS_SHOWN ? ' hidden' : ''}>
         <button type="button" class="wk${m.kind ? ` wk--${esc(m.kind)}` : ''}${m.action ? ` wk--${esc(m.action)}` : ''}"
                 data-tl-week="${esc(e.id)}" data-tl-ym="${ymKey(e.date)}"
                 title="${esc(fmtDateFull(e.date))}">
@@ -151,6 +162,12 @@ function renderServerSection(list) {
       </li>`;
     })
     .join('');
+
+  const moreBtn = `
+    <button type="button" class="wks__more" data-tl-more aria-expanded="false"
+            ${list.length > WEEKS_SHOWN ? '' : 'hidden'}>
+      Показать все (${Math.max(0, list.length - WEEKS_SHOWN)})
+    </button>`;
 
   return `
     <section class="hero hero--tl">
@@ -170,6 +187,7 @@ function renderServerSection(list) {
       </div>
 
       <ul class="wks">${pills}</ul>
+      ${moreBtn}
       <p class="wks__empty" data-tl-noweeks hidden>В этом месяце записей нет.</p>
     </section>`;
 }
@@ -370,27 +388,47 @@ function renderFeed(events) {
  * а прочитать по ним нечего.
  *
  * Теперь подробности раскрываются нажатием на саму запись, а о том, что
- * внутри что-то есть, говорит значок в углу. Одна строка вместо двух на каждой
- * записи — на телефоне это разница между «видно четыре события» и «видно шесть».
+ * внутри что-то есть, говорит тонкий уголок в углу. Одна строка вместо двух
+ * на каждой записи — на телефоне это разница между «видно четыре события»
+ * и «видно шесть».
+ *
+ * ВИД ЗАПИСИ. Никаких рамок и бейджей: тихая цветная точка слева (по цвету
+ * исхода), подпись типа и дата строкой выше названия, само название и, если
+ * есть, короткое описание. Раскрывающийся хвост обозначает единственный
+ * уголок. Так лента читается как спокойный список, а не как растровое поле.
  */
 function renderItem(e) {
   const t = EVENT_TYPE[e.type] ?? EVENT_TYPE.other;
   const images = eventImages(e);
   const hasMore = Boolean(e.body) || images.length > 0;
 
-  const head = `
-    <div class="tl__marker">${e.serverNumber != null ? esc(String(e.serverNumber)) : '•'}</div>
-    <div class="tl__body">
-      <div class="tl__meta">
-        <span class="tl__type">${esc(t.label)}</span>
-        <time>${fmtDateFull(e.date)}</time>
-        ${e.durationDays ? `<span class="tl__dur">${plural(e.durationDays, 'день', 'дня', 'дней')}</span>` : ''}
-      </div>
-      <h3>${esc(e.title)}</h3>
-      ${e.summary ? `<p class="tl__summary">${esc(e.summary)}</p>` : ''}
-    </div>`;
+  /*
+    Подпись под названием — одной спокойной строкой: дата, длительность,
+    фотографии через точку. Без чипов и панелек: лишние рамки в ленте
+    шумят, а текст всё равно переносится по границе, если места мало.
+  */
+  const note = [
+    fmtDateFull(e.date),
+    e.durationDays ? plural(e.durationDays, 'день', 'дня', 'дней') : null,
+    images.length ? `${images.length}&nbsp;фото` : null,
+  ]
+    .filter(Boolean)
+    .join('&nbsp;· ');
 
-  const attrs = `class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}" data-tl-ym="${ymKey(e.date)}"`;
+  const head = `
+    <span class="tl__dot" aria-hidden="true"></span>
+    <span class="tl__body">
+      <span class="tl__title">${esc(e.title)}</span>
+      <span class="tl__meta">
+        <span class="tl__type">${esc(t.label)}</span>
+        <span class="tl__sep" aria-hidden="true">·</span>
+        <span class="tl__meta-note">${note}</span>
+      </span>
+      ${e.summary ? `<span class="tl__summary">${esc(e.summary)}</span>` : ''}
+    </span>
+    ${hasMore ? '<span class="tl__chev" aria-hidden="true">▾</span>' : ''}`;
+
+  const attrs = `class="tl__item tl__item--${esc(e.type)}" data-tl-type="${esc(e.type)}" data-tl-ym="${ymKey(e.date)}" data-tl-id="${esc(e.id)}"`;
 
   /*
     Запись без подробностей не делаем раскрывающейся: нажатие, после которого
@@ -403,7 +441,6 @@ function renderItem(e) {
       <details class="tl__details">
         <summary class="tl__row">
           ${head}
-          <span class="tl__more" aria-hidden="true">${images.length ? `📷${images.length > 1 ? images.length : ''}` : '＋'}</span>
         </summary>
         <div class="tl__details-body">
           ${e.body ? `<p>${esc(e.body)}</p>` : ''}

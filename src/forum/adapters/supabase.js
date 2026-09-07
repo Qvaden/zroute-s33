@@ -354,6 +354,29 @@ export async function deletePost(id, reason) {
   });
 }
 
+/**
+ * ЗАКРЕПЛЕНИЕ ТЕМЫ — модерация: свои темы так нельзя двигать в топ.
+ *
+ * Проверка лимита здесь нужна для понятного сообщения, а не для защиты:
+ * её можно обойти запросом мимо сайта, и тогда откажет триггер в базе
+ * (supabase/schema.sql), где живёт то же число CONFIG.forum.limits.pinsMax.
+ */
+export async function setPinned(id, pinned) {
+  pinned = Boolean(pinned);
+  if (pinned) {
+    const rows = await rest('/forum_posts?select=id&pinned=eq.true&deleted=eq.false');
+    const count = Array.isArray(rows) ? rows.length : 0;
+    if (count >= CONFIG.forum.limits.pinsMax) {
+      throw new Error('Закреплено уже три темы — сначала открепите одну');
+    }
+  }
+
+  await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { pinned } });
+  const full = await getPost(id);
+  if (!full) throw new Error('Пост не найден после закрепления');
+  return full;
+}
+
 /* ── Комментарии ──────────────────────────────────────────────────────────── */
 
 function commentOut(row) {

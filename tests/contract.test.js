@@ -1182,9 +1182,11 @@ console.log('\nK. Публикация недели');
 // ── L. Серверные события: захваты и защиты ──────────────────────────────────
 console.log('\nL. Летопись сервера: захватили, защитили, потеряли');
 {
+  const { readFile } = await import('node:fs/promises');
   const { EVENT_TYPE, EVENT_TYPE_ORDER, SERVER_TYPES, isServerEvent, verdictText, pillText, serverEvents } =
     await import('../src/logic/event-types.js');
   const { renderTimeline } = await import('../src/pages/timeline.js');
+  const tlScript = await readFile('src/ui/timeline-controls.js', 'utf8');
 
   /*
     РАЗДЕЛЕНИЕ ОБЯЗАННОСТЕЙ, КОТОРОЕ ЭТОТ РАЗДЕЛ ОХРАНЯЕТ.
@@ -1274,6 +1276,35 @@ console.log('\nL. Летопись сервера: захватили, защи�
     (html.match(/data-tl-week="/g) || []).length, 4);
   check('война в навигации вердиктов есть', /data-tl-week="e2"/.test(html));
   check('но в ленте событий война осталась', html.includes('data-tl-type="war"'));
+
+  /*
+    Вердикт — не просто картинка в шапке, а переход к записи в ленте:
+    на записи есть якорь data-tl-id, и вердикт знает, куда вести.
+  */
+  check('вердикты знают адрес своей записи',
+    (html.match(/data-tl-open="/g) || []).length === 4 && (html.match(/data-tl-id="/g) || []).length === 4);
+  check('скрипт умеет раскрывать весь список плашек',
+    tlScript.includes('data-tl-more') && tlScript.includes('expandedWeeks') && tlScript.includes('WEEKS_SHOWN'));
+  check('скрипт прыгает к записи из вердикта',
+    tlScript.includes('data-tl-open') && tlScript.includes('data-tl-id') &&
+    tlScript.includes('scrollIntoView') && tlScript.includes('is-flash'));
+
+  /* Плашек со временем становится много — шапка не должна тащить их все.
+     По умолчанию видно четыре свежих, остальное прячется за кнопкой. */
+  const many = renderTimeline({
+    events: [
+      ev('m1', '2026-01-05', 'server_capture', 1),
+      ev('m2', '2026-02-05', 'server_capture', 2),
+      ev('m3', '2026-03-05', 'server_capture', 3),
+      ev('m4', '2026-04-05', 'server_capture', 4),
+      ev('m5', '2026-05-05', 'server_defended'),
+      ev('m6', '2026-06-05', 'server_defended'),
+    ],
+  });
+  equal('лишние плашки спрятаны в разметке', (many.match(/<li hidden>/g) || []).length, 2);
+  check('при избытке плашек кнопка «Показать все» видна',
+    /data-tl-more[\s\S]*?Показать все \(2\)/.test(many.replace(/ hidden/g, '')));
+  check('когда плашек немного, кнопка прячется', /data-tl-more[^>]*hidden/.test(html));
 
   /* Выбор «Тип» на телефоне — свой список, а не системный select. */
   check('тип фильтруется и выпадающим списком (телефон)',
@@ -2288,7 +2319,7 @@ console.log('\nQ. Форум');
   */
   const required = [
     'isReady', 'currentUser', 'signUp', 'signIn', 'signOut',
-    'listPosts', 'getPost', 'createPost', 'editPost', 'deletePost',
+    'listPosts', 'getPost', 'createPost', 'editPost', 'deletePost', 'setPinned',
     'listComments', 'addComment', 'deleteComment',
     'setReaction', 'report', 'listReports', 'resolveReport',
     'listUsers', 'resetPassword', 'setRestriction',
@@ -2370,6 +2401,46 @@ console.log('\nQ. Форум');
   }
   check('правка с неизвестным разделом отклоняется', badCategory);
 
+  /* ── Закрепление темы — модерация, локальный режим ── */
+
+  /*
+    Первый зарегистрировавшийся в локальном режиме — администратор, у него
+    право закреплять есть. Лимит — ровно три темы, число из конфига.
+  */
+  const pinable = await Promise.all([1, 2, 3, 4].map((n) =>
+    loc.createPost({ title: `Закрепить ${n}`, body: 'для проверки топа', category: 'news' })
+  ));
+
+  const pinnedOne = await loc.setPinned(pinable[0].id, true);
+  check('закреплённый пост возвращается с отметкой', pinnedOne.pinned);
+  equal('закреплённая тема встаёт в топ ленты',
+    (await loc.listPosts({})).posts[0].id, pinable[0].id);
+
+  await loc.setPinned(pinable[1].id, true);
+  await loc.setPinned(pinable[2].id, true);
+  let tooMany = false;
+  try {
+    await loc.setPinned(pinable[3].id, true);
+  } catch {
+    tooMany = true;
+  }
+  check('четвёртое закрепление отклоняется', tooMany);
+
+  await loc.setPinned(pinable[0].id, false);
+  const freed = await loc.setPinned(pinable[3].id, true);
+  check('после открепления место освобождается', freed.pinned);
+
+  await loc.signUp('прохожий_для_проверки');
+  let noRight = false;
+  try {
+    await loc.setPinned(pinable[1].id, true);
+  } catch {
+    noRight = true;
+  }
+  check('обычный участник закрепить не может', noRight);
+  // Назад к администратору: следующие блоки ждут его сессию.
+  await loc.signIn('писатель_для_тестов');
+
   /* ── Поиск и правка: источник базы ── */
 
   /*
@@ -2398,6 +2469,18 @@ console.log('\nQ. Форум');
     /data-forum-search/.test(mountSource) && /setTimeout/.test(mountSource));
   check('цитата собирается из имени и текста и встаёт блоком',
     /data-forum-quote/.test(mountSource) && /blockquote/.test(mountSource) && /\$\{esc\(item\.authorNick\)\}:/.test(mountSource));
+
+  /*
+    Закрепление — действие модерации: кнопка в карточке поста, а обработчик
+    дергает setPinned и перерисовывает ленту (закреплённые уходят наверх).
+  */
+  const forumPagesSource = await readFile('src/pages/forum.js', 'utf8');
+  check('кнопка закрепления есть в карточке поста',
+    /data-forum-pin/.test(forumPagesSource) && /Закрепить/.test(forumPagesSource) && /Открепить/.test(forumPagesSource));
+  check('обработчик закрепления зовёт адаптер и перерисовывает ленту',
+    /\[data-forum-pin\]/.test(mountSource) && /forum\.setPinned/.test(mountSource) && /loadFeed\(\)/.test(mountSource));
+  check('адаптер базы спрашивает предел из конфига перед запросом',
+    /pinsMax/.test(supabaseSource) && /forum_posts\?select=id&pinned=eq\.true/.test(supabaseSource));
 
   /*
     Панель форматирования: кнопки дёргают document.execCommand — жирный, цвет
@@ -2640,6 +2723,9 @@ console.log('\nQ. Форум');
 
   check('ограничения по полям живут в триггере, где есть OLD',
     /forum_posts_guard/.test(schema) && /new\.pinned\s*:=\s*old\.pinned/.test(schema));
+  check('лимит закреплений держит триггер базы, а не только браузер',
+    /if new\.pinned and not old\.pinned then[\s\S]*?where pinned and not deleted[\s\S]*?>= 3/.test(schema)
+    && /Закреплено уже три темы/.test(schema));
   check('автор не может выдать своё удаление за решение модерации',
     /new\.deleted_reason\s*:=\s*'Удалено автором'/.test(schema));
   check('удалённый пост не возвращается автором обратно',

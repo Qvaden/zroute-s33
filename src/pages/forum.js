@@ -761,6 +761,15 @@ function renderPostCard(p, s) {
               : ''
           }
           ${
+            canModerate
+              ? `<button type="button" class="forum-act" data-forum-pin="${esc(p.id)}"
+                         aria-pressed="${p.pinned ? 'true' : 'false'}"
+                         title="${p.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">${
+                   p.pinned ? 'Открепить' : 'Закрепить'
+                 }</button>`
+              : ''
+          }
+          ${
             isMine || canModerate
               ? `<button type="button" class="forum-act" data-forum-del-post="${esc(p.id)}"
                          title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`

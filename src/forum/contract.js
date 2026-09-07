@@ -124,6 +124,7 @@
  * @property {(draft: {title: string, body: string, category: string}) => Promise<ForumPost>} createPost
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
+ * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
  * @property {(postId: string) => Promise<ForumComment[]>} listComments
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment
  * @property {(id: string, reason: string) => Promise<void>} deleteComment
