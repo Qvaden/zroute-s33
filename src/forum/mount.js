@@ -375,16 +375,35 @@ async function handleAuth(form, mode, submitter) {
   const password = validatePassword(form.password.value);
   if (!password.ok) return showError('[data-forum-auth-error]', password.error);
 
-  await withBusy(submitter, mode === 'signup' ? 'Создаём…' : 'Входим…', async () => {
-    try {
-      state.me = mode === 'signup'
-        ? await forum.signUp(nick.value, password.value)
-        : await forum.signIn(nick.value, password.value);
-      await loadFeed();
-    } catch (err) {
-      showError('[data-forum-auth-error]', String(err?.message ?? err));
+  /*
+    Пока запрос идёт, гасим ОБЕ кнопки формы. Выключенной становится только
+    нажатая — вторая остаётся живой, и при неспешной сети человек жмёт
+    «Зарегистрироваться» следом за «Войти». Это два аккаунта, которые потом
+    ещё и разбирать.
+  */
+  const buttons = [...form.querySelectorAll('button')];
+  const original = new Map(buttons.map((b) => [b, b.textContent]));
+  for (const b of buttons) b.disabled = true;
+  if (submitter) submitter.textContent = mode === 'signup' ? 'Создаём…' : 'Входим…';
+
+  try {
+    state.me = mode === 'signup'
+      ? await forum.signUp(nick.value, password.value)
+      : await forum.signIn(nick.value, password.value);
+    await loadFeed();
+  } catch (err) {
+    showError('[data-forum-auth-error]', String(err?.message ?? err));
+  } finally {
+    // После успешного входа форма перерисована и кнопок в ней уже нет —
+    // трогаем только то, что осталось живым.
+    if (host?.querySelector('[data-forum-auth]') === form) {
+      for (const b of buttons) {
+        if (!b.isConnected) continue;
+        b.disabled = false;
+        b.textContent = original.get(b);
+      }
     }
-  });
+  }
 }
 
 /* ── Картинки в форме ─────────────────────────────────────────────────────── */
@@ -724,11 +743,19 @@ function wire() {
     if (!host || !host.contains(e.target)) return;
     const form = e.target;
 
+    /*
+      Кнопка не всегда известна: Enter в поле отправляет форму, и некоторые
+      браузеры не сообщают, какая именно кнопка нажата. Для «Публикуем…»
+      важен сам факт нажатой кнопки, а не её имя — берём первую сабмитнущую,
+      если браузер промолчал.
+    */
+    const submitter = e.submitter ?? form.querySelector('button[type="submit"]');
+
     // Вход и регистрация: две кнопки в одной форме, различаем по нажатой.
     if (form.matches('[data-forum-auth]')) {
       e.preventDefault();
-      const mode = e.submitter?.dataset.forumMode === 'signup' ? 'signup' : 'signin';
-      await handleAuth(form, mode, e.submitter);
+      const mode = submitter?.dataset.forumMode === 'signup' ? 'signup' : 'signin';
+      await handleAuth(form, mode, submitter);
       return;
     }
 
@@ -744,7 +771,7 @@ function wire() {
       });
       if (!checked.ok) return showError('[data-forum-new-error]', checked.error);
 
-      await withBusy(e.submitter, 'Публикуем…', async () => {
+      await withBusy(submitter, 'Публикуем…', async () => {
         try {
           const created = await forum.createPost(checked.value);
 
@@ -755,7 +782,7 @@ function wire() {
             из-за третьего скриншота нельзя.
           */
           const shotError = await uploadShots('new', 'post', created.id, (i, n) => {
-            if (e.submitter) e.submitter.textContent = `Картинка ${i}/${n}…`;
+            if (submitter) submitter.textContent = `Картинка ${i}/${n}…`;
           });
 
           /*
@@ -788,14 +815,14 @@ function wire() {
       const checked = validateComment(form.body.value);
       if (!checked.ok) return showError('[data-forum-comment-error]', checked.error);
 
-      await withBusy(e.submitter, 'Отправляем…', async () => {
+      await withBusy(submitter, 'Отправляем…', async () => {
         try {
           const postId = commentForm.dataset.forumCommentForm;
           const created = await forum.addComment(postId, checked.value);
 
           const shotError = created?.id
             ? await uploadShots(postId, 'comment', created.id, (i, n) => {
-                if (e.submitter) e.submitter.textContent = `Картинка ${i}/${n}…`;
+                if (submitter) submitter.textContent = `Картинка ${i}/${n}…`;
               })
             : '';
 
@@ -814,7 +841,7 @@ function wire() {
       e.preventDefault();
       clearError('[data-profile-error]');
 
-      await withBusy(e.submitter, 'Сохраняем…', async () => {
+      await withBusy(submitter, 'Сохраняем…', async () => {
         try {
           await saveProfile({
             about: form.about.value,

@@ -1,0 +1,10 @@
+{
+  "name": "zroute-s33",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/contract.test.js",
+    "preview": "node scripts/build-preview.mjs",
+    "migrate": "node scripts/migrate-to-supabase.mjs"
+  }
+}

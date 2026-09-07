@@ -274,21 +274,22 @@ export async function listPosts(opts = {}) {
   const params = new URLSearchParams();
   params.set('select', '*');
   params.set('order', ORDER[sort] ?? ORDER.fresh);
-  params.set('limit', String(limit));
+  // Просим на одну строку больше: точное число записей вернулось бы только
+  // в заголовке Content-Range, а он прячется за обёрткой rest(). Лишняя
+  // строка ничего не стоит (это тот же запрос), зато честно говорит,
+  // кончилась ли лента.
+  params.set('limit', String(limit + 1));
   params.set('offset', String(offset));
   if (category !== 'all' && CATEGORY_IDS.includes(category)) {
     params.set('category', `eq.${category}`);
   }
 
-  /*
-    Общее число нужно для «показать ещё». `count=exact` возвращает его
-    в заголовке Content-Range, но заголовки прячутся за нашей обёрткой,
-    поэтому спрашиваем отдельным дешёвым запросом.
-  */
   const rows = await rest(`/forum_post_list?${params}`);
-  const posts = (Array.isArray(rows) ? rows : []).map(postOut);
+  const hasMore = Array.isArray(rows) && rows.length > limit;
+  const posts = (hasMore ? rows.slice(0, limit) : (Array.isArray(rows) ? rows : []))
+    .map(postOut);
 
-  return { posts, total: offset + posts.length + (posts.length === limit ? 1 : 0) };
+  return { posts, total: offset + posts.length + (hasMore ? 1 : 0) };
 }
 
 export async function getPost(id) {
