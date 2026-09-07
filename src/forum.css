@@ -668,6 +668,49 @@
 .forum-edit { padding: 2px 0 6px; }
 .forum-edit__actions { display: flex; gap: 8px; margin-top: 4px; }
 
+/*
+  Панель форматирования под полем текста. Кнопки маленькие и не спорят
+  с полем: цель — обернуть выделенное, а не привлечь к себе внимание.
+  Подпись-подсказка напоминает синтаксис, чтобы кнопки не казались
+  «красивости ради».
+*/
+.forum-md {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.forum-md__btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  font: 600 13px/1 Inter, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.forum-md__btn:hover {
+  border-color: var(--accent);
+  background: rgba(255,106,43,.08);
+}
+.forum-md__btn:active { transform: scale(.95); }
+.forum-md__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.forum-md__note {
+  color: var(--mute);
+  font-size: 10.5px;
+  line-height: 1.45;
+  max-width: 320px;
+}
+@media (max-width: 420px) {
+  .forum-md__note { max-width: none; }
+}
+
 /* ── Управление лентой ────────────────────────────────────────────────────── */
 
 .ctl--forum {

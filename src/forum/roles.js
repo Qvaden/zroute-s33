@@ -115,7 +115,9 @@ export function roleBadge(account, { short = false } = {}) {
   if (!text) return '';
 
   return (
-    `<span class="role-badge role-badge--${key}" style="--role-tone:${look.tone}">` +
+    `<span class="role-badge role-badge--${key}" style="--role-tone:${look.tone}"` +
+    (text ? ` title="${text}" role="img" aria-label="${text}"` : '') +
+    '>' +
     (look.glyph ? `<i aria-hidden="true">${look.glyph}</i>` : '') +
     `<b>${text}</b>` +
     '</span>'

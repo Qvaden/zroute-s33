@@ -1971,12 +1971,26 @@ console.log('\nQ. Форум');
       !postBody('<b onerror="alert(1)">жирный</b>').includes('<b '));
 
   /*
-    Разметку от участников не принимаем вовсе: markdown в посте приятен,
-    но каждая конструкция — ещё одно место, где можно ошибиться.
-    miniMarkdown из helpers.js здесь намеренно не используется.
+    Разметка — белый список ровно из четырёх конструкций: жирный, курсив,
+    подчёркнутый, зачёркнутый. Всё остальное остаётся как набрано, включая
+    заголовки и списки: каждая добавленная конструкция — ещё одно место,
+    где можно ошибиться. miniMarkdown из helpers.js здесь не используется.
   */
-  check('звёздочки не превращаются в жирный текст',
-    !postBody('**не жирный**').includes('<strong>'));
+  check('жирный текст от участника работает',
+    postBody('**жирный**').includes('<strong>жирный</strong>'));
+  check('курсив от участника работает',
+    postBody('*курсив*').includes('<em>курсив</em>'));
+  check('подчёркнутый текст работает',
+    postBody('__подчёркнутый__').includes('<u>подчёркнутый</u>'));
+  check('зачёркнутый текст работает',
+    postBody('~~зачёркнутый~~').includes('<s>зачёркнутый</s>'));
+  check('курсив внутри жирного работает',
+    postBody('**смотри *сюда* сейчас**').includes('<strong>смотри <em>сюда</em> сейчас</strong>'));
+  check('незакрытые звёздочки разметкой не становятся',
+    !postBody('**не закрыл').includes('<strong>'));
+  check('теги, введённые в разметке, остаются текстом',
+    !postBody('**<b onerror="alert(1)">x</b>**').includes('<b '));
+  /* Заголовки в белый список не входят: раздел форума — это категория. */
   check('решётка не превращается в заголовок',
     !postBody('# не заголовок').includes('<h2>'));
 
@@ -2006,6 +2020,8 @@ console.log('\nQ. Форум');
   equal('короткий текст в выжимке не режется', excerpt('коротко', 100), 'коротко');
   check('длинный текст режется по слову, а не посередине',
     !/\s…$/.test(excerpt('слово '.repeat(80), 40)) && excerpt('слово '.repeat(80), 40).endsWith('…'));
+  check('выжимка убирает маркеры форматирования',
+    excerpt('**жирный** и ~~зачёркнутый~~', 100) === 'жирный и зачёркнутый');
 
   const now = new Date('2026-09-05T12:00:00');
   equal('свежая запись — «только что»', timeAgo(new Date('2026-09-05T11:59:40'), now), 'только что');
@@ -2364,6 +2380,15 @@ console.log('\nQ. Форум');
     /data-forum-search/.test(mountSource) && /setTimeout/.test(mountSource));
   check('цитата собирается из имени и текста, а не вставляется как есть',
     /data-forum-quote/.test(mountSource) && /> \$\{item\.authorNick\}/.test(mountSource));
+
+  /*
+    Панель форматирования: кнопки оборачивают выделенное в маркеры, а текст
+    хранится как набран — форматирование происходит при показе (format.js).
+  */
+  check('кнопки форматирования оборачивают выделенное в маркеры',
+    /data-md/.test(mountSource) && /wrapMarkdown/.test(mountSource));
+  check('обёртка снимается повторным нажатием',
+    /wasWrapped/.test(mountSource));
 
   /* ── Схема базы: где живёт настоящая защита ── */
 
@@ -2728,6 +2753,8 @@ console.log('\nQ. Форум');
   check('вошедшему показана форма написания поста', memberHtml.includes('data-forum-new'));
   check('перед публикацией названы правила и последствие',
     /соглашаетесь с правилами/i.test(memberHtml));
+  check('форма поста предлагает форматирование',
+    memberHtml.includes('data-md') && memberHtml.includes('forum-md'));
   check('чужой пост можно пожаловаться', memberHtml.includes('data-forum-report="post:p1"'));
   check('счётчик лайков виден', memberHtml.includes('>2<'));
 
@@ -2808,6 +2835,43 @@ console.log('\nQ. Форум');
   check('кнопка меню подписана для незрячих', /aria-label="Открыть меню/.test(indexHtml));
   check('кнопка меню сообщает своё состояние', /aria-expanded="false"/.test(indexHtml));
   check('стили форума подключены', indexHtml.includes('forum.css'));
+
+  /* ── Мобильная вёрстка и разметка: живой экран ── */
+
+  const mobileCss = await readFile('src/mobile.css', 'utf8');
+  const forumCss = await readFile('src/forum.css', 'utf8');
+
+  /*
+    Метка роли — подпись, а не второе имя: в строке поста/комментария от неё
+    остаётся один значок, и кнопки действий рядом не толкаются и не накрываются.
+  */
+  check('слово роли в строке поста и комментария прячется, остаётся значок',
+    /\.forum-post__by \.role-badge b,[\s\S]*display: none/.test(mobileCss));
+  check('метка роли заметно мельче ника',
+    /\.role-badge \{[^}]*font-size: 6\.5px/.test(mobileCss));
+
+  /* Шапка на телефоне: кнопка слева, марка прижата к правому краю. */
+  check('на телефоне шапка разводит кнопку и марку по краям',
+    /@media \(max-width: 700px\)[\s\S]{0,400}\.site-head__inner \{\s*justify-content: space-between/.test(mobileCss));
+  /* Шторка меню уже: на экране 375 она занимает не больше 58% ширины. */
+  check('шторка меню на телефоне уже, чем 232px',
+    /@media \(max-width: 1039px\)[\s\S]{0,400}\.side \{[^}]*min\(var\(--side-w\), 58vw\)/.test(mobileCss));
+
+  /*
+    Стабильность: на телефоне страница не дёргается. min-height через svh не
+    пересчитывается, когда адресная полоса сворачивается; полноэкранные
+    анимации фона и blur под липкой шапкой выключены.
+  */
+  check('высота страницы на телефоне не зависит от адресной полосы',
+    /body \{\s*min-height: 100svh/.test(mobileCss));
+  check('на телефоне выключены постоянные анимации фона и страницы',
+    /@media \(hover: none\) and \(pointer: coarse\)[\s\S]{0,200}body::before,[\s\S]{0,200}animation: none/.test(mobileCss));
+  check('на телефоне выключен blur под липкой шапкой',
+    /@media \(hover: none\) and \(pointer: coarse\)[\s\S]{0,600}backdrop-filter: none/.test(mobileCss));
+
+  /* Панель форматирования в стилях форума есть. */
+  check('панель форматирования получила стили',
+    /\.forum-md\b/.test(forumCss) && /\.forum-md__btn\b/.test(forumCss));
 
   const mainJs = await readFile('src/main.js', 'utf8');
   check('форум — первый раздел в меню',

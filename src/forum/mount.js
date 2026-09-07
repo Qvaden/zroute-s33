@@ -501,6 +501,43 @@ function clearAllShots() {
 }
 
 /**
+ * Кнопка форматирования: оборачивает выделение в маркеры.
+ *
+ * Если выделенного нет, вставляет слово-образец с курсором внутри — иначе
+ * «ничего не произошло» читалось бы как поломка. Повторное нажатие на уже
+ * обёрнутое снимает обёртку: так можно попробовать и передумать.
+ *
+ * @param {HTMLTextAreaElement} area
+ * @param {string} marker
+ */
+function wrapMarkdown(area, marker) {
+  const start = area.selectionStart ?? area.value.length;
+  const end = area.selectionEnd ?? start;
+  const value = area.value;
+
+  const wasWrapped =
+    value.slice(Math.max(0, start - marker.length), start) === marker &&
+    value.slice(end, end + marker.length) === marker;
+
+  const selected = value.slice(start, end);
+  const body = wasWrapped ? selected : selected || 'текст';
+
+  const next = wasWrapped
+    ? value.slice(0, start - marker.length) + body + value.slice(end + marker.length)
+    : value.slice(0, start) + marker + body + marker + value.slice(end);
+
+  area.value = next;
+
+  const cursor = wasWrapped ? start - marker.length : start + marker.length;
+  if (typeof area.setSelectionRange === 'function') {
+    try {
+      area.setSelectionRange(cursor, cursor + body.length);
+    } catch { /* select не умеет */ }
+  }
+  area.focus({ preventScroll: true });
+}
+
+/**
  * Загрузить выбранные картинки к уже созданной записи.
  *
  * Ошибку одной картинки не считаем провалом всей публикации: пост уже
@@ -566,6 +603,18 @@ function wire() {
     if (dropBtn && host.contains(dropBtn)) {
       const [scope, index] = dropBtn.dataset.attachDrop.split(':');
       dropShot(scope, Number(index));
+      return;
+    }
+
+    /*
+      Панель форматирования. Кнопка оборачивает выделенное в маркеры разметки,
+      повторное нажатие — снимает их. Разметку понимает format.js, хранится
+      же текст как набран: маркеры остаются частью текста записи.
+    */
+    const mdBtn = t.closest('[data-md]');
+    if (mdBtn && host.contains(mdBtn)) {
+      const area = mdBtn.closest('form')?.querySelector('textarea[name="body"]');
+      if (area) wrapMarkdown(area, mdBtn.dataset.md);
       return;
     }
 

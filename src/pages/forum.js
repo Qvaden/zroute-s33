@@ -313,6 +313,35 @@ function renderWhoAmI(s) {
 
 /* ── Написать пост ────────────────────────────────────────────────────────── */
 
+/**
+ * Панель форматирования для полей текста.
+ *
+ * Четыре кнопки, не больше: каждую обёртку обязан понимать и построитель
+ * разметки в format.js. Список стилей это единственный источник правды —
+ * если однажды добавить пятый, поменять надо будет только этот массив.
+ */
+const MD_STYLES = [
+  { mark: '**', label: 'Ж', title: 'Жирный: **текст**' },
+  { mark: '*', label: 'К', title: 'Курсив: *текст*' },
+  { mark: '__', label: 'У', title: 'Подчёркнутый: __текст__' },
+  { mark: '~~', label: 'З', title: 'Зачёркнутый: ~~текст~~' },
+];
+
+function renderMdBar() {
+  return `
+    <div class="forum-md" role="toolbar" aria-label="Форматирование текста">
+      ${MD_STYLES.map(
+        (s) => `<button type="button" class="forum-md__btn"
+                 data-md="${esc(s.mark)}" title="${esc(s.title)}"
+                 aria-label="${esc(s.title)}">${esc(s.label)}</button>`
+      ).join('')}
+      <small class="forum-md__note">
+        Держите звездочки по краям выделенного: **жирный**, *курсив*,
+        __подчёркнутый__, ~~зачёркнутый~~
+      </small>
+    </div>`;
+}
+
 function renderComposer(s) {
   if (!s.ready || !s.me) return '';
   if (s.me.banned) return '';
@@ -347,6 +376,8 @@ function renderComposer(s) {
           <textarea name="body" rows="7" required maxlength="${L.bodyMax}"
                     placeholder="Пустая строка разделяет абзацы. Ссылки вставляются как есть."></textarea>
         </label>
+
+        ${renderMdBar()}
 
         ${renderAttachRow('new')}
 
@@ -425,6 +456,8 @@ function renderEditForm(p) {
         <span>Текст</span>
         <textarea name="body" rows="7" required maxlength="${L.bodyMax}">${esc(p.body)}</textarea>
       </label>
+
+      ${renderMdBar()}
 
       ${renderAttachRow(`edit:${p.id}`)}
 
@@ -800,6 +833,7 @@ function renderComments(post, s) {
           ? `<form class="forum-reply" data-forum-comment-form="${esc(post.id)}">
               <textarea name="body" rows="3" required maxlength="${L.commentMax}"
                         placeholder="Ответить по делу и по правилам"></textarea>
+              ${renderMdBar()}
               ${renderAttachRow(post.id)}
               <div class="forum-reply__actions">
                 <button type="submit" class="forum-btn">Ответить</button>
