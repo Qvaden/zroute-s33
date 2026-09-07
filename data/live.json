@@ -86,6 +86,15 @@
   ],
   "events": [
     {
+      "id": "e13",
+      "body": "Для защиты интересов сервера приходится принимать непростые решения, и многие игроки переходят из одних альянсов в другие. Всё отражается на VS. Поэтому во время сезона не стоит сильно париться по поводу этих результатов. Всем добра 👋",
+      "date": "2026-09-05",
+      "type": "other",
+      "title": "Массовые поражения VS.",
+      "summary": "Всему виной - требования нового сезона! (активность).",
+      "serverNumber": 33
+    },
+    {
       "id": "e12",
       "body": "Все мы ошибаемся особенно под влиянием эмоций. А уж когда дело публичное - это вообще засада. И что бы там ни было - сервер это одна семья и мы рады что снова с нами альянс EKF. Спасибо ребятам, что приняли решение остаться на сайте. Все пропущенные результаты внесены и соответствуют действительности 🎉",
       "date": "2026-08-29",
@@ -895,9 +904,139 @@
       "weekId": "W5",
       "outcome": "win",
       "allianceId": "a32"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a01"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a02"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a03"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a04"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a05"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a06"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a07"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a08"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a09"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a10"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a11"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a12"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a13"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a14"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a15"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a16"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a17"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a18"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a19"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a20"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a21"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a22"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a23"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a30"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "loss",
+      "allianceId": "a31"
+    },
+    {
+      "weekId": "W6",
+      "outcome": "win",
+      "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-09-06T08:04:09+00",
+  "pulledAt": "2026-09-07T08:34:14+00",
   "alliances": [
     {
       "id": "a01",
