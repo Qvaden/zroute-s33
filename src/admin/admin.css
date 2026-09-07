@@ -581,7 +581,7 @@
    где часть колонок скрыта, заголовки разъезжаются с данными. */
 .adm-ally--head .adm-ally__color { background: none; }
 .adm-ally--head span { font-family: Inter, sans-serif; font-size: 10.5px; font-weight: 700; color: var(--mute); }
-.adm-ally__tag { font-family: Unbounded, sans-serif; font-size: 11.5px; font-weight: 700; }
+.adm-ally__tag { font-family: Unbounded, sans-serif; font-size: 12.5px; font-weight: 800; letter-spacing: .02em; }
 .adm-ally__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-ally__note, .adm-ally__wins, .adm-ally__id { display: none; }
 .adm-ally__state { font-size: 11.5px; color: var(--mute); white-space: nowrap; }

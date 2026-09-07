@@ -268,7 +268,7 @@ h1,h2,h3,h4 {
   transition: transform .16s var(--ease), background .16s var(--ease);
 }
 .tile:hover { transform: translateY(-2px); background: rgba(255,255,255,.07); }
-.tile b { font-family: Unbounded, sans-serif; font-size: 10.5px; font-weight: 700; color: var(--tag-color); }
+.tile b { font-family: Unbounded, sans-serif; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--tag-color); }
 
 /* ── Состояние до первого результата ────────────────────────────────────── */
 .preseason { position: relative; z-index: 1; margin-top: 20px; max-width: 62ch; }
@@ -498,7 +498,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .ally__tag {
   flex: none;
   font-family: Unbounded, sans-serif; font-weight: 800;
-  font-size: clamp(15px, 3.4vw, 20px); letter-spacing: .02em;
+  font-size: clamp(16px, 3.6vw, 22px); letter-spacing: .02em;
   padding: 10px 14px; border-radius: 12px;
   color: var(--tag-color);
   background: color-mix(in srgb, var(--tag-color) 16%, transparent);
@@ -593,7 +593,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 
 .tag {
   display: inline-block;
-  font-family: Unbounded, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .02em;
+  font-family: Unbounded, sans-serif; font-size: 11.5px; font-weight: 800; letter-spacing: .03em;
   padding: 3px 7px; border-radius: 5px;
   color: var(--tag-color, var(--dim));
   background: color-mix(in srgb, var(--tag-color, #888) 15%, transparent);
@@ -1102,7 +1102,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-team { grid-area: team; min-width: 0; }
 .quart-team__name { display: flex; align-items: center; min-width: 0; gap: 2px; flex-wrap: wrap; }
 .quart-team__name b { overflow: hidden; color: #edf5e9; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.quart-team .tag { margin-right: 5px; padding: 2px 5px; font-size: 9px; }
+.quart-team .tag { margin-right: 5px; padding: 2px 5px; font-size: 10.5px; }
 .quart-team__form { display: block; margin-top: 7px; }
 .quart-team__form .form { gap: 5px; }
 .quart-team__form .dot { width: 12px; height: 12px; border-radius: 3px; }
@@ -1183,7 +1183,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-podium-card__medal { grid-area: medal; color: #6e8866; font-size: 19px; }
 .quart-podium-card--gold .quart-podium-card__medal { color: var(--quart-acid); text-shadow: 0 0 13px rgba(211,166,255,.6); }
 .quart-podium-card--silver .quart-podium-card__medal { color: var(--quart-cyan); }
-.quart-podium-card__tag { grid-area: tag; color: var(--tag-color); font-family: Unbounded, sans-serif; font-size: 9px; font-weight: 800; }
+.quart-podium-card__tag { grid-area: tag; color: var(--tag-color); font-family: Unbounded, sans-serif; font-size: 10.5px; font-weight: 800; }
 .quart-podium-card > b { grid-area: name; overflow: hidden; color: #f0f7eb; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .quart-podium-card__meta { grid-area: meta; color: #799078; font-size: 10px; }
 .quart-podium-card > strong { grid-area: score; color: var(--quart-acid); font-family: Unbounded, sans-serif; font-size: 23px; }
@@ -1210,7 +1210,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-card__top, .quart-card__bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .quart-card__rank { color: #66816a; font-family: Unbounded, sans-serif; font-size: 10px; }
 .quart-card--m1 .quart-card__rank { color: var(--quart-acid); }
-.quart-card__tag { overflow: hidden; color: var(--tag-color); font-family: Unbounded, sans-serif; font-size: 9px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.quart-card__tag { overflow: hidden; color: var(--tag-color); font-family: Unbounded, sans-serif; font-size: 10.5px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .quart-card__name { overflow: hidden; margin-top: 10px; color: #eaf4e6; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .quart-card__form .form { gap: 4px; }
 .quart-card__form .dot { width: 11px; height: 11px; border-radius: 3px; }
@@ -1625,10 +1625,10 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 /* Manual president board — persistent across all public tabs */
 .president-board{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:10px;margin:10px 0 0;padding:9px 13px;border:1px solid rgba(167,163,194,.24);border-left:2px solid var(--electric);border-radius:10px;background:linear-gradient(110deg,rgba(167,163,194,.09),rgba(255,255,255,.025));box-shadow:inset 0 0 22px rgba(167,163,194,.045),0 10px 28px -24px var(--electric);animation:president-board-breathe 5s ease-in-out infinite}
 .president-board__signal{width:7px;height:7px;border-radius:50%;background:var(--electric);box-shadow:0 0 12px var(--electric);animation:president-board-pulse 2s ease-in-out infinite}
-.president-board__label{color:var(--electric);font:800 9px/1 Inter,sans-serif;letter-spacing:.14em;white-space:nowrap}.president-board__name{color:var(--text);font-size:14px}.president-board__alliance{color:var(--gold);font-size:13px;font-weight:800}.president-board__note{color:var(--mute);font-size:10px;text-align:right}
+.president-board__label{color:var(--electric);font:800 9px/1 Inter,sans-serif;letter-spacing:.14em;white-space:nowrap}.president-board__name{color:var(--text);font-size:14px}.president-board__alliance{color:var(--gold);font-family:Unbounded,sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em}.president-board__note{color:var(--mute);font-size:10px;text-align:right}
 @keyframes president-board-breathe{0%,100%{box-shadow:inset 0 0 22px rgba(167,163,194,.045),0 10px 28px -24px var(--electric)}50%{box-shadow:inset 0 0 28px rgba(167,163,194,.09),0 12px 32px -22px var(--electric)}}
 @keyframes president-board-pulse{0%,100%{opacity:.55;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
-@media(max-width:700px){.president-board{grid-template-columns:auto 1fr auto;gap:6px 8px;padding:9px 10px}.president-board__label{grid-column:2/-1;font-size:8px}.president-board__name{grid-column:2;font-size:13px}.president-board__alliance{grid-column:3;font-size:12px}.president-board__note{grid-column:2/-1;text-align:left;font-size:9px}}
+@media(max-width:700px){.president-board{grid-template-columns:auto 1fr auto;gap:6px 8px;padding:9px 10px}.president-board__label{grid-column:2/-1;font-size:8px}.president-board__name{grid-column:2;font-size:13px}.president-board__alliance{grid-column:3;font-size:13px}.president-board__note{grid-column:2/-1;text-align:left;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.president-board,.president-board__signal{animation:none}}
 
 /* Compact timeline cards: summary stays visible, details open on demand */
@@ -1643,10 +1643,10 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .president-board::before{content:'';position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 18%,rgba(167,163,194,.08) 47%,transparent 70%);transform:translateX(-115%);animation:president-board-scan 8s cubic-bezier(.23,1,.32,1) infinite}
 .president-board::after{content:'S33 / COMMAND STATUS';position:absolute;right:17px;bottom:12px;color:rgba(174,194,204,.38);font:700 8px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.13em;pointer-events:none}
 .president-board__head{display:flex;align-items:center;gap:9px;min-width:0;margin-bottom:13px}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px rgba(167,163,194,.1),0 0 16px var(--electric);animation:president-board-pulse 2.4s ease-in-out infinite}.president-board__label{color:var(--electric);font:800 10px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:4px 7px;border:1px solid rgba(167,163,194,.28);border-radius:999px;color:var(--electric);font:800 8px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
-.president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:#f2f7f8;font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 0 22px rgba(255,255,255,.13)}.president-board__alliance{flex:none;color:var(--gold);font-size:clamp(15px,1.8vw,20px);font-weight:800;letter-spacing:.06em;text-shadow:0 0 18px rgba(247,190,72,.22)}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid rgba(167,163,194,.13);color:var(--mute);font-size:10.5px;line-height:1.4}
+.president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:#f2f7f8;font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 0 22px rgba(255,255,255,.13)}.president-board__alliance{flex:none;color:var(--gold);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em;text-shadow:0 0 18px rgba(247,190,72,.22)}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid rgba(167,163,194,.13);color:var(--mute);font-size:10.5px;line-height:1.4}
 @keyframes president-board-scan{0%,55%{transform:translateX(-115%)}75%,100%{transform:translateX(115%)}}
-@media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:8.5px;letter-spacing:.14em}.president-board__live{font-size:7px;padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:14px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:9.5px}.president-board::after{right:13px;bottom:10px;font-size:7px}}
-@media(max-width:390px){.president-board__identity{display:grid;grid-template-columns:1fr auto;align-items:center}.president-board__name{font-size:15px}.president-board__alliance{font-size:13px}.president-board::after{display:none}}
+@media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:8.5px;letter-spacing:.14em}.president-board__live{font-size:7px;padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:15px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:9.5px}.president-board::after{right:13px;bottom:10px;font-size:7px}}
+@media(max-width:390px){.president-board__identity{display:grid;grid-template-columns:1fr auto;align-items:center}.president-board__name{font-size:15px}.president-board__alliance{font-size:14px}.president-board::after{display:none}}
 @media(prefers-reduced-motion:reduce){.president-board,.president-board::before,.president-board__signal{animation:none}}
 
 /* Keep the presidential board visually separated from the animated header edge. */
@@ -1684,7 +1684,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   .president-board__live{order:5;flex:none;margin-left:0;padding:3px 5px;font-size:6px;letter-spacing:.08em}
   .president-board__identity{display:flex;align-items:baseline;justify-content:flex-start;gap:7px;min-width:0;flex:1;padding-left:0}
   .president-board__name{min-width:0;flex:1;font-size:13px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .president-board__alliance{font-size:11px;line-height:1;white-space:nowrap}
+  .president-board__alliance{font-size:12.5px;line-height:1;white-space:nowrap}
   .president-board__note{display:none}
   .president-board::after{display:none}
   .site-head__inner .brand{padding-top:8px;padding-bottom:5px}
@@ -1694,7 +1694,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   .president-board{gap:6px;padding:7px 8px;min-height:34px}
   .president-board__label{font-size:6.5px;letter-spacing:.07em}
   .president-board__name{font-size:12px}
-  .president-board__alliance{font-size:10px}
+  .president-board__alliance{font-size:11.5px}
   .president-board__live{padding:3px 4px;font-size:5.5px}
 }
 
