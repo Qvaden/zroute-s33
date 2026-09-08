@@ -424,6 +424,20 @@ async function loadThread(postId) {
   paint();
 }
 
+function findPoll(state, pollId) {
+  for (const p of state.posts) {
+    if (p.poll && p.poll.id === pollId) return p.poll;
+  }
+  return null;
+}
+
+function pollPostId(state, pollId) {
+  for (const p of state.posts) {
+    if (p.poll && p.poll.id === pollId) return p.id;
+  }
+  return null;
+}
+
 /** Обновить одну запись после реакции — без перезагрузки всей ленты. */
 async function refreshOne(targetType, targetId) {
   try {
@@ -758,6 +772,36 @@ function wire() {
       return;
     }
 
+    /* ── Опрос: показать/скрыть форму, добавить/убрать вариант ── */
+
+    const pollToggle = t.closest('[data-forum-poll-toggle]');
+    if (pollToggle && host.contains(pollToggle)) {
+      const form = host.querySelector('[data-forum-poll-form]');
+      if (form) form.hidden = !form.hidden;
+      return;
+    }
+
+    const pollAdd = t.closest('[data-forum-poll-add]');
+    if (pollAdd && host.contains(pollAdd)) {
+      const container = host.querySelector('[data-forum-poll-options]');
+      if (!container) return;
+      const idx = container.querySelectorAll('.forum-field').length;
+      if (idx >= 8) return;
+      const label = document.createElement('label');
+      label.className = 'forum-field';
+      label.innerHTML = `<span>Вариант ${idx + 1}</span>
+        <input type="text" name="poll_option_${idx}" maxlength="120" placeholder="Вариант ответа">`;
+      container.appendChild(label);
+      return;
+    }
+
+    const pollRemove = t.closest('[data-forum-poll-remove]');
+    if (pollRemove && host.contains(pollRemove)) {
+      const form = host.querySelector('[data-forum-poll-form]');
+      if (form) form.hidden = true;
+      return;
+    }
+
     /*
       Панель форматирования. Кнопка применяет команду к редактору своей формы,
       стиль виден сразу — маркеров разметки больше нет. `color` отдельная
@@ -953,6 +997,37 @@ function wire() {
     }
     if (!t.closest('.forum-emoji')) {
       host.querySelectorAll('[data-forum-emoji-pop]').forEach((p) => { p.hidden = true; });
+    }
+
+    // Опрос: голосование.
+    const pollOpt = t.closest('[data-forum-poll-opt]');
+    if (pollOpt && host.contains(pollOpt)) {
+      const [pollId, optionId] = pollOpt.dataset.forumPollOpt.split(':');
+      const poll = findPoll(state, pollId);
+      if (!poll || poll.closed) return;
+
+      const mine = poll.options.find((o) => o.mine);
+      const sameOption = mine?.id === optionId;
+
+      if (!sameOption) {
+        // Смена варианта в опросе с одним ответом: сначала снять старый голос.
+        // База принимает голос за другой вариант только после снятия: первичный
+        // ключ держит один голос за вариант, а триггер — один голос на опрос.
+        if (!poll.multiple && mine) {
+          try { await forum.unvotePoll(pollId, mine.id); } catch (_) {}
+        }
+      }
+
+      try {
+        if (sameOption) {
+          await forum.unvotePoll(pollId, optionId);
+        } else {
+          await forum.votePoll(pollId, optionId);
+        }
+      } catch (_) {}
+
+      await refreshOne('post', state.openPostId || pollPostId(state, pollId));
+      return;
     }
 
     // Жалоба.
@@ -1184,6 +1259,20 @@ function wire() {
       e.preventDefault();
       clearError('[data-forum-new-error]');
 
+      const pollForm = form.querySelector('[data-forum-poll-form]');
+      let poll = null;
+      if (pollForm && !pollForm.hidden) {
+        const question = form.poll_question?.value?.trim();
+        const options = [];
+        for (let i = 0; i < 8; i++) {
+          const opt = form[`poll_option_${i}`]?.value?.trim();
+          if (opt) options.push(opt);
+        }
+        if (question && options.length >= 2) {
+          poll = { question, multiple: Boolean(form.poll_multiple?.checked), options };
+        }
+      }
+
       const checked = validatePost({
         title: form.title.value,
         body: formBody(form),
@@ -1191,9 +1280,11 @@ function wire() {
       });
       if (!checked.ok) return showError('[data-forum-new-error]', checked.error);
 
+      const draft = { ...checked.value, poll };
+
       await withBusy(submitter, 'Публикуем…', async () => {
         try {
-          const created = await forum.createPost(checked.value);
+          const created = await forum.createPost(draft);
 
           /*
             Картинки грузятся ПОСЛЕ создания поста: вложение ссылается

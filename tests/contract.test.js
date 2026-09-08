@@ -2328,6 +2328,7 @@ console.log('\nQ. Форум');
     'listComments', 'addComment', 'deleteComment',
     'setReaction', 'report', 'listReports', 'resolveReport',
     'listUsers', 'resetPassword', 'setRestriction',
+    'votePoll', 'unvotePoll', 'closePoll',
   ];
   const missingLocal = required.filter((m) => typeof localAdapter[m] !== 'function');
   const missingSupabase = required.filter((m) => typeof supabaseAdapter[m] !== 'function');
@@ -3469,6 +3470,142 @@ console.log('\nS. Чистые функции');
     /!s\.ready \|\| !s\.posts\.length \|\| s\.me/.test(pagesSource));
   check('профиль считает уровень и значки из тех же функций',
     /rank\.js/.test(userSource) && /достижений/.test(userSource));
+}
+
+/* ── Опросы: локальный адаптер ── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderPostCard } = await import('../src/pages/forum.js');
+  const localAdapter = await import('../src/forum/adapters/local.js');
+  const a = localAdapter;
+  const pollStorage = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (pollStorage.has(k) ? pollStorage.get(k) : null),
+    setItem: (k, v) => pollStorage.set(k, String(v)),
+    removeItem: (k) => pollStorage.delete(k),
+  };
+  await a.signUp('poll_user');
+  const post = await a.createPost({
+    title: 'Опрос', body: '<p>ТЕСТ</p>', category: 'offtop',
+    poll: { question: 'Красный или синий?', multiple: false, options: ['Красный', 'Синий'] },
+  });
+  const p = await a.getPost(post.id);
+  check('создание поста с poll создаёт опрос', p.poll !== null);
+  check('poll.id присвоен', typeof p.poll.id === 'string' && p.poll.id.length > 0);
+  check('poll.question совпадает', p.poll.question === 'Красный или синий?');
+  check('poll.options длина 2', p.poll.options.length === 2);
+  check('poll.options[0].text', p.poll.options[0].text === 'Красный');
+  check('poll.options[1].text', p.poll.options[1].text === 'Синий');
+  check('poll.total 0', p.poll.total === 0);
+
+  await a.votePoll(p.poll.id, p.poll.options[0].id);
+  const p2 = await a.getPost(post.id);
+  check('голосование увеличивает total', p2.poll.total === 1);
+  check('голосование помечает option.mine', p2.poll.options[0].mine === true);
+
+  // Повторный голос за тот же вариант — без изменений.
+  await a.votePoll(p.poll.id, p.poll.options[0].id);
+  const p3 = await a.getPost(post.id);
+  check('повторный голос не дублирует', p3.poll.total === 1);
+
+  await a.unvotePoll(p.poll.id, p.poll.options[0].id);
+  const p4 = await a.getPost(post.id);
+  check('отмена голоса уменьшает total', p4.poll.total === 0);
+  check('отмена снимает mine', p4.poll.options[0].mine === false);
+
+  // Смена варианта в опросе с одним ответом — голос переезжает, а не копится.
+  await a.votePoll(p.poll.id, p.poll.options[0].id);
+  await a.votePoll(p.poll.id, p.poll.options[1].id);
+  const pSwitch = await a.getPost(post.id);
+  check('смена одного голоса: total прежний', pSwitch.poll.total === 1);
+  check('смена одного голоса: старый вариант без голоса',
+    pSwitch.poll.options[0].votes === 0 && pSwitch.poll.options[0].mine === false);
+  check('смена одного голоса: новый вариант помечен',
+    pSwitch.poll.options[1].votes === 1 && pSwitch.poll.options[1].mine === true);
+  await a.unvotePoll(p.poll.id, p.poll.options[1].id);
+
+  // Закрытие опроса.
+  await a.closePoll(p.poll.id);
+  const p5 = await a.getPost(post.id);
+  check('closePoll закрывает опрос', p5.poll.closed === true);
+
+  // Голосование после закрытия — ошибка.
+  let closeError = false;
+  try { await a.votePoll(p.poll.id, p.poll.options[1].id); } catch { closeError = true; }
+  check('голосование после закрытия отказывает', closeError);
+
+  // Несколько вариантов.
+  const mp = await a.createPost({
+    title: 'Мульти', body: '<p>T</p>', category: 'offtop',
+    poll: { question: 'Множественный?', multiple: true, options: ['A', 'B', 'C'] },
+  });
+  const mpoll = (await a.getPost(mp.id)).poll;
+  await a.votePoll(mpoll.id, mpoll.options[0].id);
+  await a.votePoll(mpoll.id, mpoll.options[2].id);
+  const mp2 = await a.getPost(mp.id);
+  check('множественный poll: total — уникальные проголосовавшие', mp2.poll.total === 1);
+  check('множественный poll: два голоса mine', mp2.poll.options[0].mine && mp2.poll.options[2].mine);
+  check('множественный poll: голоса в каждом варианте',
+    mp2.poll.options[0].votes === 1 && mp2.poll.options[2].votes === 1);
+
+  // В одном варианте опроса один человек может голоснуть только раз.
+  await a.votePoll(mpoll.id, mpoll.options[0].id);
+  const mp3 = await a.getPost(mp.id);
+  check('повторный голос в том же варианте не дублирует',
+    mp3.poll.options[0].votes === 1);
+
+  // renderPoll: пустой опрос не крашит.
+  const noMe = { me: null, openPostId: null, editingPostId: null, comments: [],
+    category: 'all', sort: 'fresh', categories: {} };
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const emptyPollHtml = renderPostCard({
+    id: 'e1', authorId: 'u1', authorNick: 'A', title: 'E', body: '', category: 'offtop',
+    reactions: {}, myReaction: null, commentCount: 0, views: 0, createdAt: t0,
+    poll: { id: 'ep', question: 'Пустой?', multiple: false, total: 0, closed: false, options: [] },
+  }, noMe);
+  check('renderPoll с пустыми опциями не падает', /forum-poll/.test(emptyPollHtml));
+
+  const pollHtml = renderPostCard({
+    id: 'p1', authorId: 'u1', authorNick: 'A', title: 'P', body: '', category: 'offtop',
+    reactions: {}, myReaction: null, commentCount: 0, views: 0, createdAt: t0,
+    poll: {
+      id: 'pl1', question: 'Вопрос?', multiple: false, total: 5, closed: false,
+      options: [
+        { id: 'o1', text: 'Да', votes: 3, mine: true },
+        { id: 'o2', text: 'Нет', votes: 2, mine: false },
+      ],
+    },
+  }, noMe);
+  check('renderPoll показывает вопрос', /Вопрос\?/.test(pollHtml));
+  check('renderPoll показывает варианты', /Да/.test(pollHtml) && /Нет/.test(pollHtml));
+  check('renderPoll показывает голоса', /3/.test(pollHtml) && /2/.test(pollHtml));
+  check('renderPoll помечает mine', /is-on/.test(pollHtml));
+  check('renderPoll имеет data-forum-poll', /data-forum-poll/.test(pollHtml));
+  check('renderPoll имеет data-forum-poll-opt', /data-forum-poll-opt/.test(pollHtml));
+
+  const closedHtml = renderPostCard({
+    id: 'c1', authorId: 'u1', authorNick: 'A', title: 'C', body: '', category: 'offtop',
+    reactions: {}, myReaction: null, commentCount: 0, views: 0, createdAt: t0,
+    poll: {
+      id: 'cl1', question: 'Закрыт?', multiple: false, total: 10, closed: true,
+      options: [
+        { id: 'co1', text: 'X', votes: 7, mine: false },
+        { id: 'co2', text: 'Y', votes: 3, mine: false },
+      ],
+    },
+  }, noMe);
+  check('закрытый poll: disabled на инпутах', /disabled/.test(closedHtml));
+  check('закрытый poll: текст «Опрос закрыт»', /Опрос закрыт/.test(closedHtml));
+
+  // Проводка в интерфейсе: стресс-обработчик опроса и создание опроса в форме.
+  const mountSourcePoll = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSourcePoll = await readFile('src/pages/forum.js', 'utf8');
+  check('клик по варианта опроса обрабатывается',
+    /data-forum-poll-opt/.test(mountSourcePoll) && /forum\.votePoll/.test(mountSourcePoll));
+  check('форма создания опроса в композиторе',
+    /data-forum-poll-toggle/.test(pagesSourcePoll) && /poll_question/.test(pagesSourcePoll));
+  check('предел вариантов опроса в коде',
+    /idx >= 8/.test(mountSourcePoll));
 }
 
 console.log(`\n${'─'.repeat(52)}`);

@@ -1361,3 +1361,145 @@
   color: var(--text);
 }
 .forum-rank__sum { margin: 10px 0 0; font-size: 12px; }
+
+/* ── Опросы ─────────────────────────────────────────────────────────────── */
+
+.forum-poll {
+  margin: 12px 0;
+  padding: 14px 16px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.forum-poll__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.forum-poll__question {
+  font-weight: 700;
+  font-size: 14px;
+}
+.forum-poll__total {
+  font-size: 12px;
+  color: var(--mute);
+}
+.forum-poll__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.forum-poll__opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.forum-poll__opt:hover { border-color: var(--accent); }
+.forum-poll__opt.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.forum-poll__mark {
+  position: relative;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.forum-poll__mark input {
+  position: absolute;
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+.forum-poll__check {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--dim);
+  border-radius: 4px;
+  background: var(--bg);
+  transition: border-color 0.15s, background 0.15s;
+}
+.forum-poll__mark input:checked + .forum-poll__check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.forum-poll__mark input[type="radio"] + .forum-poll__check { border-radius: 50%; }
+.forum-poll__mark input[type="radio"]:checked + .forum-poll__check::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bg);
+  transform: translate(-50%, -50%);
+}
+.forum-poll__mark input[type="checkbox"]:checked + .forum-poll__check::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bg);
+  transform: translate(-50%, -50%);
+}
+.forum-poll__text {
+  flex: 1;
+  font-size: 14px;
+}
+.forum-poll__bar {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  width: var(--pct);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.forum-poll__opt.is-on .forum-poll__bar,
+.forum-poll__opt:hover .forum-poll__bar { opacity: 1; }
+.forum-poll__num {
+  font-size: 12px;
+  color: var(--mute);
+  white-space: nowrap;
+}
+.forum-poll__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.forum-poll-creator {
+  margin: 10px 0;
+}
+.forum-poll-form {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.forum-poll-options .forum-field { margin-bottom: 6px; }
+.forum-field--inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.forum-field--inline input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}

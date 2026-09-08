@@ -259,6 +259,31 @@ function postOut(row) {
     myReaction: row.my_reaction || null,
     score,
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    poll: pollOut(row.poll),
+  };
+}
+
+/**
+ * Опрос, который база собрала jsonb-подписью внутри ленты (см. forum_post_list).
+ *
+ * «poll» приходит null, когда у поста опроса нет, — и null и должен остаться:
+ * пустая разметка дороже, чем честное «нет опроса», и на каждом посту
+ * проверка на null дешевле, чем повсюду протаскивать пустой объект.
+ */
+function pollOut(p) {
+  if (!p || typeof p !== 'object') return null;
+  return {
+    id: p.id,
+    question: p.question,
+    multiple: Boolean(p.multiple),
+    closed: Boolean(p.closed),
+    total: Number(p.total || 0),
+    options: (Array.isArray(p.options) ? p.options : []).map((o) => ({
+      id: o.id,
+      text: o.text,
+      votes: Number(o.votes || 0),
+      mine: Boolean(o.mine),
+    })),
   };
 }
 
@@ -329,6 +354,27 @@ export async function registerView(postId) {
   });
 }
 
+export async function votePoll(pollId, optionId) {
+  await rest('/forum_poll_votes', {
+    method: 'POST',
+    body: { poll_id: pollId, option_id: optionId },
+  });
+}
+
+export async function unvotePoll(pollId, optionId) {
+  await rest(
+    `/forum_poll_votes?poll_id=eq.${encodeURIComponent(pollId)}&option_id=eq.${encodeURIComponent(optionId)}`,
+    { method: 'DELETE' }
+  );
+}
+
+export async function closePoll(pollId) {
+  await rest(`/forum_polls?id=eq.${encodeURIComponent(pollId)}`, {
+    method: 'PATCH',
+    body: { closed: true },
+  });
+}
+
 export async function createPost(draft) {
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
 
@@ -339,6 +385,27 @@ export async function createPost(draft) {
   });
   const created = Array.isArray(rows) ? rows[0] : rows;
   if (!created?.id) throw new Error('Пост не создан');
+
+  if (draft.poll && Array.isArray(draft.poll.options) && draft.poll.options.length >= 2) {
+    const pollRows = await rest('/forum_polls', {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        post_id: created.id,
+        question: draft.poll.question,
+        multiple: Boolean(draft.poll.multiple),
+      },
+    });
+    const poll = Array.isArray(pollRows) ? pollRows[0] : pollRows;
+    if (poll?.id) {
+      const options = draft.poll.options
+        .map((text, i) => ({ poll_id: poll.id, text, position: i }))
+        .filter((o) => o.text.trim());
+      if (options.length >= 2) {
+        await rest('/forum_poll_options', { method: 'POST', body: options });
+      }
+    }
+  }
 
   const full = await getPost(created.id);
   return full ?? postOut(created);

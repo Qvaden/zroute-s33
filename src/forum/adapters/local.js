@@ -43,13 +43,20 @@ function safe(fn, fallback = null) {
   }
 }
 
-const EMPTY = { users: [], me: null, posts: [], comments: [], reactions: [], reports: [] };
+/**
+ * Пустое состояние. Это фабрика, а не константа: раздача одной и той же
+ * константы с расшаренными массивами означала бы, что любой push в `users`
+ * одного прочтения навсегда запоминается в следующем пустом прочтении.
+ */
+function emptyState() {
+  return { users: [], me: null, posts: [], comments: [], reactions: [], reports: [], polls: [], pollVotes: [] };
+}
 
 function read() {
   const raw = safe(() => localStorage.getItem(KEY), null);
-  if (!raw) return { ...EMPTY };
+  if (!raw) return emptyState();
   const parsed = safe(() => JSON.parse(raw), null);
-  return parsed && typeof parsed === 'object' ? { ...EMPTY, ...parsed } : { ...EMPTY };
+  return parsed && typeof parsed === 'object' ? { ...emptyState(), ...parsed } : emptyState();
 }
 
 function write(state) {
@@ -187,6 +194,28 @@ function postOut(state, p) {
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
     ...r,
+    poll: pollOut(state, p.id),
+  };
+}
+
+function pollOut(state, postId) {
+  const poll = state.polls.find((pl) => pl.postId === postId);
+  if (!poll) return null;
+  const options = state.pollVotes
+    .filter((v) => v.pollId === poll.id)
+    .reduce((acc, v) => { acc[v.optionId] = (acc[v.optionId] ?? 0) + 1; return acc; }, {});
+  return {
+    id: poll.id,
+    question: poll.question,
+    multiple: Boolean(poll.multiple),
+    closed: Boolean(poll.closed),
+    total: new Set(state.pollVotes.filter((v) => v.pollId === poll.id).map((v) => v.userId)).size,
+    options: (poll.options || []).map((o) => ({
+      id: o.id,
+      text: o.text,
+      votes: options[o.id] || 0,
+      mine: state.me ? state.pollVotes.some((v) => v.pollId === poll.id && v.optionId === o.id && v.userId === state.me) : false,
+    })),
   };
 }
 
@@ -278,6 +307,24 @@ export async function createPost(draft) {
     views: 0,
   };
   s.posts.push(post);
+
+  if (draft.poll && Array.isArray(draft.poll.options) && draft.poll.options.length >= 2) {
+    const pollId = newId('pl');
+    const options = draft.poll.options
+      .filter((text) => text.trim())
+      .map((text, i) => ({ id: newId('po'), text: text.trim(), position: i }));
+    if (options.length >= 2) {
+      s.polls.push({
+        id: pollId,
+        postId: post.id,
+        question: draft.poll.question,
+        multiple: Boolean(draft.poll.multiple),
+        closed: false,
+        options,
+      });
+    }
+  }
+
   write(s);
   return postOut(s, post);
 }
@@ -548,5 +595,62 @@ export async function adminDeleteUser(userId) {
   for (const p of s.posts) if (p.authorId === userId) p.authorId = null;
   for (const c of s.comments) if (c.authorId === userId) c.authorId = null;
   if (s.me === userId) s.me = null;
+  write(s);
+}
+
+export async function votePoll(pollId, optionId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const poll = s.polls.find((pl) => pl.id === pollId);
+  if (!poll) throw new Error('Опрос не найден');
+  if (poll.closed) throw new Error('Опрос закрыт');
+
+  // Голос за тот же вариант уже стоит — повторное нажатие ничего не меняет.
+  const sameOption = s.pollVotes.find(
+    (v) => v.pollId === pollId && v.userId === me.id && v.optionId === optionId
+  );
+  if (sameOption) return;
+
+  // Один вариант: прежний голос заменяется новым. Несколько — голоса
+  // складываются, у каждого варианта своя строка.
+  if (!poll.multiple) {
+    s.pollVotes = s.pollVotes.filter((v) => !(v.pollId === pollId && v.userId === me.id));
+  }
+
+  s.pollVotes.push({
+    pollId,
+    optionId,
+    userId: me.id,
+    votedAt: new Date().toISOString(),
+  });
+  write(s);
+}
+
+export async function unvotePoll(pollId, optionId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const poll = s.polls.find((pl) => pl.id === pollId);
+  if (!poll) throw new Error('Опрос не найден');
+  if (poll.closed) throw new Error('Опрос закрыт');
+
+  s.pollVotes = s.pollVotes.filter(
+    (v) => !(v.pollId === pollId && v.optionId === optionId && v.userId === me.id)
+  );
+  write(s);
+}
+
+export async function closePoll(pollId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+  if (me.role !== 'admin' && me.role !== 'moderator') throw new Error('Недостаточно прав');
+
+  const poll = s.polls.find((pl) => pl.id === pollId);
+  if (!poll) throw new Error('Опрос не найден');
+  poll.closed = true;
   write(s);
 }

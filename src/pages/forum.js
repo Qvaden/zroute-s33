@@ -503,6 +503,35 @@ function renderComposer(s) {
 
         ${renderAttachRow('new')}
 
+        <div class="forum-poll-creator" data-forum-poll-creator>
+          <button type="button" class="forum-btn forum-btn--ghost" data-forum-poll-toggle>
+            Добавить опрос
+          </button>
+          <div class="forum-poll-form" data-forum-poll-form hidden>
+            <label class="forum-field">
+              <span>Вопрос</span>
+              <input type="text" name="poll_question" maxlength="200"
+                     placeholder="Что хотите спросить?">
+            </label>
+            <div class="forum-poll-options" data-forum-poll-options>
+              <label class="forum-field">
+                <span>Вариант 1</span>
+                <input type="text" name="poll_option_0" maxlength="120" placeholder="Вариант ответа">
+              </label>
+              <label class="forum-field">
+                <span>Вариант 2</span>
+                <input type="text" name="poll_option_1" maxlength="120" placeholder="Вариант ответа">
+              </label>
+            </div>
+            <button type="button" class="forum-btn forum-btn--ghost" data-forum-poll-add>+ Ещё вариант</button>
+            <label class="forum-field forum-field--inline">
+              <input type="checkbox" name="poll_multiple">
+              <span>Несколько вариантов</span>
+            </label>
+            <button type="button" class="forum-btn forum-btn--ghost" data-forum-poll-remove>Убрать опрос</button>
+          </div>
+        </div>
+
         <p class="forum-composer__rules muted">
           Публикуя пост, вы соглашаетесь с правилами выше. Нарушение —
           удаление с указанием пункта, повторное — запрет писать.
@@ -757,7 +786,7 @@ function renderFeed(s) {
  * пост читается как поломка сайта и порождает второй такой же, а причина —
  * единственное, чем правило вообще чему-то учит.
  */
-function renderPostCard(p, s) {
+export function renderPostCard(p, s) {
   if (p.deleted) {
     return `<article class="panel forum-post forum-post--deleted" data-forum-post="${esc(p.id)}">
       <div class="forum-post__gone">
@@ -807,6 +836,8 @@ function renderPostCard(p, s) {
       </div>
 
       ${renderShots(p)}
+
+      ${p.poll ? renderPoll(p.poll, s) : ''}
 
       ${
         !isOpen && p.body.length > 220
@@ -917,6 +948,48 @@ function renderReactions(targetType, item, s) {
             .join('')}
         </div>
       </div>
+    </div>`;
+}
+
+/* ── Опросы ───────────────────────────────────────────────────────────────── */
+
+/**
+ * Голосование в посте. Результаты видны сразу — так задумано: тайное
+ * голосование на форуме сообщества создаёт больше проблем, чем решает.
+ *
+ * Если человек уже голосовал, его вариант подсвечен. Если опрос закрыт,
+ * кнопки блокируются. Если несколько вариантов — чекбоксы, иначе радио.
+ */
+function renderPoll(poll, s) {
+  const canVote = s.me && !poll.closed && !s.me.banned;
+  const type = poll.multiple ? 'checkbox' : 'radio';
+  const name = `poll-${poll.id}`;
+
+  return `
+    <div class="forum-poll" data-forum-poll="${esc(poll.id)}">
+      <div class="forum-poll__head">
+        <span class="forum-poll__question">${esc(poll.question)}</span>
+        <span class="forum-poll__total">${poll.total} ${plural(poll.total, 'голос', 'голоса', 'голосов')}</span>
+      </div>
+      <div class="forum-poll__options">
+        ${poll.options.map((o) => {
+          const pct = poll.total > 0 ? Math.round((o.votes / poll.total) * 100) : 0;
+          return `
+          <label class="forum-poll__opt ${o.mine ? 'is-on' : ''}">
+            <span class="forum-poll__mark">
+              <input type="${type}" name="${esc(name)}" value="${esc(o.id)}"
+                     data-forum-poll-opt="${esc(poll.id)}:${esc(o.id)}"
+                     ${o.mine ? 'checked' : ''}
+                     ${canVote ? '' : 'disabled'}>
+              <span class="forum-poll__check"></span>
+            </span>
+            <span class="forum-poll__text">${esc(o.text)}</span>
+            <span class="forum-poll__bar" style="--pct:${pct}%"></span>
+            <span class="forum-poll__num">${o.votes} (${pct}%)</span>
+          </label>`;
+        }).join('')}
+      </div>
+      ${canVote ? '' : `<p class="forum-poll__hint muted">${poll.closed ? 'Опрос закрыт' : 'Войдите, чтобы проголосовать'}</p>`}
     </div>`;
 }
 

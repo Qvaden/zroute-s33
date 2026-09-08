@@ -123,7 +123,7 @@
  * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string}) => Promise<{posts: ForumPost[], total: number}>} listPosts
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
- * @property {(draft: {title: string, body: string, category: string}) => Promise<ForumPost>} createPost
+ * @property {(draft: {title: string, body: string, category: string, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
@@ -138,6 +138,9 @@
  * @property {(userId: string, password: string) => Promise<void>} resetPassword
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
+ * @property {(pollId: string, optionId: string) => Promise<void>} votePoll
+ * @property {(pollId: string, optionId: string) => Promise<void>} unvotePoll
+ * @property {(pollId: string) => Promise<void>} closePoll
  */
 
 export {};
