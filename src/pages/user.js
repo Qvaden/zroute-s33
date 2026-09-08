@@ -64,6 +64,7 @@ export function renderUserPage(state = {}) {
     ${renderCard(profile, isMe, editing)}
     ${editing && isMe ? renderEditForm(profile) : ''}
     ${renderStats(profile)}
+    ${profile.isBlogger ? renderBlog(profile, posts) : ''}
     ${renderRank(profile)}
     ${renderPosts(profile, posts)}`;
 }
@@ -80,6 +81,7 @@ function renderCard(p, isMe, editing) {
           <h1 class="forum-profile__nick">${esc(p.nick)}</h1>
           <div class="forum-profile__meta">
             ${roleBadge(p) || `<span class="forum-profile__role">${esc(roleLabel(p))}</span>`}
+            ${p.isBlogger ? '<span class="forum-profile__role forum-profile__role--blogger" title="Ведёт свой блог">✍️ Блогер</span>' : ''}
             ${p.allianceTag ? `<span class="forum-profile__ally">${esc(p.allianceTag)}</span>` : ''}
             <span class="muted">с ${esc(joinDate(p.createdAt))}</span>
           </div>
@@ -93,6 +95,52 @@ function renderCard(p, isMe, editing) {
             : ''
         }
       </div>
+    </section>`;
+}
+
+/* ── Блог ─────────────────────────────────────────────────────────────────── */
+/*
+  Блок блога появляется только у блогеров. Внутри — размер блога и общее число
+  просмотров его записей: именно это «сколько посещений блога» видит сам автор.
+  Список постов блога — это обычные посты раздела «Блоги», поэтому они уже
+  в списке `posts` на этой странице.
+*/
+function renderBlog(p, posts) {
+  const blogPosts = posts.filter((x) => x.category === 'blog');
+
+  return `
+    <section class="panel forum-blog">
+      <div class="forum-blog__head">
+        <span class="forum-blog__badge">✍️ Блог</span>
+        <div class="forum-blog__stats">
+          <div class="forum-profile__stat">
+            <b class="num">${p.blogPostCount > 0 ? p.blogPostCount : blogPosts.length}</b><span>записей</span>
+          </div>
+          <div class="forum-profile__stat">
+            <b class="num">${p.blogViews}</b><span>просмотров</span>
+          </div>
+        </div>
+        <a class="forum-btn forum-btn--ghost" href="#/forum">Все записи блогов</a>
+      </div>
+      ${
+        blogPosts.length
+          ? `<ul class="forum-profile__posts">
+          ${blogPosts
+            .map((x) => {
+              const date = x.created_at ? new Date(x.created_at) : null;
+              return `<li>
+                <a href="#/forum/${esc(x.id)}">${esc(x.title)}</a>
+                <div class="forum-profile__post-meta muted">
+                  ${date ? `<time title="${esc(fullTime(date))}">${esc(timeAgo(date))}</time>` : ''}
+                  ${Number(x.views) ? `<span>👁 ${Number(x.views)}</span>` : ''}
+                  ${Number(x.score) ? `<span>${Number(x.score) > 0 ? '+' : ''}${Number(x.score)}</span>` : ''}
+                </div>
+              </li>`;
+            })
+            .join('')}
+        </ul>`
+          : `<p class="muted">Записей в блоге пока нет.</p>`
+      }
     </section>`;
 }
 

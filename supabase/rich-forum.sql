@@ -485,6 +485,7 @@ select
   prof.avatar_url as author_avatar,
   prof.alliance_tag as author_alliance,
   prof.role as author_role,
+  prof.is_blogger as author_is_blogger,
   p.category,
   p.title,
   p.body,
@@ -559,6 +560,7 @@ select
   c.author_nick,
   prof.avatar_url as author_avatar,
   prof.role as author_role,
+  prof.is_blogger as author_is_blogger,
   c.body,
   c.created_at,
   c.deleted,
@@ -637,12 +639,15 @@ join public.forum_users reporter on reporter.id = r.reporter_id;
 -- forum_posts_category_check. Снимаем старое и навешиваем то же имя
 -- с флудилкой в списке: имя не меняется, значит не меняется и всё,
 -- что на него ссылается.
+alter table public.forum_users
+  add column if not exists is_blogger boolean not null default false;
+
 alter table public.forum_posts
   drop constraint if exists forum_posts_category_check;
 
 alter table public.forum_posts
   add constraint forum_posts_category_check
-  check (category in ('news','vs','chronicle','ally','help','offtop','flood'));
+  check (category in ('news','vs','chronicle','ally','help','offtop','flood','blog'));
 
 -- Лимит картинок. В живой базе старая функция была поставлена с «не больше
 -- четырёх»; теперь число одно на проект и повторяет config.js.

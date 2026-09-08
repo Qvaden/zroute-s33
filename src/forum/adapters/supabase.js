@@ -97,6 +97,7 @@ function userOut(row) {
     avatarUrl: row.avatar_url || '',
     about: row.about || '',
     allianceTag: row.alliance_tag || '',
+    isBlogger: Boolean(row.is_blogger),
     canEditSite: Boolean(row.can_edit_site) || row.role === 'admin',
     createdAt: toDate(row.created_at) ?? new Date(),
     mutedUntil: toDate(row.muted_until),
@@ -245,6 +246,7 @@ function postOut(row) {
       модератора ничем не отличается от слова любого участника.
     */
     authorRole: row.author_role || 'member',
+    authorIsBlogger: Boolean(row.author_is_blogger),
     category: row.category,
     title: row.title,
     body: row.body,
@@ -476,6 +478,7 @@ function commentOut(row) {
     authorNick: row.author_nick,
     authorAvatar: row.author_avatar || '',
     authorRole: row.author_role || 'member',
+    authorIsBlogger: Boolean(row.author_is_blogger),
     body: row.body,
     createdAt: toDate(row.created_at) ?? new Date(),
     deleted: Boolean(row.deleted),

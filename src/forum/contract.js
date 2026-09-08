@@ -25,6 +25,7 @@
  * @property {string} nick          Как его видят люди.
  * @property {'member'|'moderator'|'admin'} role
  * @property {Date}   createdAt
+ * @property {boolean} [isBlogger]          Ведёт блог; метка у постов.
  * @property {Date|null} [mutedUntil]  До этого времени писать нельзя.
  * @property {boolean} [banned]     Запрет без срока.
  * @property {string} [banReason]
@@ -42,6 +43,7 @@
  * @property {string}  id
  * @property {string}  authorId
  * @property {string}  authorNick     Копией, чтобы лента не ходила за автором.
+ * @property {boolean} [authorIsBlogger]  Автор ведёт блог: метка и ссылка на него.
  * @property {string}  category       Из CATEGORIES в rules.js.
  * @property {string}  title
  * @property {string}  body

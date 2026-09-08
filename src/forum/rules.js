@@ -119,6 +119,7 @@ export const CATEGORIES = [
   { id: 'help', label: 'Вопросы', hint: 'Спросить и получить ответ' },
   { id: 'offtop', label: 'Разное', hint: 'Всё остальное про сообщество' },
   { id: 'flood', label: 'Флудилка', hint: 'Болтовня не по игре' },
+  { id: 'blog', label: 'Блоги', hint: 'Личные блоги игроков' },
 ];
 
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);

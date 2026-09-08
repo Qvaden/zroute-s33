@@ -2172,8 +2172,8 @@ console.log('\nQ. Форум');
 
   /* ── Разделы, включая флудилку ── */
 
-  equal('все разделы на месте, флудилка последняя',
-    CATEGORIES.map((c) => c.id).join(','), 'news,vs,chronicle,ally,help,offtop,flood');
+  equal('все разделы на месте',
+    CATEGORIES.map((c) => c.id).join(','), 'news,vs,chronicle,ally,help,offtop,flood,blog');
   check('у флудилки есть короткое имя и пояснение',
     CATEGORIES.some((c) => c.id === 'flood' && c.label === 'Флудилка' && /не по игре/i.test(c.hint)));
   check('идентификаторы разделов уникальны',

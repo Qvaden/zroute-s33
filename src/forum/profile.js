@@ -38,10 +38,14 @@ function profileFrom(row) {
     about: row.about || '',
     allianceTag: row.alliance_tag || '',
     role: row.role,
+    isBlogger: Boolean(row.is_blogger),
     createdAt: toDate(row.created_at) ?? new Date(),
     postCount: Number(row.post_count || 0),
     commentCount: Number(row.comment_count || 0),
     likesReceived: Number(row.likes_received || 0),
+    /* Сколько просмотров собрали все записи блога. Считает база в forum_profiles. */
+    blogViews: Number(row.blog_views || 0),
+    blogPostCount: Number(row.blog_post_count || 0),
   };
 }
 

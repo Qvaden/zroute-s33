@@ -66,6 +66,7 @@ alter table public.forum_users
     Связь означала бы «выбери из списка или соври», а текст — «напиши как есть».
   */
   add column if not exists alliance_tag text not null default '',
+  add column if not exists is_blogger boolean not null default false,
   add column if not exists updated_at timestamptz not null default now();
 
 -- ── Открытая страница участника ─────────────────────────────────────────────
@@ -111,6 +112,7 @@ select
   u.about,
   u.alliance_tag,
   u.role,
+  u.is_blogger,
   u.created_at,
   (select count(*) from public.forum_posts p
      where p.author_id = u.id and p.deleted = false) as post_count,
@@ -126,7 +128,22 @@ select
       from public.forum_reactions r
       join public.forum_posts p on p.id = r.target_id
      where r.target_type = 'post' and p.author_id = u.id and r.reaction = 'like'
-  ), 0) as likes_received
+  ), 0) as likes_received,
+  /*
+    Счётчики блога. Просмотры — сумма views записей, помеченных разделом blog:
+    это «сколько раз открыли что-то в блоге». Число постов — отдельно,
+    чтобы участник видел размер своего блога, не считая чужие записи.
+  */
+  coalesce((
+    select sum(p.views)
+      from public.forum_posts p
+     where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+  ), 0) as blog_views,
+  coalesce((
+    select count(*)
+      from public.forum_posts p
+     where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+  ), 0) as blog_post_count
 from public.forum_users u;
 
 grant select on public.forum_profiles to anon, authenticated;
@@ -438,6 +455,7 @@ select
     ничем не отличается от слова любого участника.
   */
   prof.role as author_role,
+  prof.is_blogger as author_is_blogger,
   p.category,
   p.title,
   p.body,
@@ -482,6 +500,7 @@ select
   c.author_nick,
   prof.avatar_url as author_avatar,
   prof.role as author_role,
+  prof.is_blogger as author_is_blogger,
   c.body,
   c.created_at,
   c.deleted,

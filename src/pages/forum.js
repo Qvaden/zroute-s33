@@ -999,6 +999,11 @@ export function renderPostCard(p, s) {
         ${avatar(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
           <b>${nickLink(p.authorNick)}${
+            p.authorIsBlogger
+              ? `<a class="role-badge role-badge--blogger" href="#/user/${esc(encodeURIComponent(p.authorNick))}"
+                   title="Ведёт блог — загляните" role="img" aria-label="Блогер">✍️<b>блогер</b></a>`
+              : ''
+          }${
             roleBadge({ role: p.authorRole }, { short: true })
           }${
             p.authorAlliance ? ` <span class="forum-post__ally">${esc(p.authorAlliance)}</span>` : ''
@@ -1207,6 +1212,11 @@ function renderComments(post, s) {
             <div class="forum-comment__body">
               <div class="forum-comment__head">
                 <b>${nickLink(c.authorNick)}${
+                  c.authorIsBlogger
+                    ? `<a class="role-badge role-badge--blogger" href="#/user/${esc(encodeURIComponent(c.authorNick))}"
+                         title="Ведёт блог" role="img" aria-label="Блогер">✍️<b>блогер</b></a>`
+                    : ''
+                }${
                   roleBadge({ role: c.authorRole }, { short: true })
                 }</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>

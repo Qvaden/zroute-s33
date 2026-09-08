@@ -56,7 +56,7 @@ create table if not exists public.forum_posts (
     и нет; если появится — надо будет обновлять копии, и это придётся помнить.
   */
   author_nick    text not null default '',
-  category       text not null check (category in ('news','vs','chronicle','ally','help','offtop','flood')),
+   category       text not null check (category in ('news','vs','chronicle','ally','help','offtop','flood','blog')),
   title          text not null check (char_length(title) between 3 and 140),
   body           text not null check (char_length(body) between 1 and 8000),
   created_at     timestamptz not null default now(),
@@ -233,6 +233,7 @@ create trigger forum_on_signup
 -- давал бы полный доступ к таблицам, поэтому строки `enable row level
 -- security` — самые важные в файле.
 
+alter table public.forum_users add column if not exists is_blogger boolean default false;
 alter table public.forum_users     enable row level security;
 alter table public.forum_posts     enable row level security;
 alter table public.forum_comments  enable row level security;

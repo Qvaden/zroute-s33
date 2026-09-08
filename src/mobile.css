@@ -340,6 +340,13 @@ html {
   font-size: 12px;
 }
 .forum-profile__role { color: var(--dim); }
+/* Метка «Блогер» на странице участника — свой цвет, как и роль-бейдж в ленте. */
+.forum-profile__role--blogger {
+  padding: 2px 8px;
+  border: 1px solid rgba(49,197,181,.4);
+  border-radius: 999px;
+  color: #31c5b5;
+}
 .forum-profile__ally {
   padding: 2px 8px;
   border: 1px solid rgba(255,201,60,.3);
@@ -398,6 +405,57 @@ html {
   margin-top: 4px;
   color: var(--mute);
   font-size: 10.5px;
+}
+
+/*
+  Блок блога на странице участника-блогера: счётчики записей и просмотров.
+  Строка stats повторяет layout статистики профиля, но в одну линию — сбоку
+  от неё кнопка перехода к ленте блогов.
+*/
+.forum-blog { margin-bottom: 18px; padding: 14px 16px; }
+.forum-blog__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+.forum-blog__badge {
+  padding: 3px 10px;
+  border: 1px solid rgba(49,197,181,.4);
+  border-radius: 999px;
+  background: rgba(49,197,181,.08);
+  color: #31c5b5;
+  font-size: 11px;
+  font-weight: 700;
+}
+.forum-blog__stats {
+  display: flex;
+  gap: 18px;
+}
+.forum-blog__stats .forum-profile__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+}
+.forum-blog__stats b { font-size: 15px; }
+.forum-blog__stats span {
+  display: inline;
+  margin: 0;
+  font-size: 10.5px;
+}
+.forum-blog__head .forum-btn { margin-left: auto; }
+.forum-blog__posts { margin: 12px 0 0; padding: 0; list-style: none; }
+.forum-blog__post {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.forum-blog__post:last-child { border-bottom: none; }
+.forum-blog__post-meta {
+  margin-top: 3px;
+  font-size: 11px;
 }
 
 .forum-profile__posts { margin: 0; padding: 0; list-style: none; }
@@ -851,6 +909,23 @@ html {
   box-shadow: 0 0 9px -5px rgba(255,201,60,.5), inset 0 1px rgba(255,255,255,.08);
 }
 .role-badge--owner i { filter: drop-shadow(0 0 3px rgba(255,201,60,.45)); }
+
+/*
+  Блогер — не роль, а отметка: писать блог может участник любой роли, поэтому
+  метка своя. Цвет отличён от ролей (бирюзовый), чтобы читалась как «загляните
+  в блог», а не как «у этого человека есть власть».
+*/
+.role-badge--blogger {
+  --role-tone: #31c5b5;
+  border-color: color-mix(in srgb, var(--role-tone) 40%, transparent);
+  background: color-mix(in srgb, var(--role-tone) 12%, transparent);
+  color: var(--role-tone);
+}
+.role-badge--blogger:hover {
+  border-color: var(--role-tone);
+  background: color-mix(in srgb, var(--role-tone) 20%, transparent);
+}
+.role-badge--blogger i { font-size: 7.5px; }
 
 /* В шапке форума метка стоит одна, без ника рядом — отступ слева не нужен. */
 .forum-me__body .role-badge { margin-left: 0; }
