@@ -286,10 +286,22 @@ export function describeChanges(changes) {
     const removed = changes.filter((c) => c.entity === entity && c.action === 'delete').length;
 
     if (saved) parts.push(`${saved} ${pick(saved, forms)}`);
-    if (removed) parts.push(`удалится ${removed} ${pick(removed, forms)}`);
+    if (removed) parts.push(`${removalVerb(removed)} ${removed} ${pick(removed, forms)}`);
   }
 
   return parts.join(', ');
+}
+
+/**
+ * «Удалится»/«удалятся» согласуется с числом: «удалятся 2 результата»,
+ * но «удалится 1 результат». Прежний текст всегда говорил «удалится»,
+ * и про «2» это резало глаз.
+ */
+function removalVerb(n) {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'удалятся';
+  return 'удалится';
 }
 
 function pick(n, [one, few, many]) {

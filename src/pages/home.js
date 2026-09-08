@@ -116,9 +116,15 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks } = {})
           .join('')
       : '<span class="muted">никого</span>';
 
+  // Серия у лидера может быть и проигрышной: победа в ней не обязательна.
+  const STREAK_WORDS = {
+    win: ['победа', 'победы', 'побед'],
+    loss: ['поражение', 'поражения', 'поражений'],
+  };
+  const leaderStreakWords = leader?.streak ? STREAK_WORDS[leader.streak.type] : null;
   const leaderStreak =
-    leader?.streak && leader.streak.length > 1
-      ? ` · серия ${plural(leader.streak.length, 'победа', 'победы', 'побед')}`
+    leaderStreakWords && leader?.streak.length > 1
+      ? ` · серия ${plural(leader.streak.length, ...leaderStreakWords)}`
       : '';
 
   const moverRow = (r) =>

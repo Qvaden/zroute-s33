@@ -505,14 +505,23 @@ export async function report({ targetType, targetId, ruleId, note = '' }) {
   );
   if (already) return;
 
+  const isPost = targetType === 'post';
+  const post = isPost ? s.posts.find((p) => p.id === targetId) : null;
+  const comment = isPost ? null : s.comments.find((c) => c.id === targetId);
+  const target = post ?? comment;
+
   s.reports.push({
     id: newId('r'),
     targetType,
     targetId,
     // Родительский пост: по нему строится ссылка «Открыть на сайте».
-    targetPostId: targetType === 'comment'
-      ? s.comments.find((c) => c.id === targetId)?.postId ?? null
-      : targetId,
+    targetPostId: isPost ? targetId : comment?.postId ?? null,
+    // Поля цели в локальном режиме заполняются так же, как представление
+    // forum_report_list в базе: иначе экран модерации показал бы «автор
+    // неизвестен» и «текст недоступен» только потому, что форум не на Supabase.
+    targetTitle: isPost ? String(post?.title ?? '') : '',
+    targetBody: String(target?.body ?? '').slice(0, 400),
+    targetAuthorNick: String(target?.authorNick ?? ''),
     reporterId: me.id,
     reporterNick: me.nick,
     ruleId,

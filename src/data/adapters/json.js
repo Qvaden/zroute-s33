@@ -38,13 +38,24 @@ async function raw() {
   cache = (async () => {
     // В браузере путь резолвится относительно index.html, в Node — относительно cwd.
     const path = CONFIG.json.path;
-    if (typeof fetch === 'function' && typeof window !== 'undefined') {
-      const res = await fetch(path);
-      if (!res.ok) throw new Error(`json-адаптер: не удалось прочитать ${path} (${res.status})`);
-      return res.json();
+    try {
+      if (typeof fetch === 'function' && typeof window !== 'undefined') {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`json-адаптер: не удалось прочитать ${path} (${res.status})`);
+        return res.json();
+      }
+      const { readFile } = await import('node:fs/promises');
+      return JSON.parse(await readFile(path.replace(/^\.\//, ''), 'utf8'));
+    } catch (err) {
+      /*
+        Плохой ответ — не данные, кэшировать его незачем. Раньше здесь
+        оставался отвергнутый промис, и после первого сбоя (закачанный файл,
+        перебои сети) сайт навсегда показывал ошибку до перезагрузки страницы.
+        Сбрасываем кэш — следующий запрос попробует ещё раз.
+      */
+      cache = null;
+      throw err;
     }
-    const { readFile } = await import('node:fs/promises');
-    return JSON.parse(await readFile(path.replace(/^\.\//, ''), 'utf8'));
   })();
 
   return cache;

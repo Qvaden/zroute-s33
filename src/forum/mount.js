@@ -92,6 +92,17 @@ let host = null;
 let wired = false;
 /** Что показываем: ленту или страницу участника. */
 let mode = 'feed';
+/**
+ * Поколение монтирования. Каждый вход на форум/страницу участника увеличивает
+ * его на единицу; вклад после await красит только то поколение, которое сейчас
+ * на экране. Иначе поздний ответ loadFeed/loadProfile нарисовал бы чужое
+ * содержимое поверх свежей страницы (когда человек за время запроса ушёл
+ * на другую вкладку и вернулся).
+ */
+let mountToken = 0;
+/** Таймер отложенного поиска по ленте — живёт на уровне модуля, чтобы его
+ *  можно было гасить при уходе со страницы. */
+let searchTimer = 0;
 
 /* ── Отрисовка ────────────────────────────────────────────────────────────── */
 
@@ -120,7 +131,10 @@ function captureInput() {
   const forms = {};
   host.querySelectorAll('textarea, input:not([type="radio"]):not([type="password"]), select, [data-editor]').forEach((el) => {
     const key = fieldKey(el);
-    if (key) forms[key] = el.matches('[contenteditable]') ? el.innerHTML : el.value;
+    // Чекбокс (например, «разрешить несколько ответов» у опроса) хранит
+    // состояние в checked, а не в value: иначе после перерисовки галочка
+    // пропадала бы, даже когда человек её ставил.
+    if (key) forms[key] = el.type === 'checkbox' ? el.checked : (el.matches('[contenteditable]') ? el.innerHTML : el.value);
   });
 
   // Раскрытые <details>: правила, форма поста.
@@ -233,6 +247,10 @@ function setFieldValue(el, value) {
   if (el.matches('[contenteditable]')) {
     el.innerHTML = value;
     syncEditorEmpty(el);
+  } else if (el.type === 'checkbox') {
+    // Значение чекбокса после перерисовки восстанавливаем как состояние,
+    // а не как value — иначе сохранённая галочка не вернётся.
+    el.checked = Boolean(value);
   } else {
     el.value = value;
   }
@@ -363,6 +381,7 @@ async function withBusy(button, label, action) {
 /* ── Загрузка ─────────────────────────────────────────────────────────────── */
 
 async function loadFeed({ append = false } = {}) {
+  const token = mountToken;
   state.loading = !append;
   state.error = '';
   // Любое движение по ленте закрывает открытую правку: форма живёт в карточке.
@@ -414,11 +433,15 @@ async function loadFeed({ append = false } = {}) {
     state.error = String(err?.message ?? err);
   } finally {
     state.loading = false;
-    paint();
+    // Пока ждали сеть, мог смениться экран (уход на другую вкладку и вход
+    // обратно). Тогда ленту принесло не на ту страницу — пусть красит тот,
+    // кто на экране сейчас.
+    if (token === mountToken) paint();
   }
 }
 
 async function loadThread(postId) {
+  const token = mountToken;
   state.openPostId = postId;
   state.comments = [];
   state.editingPostId = null;
@@ -442,7 +465,7 @@ async function loadThread(postId) {
     state.error = String(err?.message ?? err);
   }
   state.loading = false;
-  paint();
+  if (token === mountToken) paint();
 }
 
 function findPoll(state, pollId) {
@@ -708,6 +731,7 @@ async function uploadShots(scope, targetType, targetId, onProgress) {
 /* ── Страница участника ───────────────────────────────────────────────────── */
 
 async function loadProfile(nick) {
+  const token = mountToken;
   mode = 'user';
   profileState.nick = nick;
   profileState.loading = true;
@@ -724,7 +748,9 @@ async function loadProfile(nick) {
     profileState.error = String(err?.message ?? err);
   } finally {
     profileState.loading = false;
-    paint();
+    // За время запроса могли уйти со страницы участника — чужую страницу
+    // не рисуем.
+    if (token === mountToken) paint();
   }
 }
 
@@ -1007,8 +1033,14 @@ function wire() {
         await forum.setReaction(targetType, targetId, next);
         await refreshOne(targetType, targetId);
       } catch (err) {
-        state.error = String(err?.message ?? err);
-        // Возвращаем настоящее состояние: показанное было предположением.
+        /*
+          Неудачная реакция не должна гасить ленту. state.error рисует на месте
+          ленты панель «Форум не отвечает», и одна упавшая кнопка убирала бы
+          весь список до повторной загрузки. Возвращаем настоящее состояние
+          (показанное было предположением), а об ошибке молчим — её видно
+          по тому, что кнопка вернулась в прежнее положение.
+        */
+        console.error('реакция не сохранена:', err?.message ?? err);
         await refreshOne(targetType, targetId);
       }
       return;
@@ -1035,20 +1067,24 @@ function wire() {
       const poll = findPoll(state, pollId);
       if (!poll || poll.closed) return;
 
-      const mine = poll.options.find((o) => o.mine);
-      const sameOption = mine?.id === optionId;
+      const mineHere = poll.options.filter((o) => o.mine);
+      const already = mineHere.some((o) => o.id === optionId);
 
-      if (!sameOption) {
+      if (!already) {
         // Смена варианта в опросе с одним ответом: сначала снять старый голос.
         // База принимает голос за другой вариант только после снятия: первичный
         // ключ держит один голос за вариант, а триггер — один голос на опрос.
-        if (!poll.multiple && mine) {
-          try { await forum.unvotePoll(pollId, mine.id); } catch (_) {}
+        if (!poll.multiple && mineHere.length) {
+          try { await forum.unvotePoll(pollId, mineHere[0].id); } catch (_) {}
         }
       }
 
       try {
-        if (sameOption) {
+        if (already) {
+          // Повторный клик по выбранному варианту снимает голос — и в опросе
+          // с одним ответом, и с несколькими. Раньше для нескольких «уже
+          // проголосовано» искали только первый mine-вариант, и снять голос
+          // за второй было нельзя.
           await forum.unvotePoll(pollId, optionId);
         } else {
           await forum.votePoll(pollId, optionId);
@@ -1094,7 +1130,9 @@ function wire() {
         // Порядок ленты меняется (закреплённые всегда сверху) — перерисовываем её.
         await loadFeed();
       } catch (err) {
-        state.error = String(err?.message ?? err);
+        // Порядок и состояние вернёт loadFeed; ошибку, как и у реакции,
+        // не выносим на всю ленту.
+        console.error('закрепление не сохранено:', err?.message ?? err);
         await loadFeed();
       }
       return;
@@ -1132,7 +1170,6 @@ function wire() {
     в базу — значит дёргать её на темп набора. Ключ 'search' в findByKey
     возвращает инпут после перерисовки, поэтому запрос не теряется.
   */
-  let searchTimer;
   document.addEventListener('input', (e) => {
     if (!host || !host.contains(e.target)) return;
 
@@ -1614,6 +1651,7 @@ export async function mountForum(container, view, postId = null) {
   host = container;
   siteView = view;
   mode = 'feed';
+  mountToken++;
   wire();
 
   /*
@@ -1689,6 +1727,7 @@ export async function mountForum(container, view, postId = null) {
  */
 export async function mountUser(container, nick) {
   host = container;
+  mountToken++;
   wire();
 
   let ready = false;
@@ -1732,6 +1771,14 @@ export function unmountForum() {
   state.comments = [];
   state.query = '';
   state.editingPostId = null;
+
+  // Не даём отложенному поиску сработать уже на новой вкладке: он чистит
+  // query и лезет в базу, когда хост другой страницы.
+  window.clearTimeout(searchTimer);
+
+  // Ответы, что ещё летят из хранилища, не должны нарисовать форум поверх
+  // новой страницы.
+  mountToken++;
 
   profileState.profile = null;
   profileState.posts = [];

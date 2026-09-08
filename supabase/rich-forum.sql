@@ -356,7 +356,7 @@ declare
 begin
   foreach nick in array public.forum_mentioned_nicks(new.title || ' ' || new.body)
   loop
-    select id into target from public.forum_users where lower(nick_lower(nick)) = lower(nick_lower(nick)) and lower(forum_users.nick) = lower(nick);
+    select id into target from public.forum_users where lower(forum_users.nick) = lower(nick);
 
     -- Себя не уведомляем: человек знает, что написал.
     if target is not null and target <> new.author_id then

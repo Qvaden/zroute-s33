@@ -96,9 +96,15 @@ const SCREENS = [
   { id: 'texts', label: 'Тексты', html: renderTexts(view) },
 ];
 
-const [siteCss, admCss] = await Promise.all([
-  readFile('src/styles.css', 'utf8'),
+// Те же таблицы стилей и в том же порядке, что admin.html грузит на боевую
+// панель. Раньше здесь читались styles.css + admin.css: styles.css не
+// используется с версии v6, а admin-mobile.css и controls.css терялись вовсе,
+// и превью показывало не те стили, чем статичная панель.
+const [siteCss, admCss, admMobileCss, controlsCss] = await Promise.all([
+  readFile('src/styles-v8.css', 'utf8'),
   readFile('src/admin/admin.css', 'utf8'),
+  readFile('src/admin/admin-mobile.css', 'utf8'),
+  readFile('src/controls.css', 'utf8'),
 ]);
 
 const inner = SCREENS.map(
@@ -118,6 +124,8 @@ const html = `<!DOCTYPE html>
 <style>
 ${siteCss}
 ${admCss}
+${admMobileCss}
+${controlsCss}
 .page { display: none; }
 .page.is-active { display: block; }
 </style>

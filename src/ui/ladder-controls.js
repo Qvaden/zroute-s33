@@ -124,5 +124,23 @@
   } else {
     apply();
   }
-  window.addEventListener('hashchange', function () { setTimeout(apply, 0); });
+
+  function resetState() {
+    state.q = '';
+    state.filter = 'active';
+    state.sort = 'points';
+  }
+
+  window.addEventListener('hashchange', function () {
+    setTimeout(function () {
+      // Ушли со страницы рейтинга — подчищаем фильтр и поиск. Состояние
+      // единственное на всё приложение, и вернувшись, человек увидел бы
+      // свой прошлый запрос при свежеподсвеченной кнопке «Активные».
+      if (!document.querySelector('[data-ladder-list]')) {
+        resetState();
+        return;
+      }
+      apply();
+    }, 0);
+  });
 })();

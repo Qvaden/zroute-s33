@@ -140,8 +140,29 @@ export { EVENT_TYPE, EVENT_TYPE_ORDER };
 
 /** «2026-07-19» — формат, который понимают и файл, и input type=date. */
 function isoDay(value) {
-  const d = toDate(value);
-  return d ? d.toISOString().slice(0, 10) : '';
+  const s = String(value ?? '').trim();
+
+  /*
+    Строковую дату берём как есть, без Date: у значения с временем («2026-07-19
+    00:00:00») toDate понял бы его как местную полночь и toISOString() сдвинул
+    бы день назад в поясе восточнее UTC. События живут календарными днями,
+    и час внутри них значения не имеет.
+  */
+  const bare = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})([ T]|$)/);
+  if (bare) {
+    const [, y, m, d] = bare;
+    return `${y}-${String(+m).padStart(2, '0')}-${String(+d).padStart(2, '0')}`;
+  }
+
+  // «19.07.2026» и Date: toDate собирает первый через Date.UTC, так что и тут
+  // без часового пояса. toISOString() не используем — он вернул бы чужой день.
+  const date = toDate(s);
+  if (!date) return '';
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, '0'),
+    String(date.getUTCDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 /**

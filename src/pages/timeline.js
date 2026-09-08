@@ -65,9 +65,16 @@ export function renderTimeline({ events } = {}) {
 
   const captures = sorted.filter((e) => e.type === 'server_capture');
 
+  /*
+    Стена трофеев — про взятые Столицы, и без них она врёт: большой «0 Столиц
+    взято» рядом с лентой читается как сломанный счётчик, а не как честный ноль.
+    Захватов нет — стену не рисуем вовсе: лента и серверный раздел несут историю.
+  */
+  const trophies = captures.length ? renderTrophies(captures, sorted) : '';
+
   return `
     ${renderServerSection(sorted)}
-    ${captures.length || sorted.length ? renderTrophies(captures, sorted) : ''}
+    ${trophies}
     ${sorted.length ? renderFilters(sorted) : ''}
     ${sorted.length ? renderFeed(sorted) : ''}
     <p class="tl__empty" data-tl-empty hidden>Событий такого типа пока нет.</p>`;

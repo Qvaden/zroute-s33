@@ -11,7 +11,14 @@
  * Отсутствие записи за неделю означает «данные ещё не внесли» (или альянса
  * тогда не существовало). На очки это не влияет никак: сумма просто
  * не меняется, а неделя не попадает ни в победы, ни в поражения.
+ *
+ * ПОРЯДОК НЕДЕЛЬ. Везде ниже недели сортируются byWeekStart — по дате,
+ * а не по номеру. Номер — подпись для человека (см. data/week-order.js);
+ * внутри года он может пойти заново с 1, и тогда «по номеру» переставило бы
+ * январь будущего года перед декабрём текущего.
  */
+
+import { byWeekStart } from '../data/week-order.js';
 
 /**
  * @typedef {Object} StandingRow
@@ -47,7 +54,7 @@
  * @returns {import('../data/types.js').Week[]} пустой массив, если данных нет вовсе
  */
 export function weeksUpToLastData(weeks, results) {
-  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const ordered = [...weeks].sort(byWeekStart);
   const filled = new Set(results.map((r) => r.weekId));
 
   let last = -1;
@@ -135,7 +142,7 @@ function tallyUpTo(alliances, weeks, index, scoring, upToIndex) {
  * @returns {{weeks: import('../data/types.js').Week[], number: number, startNumber: number|null, endNumber: number|null}}
  */
 export function computeQuarterWindow(weeks, results, periodLength = 4) {
-  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const ordered = [...weeks].sort(byWeekStart);
   const filled = new Set(results.map((r) => r.weekId));
   const last = [...ordered].reverse().find((week) => filled.has(week.id));
 
@@ -165,7 +172,7 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
  */
 export function computeStandings(alliances, weeks, results, scoring, formLength = 5) {
   const index = indexResults(results);
-  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const ordered = [...weeks].sort(byWeekStart);
   const last = ordered.length - 1;
 
   if (last < 0) {
@@ -245,7 +252,7 @@ export function computeStandings(alliances, weeks, results, scoring, formLength 
  * @param {string} [weekId]
  */
 export function computeWeekSummary(alliances, weeks, results, weekId) {
-  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const ordered = [...weeks].sort(byWeekStart);
   const week = weekId ? ordered.find((w) => w.id === weekId) : ordered[ordered.length - 1];
   if (!week) return null;
 
@@ -286,7 +293,7 @@ export function computeWeekSummary(alliances, weeks, results, weekId) {
  */
 export function computePlaceHistory(alliances, weeks, results, scoring) {
   const index = indexResults(results);
-  const ordered = [...weeks].sort((a, b) => a.number - b.number);
+  const ordered = [...weeks].sort(byWeekStart);
   const history = new Map(alliances.map((a) => [a.id, []]));
 
   for (let i = 0; i < ordered.length; i++) {
@@ -309,7 +316,7 @@ export function computePlaceHistory(alliances, weeks, results, scoring) {
 export function computeAllianceHistory(allianceId, weeks, results) {
   const index = indexResults(results);
   return [...weeks]
-    .sort((a, b) => a.number - b.number)
+    .sort(byWeekStart)
     .map((week) => ({ week, outcome: index.get(`${week.id}|${allianceId}`) ?? null }));
 }
 
@@ -326,7 +333,7 @@ export function computeAllianceHistory(allianceId, weeks, results) {
 export function computeWindowForm(allianceId, weeks, results) {
   const index = indexResults(results);
   return [...weeks]
-    .sort((a, b) => a.number - b.number)
+    .sort(byWeekStart)
     .map((week) => index.get(`${week.id}|${allianceId}`) ?? null);
 }
 
