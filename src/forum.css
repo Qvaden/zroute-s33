@@ -894,6 +894,10 @@
 
 .forum-post { margin-bottom: 0; }
 .forum-post--pinned { border-color: rgba(255,201,60,.28); }
+.forum-post--trail {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent 34%);
+}
 
 .forum-post__head {
   display: flex;
@@ -913,6 +917,17 @@
   white-space: nowrap;
 }
 .forum-post__pin { font-size: 13px; }
+.forum-post__trail {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 .forum-post__title { margin: 0 0 9px; font-size: clamp(16px, 2.1vw, 20px); }
 .forum-post__title a { color: inherit; text-decoration: none; }

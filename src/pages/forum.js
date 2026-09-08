@@ -872,9 +872,15 @@ export function renderPostCard(p, s) {
   const isMine = s.me && s.me.id === p.authorId;
   const editing = s.editingPostId === p.id;
   const canReply = Boolean(isOpen && s.me && !s.me.banned);
+  // «Мой след» — темы, где участник оставил след: свой пост, реакция или голос
+  // в опросе. Считается из данных, которые карточка уже несёт: сверяться
+  // с ответами на каждый пост — N+1 запросов на ленту и лишняя нагрузка.
+  const inTrail = Boolean(s.me) && (Boolean(isMine) || Boolean(p.myReaction) || Boolean(
+    Array.isArray(p.poll?.options) && p.poll.options.some((o) => o.mine)
+  ));
 
   return `
-    <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}" data-forum-post="${esc(p.id)}">
+    <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}${inTrail ? ' forum-post--trail' : ''}" data-forum-post="${esc(p.id)}">
       <header class="forum-post__head">
         ${avatar(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
@@ -889,6 +895,11 @@ export function renderPostCard(p, s) {
         </div>
         <span class="forum-post__cat">${esc(categoryLabel(p.category))}</span>
         ${p.pinned ? '<span class="forum-post__pin" title="Закреплён">📌</span>' : ''}
+        ${
+          inTrail
+            ? '<span class="forum-post__trail" title="Вы участвовали: ваш пост, реакция или голос в опросе">Ваш след</span>'
+            : ''
+        }
       </header>
 
       ${

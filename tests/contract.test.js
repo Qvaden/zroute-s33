@@ -3679,6 +3679,43 @@ console.log('\nS. Чистые функции');
     /data-forum-lead-period/.test(mountSource) && /state\.leadPeriod/.test(mountSource));
 }
 
+/* ── «Мой след»: подсветка карточек с участием ── */
+{
+  const { renderPostCard } = await import('../src/pages/forum.js');
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const seat = { me: null, openPostId: null, editingPostId: null, comments: [],
+    category: 'all', sort: 'fresh', categories: {} };
+  const member = { ...seat, me: { id: 'u1', role: 'member' } };
+
+  const base = {
+    id: 'x1', authorId: 'u2', authorNick: 'B', title: 'T', body: '<p>x</p>',
+    category: 'offtop', reactions: {}, myReaction: null, commentCount: 0, views: 0,
+    createdAt: t0,
+  };
+
+  const plain = renderPostCard({ ...base }, member);
+  check('след: без участия нет ни класса, ни бейджа',
+    !/forum-post--trail/.test(plain) && !/Ваш след/.test(plain));
+
+  const minePost = renderPostCard({ ...base, authorId: 'u1', authorNick: 'A' }, member);
+  check('след: свой пост подсвечен', /forum-post--trail/.test(minePost) && /Ваш след/.test(minePost));
+
+  const reacted = renderPostCard({ ...base, myReaction: 'like' }, member);
+  check('след: моя реакция подсвечена', /forum-post--trail/.test(reacted) && /Ваш след/.test(reacted));
+
+  const voted = renderPostCard({
+    ...base,
+    poll: {
+      id: 'pl', question: 'Q', multiple: false, total: 1, closed: false,
+      options: [{ id: 'o', text: 'X', votes: 1, mine: true }],
+    },
+  }, member);
+  check('след: голос в опросе подсвечен', /forum-post--trail/.test(voted) && /Ваш след/.test(voted));
+
+  const guestPlain = renderPostCard({ ...base, myReaction: 'like' }, seat);
+  check('след: гость не получает подсветку', !/forum-post--trail/.test(guestPlain));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
