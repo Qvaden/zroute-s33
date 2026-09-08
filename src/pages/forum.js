@@ -29,6 +29,13 @@ import { CONFIG } from '../../config.js';
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
 /**
+ * Ключ еженедельной темы в текстах сайта (вкладка «Тексты» в панели).
+ * Держится здесь одним словом — в admin/edit.js этот же ключ предлагается
+ * в форме. Расхождение между двумя списками ловит тест.
+ */
+export const FORUM_THEME_KEY = 'forum-theme';
+
+/**
  * @typedef {Object} ForumViewState
  * @property {boolean} ready        Настроен ли источник форума.
  * @property {boolean} shared       Видят ли записи другие люди.
@@ -73,6 +80,7 @@ export function renderForum(view, state = {}) {
   return `
     ${renderChronicleBand(view?.events ?? [])}
     ${renderWelcome(s)}
+    ${renderWeekTheme(view)}
     ${renderHotTopics(s)}
     ${renderLeaderboard(s)}
     ${renderRules()}
@@ -204,6 +212,37 @@ function renderWelcome(s) {
       <button type="button" class="forum-btn forum-btn--ghost" data-forum-welcome-auth>
         Войти и начать тему
       </button>
+    </section>`;
+}
+
+/**
+ * ЕЖЕНЕДЕЛЬНАЯ ТЕМА — «рубрики-римпления».
+ *
+ * Админ заводит её как обычный текст с ключом forum-theme на вкладке «Тексты»
+ * (заголовок — название рубрики, текст — как писать в неё). Форум берёт блок
+ * из общих данных сайта, поэтому тема одинакова и на форуме, и в гайде, и не
+ * требует отдельного запроса к базе. Ключа нет — баннера нет.
+ */
+function renderWeekTheme(view) {
+  const texts = Array.isArray(view?.texts) ? view.texts : [];
+  const theme = texts.find((t) => t?.key === FORUM_THEME_KEY);
+  if (!theme) return '';
+
+  const title = String(theme.title ?? '').trim() || 'Тема недели';
+  const body = String(theme.body ?? '').trim().replace(/\s+/g, ' ');
+
+  return `
+    <section class="panel forum-theme" data-forum-theme aria-label="Тема недели">
+      <header class="forum-theme__head">
+        <span class="forum-theme__mark" aria-hidden="true">🖋</span>
+        <span class="eyebrow">Тема недели — пишите в неё</span>
+      </header>
+      <h2 class="forum-theme__title">${esc(title)}</h2>
+      ${
+        body
+          ? `<p class="forum-theme__body">${esc(body.length > 240 ? `${body.slice(0, 237)}…` : body)}</p>`
+          : ''
+      }
     </section>`;
 }
 

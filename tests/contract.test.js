@@ -3716,6 +3716,39 @@ console.log('\nS. Чистые функции');
   check('след: гость не получает подсветку', !/forum-post--trail/.test(guestPlain));
 }
 
+/* ── Еженедельная тема ── */
+{
+  const { renderForum } = await import('../src/pages/forum.js');
+  const { KNOWN_TEXT_KEYS } = await import('../src/admin/edit.js');
+
+  const seat = { ready: true, posts: [], hot: [], lead: [], categories: {} };
+
+  const themed = renderForum({ events: [], texts: [
+    { key: 'forum-theme', title: 'Рубрика дипломатии', body: 'Расскажите о союзах этой недели.' },
+  ] }, seat);
+  check('тема недели: баннер рисуется', /data-forum-theme/.test(themed));
+  check('тема недели: заголовок показан', /Рубрика дипломатии/.test(themed));
+  check('тема недели: текст рубрики показан', /союзах этой недели/.test(themed));
+
+  const noTheme = renderForum({ events: [], texts: [
+    { key: 'guide-intro', title: 'Гайд', body: 'x' },
+  ] }, seat);
+  check('тема недели: без ключа баннера нет', !/data-forum-theme/.test(noTheme));
+
+  const emptyTexts = renderForum({ events: [], texts: [] }, seat);
+  check('тема недели: пустой список текстов не мешает', !/data-forum-theme/.test(emptyTexts));
+
+  const bareTheme = renderForum({ events: [], texts: [
+    { key: 'forum-theme', title: '', body: '' },
+  ] }, seat);
+  check('тема недели: пустой заголовок — заглушка', /data-forum-theme/.test(bareTheme) && /Тема недели/.test(bareTheme));
+
+  const { readFile } = await import('node:fs/promises');
+  const pagesSource = await readFile('src/pages/forum.js', 'utf8');
+  check('тема недели: ключ один на форум и панель',
+    KNOWN_TEXT_KEYS.includes('forum-theme') && /FORUM_THEME_KEY = 'forum-theme'/.test(pagesSource));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
