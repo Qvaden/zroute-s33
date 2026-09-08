@@ -342,9 +342,9 @@ async function refreshToken() {
  * что получилось.
  *
  * @param {string} path
- * @param {{method?: string, body?: any, prefer?: string, headers?: object, retry?: boolean}} [opts]
+ * @param {{method?: string, body?: any, prefer?: string, headers?: object, retry?: boolean, retryOnAbort?: boolean}} [opts]
  */
-export async function rest(path, { method = 'GET', body, prefer, headers = {}, retry = true } = {}) {
+export async function rest(path, { method = 'GET', body, prefer, headers = {}, retry = true, retryOnAbort = false } = {}) {
   requireConfig();
   const token = readSession()?.access_token;
 
@@ -362,6 +362,22 @@ export async function rest(path, { method = 'GET', body, prefer, headers = {}, r
       cache: 'no-store',
     });
   } catch (err) {
+    /*
+      УСНУВШАЯ БАЗА. Пока бесплатный проект молчит неделю, Supabase его
+      усыпляет, и ПЕРВЫЙ же запрос часто не укладывается в общий таймаут:
+      база просыпается дольше, чем живёт fetch. Из-за этого лента «не
+      грузилась с первого раза»: второй заход уже работал, а первый падал
+      с таймаутом.
+
+      Один повтор после короткой паузы переживает пробуждение. Флаг отдельный
+      (retryOnAbort) потому, что молчать вдвое дольше при настоящей пропаже
+      сети — пытка: включён он только там, где повтор реально лечит, — чтение
+      ленты, поста и комментариев.
+    */
+    if (retryOnAbort && err?.name === 'AbortError') {
+      await new Promise((r) => setTimeout(r, 750));
+      return rest(path, { method, body, prefer, headers, retry, retryOnAbort: false });
+    }
     throw new Error(
       err?.name === 'AbortError'
         ? 'База не отвечает. Проверьте интернет и попробуйте ещё раз.'

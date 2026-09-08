@@ -1,6 +1,6 @@
-﻿import { CONFIG } from '../config.js?v=24';
-import { loadAll, capabilities, db } from './data/index.js?v=24';
-import { validateDataset } from './data/contract.js?v=24';
+﻿import { CONFIG } from '../config.js?v=25';
+import { loadAll, capabilities, db } from './data/index.js?v=25';
+import { validateDataset } from './data/contract.js?v=25';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,21 +9,21 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=24';
-import { renderHome } from './pages/home.js?v=24';
-import { renderLadder } from './pages/ladder.js?v=24';
-import { renderQuarter } from './pages/quarter-final.js?v=24';
-import { renderTimeline } from './pages/timeline.js?v=24';
-import { renderGuide } from './pages/guide.js?v=24';
-import { renderBot } from './pages/bot.js?v=24';
-import { renderAlliance } from './pages/alliance.js?v=24';
-import { computeAchievements } from './logic/achievements.js?v=24';
-import { esc } from './ui/helpers.js?v=24';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=24';
+} from './logic/standings.js?v=25';
+import { renderHome } from './pages/home.js?v=25';
+import { renderLadder } from './pages/ladder.js?v=25';
+import { renderQuarter } from './pages/quarter-final.js?v=25';
+import { renderTimeline } from './pages/timeline.js?v=25';
+import { renderGuide } from './pages/guide.js?v=25';
+import { renderBot } from './pages/bot.js?v=25';
+import { renderAlliance } from './pages/alliance.js?v=25';
+import { computeAchievements } from './logic/achievements.js?v=25';
+import { esc } from './ui/helpers.js?v=25';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=25';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=24';
-import './ui/timeline-controls.js?v=24';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=24';
+import './ui/ladder-controls.js?v=25';
+import './ui/timeline-controls.js?v=25';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=25';
 
 /*
   РАЗДЕЛЫ.
@@ -320,8 +320,49 @@ function render() {
   trackPageview(path);
 }
 
+/**
+ * ПУСТОЙ НАБОР, С КОТОРЫМ САЙТ ЖИВЁТ ДО ПРИХОДА ДАННЫХ (ИЛИ ВМЕСТО НИХ).
+ *
+ * Единая форма для двух мест: пустой кадр, с которым рисуются живые вкладки
+ * до загрузки, и пустой кадр после падения загрузки. У них один и тот же
+ * набор полей — иначе «живём с пустотой» и «всё упало» разъехались бы и
+ * повели себя по-разному.
+ */
+function emptyView(loadError = '') {
+  return {
+    alliances: [], weeks: [], allWeeks: [], results: [], events: [], texts: [],
+    standings: [], quarterStandings: [],
+    quarter: { weeks: [], from: null, to: null },
+    summary: null, movers: { up: [], down: [] },
+    placeHistory: new Map(), achievements: new Map(),
+    problems: [],
+    loadError,
+  };
+}
+
 async function boot() {
-  app.innerHTML = '<div class="loading">Загружаем данные…</div>';
+  /*
+    ФОРУМ НЕ ЖДЁТ ДАННЫХ САЙТА — ОН ИХ И НЕ ИСПОЛЬЗУЕТ.
+
+    Главная вкладка — форум, а данные сайта едут из той же базы отдельным
+    запросом, который может опоздать или упасть: Supabase усыпляет проекты
+    на тарифе free, и первый заход будит базу по десять секунд и больше.
+    Раньше render() вызывался только после loadAll(), и лента форума даже
+    не начинала грузиться, пока ждали данные. Человеку это виделось как
+    «форум не грузится с первого раза».
+
+    Поэтому живые вкладки (форум и страница участника) рисуем сразу, ещё
+    пустым контуром: им от данных сайта нужна только плашка хроники в шапке,
+    и она допишется, когда данные приедут. А сами данные грузятся фоном.
+  */
+  const { id, param } = parseHash();
+  const liveFirst = id === 'forum' || (id === 'user' && param);
+
+  app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
+  if (liveFirst) {
+    view = emptyView();
+    render();
+  }
 
   try {
     const data = await loadAll();
@@ -384,15 +425,7 @@ async function boot() {
       откроется как обычно. Ронять разговор сообщества из-за недоступной
       таблицы результатов — плохая сделка.
     */
-    view = {
-      alliances: [], weeks: [], allWeeks: [], results: [], events: [], texts: [],
-      standings: [], quarterStandings: [],
-      quarter: { weeks: [], from: null, to: null },
-      summary: null, movers: { up: [], down: [] },
-      placeHistory: new Map(), achievements: new Map(),
-      problems: [],
-      loadError: String(err.message ?? err),
-    };
+    view = emptyView(String(err.message ?? err));
 
     const badge = document.getElementById('source-badge');
     if (badge) badge.textContent = 'недоступен';

@@ -295,7 +295,7 @@ export async function listPosts(opts = {}) {
     params.set('or', `(title.ilike.*${query}*,body.ilike.*${query}*)`);
   }
 
-  const rows = await rest(`/forum_post_list?${params}`);
+  const rows = await rest(`/forum_post_list?${params}`, { retryOnAbort: true });
   const hasMore = Array.isArray(rows) && rows.length > limit;
   const posts = (hasMore ? rows.slice(0, limit) : (Array.isArray(rows) ? rows : []))
     .map(postOut);
@@ -304,7 +304,9 @@ export async function listPosts(opts = {}) {
 }
 
 export async function getPost(id) {
-  const rows = await rest(`/forum_post_list?select=*&id=eq.${encodeURIComponent(id)}&limit=1`);
+  const rows = await rest(`/forum_post_list?select=*&id=eq.${encodeURIComponent(id)}&limit=1`, {
+    retryOnAbort: true,
+  });
   const row = Array.isArray(rows) ? rows[0] : null;
   return row ? postOut(row) : null;
 }
@@ -419,7 +421,8 @@ function commentOut(row) {
 
 export async function listComments(postId) {
   const rows = await rest(
-    `/forum_comment_list?select=*&post_id=eq.${encodeURIComponent(postId)}&order=created_at.asc`
+    `/forum_comment_list?select=*&post_id=eq.${encodeURIComponent(postId)}&order=created_at.asc`,
+    { retryOnAbort: true }
   );
   return (Array.isArray(rows) ? rows : []).map(commentOut);
 }
