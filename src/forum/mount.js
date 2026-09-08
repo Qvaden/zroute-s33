@@ -26,6 +26,7 @@ import { validateNick, validatePassword, validatePost, validateComment, deletion
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { esc } from '../ui/helpers.js';
+import { leaderboardOf } from './leaderboard.js';
 import { CONFIG } from '../../config.js';
 
 /** Состояние страницы. Живёт между перерисовками, сбрасывается при уходе. */
@@ -49,6 +50,9 @@ const state = {
   pending: null,
   /** «Самое обсуждаемое» — три темы для блока горячих. */
   hot: [],
+  /** Лидерборд: топ авторов по активности (неделя или всё время). */
+  lead: [],
+  leadPeriod: 'week',
 };
 
 /**
@@ -387,6 +391,23 @@ async function loadFeed({ append = false } = {}) {
         state.hot = (hot.posts ?? []).filter((p) => !p.deleted && p.commentCount > 0);
       } catch {
         state.hot = state.hot;
+      }
+
+      /*
+        Лидерборд тянем отдельной широкой выборкой: свою ленту меряем от
+        последних 300 постов, а не от тех 20, что у человека на экране.
+        Сортируем по времени — автор с кучей старых постов и парой свежих
+        заслуживает места не меньше, чем автор одной шумной темы.
+        Неудача, как и с горячими, не роняет страницу.
+      */
+      try {
+        const wide = await forum.listPosts({ sort: 'fresh', limit: 300 });
+        state.lead = {
+          week: leaderboardOf(wide.posts ?? [], { period: 'week' }),
+          all: leaderboardOf(wide.posts ?? [], { period: 'all' }),
+        };
+      } catch {
+        state.lead = state.lead;
       }
     }
   } catch (err) {
@@ -862,6 +883,14 @@ function wire() {
     if (sort && host.contains(sort)) {
       state.sort = sort.dataset.forumSort;
       await loadFeed();
+      return;
+    }
+
+    // Лидерборд: период (неделя / всё время).
+    const leadTab = t.closest('[data-forum-lead-period]');
+    if (leadTab && host.contains(leadTab)) {
+      state.leadPeriod = leadTab.dataset.forumLeadPeriod;
+      paint();
       return;
     }
 

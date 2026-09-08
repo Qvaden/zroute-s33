@@ -3608,6 +3608,77 @@ console.log('\nS. Чистые функции');
     /idx >= 8/.test(mountSourcePoll));
 }
 
+/* ── Лидерборд: агрегатор и панель ── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const { leaderboardOf } = await import('../src/forum/leaderboard.js');
+  const { renderForum } = await import('../src/pages/forum.js');
+
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const fresh = (offsetDays) => new Date(now - offsetDays * day);
+
+  const posts = [
+    { id: '1', authorId: 'u1', authorNick: 'A', deleted: false, commentCount: 2, score: 5, views: 10, createdAt: fresh(1) },
+    { id: '2', authorId: 'u1', authorNick: 'A', deleted: false, commentCount: 4, score: 2, views: 40, createdAt: fresh(12) },
+    { id: '3', authorId: 'u2', authorNick: 'B', deleted: false, commentCount: 8, score: 1, views: 80, createdAt: fresh(2) },
+    { id: '4', authorId: 'u2', authorNick: 'B', deleted: true, commentCount: 99, score: 99, views: 999, createdAt: fresh(1) },
+    { id: '5', authorId: 'u3', authorNick: 'C', deleted: false, commentCount: 1, score: 50, views: 5, createdAt: fresh(3) },
+    { id: '6', authorNick: 'Гость', deleted: false, commentCount: 1, score: 0, views: 3, createdAt: fresh(1) },
+    { id: '7', authorId: 'u4', authorNick: 'Будущее', deleted: false, commentCount: 1, score: 1, views: 1, createdAt: new Date(now + 30 * day) },
+  ];
+
+  const all = leaderboardOf(posts, { period: 'all' });
+  const week = leaderboardOf(posts, { period: 'week' });
+
+  check('лидерборд: ранги идут с 1', all[0].rank === 1 && all.at(-1).rank === all.length);
+  check('лидерборд: не больше десяти строк', all.length <= 10);
+  check('лидерборд: B выше по активности (8 ответов)',
+    all[0].nick === 'B' && all[0].activity === 9);
+  check('лидерборд: A второй (8 активность)', all[1].nick === 'A' && all[1].activity === 8);
+  check('лидерборд: равная активность — выше рейтинг', all[2].nick === 'C');
+  check('лидерборд: удалённый пост не идёт в счёт', all[0].posts === 1 && all[0].comments === 8);
+  check('лидерборд: гости считаются по нику', all.some((l) => l.nick === 'Гость'));
+  check('лидерборд: суммы ответов и рейтинга за период',
+    all[1].posts === 2 && all[1].comments === 6 && all[1].score === 7);
+  check('лидерборд: views суммируются', all[1].views === 50);
+
+  check('лидерборд (неделя): старый пост не попадает',
+    !week.some((l) => l.nick === 'A') || week.find((l) => l.nick === 'A').posts === 1);
+  check('лидерборд (неделя): будущий пост не попадает', !week.some((l) => l.nick === 'Будущее'));
+  check('лидерборд (всё время): будущий пост виден', all.some((l) => l.nick === 'Будущее'));
+  check('лидерборд: не-массив даёт пустой ряд', leaderboardOf(null).length === 0 && leaderboardOf(undefined).length === 0);
+
+  const board = {
+    week: [{ rank: 1, nick: 'B', avatar: '', posts: 1, comments: 8, views: 80, score: 1 }],
+    all: [
+      { rank: 1, nick: 'B', avatar: '', posts: 1, comments: 8, views: 80, score: 1 },
+      { rank: 2, nick: 'A', avatar: '', posts: 2, comments: 6, views: 50, score: 7 },
+    ],
+  };
+  const leadAll = renderForum({ events: [] }, { lead: board, leadPeriod: 'all' });
+  check('лидерборд: панель рисуется при непустом ряде', /data-forum-lead/.test(leadAll));
+  check('лидерборд: вкладки «Неделя» и «Всё время»', /data-forum-lead-period="week"/.test(leadAll) && /data-forum-lead-period="all"/.test(leadAll));
+  check('лидерборд: строки с ником и числом постов',
+    /forum-lead__row/.test(leadAll) && /href="#\/user\/A"/.test(leadAll) && /2 поста/.test(leadAll));
+  check('лидерборд: выбранный период помечен', /class="seg__btn is-on"[^>]*data-forum-lead-period="all"/.test(leadAll));
+
+  const leadWeekEmpty = renderForum({ events: [] }, { lead: { week: [], all: board.all }, leadPeriod: 'week' });
+  check('лидерборд: пустая неделя — приглашение написать первым',
+    /data-forum-lead/.test(leadWeekEmpty) && /станьте первым/.test(leadWeekEmpty));
+
+  const leadNone = renderForum({ events: [] }, { lead: { week: [], all: [] }, leadPeriod: 'all' });
+  check('лидерборд: пустой ряд — нет панели', !/data-forum-lead/.test(leadNone));
+
+  const mountSource = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSource = await readFile('src/pages/forum.js', 'utf8');
+  check('лидерборд: mount считает через leaderboardOf по обеим периодам',
+    /leaderboardOf\(.*period: 'week'/.test(mountSource) && /leaderboardOf\(.*period: 'all'/.test(mountSource));
+  check('лидерборд: широкая выборка для счёта', /listPosts\(\{ sort: 'fresh', limit: 300 \}\)/.test(mountSource));
+  check('лидерборд: переключение периода обрабатывается',
+    /data-forum-lead-period/.test(mountSource) && /state\.leadPeriod/.test(mountSource));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

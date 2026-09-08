@@ -65,6 +65,8 @@ export function renderForum(view, state = {}) {
     query: '',
     editingPostId: null,
     hot: [],
+    lead: [],
+    leadPeriod: 'week',
     ...state,
   };
 
@@ -72,6 +74,7 @@ export function renderForum(view, state = {}) {
     ${renderChronicleBand(view?.events ?? [])}
     ${renderWelcome(s)}
     ${renderHotTopics(s)}
+    ${renderLeaderboard(s)}
     ${renderRules()}
     ${renderAccountBar(s)}
     ${renderComposer(s)}
@@ -236,6 +239,71 @@ function renderHotTopics(s) {
           .join('')}
       </ul>
     </section>`;
+}
+
+/* ── Лидерборд ────────────────────────────────────────────────────────────── */
+
+/**
+ * «Топ игроков» — активность за неделю или всё время.
+ *
+ * Считается в leaderboard.js из широкой выборки постов: список ранжированный
+ * и готовый к показу. Здесь только верстка: ранги, ники с аватарками и три
+ * числа — посты, ответы, рейтинг.
+ */
+function renderLeaderboard(s) {
+  const all = Array.isArray(s.lead) ? s.lead : (s.lead?.all ?? []);
+  if (!Array.isArray(all) || !all.length) return '';
+
+  const rows = s.leadPeriod === 'week' ? (s.lead?.week ?? []) : all;
+
+  return `
+    <section class="panel forum-lead" data-forum-lead aria-label="Топ игроков">
+      <header class="forum-lead__head">
+        <span class="forum-lead__icon" aria-hidden="true">🏆</span>
+        <b>Топ игроков</b>
+        ${renderLeadTabs(s)}
+      </header>
+      ${rows.length ? `
+      <ol class="forum-lead__list">
+        ${rows
+          .map(
+            (l) => `<li class="forum-lead__row">
+              <span class="forum-lead__rank${l.rank <= 3 ? ' forum-lead__rank--top' : ''}">${l.rank}</span>
+              ${avatar(l.nick, l.avatar)}
+              <span class="forum-lead__who">
+                <b>${nickLink(l.nick)}</b>
+                <small>${esc(plural(l.posts, 'пост', 'поста', 'постов'))} ·
+                  ${esc(plural(l.comments, 'ответ', 'ответа', 'ответов'))}${
+                    l.views ? ` · ${esc(plural(l.views, 'просмотр', 'просмотра', 'просмотров'))}` : ''
+                  }</small>
+              </span>
+              <span class="forum-lead__score" title="Рейтинг">
+                <b class="num">${l.score > 0 ? '+' : ''}${l.score}</b>
+              </span>
+            </li>`
+          )
+          .join('')}
+      </ol>
+      ` : `
+      <p class="muted forum-lead__empty">За эту неделю ещё никто ничего не написал — станьте первым.</p>
+      `}
+    </section>`;
+}
+
+function renderLeadTabs(s) {
+  return `<div class="seg seg--lead" role="tablist">
+    ${[
+      ['week', 'Неделя'],
+      ['all', 'Всё время'],
+    ]
+      .map(
+        ([period, label]) => `<button type="button"
+            class="seg__btn${s.leadPeriod === period ? ' is-on' : ''}"
+            role="tab" aria-selected="${s.leadPeriod === period}"
+            data-forum-lead-period="${period}">${label}</button>`
+      )
+      .join('')}
+  </div>`;
 }
 
 /* ── Правила ──────────────────────────────────────────────────────────────── */
