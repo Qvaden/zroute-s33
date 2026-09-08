@@ -78,6 +78,27 @@
  */
 
 /**
+ * Уведомление участника: ответ, упоминание или согласие/несогласие.
+ *
+ * Пишет их база триггерами (см. supabase/rich-forum.sql), а не сайт —
+ * триггер срабатывает в той же транзакции, что и вставка записи: или
+ * есть и пост, и уведомление, или ни того ни другого. Адаптеры лишь
+ * читают свои строки и ставят read_at.
+ *
+ * @typedef {Object} ForumNotification
+ * @property {string}  id
+ * @property {string}  userId        Кому.
+ * @property {string|null} [actorId]    От кого; пусто, если аккаунт удалили.
+ * @property {string}  actorNick     Копией, как ник автора у поста.
+ * @property {'mention'|'reply'|'reaction'} kind
+ * @property {string}  [postId]      На какой пост ведёт уведомление.
+ * @property {string}  [commentId]   Для реакции на комментарий.
+ * @property {string}  preview       Кусок текста, чтобы читалось без перехода.
+ * @property {Date|null} readAt      null — ещё не прочитано.
+ * @property {Date}    createdAt
+ */
+
+/**
  * Жалоба на запись. Смысловые правила проверяет человек, а не код,
  * поэтому жалоба — рабочий инструмент модерации, а не украшение.
  *
@@ -141,6 +162,9 @@
  * @property {(pollId: string, optionId: string) => Promise<void>} votePoll
  * @property {(pollId: string, optionId: string) => Promise<void>} unvotePoll
  * @property {(pollId: string) => Promise<void>} closePoll
+ * @property {() => Promise<ForumNotification[]>} listNotifications  Свежие сверху, только свои.
+ * @property {(ids: string[]) => Promise<void>} markNotificationsRead
+ * @property {() => Promise<void>} markAllNotificationsRead
  */
 
 export {};

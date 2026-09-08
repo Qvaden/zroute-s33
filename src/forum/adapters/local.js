@@ -49,7 +49,17 @@ function safe(fn, fallback = null) {
  * одного прочтения навсегда запоминается в следующем пустом прочтении.
  */
 function emptyState() {
-  return { users: [], me: null, posts: [], comments: [], reactions: [], reports: [], polls: [], pollVotes: [] };
+  return {
+    users: [],
+    me: null,
+    posts: [],
+    comments: [],
+    reactions: [],
+    reports: [],
+    polls: [],
+    pollVotes: [],
+    notifications: [],
+  };
 }
 
 function read() {
@@ -325,6 +335,20 @@ export async function createPost(draft) {
     }
   }
 
+  // Уведомления: упомянутые в заголовке и тексте. Как в базе триггером
+  // forum_notify_post — себя пропускаем, остальным по одному (ник в тексте
+  // может встретиться несколько раз, а уведомление должно быть одно).
+  for (const user of mentionTargets(s, `${draft.title} ${draft.body}`, new Set([me.id]))) {
+    pushNotification(s, {
+      userId: user.id,
+      actorId: me.id,
+      actorNick: me.nick,
+      kind: 'mention',
+      postId: post.id,
+      preview: draft.title,
+    });
+  }
+
   write(s);
   return postOut(s, post);
 }
@@ -442,12 +466,43 @@ export async function addComment(postId, body) {
     body,
     createdAt: new Date().toISOString(),
     deleted: false,
-  };
+};
+
   s.comments.push(comment);
+
+  /*
+    Уведомления. То же, что триггер forum_notify_comment: автору поста —
+    ответ; упомянутым — ещё по одному. Автор поста, которого заодно
+    и упомянули, получает одно уведомление, а не два.
+  */
+  const notified = new Set([me.id]);
+  if (post.authorId && post.authorId !== me.id) {
+    pushNotification(s, {
+      userId: post.authorId,
+      actorId: me.id,
+      actorNick: me.nick,
+      kind: 'reply',
+      postId,
+      commentId: comment.id,
+      preview: body,
+    });
+    notified.add(post.authorId);
+  }
+  for (const user of mentionTargets(s, body, notified)) {
+    pushNotification(s, {
+      userId: user.id,
+      actorId: me.id,
+      actorNick: me.nick,
+      kind: 'mention',
+      postId,
+      commentId: comment.id,
+      preview: body,
+    });
+  }
+
   write(s);
   return commentOut(s, comment);
 }
-
 export async function deleteComment(id, reason) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me);
@@ -489,7 +544,78 @@ export async function setReaction(targetType, targetId, reactionId) {
   if (reactionId) {
     s.reactions.push({ targetType, targetId, userId: s.me, reactionId });
   }
+
+  /*
+    Уведомление о реакции приходит только за согласие и несогласие: смайлики
+    ставят десятками, и каждое превратило бы список в шум. То же правило,
+    что в триггере forum_notify_reaction: автору записи, себя не считаем.
+  */
+  if (reactionId === 'like' || reactionId === 'dislike') {
+    const isPost = targetType === 'post';
+    const post = isPost ? s.posts.find((p) => p.id === targetId) : null;
+    const comment = isPost ? null : s.comments.find((c) => c.id === targetId);
+    const target = post ?? comment;
+    if (target && target.authorId && target.authorId !== s.me) {
+      pushNotification(s, {
+        userId: target.authorId,
+        actorId: s.me,
+        actorNick: s.users.find((u) => u.id === s.me)?.nick || '',
+        kind: 'reaction',
+        postId: isPost ? target.id : comment?.postId ?? null,
+        commentId: isPost ? null : target.id,
+        preview: isPost ? post.title : comment.body,
+      });
+    }
+  }
+
   write(s);
+}
+
+/* ── Уведомления ──────────────────────────────────────────────────────────── */
+
+/**
+ * Ники, упомянутые в тексте. То же правило, что `forum_mentioned_nicks`
+ * в supabase/rich-forum.sql: адрес-разделитель перед «@» и ник из букв,
+ * цифр, подчёркивания и дефиса. Разбор для рассылки, поэтому строгий:
+ * показавшееся упоминание прощается, уведомление нет.
+ */
+function mentionedNicks(text) {
+  const nicks = new Set();
+  const re = /(?:^|[\s(«">])@([\p{L}\p{N}_-]{2,24})/gu;
+  for (const m of String(text ?? '').matchAll(re)) {
+    nicks.add(m[1].toLowerCase());
+  }
+  return [...nicks];
+}
+
+/**
+ * Одно уведомление. У всех правил общее: себя не уведомляем (человек знает,
+ * что написал), и на одного человека — одно уведомление за одно действие.
+ */
+function pushNotification(state, { userId, actorId, actorNick, kind, postId = null, commentId = null, preview = '' }) {
+  if (!userId) return;
+  state.notifications.push({
+    id: newId('n'),
+    userId,
+    actorId,
+    actorNick,
+    kind,
+    postId,
+    commentId,
+    preview: String(preview ?? '').slice(0, 120),
+    readAt: null,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** Упомянутые в тексте участники, которым ещё не уведомили за это действие. */
+function mentionTargets(state, text, skip = new Set()) {
+  const targets = [];
+  for (const nick of mentionedNicks(text)) {
+    const user = state.users.find((u) => u.nick.toLowerCase() === nick);
+    if (user && !skip.has(user.id)) targets.push(user);
+  }
+  return targets;
 }
 
 /* ── Жалобы и модерация ───────────────────────────────────────────────────── */
@@ -603,6 +729,9 @@ export async function adminDeleteUser(userId) {
   s.users = s.users.filter((u) => u.id !== userId);
   for (const p of s.posts) if (p.authorId === userId) p.authorId = null;
   for (const c of s.comments) if (c.authorId === userId) c.authorId = null;
+  // Уведомления этого участника уходят вместе с ним — как в базе
+  // (on delete cascade по user_id), копию ника автора оставляем.
+  s.notifications = s.notifications.filter((n) => n.userId !== userId);
   if (s.me === userId) s.me = null;
   write(s);
 }
@@ -661,5 +790,53 @@ export async function closePoll(pollId) {
   const poll = s.polls.find((pl) => pl.id === pollId);
   if (!poll) throw new Error('Опрос не найден');
   poll.closed = true;
+  write(s);
+}
+
+/* ── Уведомления ───────────────────────────────────────────────────────────── */
+
+function notificationOut(s, n) {
+  if (!n || n.userId !== s.me) return null;
+  return {
+    id: n.id,
+    userId: n.userId,
+    actorId: n.actorId || null,
+    actorNick: n.actorNick || '',
+    kind: n.kind,
+    postId: n.postId || null,
+    commentId: n.commentId || null,
+    preview: n.preview || '',
+    readAt: toDate(n.readAt),
+    createdAt: toDate(n.createdAt) ?? new Date(),
+  };
+}
+
+/** Свои уведомления, свежие сверху. В локальном режиме их создают те же
+ *  действия, что и триггеры базы в рабочем режиме (см. выше). */
+export async function listNotifications() {
+  const s = read();
+  return s.notifications
+    .filter((n) => n.userId === s.me)
+    .sort((a, b) => toDate(b.createdAt) - toDate(a.createdAt))
+    .map((n) => notificationOut(s, n));
+}
+
+/** Отметить прочитанными перечисленные. Чужие не трогаем — их и не видно. */
+export async function markNotificationsRead(ids) {
+  const s = read();
+  const want = new Set(ids);
+  const stamp = new Date().toISOString();
+  for (const n of s.notifications) {
+    if (n.userId === s.me && want.has(n.id) && !n.readAt) n.readAt = stamp;
+  }
+  write(s);
+}
+
+export async function markAllNotificationsRead() {
+  const s = read();
+  const stamp = new Date().toISOString();
+  for (const n of s.notifications) {
+    if (n.userId === s.me && !n.readAt) n.readAt = stamp;
+  }
   write(s);
 }

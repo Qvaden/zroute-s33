@@ -2329,6 +2329,7 @@ console.log('\nQ. Форум');
     'setReaction', 'report', 'listReports', 'resolveReport',
     'listUsers', 'resetPassword', 'setRestriction',
     'votePoll', 'unvotePoll', 'closePoll',
+    'listNotifications', 'markNotificationsRead', 'markAllNotificationsRead',
   ];
   const missingLocal = required.filter((m) => typeof localAdapter[m] !== 'function');
   const missingSupabase = required.filter((m) => typeof supabaseAdapter[m] !== 'function');
@@ -3606,6 +3607,89 @@ console.log('\nS. Чистые функции');
     /data-forum-poll-toggle/.test(pagesSourcePoll) && /poll_question/.test(pagesSourcePoll));
   check('предел вариантов опроса в коде',
     /idx >= 8/.test(mountSourcePoll));
+}
+
+/* ── Уведомления: правила те же, что у триггеров базы ── */
+{
+  const localNotif = await import('../src/forum/adapters/local.js');
+  const n = localNotif;
+  const nStorage = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (nStorage.has(k) ? nStorage.get(k) : null),
+    setItem: (k, v) => nStorage.set(k, String(v)),
+    removeItem: (k) => nStorage.delete(k),
+  };
+
+  // Автор темы.
+  await n.signUp('автор_темы_проверки');
+  const theme = await n.createPost({
+    title: 'Обсуждение уведомлений', body: 'открыто', category: 'offtop',
+  });
+
+  // Читатель отвечает и в том же тексте упоминает автора — у автора должно
+  // быть ОДНО уведомление, а не два (правило forum_notify_comment).
+  await n.signUp('читатель_темы_проверки');
+  await n.addComment(theme.id, 'посмотрел, @автор_темы_проверки, и одобряю');
+
+  await n.signIn('автор_темы_проверки');
+  let notif = await n.listNotifications();
+  check('ответ рождает уведомление reply',
+    notif.some((x) => x.kind === 'reply' && x.postId === theme.id && !x.readAt));
+  check('упоминание автора в ответе не даёт второго уведомления',
+    notif.filter((x) => x.kind === 'mention').length === 0);
+  check('в уведомлении лежит актор', notif.every((x) => x.actorNick === 'читатель_темы_проверки'));
+  check('в уведомлении лежит кусок текста', notif.some((x) => x.preview.includes('одобряю')));
+
+  // Согласие на пост — уведомление автору.
+  await n.signIn('читатель_темы_проверки');
+  await n.setReaction('post', theme.id, 'like');
+  await n.signIn('автор_темы_проверки');
+  notif = await n.listNotifications();
+  check('лайк рождает уведомление reaction',
+    notif.some((x) => x.kind === 'reaction' && x.postId === theme.id && !x.readAt));
+
+  // Смайлик не уведомляет — как в forum_notify_reaction (только like/dislike).
+  const beforeSmile = (await n.listNotifications()).length;
+  await n.signIn('читатель_темы_проверки');
+  await n.setReaction('post', theme.id, 'fire');
+  await n.signIn('автор_темы_проверки');
+  check('смайлик не рождает уведомления',
+    (await n.listNotifications()).length === beforeSmile);
+
+  // Отметка прочитанным: выборочно и всё разом.
+  const unread = (await n.listNotifications()).filter((x) => !x.readAt);
+  check('новые уведомления приходят непрочитанными', unread.length >= 2);
+  const one = unread[0];
+  await n.markNotificationsRead([one.id]);
+  const afterOne = await n.listNotifications();
+  check('markNotificationsRead отмечает выбранное',
+    afterOne.find((x) => x.id === one.id)?.readAt instanceof Date);
+  check('остальные остаются непрочитанными',
+    afterOne.filter((x) => x.id !== one.id && !x.readAt).length === unread.length - 1);
+
+  await n.markAllNotificationsRead();
+  check('markAllNotificationsRead отмечает всё',
+    (await n.listNotifications()).every((x) => x.readAt));
+
+  // Чужих уведомлений чужой не видит.
+  await n.signIn('читатель_темы_проверки');
+  const theirs = await n.listNotifications();
+  const who = (await n.currentUser()).id;
+  check('свои уведомления другому не видны',
+    theirs.every((x) => x.userId === who));
+
+  // Упоминание в заголовке поста — уведомление (forum_notify_post).
+  await n.signUp('третья_сторона_проверки');
+  await n.createPost({ title: 'Для @читатель_темы_проверки', body: 'вот', category: 'offtop' });
+  await n.signIn('читатель_темы_проверки');
+  check('упоминание в заголовке поста уведомляет',
+    (await n.listNotifications()).some((x) => x.kind === 'mention' && x.preview.includes('Для')));
+
+  // Сам себя не уведомляет.
+  await n.signIn('автор_темы_проверки');
+  await n.addComment(theme.id, '@автор_темы_проверки, помню себя');
+  check('себя не уведомляет',
+    (await n.listNotifications()).every((x) => x.actorNick !== 'автор_темы_проверки'));
 }
 
 /* ── Лидерборд: агрегатор и панель ── */

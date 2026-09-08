@@ -74,6 +74,10 @@ export function renderForum(view, state = {}) {
     hot: [],
     lead: [],
     leadPeriod: 'week',
+    /** Уведомления: открыта ли панель и что в ней. */
+    notifyOpen: false,
+    notifyList: [],
+    notifyUnread: 0,
     ...state,
   };
 
@@ -85,6 +89,7 @@ export function renderForum(view, state = {}) {
     ${renderLeaderboard(s)}
     ${renderRules()}
     ${renderAccountBar(s)}
+    ${renderNotifications(s)}
     ${renderComposer(s)}
     ${renderFeedControls(s)}
     ${renderFeed(s)}`;
@@ -444,6 +449,66 @@ function renderAccountBar(s) {
   return `<section class="panel forum-account">${renderWhoAmI(s)}</section>`;
 }
 
+/* ── Уведомления ──────────────────────────────────────────────────────────── */
+
+/**
+ * Короткое человеческое слово о том, что случилось. Сама запись (кто, где,
+ * какой текст) — в списке ниже; здесь только «что за событие».
+ */
+function notifyKindText(n) {
+  if (n.kind === 'reply') return 'ответил на вашу запись';
+  if (n.kind === 'mention') return 'упомянул вас';
+  // Реакция: что именно — подсказывает значок в панели.
+  return 'оценил вашу запись';
+}
+
+/**
+ * Панель уведомлений. Сворачивает и разворачивает колокольчик рядом
+ * с профилем: панель не модальное окно (его легче не заметить за экраном
+ * на телефоне), а лист под учётной строкой.
+ */
+function renderNotifications(s) {
+  if (!s.me || !s.notifyOpen) return '';
+
+  const list = s.notifyList;
+
+  if (!list.length) {
+    return `
+      <section class="panel forum-notify" data-forum-notify-panel>
+        <div class="forum-notify__head">
+          <span class="eyebrow">Уведомления</span>
+        </div>
+        <p class="muted forum-notify__empty">Пока пусто: сюда приходят ответы, упоминания и оценки ваших записей.</p>
+      </section>`;
+  }
+
+  return `
+    <section class="panel forum-notify" data-forum-notify-panel>
+      <div class="forum-notify__head">
+        <span class="eyebrow">Уведомления</span>
+        <small class="muted">${plural(list.length, 'уведомление', 'уведомления', 'уведомлений')}</small>
+      </div>
+      <ul class="forum-notify__list">
+        ${list.map((n) => {
+          const actor = n.actorNick
+            ? `@${esc(n.actorNick)}`
+            : '<em>аккаунт удалён</em>';
+          return `
+            <li class="forum-notify__item">
+              <a class="forum-notify__link" href="#/forum/${esc(n.postId || '')}">
+                <span class="forum-notify__text">
+                  <span class="forum-notify__actor">${actor}</span>
+                  <span class="forum-notify__what">${esc(notifyKindText(n))}</span>
+                </span>
+                <span class="forum-notify__preview">${esc(n.preview || '')}</span>
+                <span class="forum-notify__time">${esc(fullTime(n.createdAt))}</span>
+              </a>
+            </li>`;
+        }).join('')}
+      </ul>
+    </section>`;
+}
+
 function renderWhoAmI(s) {
   if (s.me) {
     const muted = s.me.mutedUntil && s.me.mutedUntil > new Date();
@@ -454,6 +519,16 @@ function renderWhoAmI(s) {
           <b>${nickLink(s.me.nick)}</b>
           <small>${roleBadge(s.me) || esc(roleLabel(s.me))}</small>
         </span>
+        <button type="button" class="forum-btn forum-btn--ghost forum-bell"
+                data-forum-notify-open aria-label="Уведомления"
+                ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>
+<span class="forum-bell__label">Уведомления</span>
+          ${
+            s.notifyUnread > 0
+              ? `<span class="forum-bell__badge" data-forum-notify-badge>${s.notifyUnread}</span>`
+              : ''
+          }
+        </button>
         <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
         <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
       </div>

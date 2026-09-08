@@ -634,3 +634,50 @@ export async function adminDeleteUser(userId) {
     body: { target_user: userId },
   });
 }
+
+/* ── Уведомления ───────────────────────────────────────────────────────────── */
+
+/*
+  Пишет их база триггерами (supabase/rich-forum.sql), а не сайт. Здесь только
+  чтение своих строк и пометка прочитанным. Политика доступа сама отдаёт
+  только свои уведомления (forum_notifications_read), фильтр по получателю
+  поэтому не нужен — права отвечают на «что мне можно», а не на «кто я».
+
+  Тот же вопрос, что с профилем: не полагаться на правила, что в ответе
+  только мои строки. Здесь это сделать нечем: у модерации к уведомлениям
+  доступа нет вовсе, а участник видит только свои — пересечения нет.
+*/
+function notificationOut(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    actorId: row.actor_id || null,
+    actorNick: row.actor_nick || '',
+    kind: row.kind,
+    postId: row.post_id || null,
+    commentId: row.comment_id || null,
+    preview: row.preview || '',
+    readAt: toDate(row.read_at),
+    createdAt: toDate(row.created_at) ?? new Date(),
+  };
+}
+
+export async function listNotifications() {
+  const rows = await rest('/forum_notifications?select=*&order=created_at.desc&limit=50');
+  return (Array.isArray(rows) ? rows : []).map(notificationOut);
+}
+
+export async function markNotificationsRead(ids) {
+  if (!Array.isArray(ids) || !ids.length) return;
+  await rest(`/forum_notifications?id=in.(${ids.map(encodeURIComponent).join(',')})`, {
+    method: 'PATCH',
+    body: { read_at: new Date().toISOString() },
+  });
+}
+
+export async function markAllNotificationsRead() {
+  await rest('/forum_notifications?read_at=is.null', {
+    method: 'PATCH',
+    body: { read_at: new Date().toISOString() },
+  });
+}

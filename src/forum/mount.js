@@ -53,6 +53,10 @@ const state = {
   /** Лидерборд: топ авторов по активности (неделя или всё время). */
   lead: [],
   leadPeriod: 'week',
+  /** Уведомления: открыта ли панель, список и сколько непрочитанных. */
+  notifyOpen: false,
+  notifyList: [],
+  notifyUnread: 0,
 };
 
 /**
@@ -499,6 +503,26 @@ async function refreshOne(targetType, targetId) {
   paint();
 }
 
+/**
+ * Уведомления: свежий список и счётчик непрочитанных.
+ *
+ * Неудача не роняет страницу — колокольчик остаётся с тем, что пришло
+ * в прошлый раз, а прочитанное всё равно уже отмечено в базе.
+ */
+async function loadNotifications() {
+  const token = mountToken;
+  try {
+    const list = await forum.listNotifications();
+    if (token !== mountToken) return;
+    state.notifyList = list;
+    state.notifyUnread = list.filter((n) => !n.readAt).length;
+  } catch {
+    // Молчим: уведомления — не причина для полосы ошибок на весь форум.
+    return;
+  }
+  paint();
+}
+
 /* ── Вход ─────────────────────────────────────────────────────────────────── */
 
 async function handleAuth(form, mode, submitter) {
@@ -525,6 +549,7 @@ async function handleAuth(form, mode, submitter) {
     state.me = mode === 'signup'
       ? await forum.signUp(nick.value, password.value)
       : await forum.signIn(nick.value, password.value);
+    await loadNotifications();
     await loadFeed();
   } catch (err) {
     showError('[data-forum-auth-error]', String(err?.message ?? err));
@@ -997,7 +1022,31 @@ function wire() {
     if (t.closest('[data-forum-signout]')) {
       await forum.signOut();
       state.me = null;
+      state.notifyOpen = false;
+      state.notifyList = [];
+      state.notifyUnread = 0;
       await loadFeed();
+      return;
+    }
+
+    // Уведомления: открыть или закрыть панель.
+    if (t.closest('[data-forum-notify-open]')) {
+      state.notifyOpen = !state.notifyOpen;
+      if (state.notifyOpen) {
+        await loadNotifications();
+        /*
+          Открыли — прочитали. Отметку не ждём и не перерисовываем дважды:
+          если сеть ответит быстро, повторный запрос списка пришёл бы
+          с уже прочитанными строками и стёр бы их с экрана на глазах.
+          Помечаем локально те, что были непрочитанными.
+        */
+        if (state.notifyUnread > 0) {
+          forum.markAllNotificationsRead().catch(() => {});
+          state.notifyUnread = 0;
+          state.notifyList = state.notifyList.map((n) => (n.readAt ? n : { ...n, readAt: new Date() }));
+        }
+      }
+      paint();
       return;
     }
 
@@ -1694,6 +1743,8 @@ export async function mountForum(container, view, postId = null) {
     state.me = null;
   }
 
+  if (state.me) await loadNotifications();
+
   /*
     Просмотр регистрируем при ОТКРЫТИИ темы, а не в loadThread: тот зовётся
     ещё и после правки, удаления или комментария, и каждая такая перерисовка
@@ -1771,6 +1822,10 @@ export function unmountForum() {
   state.comments = [];
   state.query = '';
   state.editingPostId = null;
+  // Уведомления сбрасываем вместе с остальным состоянием страницы.
+  state.notifyOpen = false;
+  state.notifyList = [];
+  state.notifyUnread = 0;
 
   // Не даём отложенному поиску сработать уже на новой вкладке: он чистит
   // query и лезет в базу, когда хост другой страницы.

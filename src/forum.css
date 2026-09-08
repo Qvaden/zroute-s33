@@ -532,6 +532,78 @@
 }
 
 /*
+  Колокольчик уведомлений. Счётчик — маленький кружок на кнопке, как у мессенджера:
+  число должно читаться, не отвлекая от остальной строки «профиль · выйти».
+*/
+.forum-bell { position: relative; }
+.forum-bell[aria-expanded="true"] {
+  border-color: rgba(255,255,255,.32);
+  background: rgba(255,255,255,.08);
+}
+.forum-bell__badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #ff4757;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Панель уведомлений: лист под учётной строкой, а не модальное окно. */
+.forum-notify { margin-top: 10px; }
+.forum-notify__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.forum-notify__empty { margin: 0; }
+.forum-notify__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.forum-notify__link {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  background: rgba(255,255,255,.03);
+  color: inherit;
+  line-height: 1.45;
+}
+.forum-notify__link:hover { border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.06); }
+.forum-notify__text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13.5px; }
+.forum-notify__actor { font-weight: 700; color: var(--link, #7fb2ff); }
+.forum-notify__what { color: #e8e6f0; }
+.forum-notify__preview {
+  display: block;
+  margin-top: 3px;
+  color: var(--mute, #9a97ad);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.forum-notify__time {
+  display: block;
+  margin-top: 4px;
+  color: var(--mute, #9a97ad);
+  font-size: 11px;
+}
+
+/*
   Метка участника вместо аватарки. Хранение картинок — первое, что упирается
   в деньги, поэтому буква в цветном квадрате. Цвет считается из ника
   (см. nickColor), и знакомого человека видно в ленте по цвету.
