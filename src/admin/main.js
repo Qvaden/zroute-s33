@@ -1508,6 +1508,39 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  /*
+    Отметка блогера — без окна и без подтверждения, как роль модератора:
+    действие обратимо одним нажатием той же кнопки.
+  */
+  const blogBtn = e.target.closest('[data-player-blogger]');
+  if (blogBtn) {
+    const nick = blogBtn.dataset.playerNick;
+    const isBlogger = blogBtn.dataset.playerBlog === '1';
+
+    blogBtn.disabled = true;
+    blogBtn.textContent = isBlogger ? 'Снимаем…' : 'Отмечаем…';
+
+    try {
+      await forum.setBlogger(blogBtn.dataset.playerBlogger, !isBlogger);
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        isBlogger
+          ? `<b>${esc(nick)} больше не блогер.</b> Отметка снята, его записи в «Блогах» остались на месте.`
+          : `<b>${esc(nick)} теперь блогер.</b> Его посты получат метку, а на странице появится блок блога с просмотрами.`,
+        'ok'
+      );
+    } catch (err) {
+      if (blogBtn.isConnected) {
+        blogBtn.disabled = false;
+        blogBtn.textContent = isBlogger ? 'Снять блогера' : 'Сделать блогером';
+      }
+      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
   const dismiss = e.target.closest('[data-report-dismiss]');
   if (dismiss) {
     resolveReport(dismiss.dataset.reportDismiss);

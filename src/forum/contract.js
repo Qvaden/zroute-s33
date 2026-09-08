@@ -160,6 +160,7 @@
  * @property {() => Promise<ForumUser[]>} listUsers
  * @property {(userId: string, password: string) => Promise<void>} resetPassword
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
+ * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
  * @property {(pollId: string, optionId: string) => Promise<void>} votePoll
  * @property {(pollId: string, optionId: string) => Promise<void>} unvotePoll

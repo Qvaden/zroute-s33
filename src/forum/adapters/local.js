@@ -713,6 +713,18 @@ export async function setRestriction(userId, opts) {
   write(s);
 }
 
+export async function setBlogger(userId, isBlogger) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me || (me.role !== 'admin' && me.role !== 'moderator')) {
+    throw new Error('Недостаточно прав');
+  }
+  const user = s.users.find((u) => u.id === userId);
+  if (!user) throw new Error('Игрок не найден');
+  user.isBlogger = Boolean(isBlogger);
+  write(s);
+}
+
 /**
  * УДАЛЕНИЕ АККАУНТА.
  *

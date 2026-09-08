@@ -100,8 +100,8 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь назначают модераторов, сбрасывают забытый пароль, закрывают
-          возможность писать и удаляют чужие аккаунты.
+          Здесь назначают модераторов, отмечают блогеров, сбрасывают забытый
+          пароль, закрывают возможность писать и удаляют чужие аккаунты.
         </p>
       </header>
 
@@ -120,6 +120,11 @@ export function renderPlayers(view) {
           <b>Владелец один</b>, и это правило держит база, а не договорённость.
           Передача сайта другому человеку делается запросом в базу, а не нажатием:
           такое решение не должно приниматься случайно.
+        </p>
+        <p class="muted">
+          <b>Блогер</b> — игрок, который ведёт свой блог в разделе «Блоги».
+          Отметка ставится и снимается одним нажатием, ничего не удаляет и
+          не ограничивает: это только метка у постов и блок блога на странице.
         </p>
         <p class="muted">
           Пароль показывается один раз и только вам — передайте его человеку сами.
@@ -188,6 +193,12 @@ function renderRow(user, me) {
                 <button type="button" class="adm-btn"
                         data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
                   Сбросить пароль
+                </button>
+                <button type="button" class="adm-btn"
+                        data-player-blogger="${esc(user.id)}"
+                        data-player-nick="${esc(user.nick)}"
+                        data-player-blog="${user.isBlogger ? '1' : ''}">
+                  ${user.isBlogger ? 'Снять блогера' : 'Сделать блогером'}
                 </button>
                 <button type="button" class="adm-btn"
                         data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"

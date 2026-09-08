@@ -624,6 +624,20 @@ export async function setRestriction(userId, opts) {
 }
 
 /**
+ * Отметка блогера.
+ *
+ * Не роль и не ограничение: просто галочка «человек ведёт блог», поэтому
+ * живёт тем же прямым PATCH'ем через политику forum_users_moderate
+ * (модерация правит профили). Обратимо тем же нажатием.
+ */
+export async function setBlogger(userId, isBlogger) {
+  await rest(`/forum_users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: { is_blogger: Boolean(isBlogger) },
+  });
+}
+
+/**
  * УДАЛЕНИЕ АККАУНТА.
  *
  * Так же, как сброс пароля, это живёт функцией в базе (forum_admin_delete_user):
