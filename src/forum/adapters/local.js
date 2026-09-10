@@ -1,4 +1,4 @@
-﻿/**
+/**
  * АДАПТЕР ФОРУМА: локальный, в браузере.
  *
  * РЕЖИМ РАЗРАБОТКИ, и он честно об этом говорит. Всё лежит в localStorage
@@ -17,7 +17,10 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, REACTION_IDS, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, REACTION_IDS, reactionMeta, isChatReaction } from '../rules.js';
+import {
+  CHAT_LIMITS, checkFile, nameOf, readAsDataUrl, dataUrlToBlob, audioDuration, formatBytes, formatLimit,
+} from '../media.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -62,6 +65,15 @@ function emptyState() {
     chats: [],
     chatMembers: [],
     chatMessages: [],
+    /*
+      Вложения локального режима лежат здесь же, как data-URL: хранилища,
+      куда положить файл, у одного браузера нет. Предел веса поэтому ниже
+      общего (CONFIG.forum.chat.localMaxBytes) — у localStorage это 5 МБ
+      на весь домен, и честнее отказать с объяснением, чем не сохранить молча.
+    */
+    chatAttachments: [],
+    chatReactions: [],
+    chatTyping: [],
   };
 }
 
@@ -72,8 +84,28 @@ function read() {
   return parsed && typeof parsed === 'object' ? { ...emptyState(), ...parsed } : emptyState();
 }
 
+/**
+ * Запись состояния. Возвращает признак успеха, и это важно именно для чатов:
+ * браузер отказывает в записи, когда место кончилось (вложение не влезло),
+ * а молчаливое «сохранили» показывало бы отправленное сообщение, которого
+ * после перезагрузки нет.
+ */
 function write(state) {
-  safe(() => localStorage.setItem(KEY, JSON.stringify(state)));
+  return safe(() => {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    return true;
+  }, false);
+}
+
+/** Отказ записи: чаще всего это переполненное хранилище браузера. */
+function writeOrThrow(state) {
+  if (!write(state)) {
+    throw new Error(
+      'Браузер не сохранил данные: в локальном режиме место кончилось ' +
+        `(вложения тут живут в самом браузере, до ${formatBytes(CHAT_LIMITS.localMaxBytes)}). ` +
+        'Уберите вложение или подключите базу — см. docs/FORUM.md.'
+    );
+  }
 }
 
 /** Идентификатор без внешних библиотек: времени достаточно, гонок тут нет. */
@@ -940,21 +972,104 @@ const isStaff = (u) => u && (u.role === 'admin' || u.role === 'moderator');
 const memberOf = (s, chatId, userId) => s.chatMembers.find((m) => m.chatId === chatId && m.userId === userId);
 const canManage = (s, chatId, me) => isStaff(me) || ['owner', 'admin'].includes(memberOf(s, chatId, me.id)?.role);
 
-function chatView(s, c, meId) {
+/** Вложения одного сообщения — в порядке добавления. */
+const attachmentsOf = (s, messageId) => s.chatAttachments.filter((a) => a.messageId === messageId);
+
+/**
+ * Реакции сообщения в том же виде, что отдаёт представление базы:
+ * эмодзи, сколько человек поставило, поставил ли я и кто именно.
+ */
+function reactionsOf(s, messageId, meId) {
+  const list = s.chatReactions.filter((r) => r.messageId === messageId);
+  const byEmoji = new Map();
+  for (const r of list) {
+    const item = byEmoji.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false, nicks: [] };
+    item.count += 1;
+    if (r.userId === meId) item.mine = true;
+    const u = s.users.find((x) => x.id === r.userId);
+    if (u) item.nicks.push(u.nick);
+    byEmoji.set(r.emoji, item);
+  }
+  // Порядок как в подсказке быстрых реакций, а не как придётся.
+  return [...byEmoji.values()].sort(
+    (a, b) => CHAT_REACTIONS.indexOf(a.emoji) - CHAT_REACTIONS.indexOf(b.emoji)
+  );
+}
+
+/**
+ * Сообщение в том же виде, что отдают представления базы.
+ *
+ * Живёт одной функцией на все выходы (лента, поиск, закреплённые): иначе
+ * в поиске ответ на сообщение показывался бы без цитаты, а в закреплённых
+ * пропадали бы вложения — и это были бы три разных поведения одного экрана.
+ *
+ * Экспортируется ради теста паритета (tests/contract.test.js): два адаптера
+ * обязаны отдавать ОДИН набор полей, иначе переключение источника данных
+ * однажды покажет в чате пустые вложения. Проверяется без базы именно здесь.
+ */
+export function chatMessageView(s, x, meId) {
+  const u = s.users.find((y) => y.id === x.authorId);
+  const reply = x.replyToId ? s.chatMessages.find((m) => m.id === x.replyToId) : null;
+  return {
+    id: x.id,
+    chatId: x.chatId,
+    authorId: x.authorId,
+    authorNick: x.authorNick,
+    authorAvatar: u?.avatarUrl ?? '',
+    authorAlliance: u?.allianceTag ?? '',
+    authorRole: u?.role ?? 'member',
+    authorIsLeader: Boolean(u?.isLeader),
+    body: x.body,
+    deleted: Boolean(x.deleted),
+    deletedReason: x.deletedReason ?? '',
+    createdAt: new Date(x.createdAt),
+    pinned: Boolean(x.pinned),
+    attachments: attachmentsOf(s, x.id).map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      url: a.url,
+      name: a.name,
+      mime: a.mime,
+      sizeBytes: a.sizeBytes,
+      width: a.width,
+      height: a.height,
+      durationMs: a.durationMs,
+    })),
+    reactions: reactionsOf(s, x.id, meId),
+    replyToId: reply?.id ?? null,
+    replyNick: reply?.authorNick ?? '',
+    replyBody: reply?.body ?? '',
+    replyDeleted: Boolean(reply?.deleted),
+  };
+}
+
+/**
+ * Чат в том же виде, что отдаёт представление базы (forum_chat_list).
+ *
+ * Экспортируется ради теста паритета: список чатов рисуется из этих полей,
+ * и пропажа одного из них (последнее вложение, число закреплённых) в одной
+ * из веток прошла бы незамеченной — до дня, когда источник переключат.
+ */
+export function chatView(s, c, meId) {
   const members = s.chatMembers.filter((m) => m.chatId === c.id);
   const mine = members.find((m) => m.userId === meId);
   const msgs = s.chatMessages.filter((x) => x.chatId === c.id && !x.deleted);
   const last = msgs[msgs.length - 1];
+  const lastFile = last ? attachmentsOf(s, last.id)[0] : null;
   const since = mine ? new Date(mine.lastReadAt).getTime() : 0;
   return {
     ...c,
     createdAt: new Date(c.createdAt),
+    topic: c.topic ?? '',
+    avatarUrl: c.avatarUrl ?? '',
     memberCount: members.length,
     myRole: mine?.role ?? null,
     unread: msgs.filter((x) => new Date(x.createdAt).getTime() > since && x.authorId !== meId).length,
     lastBody: last?.body ?? '',
     lastNick: last?.authorNick ?? '',
+    lastKind: lastFile?.kind ?? '',
     lastAt: last ? new Date(last.createdAt) : null,
+    pinnedCount: s.chatMessages.filter((x) => x.chatId === c.id && x.pinned && !x.deleted).length,
   };
 }
 
@@ -994,6 +1109,7 @@ export async function createChat({ title, kind = 'alliance', allianceTag = '' })
   if (clean.length < 2) throw new Error('Название чата короче двух символов');
   const c = {
     id: newId('c'), title: clean, kind, allianceTag: String(allianceTag).trim().slice(0, 12),
+    topic: '', avatarUrl: '',
     ownerId: me.id, ownerNick: me.nick, inviteCode: Math.random().toString(36).slice(2, 10),
     maxMembers: 200, closed: false, closedReason: '', createdAt: new Date().toISOString(),
   };
@@ -1062,25 +1178,48 @@ export async function listChatMessages(chatId, { limit = 60, before = null } = {
   const s = read();
   let list = s.chatMessages.filter((x) => x.chatId === chatId);
   if (before) list = list.filter((x) => new Date(x.createdAt) < new Date(before));
-  return list.slice(-limit).map((x) => {
-    const u = s.users.find((y) => y.id === x.authorId);
-    return { ...x, createdAt: new Date(x.createdAt), authorAvatar: u?.avatarUrl ?? '', authorAlliance: u?.allianceTag ?? '', authorRole: u?.role ?? 'member', authorIsLeader: Boolean(u?.isLeader) };
-  });
+  return list.slice(-limit).map((x) => chatMessageView(s, x, s.me));
 }
 
-export async function sendChatMessage(chatId, body) {
+/**
+ * Отправка сообщения: текст, ответ на другое сообщение и уже загруженные
+ * вложения. Вложения приходят готовыми (uploadChatFile) — тем же порядком,
+ * что и в базе, где файл сначала ложится в хранилище.
+ */
+export async function sendChatMessage(chatId, body, { replyToId = null, attachments = [] } = {}) {
   const s = read();
   const me = meOrThrow(s);
   if (me.banned) throw new Error('Вам запрещено писать');
   if (!memberOf(s, chatId, me.id) && !isStaff(me)) throw new Error('Вы не участник этого чата');
   const c = s.chats.find((x) => x.id === chatId);
   if (!c || c.closed) throw new Error('Чат закрыт');
-  const text = String(body).slice(0, 2000);
-  if (!text.trim()) throw new Error('Пустое сообщение');
-  const m = { id: newId('m'), chatId, authorId: me.id, authorNick: me.nick, body: text, deleted: false, deletedReason: '', createdAt: new Date().toISOString() };
+
+  const files = Array.isArray(attachments) ? attachments.filter((a) => a?.url) : [];
+  if (files.length > CHAT_LIMITS.attachmentsMax) {
+    throw new Error(`К сообщению можно приложить не больше ${CHAT_LIMITS.attachmentsMax} файлов`);
+  }
+  const text = String(body).slice(0, CHAT_LIMITS.messageMax);
+  if (!text.trim() && !files.length) throw new Error('Пустое сообщение');
+
+  const reply = replyToId ? s.chatMessages.find((x) => x.id === replyToId && x.chatId === chatId) : null;
+  const createdAt = new Date().toISOString();
+  const m = {
+    id: newId('m'), chatId, authorId: me.id, authorNick: me.nick, body: text,
+    replyToId: reply?.id ?? null, pinned: false, pinnedAt: null,
+    deleted: false, deletedReason: '', createdAt,
+  };
   s.chatMessages.push(m);
-  write(s);
-  return { ...m, createdAt: new Date(m.createdAt), authorAvatar: me.avatarUrl ?? '', authorAlliance: me.allianceTag ?? '', authorRole: me.role, authorIsLeader: Boolean(me.isLeader) };
+  for (const a of files) {
+    s.chatAttachments.push({
+      id: newId('a'), messageId: m.id, chatId, uploaderId: me.id,
+      kind: a.kind ?? 'file', url: a.url, storagePath: a.storagePath ?? '',
+      name: a.name ?? 'файл', mime: a.mime ?? '', sizeBytes: a.sizeBytes ?? 0,
+      width: a.width ?? 0, height: a.height ?? 0, durationMs: a.durationMs ?? 0,
+      createdAt,
+    });
+  }
+  writeOrThrow(s);
+  return chatMessageView(s, m, me.id);
 }
 
 export async function deleteChatMessage(id, reason = '') {
@@ -1091,7 +1230,149 @@ export async function deleteChatMessage(id, reason = '') {
   if (m.authorId !== me.id && !canManage(s, m.chatId, me)) throw new Error('Недостаточно прав');
   m.deleted = true;
   m.deletedReason = String(reason || '');
+  m.pinned = false;
+  /*
+    Файлы удалённого сообщения убираем вместе с ним: удаление здесь значит
+    «этого не было», и оставлять вложение в браузере — держать место занятым
+    ради того, чего никто не увидит.
+  */
+  s.chatAttachments = s.chatAttachments.filter((a) => a.messageId !== id);
   write(s);
+}
+
+/* ── Вложения, реакции, закрепления, «пишет…» ──────────────────────────────── */
+
+/**
+ * Загрузка файла. В локальном режиме «хранилище» — сам браузер, поэтому файл
+ * превращается в data-URL, а предел веса берётся из CHAT_LIMITS.localMaxBytes.
+ * Ограничение честное: иначе первое же видео на 20 МБ упало бы с отказом
+ * localStorage, и человек не понял бы, что произошло.
+ */
+export async function uploadChatFile(chatId, file, { onProgress = null } = {}) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!memberOf(s, chatId, me.id) && !isStaff(me)) throw new Error('Вы не участник этого чата');
+
+  /*
+    Вид и запрещённые типы проверяет общая функция — та же, что и в браузере
+    перед отправкой. Локальный режим добавляет к ней только свой потолок:
+    «хранилище» здесь — localStorage, и 25-мегабайтное видео в него не влезет.
+  */
+  const check = checkFile(file);
+  if (!check.ok) throw new Error(check.error);
+  const kind = check.kind;
+  const max = Math.min(CHAT_LIMITS.maxBytes[kind] ?? CHAT_LIMITS.maxBytes.file, CHAT_LIMITS.localMaxBytes);
+  if (file.size > max) {
+    throw new Error(
+      `${nameOf(file)} весит ${formatBytes(file.size)}. В локальном режиме предел — ${formatLimit(max)} ` +
+        '(файлы хранит сам браузер). Подключите базу — см. docs/FORUM.md.'
+    );
+  }
+
+  onProgress?.(0.1);
+  const url = await readAsDataUrl(file);
+  onProgress?.(1);
+
+  const durationMs = kind === 'audio' ? await audioDuration(file) : 0;
+  return {
+    kind, url, storagePath: '', name: nameOf(file), mime: file.type || '',
+    sizeBytes: file.size || 0, width: 0, height: 0, durationMs,
+  };
+}
+
+/** Картинка чата: в локальном режиме просто ссылка на сжатый файл. */
+export async function uploadChatAvatar(chatId, file) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!canManage(s, chatId, me)) throw new Error('Недостаточно прав');
+  const { prepareImage } = await import('../../ui/image-prep.js');
+  const blob = await prepareImage(file, 'avatar');
+  const url = await readAsDataUrl(blob);
+  const c = s.chats.find((x) => x.id === chatId);
+  if (c) { c.avatarUrl = url; write(s); }
+  return url;
+}
+
+export async function toggleChatReaction(messageId, emoji) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!isChatReaction(emoji)) throw new Error('Такой реакции нет');
+  const m = s.chatMessages.find((x) => x.id === messageId);
+  if (!m) throw new Error('Сообщение не найдено');
+  if (!memberOf(s, m.chatId, me.id) && !isStaff(me)) throw new Error('Вы не участник этого чата');
+
+  const at = s.chatReactions.findIndex(
+    (r) => r.messageId === messageId && r.userId === me.id && r.emoji === emoji
+  );
+  if (at >= 0) s.chatReactions.splice(at, 1);
+  else s.chatReactions.push({ messageId, userId: me.id, emoji, createdAt: new Date().toISOString() });
+  write(s);
+}
+
+export async function pinChatMessage(messageId, pinned) {
+  const s = read();
+  const me = meOrThrow(s);
+  const m = s.chatMessages.find((x) => x.id === messageId);
+  if (!m) throw new Error('Сообщение не найдено');
+  if (!canManage(s, m.chatId, me)) throw new Error('Закреплять сообщения может владелец чата или его помощник');
+  if (pinned && s.chatMessages.filter((x) => x.chatId === m.chatId && x.pinned && !x.deleted).length >= CHAT_LIMITS.pinsMax) {
+    throw new Error(`В чате уже ${CHAT_LIMITS.pinsMax} закреплённых — открепите что-нибудь`);
+  }
+  m.pinned = Boolean(pinned);
+  m.pinnedAt = pinned ? new Date().toISOString() : null;
+  write(s);
+}
+
+export async function listChatPinned(chatId) {
+  const s = read();
+  return s.chatMessages
+    .filter((x) => x.chatId === chatId && x.pinned && !x.deleted)
+    .slice(-CHAT_LIMITS.pinsMax)
+    .reverse()
+    .map((x) => chatMessageView(s, x, s.me));
+}
+
+/** Поиск по переписке: по тексту и по имени файла. */
+export async function searchChatMessages(chatId, query, { limit = CHAT_LIMITS.searchLimit } = {}) {
+  const s = read();
+  const q = String(query ?? '').trim().toLowerCase();
+  if (q.length < 2) return [];
+  return s.chatMessages
+    .filter((x) => x.chatId === chatId && !x.deleted)
+    .filter((x) => {
+      if (String(x.body).toLowerCase().includes(q)) return true;
+      return attachmentsOf(s, x.id).some((a) => String(a.name).toLowerCase().includes(q));
+    })
+    .slice(-limit)
+    .reverse()
+    .map((x) => chatMessageView(s, x, s.me));
+}
+
+/**
+ * Отметка «пишу». Хранится вместе с остальным состоянием, но живёт секунды:
+ * список для показа отсекается по времени здесь же, как это делает
+ * представление базы. Так «пишет…» не остаётся навсегда, если человек
+ * закрыл вкладку.
+ */
+export async function touchChatTyping(chatId) {
+  const s = read();
+  if (!s.me) return;
+  const at = new Date();
+  const row = s.chatTyping.find((x) => x.chatId === chatId && x.userId === s.me);
+  if (row) row.at = at.toISOString();
+  else s.chatTyping.push({ chatId, userId: s.me, at: at.toISOString() });
+  const fresh = new Date(at.getTime() - 60000).toISOString();
+  s.chatTyping = s.chatTyping.filter((x) => x.at >= fresh);
+  write(s);
+}
+
+export async function listChatTyping(chatId) {
+  const s = read();
+  const since = new Date(Date.now() - CHAT_LIMITS.typingMs).getTime();
+  return s.chatTyping
+    .filter((x) => x.chatId === chatId && new Date(x.at).getTime() >= since && x.userId !== s.me)
+    .map((x) => ({ userId: x.userId, nick: s.users.find((u) => u.id === x.userId)?.nick ?? '' }))
+    .filter((x) => x.nick);
 }
 
 export async function markChatRead(chatId) {
@@ -1108,6 +1389,8 @@ export async function updateChat(chatId, patch) {
   if (!c) throw new Error('Чат не найден');
   if (patch.title != null) c.title = String(patch.title).trim().slice(0, 60);
   if (patch.allianceTag != null) c.allianceTag = String(patch.allianceTag).trim().slice(0, 12);
+  if (patch.topic != null) c.topic = String(patch.topic).trim().slice(0, CHAT_LIMITS.topicMax);
+  if (patch.avatarUrl != null) c.avatarUrl = String(patch.avatarUrl);
   if (patch.closed != null) c.closed = Boolean(patch.closed);
   if (patch.closedReason != null) c.closedReason = String(patch.closedReason);
   write(s);
@@ -1127,8 +1410,15 @@ export async function rotateChatCode(chatId) {
 export async function adminDeleteChat(chatId) {
   const s = read();
   if (!isStaff(meOrThrow(s))) throw new Error('Недостаточно прав');
+  const gone = new Set(s.chatMessages.filter((m) => m.chatId === chatId).map((m) => m.id));
   s.chats = s.chats.filter((c) => c.id !== chatId);
   s.chatMembers = s.chatMembers.filter((m) => m.chatId !== chatId);
   s.chatMessages = s.chatMessages.filter((m) => m.chatId !== chatId);
+  // Вложения, реакции и отметки «пишу» уходят вместе с чатом: в базе это
+  // делает каскад, здесь — эти четыре строки. Оставленные, они копились бы
+  // в localStorage навсегда и однажды упёрлись бы в его предел.
+  s.chatAttachments = s.chatAttachments.filter((a) => a.chatId !== chatId && !gone.has(a.messageId));
+  s.chatReactions = s.chatReactions.filter((r) => !gone.has(r.messageId));
+  s.chatTyping = s.chatTyping.filter((x) => x.chatId !== chatId);
   write(s);
 }

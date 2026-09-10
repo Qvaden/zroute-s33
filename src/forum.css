@@ -1070,6 +1070,18 @@
 }
 .forum-act:hover { border-color: var(--line); color: var(--text); }
 
+/*
+  Мелкое действие, которое лучше не нажимать случайно: выгнать участника,
+  убрать картинку чата, удалить чат. Форма та же, что у прочих «действий»
+  рядом, а цвет предупреждает до нажатия, а не после.
+*/
+.forum-act--danger { color: #ff8f9c; }
+.forum-act--danger:hover {
+  border-color: rgba(255, 71, 87, .4);
+  background: rgba(255, 71, 87, .08);
+  color: #ffb3bc;
+}
+
 /* Удалённая запись остаётся на месте: см. рассуждение в forum/contract.js. */
 .forum-post--deleted { border-style: dashed; opacity: .78; }
 .forum-post__gone { display: flex; align-items: flex-start; gap: 11px; }

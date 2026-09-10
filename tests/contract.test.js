@@ -2330,11 +2330,75 @@ console.log('\nQ. Форум');
     'listUsers', 'resetPassword', 'setRestriction',
     'votePoll', 'unvotePoll', 'closePoll',
     'listNotifications', 'markNotificationsRead', 'markAllNotificationsRead',
+    /*
+      ЧАТЫ. Список вырос вместе с механиками: файлы, реакции, закреплённое,
+      поиск и «пишет…» появились в обоих адаптерах одним заходом. Проверка
+      именно списком, а не «есть хоть что-то про чат»: забытый метод виден
+      только в тот момент, когда человек нажимает кнопку.
+    */
+    'listChats', 'getChat', 'createChat', 'updateChat', 'joinChat', 'leaveChat',
+    'listChatMembers', 'setChatMemberRole', 'kickChatMember', 'rotateChatCode',
+    'adminDeleteChat', 'listChatMessages', 'sendChatMessage', 'deleteChatMessage',
+    'markChatRead', 'uploadChatFile', 'uploadChatAvatar', 'toggleChatReaction',
+    'pinChatMessage', 'listChatPinned', 'searchChatMessages',
+    'touchChatTyping', 'listChatTyping',
   ];
   const missingLocal = required.filter((m) => typeof localAdapter[m] !== 'function');
   const missingSupabase = required.filter((m) => typeof supabaseAdapter[m] !== 'function');
   equal('локальный адаптер реализует контракт целиком', missingLocal.join(', '), '');
   equal('адаптер базы реализует контракт целиком', missingSupabase.join(', '), '');
+
+  /*
+    ВЫЗОВЫ СО СТРАНИЦ ПРОТИВ СПИСКА МЕТОДОВ.
+
+    Список выше — обещание; здесь проверка, что обещанием пользуются. Опечатка
+    в имени (forum.listPinned вместо listChatPinned) не роняет сайт при загрузке:
+    она ждёт нажатия кнопки, и в момент нажатия всё уже выложено.
+
+    Два правила, а не одно. Первое: метод, которого нет НИ В ОДНОЙ ветке, —
+    ошибка в коде страницы. Второе: метод, который есть только в одной ветке,
+    обязан вызываться под проверкой — так устроены профили: локальный адаптер
+    умеет их сам, а с базой страница профиля ходит в неё напрямую (см. проверку
+    выше). Без второй половины правила падение случается ровно в тот день,
+    когда источник данных переключат.
+  */
+  const callerFiles = ['src/forum/chats.js', 'src/forum/mount.js', 'src/forum/profile.js'];
+  const callerSources = await Promise.all(callerFiles.map((f) => readFile(f, 'utf8')));
+
+  const everywhere = new Set();
+  const problems = [];
+  callerFiles.forEach((file, i) => {
+    const src = callerSources[i];
+    for (const m of src.matchAll(/\bforum\.([A-Za-z_]\w*)\s*\(/g)) {
+      const name = m[1];
+      everywhere.add(name);
+      const inLocal = typeof localAdapter[name] === 'function';
+      const inRemote = typeof supabaseAdapter[name] === 'function';
+      if (!inLocal && !inRemote) {
+        problems.push(`${file}: ${name} — такого метода нет нигде`);
+      } else if (!inLocal || !inRemote) {
+        /*
+          Проверка перед вызовом бывает и общей: profile.js спрашивает один раз
+          «умеет ли адаптер профили» и держит ответ в константе ownProfiles.
+          Поэтому принимаем два вида: прямой typeof у самого вызова или
+          `if (<константа>)` с таким же typeof рядом, в одной строке-проверке.
+        */
+        const direct = new RegExp(`typeof forum\\.${name}\\s*===\\s*'function'`).test(src);
+        const guards = [...src.matchAll(/const (\w+) = typeof forum\.(\w+)\s*===\s*'function'/g)]
+          .map((g) => g[1]);
+        const flat = src.replace(/\s+/g, ' ');
+        const viaConstant = guards.some((g) => new RegExp(
+          `if \\(${g}\\)[^;]{0,90}forum\\.${name}\\s*\\(`
+        ).test(flat));
+        if (!direct && !viaConstant) {
+          problems.push(`${file}: ${name} — есть только в одной ветке и вызван без проверки`);
+        }
+      }
+    }
+  });
+  equal('каждый вызов со страниц ведёт к существующему методу', problems.join('; '), '');
+  check('вызовов со страниц достаточно много, чтобы проверка что-то значила',
+    everywhere.size >= 10, `найдено вызовов: ${everywhere.size}`);
 
   check('оба адаптера честно объявляют, видят ли записи другие люди',
     localAdapter.capabilities.isShared === false && supabaseAdapter.capabilities.isShared === true);
@@ -3864,5 +3928,375 @@ console.log('\nS. Чистые функции');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+
+/* ── T. Чат: вложения, ответы, реакции, закреплённое, «пишет…» ─────────────── */
+/*
+  ЧАТ ОБЕЩАЛ МЕНЬШЕ, ЧЕМ НУЖНО.
+
+  Подсказка у входа звала в «закрытый чат альянса», а внутрь можно было
+  принести только текст: скриншот разведки, запись замеса и файл со списком
+  состава уезжали в чужие мессенджеры — то есть ровно туда, откуда этот чат
+  должен был забрать разговор. Это и чинилось: вложения, ответы цитатой,
+  реакции, закреплённое, поиск, «пишет…», настройки чата.
+
+  ПОЧЕМУ ПРОВЕРКИ ТЕКСТОВЫЕ, А НЕ «ЗАПУСТИМ И ПОСМОТРИМ». База в тестах не
+  поднимается: в проекте нет ни сборки, ни зависимостей, а SQL живёт в файле,
+  который человек запускает руками. Поэтому то, что обязано совпадать —
+  числа пределов, список реакций, названия полей, набор методов обоих
+  адаптеров, — сравнивается как данные. Запуск же в браузере проверяется
+  отдельно: то, что можно проверить без него, здесь, остальное — руками.
+*/
+{
+  const { readFile } = await import('node:fs/promises');
+  const media = await import('../src/forum/media.js');
+  const { CHAT_REACTIONS } = await import('../src/forum/rules.js');
+  const { CONFIG } = await import('../config.js');
+  const chatCfg = CONFIG.forum.chat;
+
+  const chatsPage = await readFile('src/pages/chats.js', 'utf8');
+  const chatBehavior = await readFile('src/forum/chats.js', 'utf8');
+  const selectJs = await readFile('src/ui/select.js', 'utf8');
+  const controlsCss = await readFile('src/controls.css', 'utf8');
+  const chatCss = await readFile('src/chat.css', 'utf8');
+  const indexHtml = await readFile('index.html', 'utf8');
+  const localSource = await readFile('src/forum/adapters/local.js', 'utf8');
+  const remoteSource = await readFile('src/forum/adapters/supabase.js', 'utf8');
+
+  /* ── Вид чата: свой список вместо системного ── */
+
+  /*
+    Комментарии из проверки выкинуты: в шапке страницы сказано, ПОЧЕМУ тут
+    не <select>, и эта фраза — не тег. Ищем именно разметку.
+  */
+  const withoutComments = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+  check('в форме создания чата нет системного списка', !/<select/i.test(withoutComments(chatsPage)));
+  check('вид чата выбирается своим списком', /renderSelect\(/.test(chatsPage));
+  check('свой список рисует отдельный файл', /export function renderSelect/.test(selectJs));
+  check('обработчики списка ставятся со страницы, а не из index.html',
+    /initSelects/.test(chatBehavior) && /export function initSelects/.test(selectJs));
+  check('своё поле выбора одето в стили сайта',
+    /\.sel__btn\b/.test(controlsCss) && /\.sel__pop\b/.test(controlsCss) && /\.sel__opt\b/.test(controlsCss));
+
+  /*
+    Колонка чата обрезает содержимое (overflow: hidden у панелей). Список,
+    нарисованный внутри поля, терял бы нижние пункты на коротком окне —
+    поэтому поведение переносит его в координаты окна, а стили это знают.
+  */
+  check('список не обрезается границей колонки',
+    /sel--fixed/.test(selectJs) && /\.sel--fixed \.sel__pop/.test(controlsCss));
+  check('когда снизу места нет, список раскрывается вверх',
+    /sel--up/.test(selectJs) && /\.sel--up \.sel__pop/.test(controlsCss));
+  check('на телефоне список становится шторкой снизу, как системный',
+    /@media \(max-width: 759px\)[\s\S]{0,1200}\.sel__pop/.test(controlsCss)
+      && /\.sel__veil \{/.test(controlsCss));
+  check('список закрывается по Escape и по клику мимо',
+    /case 'Escape'|'Escape'/.test(selectJs) && /closeAll\(\)/.test(selectJs));
+  check('выбор сообщается странице отдельным событием',
+    /sel:change/.test(selectJs));
+
+  /* ── Вложения: что можно и что нельзя ── */
+
+  equal('видов вложений ровно четыре', media.KINDS.join(','), 'image,video,audio,file');
+  check('картинка узнаётся по типу файла',
+    media.checkFile({ name: 'shot.png', type: 'image/png', size: 1000 }).ok === true);
+  check('видео узнаётся и по расширению, когда браузер молчит о типе',
+    media.checkFile({ name: 'clip.MP4', type: '', size: 1000 }).kind === 'video');
+  check('пустой файл не отправляется',
+    media.checkFile({ name: 'a.png', type: 'image/png', size: 0 }).ok === false);
+  check('тяжёлый файл отклоняется с понятным пределом',
+    /предел — 10 МБ/.test(media.checkFile({
+      name: 'shot.png', type: 'image/png', size: media.maxBytesFor('image') + 1,
+    }).error ?? ''));
+  check('страница, скрипт и программа в чат не отправляются',
+    ['index.html', 'setup.exe', 'bad.js', 'logo.svg', 'patch.apk']
+      .every((n) => media.checkFile({ name: n, type: '', size: 1000 }).ok === false));
+  check('документ и архив проходят',
+    ['состав.pdf', 'список.zip'].every((n) => media.checkFile({ name: n, type: '', size: 1000 }).ok === true));
+
+  const blocked = media.BLOCKED_EXT;
+  check('запрет описан списком, а не россыпью условий',
+    Array.isArray(blocked) && blocked.includes('html') && blocked.includes('exe'));
+  check('пределы берутся из настроек, а не из головы',
+    media.maxBytesFor('video') === chatCfg.maxBytes.video
+      && media.maxBytesFor('file') === chatCfg.maxBytes.file
+      && media.maxBytesFor('image') === chatCfg.maxBytes.image);
+  check('имя в хранилище безопасно',
+    /^[a-z0-9-]+\.pdf$/.test(media.storageName({ name: 'Отчёт за неделю (финал).pdf' }, 'pdf')));
+  check('два файла с одним именем не затирают друг друга',
+    media.storageName({ name: 'a.png' }, 'png') !== media.storageName({ name: 'a.png' }, 'png'));
+  equal('вес по-человечески', media.formatBytes(1536), '2 КБ');
+  equal('предел в отказе — без десятых', media.formatLimit(25000000), '25 МБ');
+  equal('длительность голосового', media.formatDuration(62000), '1:02');
+
+  /* ── База: те же числа, тот же список реакций ── */
+
+  const chatSql = await readFile('supabase/chats.sql', 'utf8');
+  check('в базе есть вложения, реакции и отметки набора',
+    /create table if not exists public\.forum_chat_attachments/.test(chatSql)
+      && /create table if not exists public\.forum_chat_reactions/.test(chatSql)
+      && /create table if not exists public\.forum_chat_typing/.test(chatSql));
+  check('файлы чатов лежат в отдельном хранилище',
+    /'chat-uploads'/.test(chatSql) && /bucket_id = 'chat-uploads'/.test(chatSql));
+  check('файл чата виден только участникам чата',
+    /create policy chat_uploads_read/.test(chatSql) && /forum_chat_path_chat/.test(chatSql));
+  check('в чужую папку файл не положить',
+    /split_part\(name, '\/', 3\) = auth\.uid\(\)::text/.test(chatSql));
+  check('предел вложений на сообщение — из настроек',
+    chatSql.includes(`>= ${chatCfg.attachmentsMax} then`));
+  check('закреплённых в чате не больше, чем в настройках',
+    chatSql.includes(`>= ${chatCfg.pinsMax} then`));
+  check('длина сообщения отрезается по общему пределу',
+    chatSql.includes(`left(coalesce(new.body, ''), ${chatCfg.messageMax})`));
+  check('длина темы отрезается по общему пределу',
+    chatSql.includes(`left(btrim(coalesce(new.topic, '')), ${chatCfg.topicMax})`));
+  check('потолок веса в базе — самый большой предел из настроек',
+    chatSql.includes(`> ${chatCfg.maxBytes.video}`));
+  equal('список реакций один на браузер и базу',
+    CHAT_REACTIONS.filter((e) => !chatSql.includes(`'${e}'`)).join(' '), '');
+  equal('запрет страниц и программ один на браузер и базу',
+    blocked.filter((e) => !chatSql.includes(e)).join(' '), '');
+  check('сообщение и его вложения появляются одной вставкой',
+    /draft_attachments/.test(chatSql) && /jsonb_to_recordset\(new\.draft_attachments\)/.test(chatSql));
+  check('правка сообщения не переписывает сказанное',
+    chatSql.includes('new.body := old.body'));
+  check('переписку нельзя перепривязать к другому чату или человеку',
+    chatSql.includes('new.chat_id := old.chat_id') && chatSql.includes('new.author_id := old.author_id'));
+  check('вложение обязано лежать в папке своего чата',
+    chatSql.includes("'chat/' || new.chat_id::text || '/' || coalesce(auth.uid()::text, '') || '/%'"));
+  check('вложения и реакции едут вместе с сообщением, а не запросом на каждое',
+    /as attachments,/.test(chatSql) && /as reactions,/.test(chatSql) && /jsonb_agg/.test(chatSql));
+  check('закрепление — отдельное право, а не флаг автора',
+    /public\.forum_chat_manager\(old\.chat_id\)/.test(chatSql));
+  check('в списке чатов видно последнее вложение и число закреплённых',
+    /last_kind/.test(chatSql) && /pinned_count/.test(chatSql) && /unread_count/.test(chatSql));
+  check('«пишет…» пишется только участником и гаснет само',
+    /forum_chat_typing_touch/.test(chatSql) && /interval '1 minute'/.test(chatSql));
+  check('отметки набора недоступны в обход функции',
+    /revoke all on function public\.forum_chat_typing_touch/.test(chatSql));
+
+  /*
+    ФАЙЛ ДОЛЖЕН ЗАПУСКАТЬСЯ ПОВТОРНО. Его правят руками в панели Supabase,
+    и одна ошибка «уже существует» означает, что человек бросит настройку
+    на середине — то есть останется без вложений и решит, что так и надо.
+  */
+  check('SQL можно запускать повторно',
+    /if not exists/.test(chatSql) && /drop policy if exists/.test(chatSql)
+      && /create or replace function/.test(chatSql));
+
+  /* ── Адаптеры: одна модель сообщения на две ветки ── */
+
+  check('файл уходит в хранилище с показом хода загрузки',
+    /uploadFileWithProgress/.test(remoteSource) && /onProgress/.test(remoteSource));
+  check('оба адаптера принимают файл одной проверкой',
+    /checkFile\(/.test(remoteSource) && /checkFile\(/.test(localSource));
+  check('локальный режим честно говорит свой предел',
+    /localMaxBytes/.test(localSource));
+  check('вложения удаляются вместе с сообщением',
+    /deleteFile\('chat-uploads'/.test(remoteSource));
+
+  const { chatMessageOut } = await import('../src/forum/adapters/supabase.js');
+  const { chatMessageView } = await import('../src/forum/adapters/local.js');
+
+  const state = {
+    me: 'u1',
+    users: [
+      { id: 'u1', nick: 'Иванов', avatarUrl: '', allianceTag: 'TAG', role: 'member', isLeader: false },
+      { id: 'u2', nick: 'Петров', avatarUrl: '', allianceTag: 'TAG', role: 'member', isLeader: false },
+    ],
+    chatMessages: [
+      { id: 'm0', chatId: 'c1', authorId: 'u2', authorNick: 'Петров', body: 'раньше', createdAt: '2026-09-01T09:00:00.000Z' },
+      { id: 'm1', chatId: 'c1', authorId: 'u1', authorNick: 'Иванов', body: 'привет', createdAt: '2026-09-01T10:00:00.000Z', pinned: true, replyToId: 'm0' },
+    ],
+    chatAttachments: [
+      { id: 'a1', messageId: 'm1', kind: 'image', url: 'https://example.com/x.jpg', name: 'x.png', mime: 'image/jpeg', sizeBytes: 3, width: 0, height: 0, durationMs: 0 },
+    ],
+    chatReactions: [{ messageId: 'm1', userId: 'u1', emoji: '🔥', createdAt: '2026-09-01T10:01:00.000Z' }],
+  };
+  const row = {
+    id: 'm1',
+    chat_id: 'c1',
+    author_id: 'u1',
+    author_nick: 'Иванов',
+    body: 'привет',
+    created_at: '2026-09-01T10:00:00.000Z',
+    pinned: true,
+    reply_id: 'm0',
+    reply_nick: 'Петров',
+    reply_body: 'раньше',
+    reply_deleted: false,
+    attachments: [
+      { id: 'a1', kind: 'image', url: 'https://example.com/x.jpg', name: 'x.png', mime: 'image/jpeg', size_bytes: 3, width: 0, height: 0, duration_ms: 0 },
+    ],
+    reactions: [{ emoji: '🔥', count: 1, mine: true, nicks: ['Иванов'] }],
+  };
+
+  const localMessage = chatMessageView(state, state.chatMessages[1], 'u1');
+  const remoteMessage = chatMessageOut(row);
+  const drift = [
+    ...Object.keys(localMessage).filter((k) => !(k in remoteMessage)),
+    ...Object.keys(remoteMessage).filter((k) => !(k in localMessage)),
+  ];
+  equal('обе ветки отдают одно и то же сообщение', drift.join(', '), '');
+  equal('одно и то же вложение',
+    JSON.stringify(localMessage.attachments), JSON.stringify(remoteMessage.attachments));
+  equal('одну и ту же реакцию',
+    JSON.stringify(localMessage.reactions), JSON.stringify(remoteMessage.reactions));
+  check('цитата ответа едет вместе с сообщением',
+    localMessage.replyNick === 'Петров' && remoteMessage.replyBody === 'раньше');
+  check('закрепление видно в модели',
+    localMessage.pinned === true && remoteMessage.pinned === true);
+  check('у сообщения из одних картинок пустое тело — это не ошибка',
+    chatMessageOut({ ...row, body: '' }).body === '');
+
+  /* ── Поведение страницы ── */
+
+  check('в поле выбора открыты картинки, видео и любые файлы',
+    /data-chat-pick="media"/.test(chatsPage) && /accept="image\/\*,video\/\*"/.test(chatsPage)
+      && /data-chat-pick="file"/.test(chatsPage));
+  check('файл грузится сразу, а не в момент отправки',
+    /uploadChatFile\(/.test(chatBehavior));
+  check('ход загрузки обновляет карточку, а не всю страницу',
+    /function paintQueueItem/.test(chatBehavior) && /paintQueueItem\(item\)/.test(chatBehavior));
+  check('перетаскивание файлов в окно чата работает',
+    /dragover|drop/.test(chatBehavior) && /is-dropping/.test(chatBehavior + chatCss));
+  check('ответ ставится цитатой',
+    /replyToId/.test(chatBehavior) && /data-chat-reply/.test(chatsPage));
+  check('реакция ставится одним нажатием',
+    /toggleChatReaction/.test(chatBehavior) && /data-chat-msg-react/.test(chatsPage));
+  check('важное закрепляется, и список закреплённого берётся из адаптера',
+    /pinChatMessage/.test(chatBehavior) && /listChatPinned/.test(chatBehavior));
+  check('поиск идёт по переписке',
+    /searchChatMessages/.test(chatBehavior) && /data-chat-search-input/.test(chatsPage));
+  check('«пишет…» сообщается не чаще, чем разрешено настройками',
+    /CHAT_LIMITS\.typingEveryMs/.test(chatBehavior) && /touchChatTyping/.test(chatBehavior));
+  check('опрос останавливается в скрытой вкладке',
+    /document\.hidden/.test(chatBehavior));
+  check('голосовое записывается и отправляется одним движением',
+    /MediaRecorder/.test(chatBehavior) && /data-chat-rec-send/.test(chatsPage));
+  check('лента не сбивает прокрутку, когда человек читает выше',
+    /stick/.test(chatBehavior));
+
+  /*
+    СВОИ ОКНА ВМЕСТО СИСТЕМНЫХ.
+
+    Браузерные confirm и prompt рисует операционная система: на телефоне это
+    серый ящик с чужими кнопками, на компьютере — окно из другого приложения.
+    Для чата, который переделывался именно из-за «выглядит не по-своему»,
+    это та же беда, что системный список выбора. Вопросы задаются окном сайта
+    (.forum-modal) — тем же, что у форума.
+  */
+  const systemWindows = /\b(prompt|confirm|alert)\s*\(/;
+  check('чат не зовёт системные окна',
+    !systemWindows.test(withoutComments(chatBehavior + chatsPage)),
+    'нашлось: ' + (withoutComments(chatBehavior + chatsPage).match(systemWindows)?.[0] ?? ''));
+  check('вопрос задаётся окном сайта',
+    /forum-modal/.test(chatsPage) && /data-chat-dialog-form/.test(chatsPage));
+  check('ответ на вопрос обрабатывается',
+    /data-chat-dialog-form/.test(chatBehavior) && /runDialog/.test(chatBehavior));
+  check('окно чата одето теми же стилями, что окно форума',
+    /\.forum-modal__box/.test(await readFile('src/forum.css', 'utf8')));
+  check('в вопросе может быть поле причины',
+    /name="reason"/.test(chatsPage) && /field:\s*true/.test(chatBehavior));
+
+  /*
+    ПОРЯДОК В SQL — НЕ ПРИДИРКА.
+
+    Представление, читающее таблицу, Postgres разбирает при создании: если
+    таблицы вложений ещё нет, «create view» падает, и человек, запускающий
+    файл в панели Supabase, получает ошибку на середине. А если определение
+    представления по ошибке осталось в двух местах, побеждает нижнее — и
+    правка в верхнем молча не работает. Обе беды здесь и проверяются.
+  */
+  const sqlAt = (needle) => chatSql.indexOf(needle);
+  check('таблицы вложений объявлены раньше представления, которое их читает',
+    sqlAt('create table if not exists public.forum_chat_attachments')
+      < sqlAt('create view public.forum_chat_message_list'));
+  check('таблица реакций объявлена раньше представления',
+    sqlAt('create table if not exists public.forum_chat_reactions')
+      < sqlAt('create view public.forum_chat_message_list'));
+  check('права на представление выданы после его создания',
+    sqlAt('create view public.forum_chat_list') < sqlAt('grant select on public.forum_chat_list'));
+
+  const definitions = {};
+  for (const m of chatSql.matchAll(/create (?:or replace )?(view|table|trigger|policy|function|index)\s+(?:if not exists\s+)?([\w.]+)/g)) {
+    const key = `${m[1]} ${m[2]}`;
+    definitions[key] = (definitions[key] ?? 0) + 1;
+  }
+  /*
+    Повторы допустимы ровно у трёх функций: их первая версия объявлена в начале
+    файла, вторая — в конце, с новыми правилами. Postgres оставляет последнюю,
+    поэтому каждая помечена в файле словами «ЗАМЕНЕНА В КОНЦЕ ФАЙЛА». Всё
+    остальное продублировано быть не должно: вторая копия представления или
+    правила — это правка, которая не сработает.
+  */
+  const replacedOnPurpose = new Set([
+    'function public.forum_chat_guard',
+    'function public.forum_chat_message_guard',
+    'function public.forum_chat_message_set_author',
+  ]);
+  const unexpected = Object.entries(definitions)
+    .filter(([key, n]) => n > 1 && !replacedOnPurpose.has(key) && !key.startsWith('index '))
+    .map(([key, n]) => `${key} × ${n}`);
+  equal('ничего, кроме трёх задуманных замен, в файле не продублировано', unexpected.join('; '), '');
+  /* Каждая заменяемая функция обязана быть помечена в ОБЕИХ копиях: у старой —
+     «заменена в конце файла», у новой — «заменяет функцию из первой части». */
+  equal('у каждой заменяемой функции помечены обе копии',
+    [
+      (chatSql.match(/ЗАМЕНЕНА В КОНЦЕ ФАЙЛА/g) ?? []).length,
+      (chatSql.match(/ЗАМЕНЯЕТ функцию из первой части/g) ?? []).length,
+    ].join(','), '3,2');
+  check('представления не объявлены дважды — правка попадёт туда, куда её пишут',
+    (chatSql.match(/create view public\.forum_chat_/g) ?? []).length === 3);
+
+  /* ── Список чатов: обе ветки отдают одни и те же поля ── */
+
+  const { chatOut } = await import('../src/forum/adapters/supabase.js');
+  const { chatView } = await import('../src/forum/adapters/local.js');
+
+  const listState = {
+    me: 'u1',
+    users: [{ id: 'u1', nick: 'Иванов', avatarUrl: '', allianceTag: 'TAG', role: 'member', isLeader: true }],
+    chatMembers: [{ chatId: 'c1', userId: 'u1', role: 'owner', joinedAt: '2026-09-01T09:00:00.000Z', lastReadAt: '2026-09-01T09:30:00.000Z' }],
+    chatMessages: [{ id: 'm1', chatId: 'c1', authorId: 'u1', authorNick: 'Иванов', body: 'привет', createdAt: '2026-09-01T10:00:00.000Z', pinned: true }],
+    chatAttachments: [{ id: 'a1', messageId: 'm1', kind: 'video', url: 'https://example.com/v.mp4' }],
+    chatReactions: [],
+    chatTyping: [],
+  };
+  const chatRow = {
+    id: 'c1', title: 'Штаб', kind: 'alliance', alliance_tag: 'TAG', topic: 'сбор', avatar_url: '',
+    owner_id: 'u1', owner_nick: 'Иванов', invite_code: 'abcdefgh', max_members: 200,
+    closed: false, closed_reason: '', created_at: '2026-09-01T09:00:00.000Z',
+    member_count: 1, my_role: 'owner', unread_count: 0, last_body: 'привет', last_nick: 'Иванов',
+    last_kind: 'video', last_at: '2026-09-01T10:00:00.000Z', pinned_count: 1,
+  };
+  const localChat = chatView(listState, {
+    id: 'c1', title: 'Штаб', kind: 'alliance', allianceTag: 'TAG', topic: 'сбор', avatarUrl: '',
+    ownerId: 'u1', ownerNick: 'Иванов', inviteCode: 'abcdefgh', maxMembers: 200,
+    closed: false, closedReason: '', createdAt: '2026-09-01T09:00:00.000Z',
+  }, 'u1');
+  const remoteChat = chatOut(chatRow);
+  const chatDrift = [
+    ...Object.keys(localChat).filter((k) => !(k in remoteChat)),
+    ...Object.keys(remoteChat).filter((k) => !(k in localChat)),
+  ];
+  equal('обе ветки отдают один и тот же чат в списке', chatDrift.join(', '), '');
+  check('в списке видно последнее вложение и число закреплённых',
+    localChat.lastKind === 'video' && remoteChat.lastKind === 'video'
+      && localChat.pinnedCount === 1 && remoteChat.pinnedCount === 1);
+  check('тема и картинка чата доезжают из обеих веток',
+    localChat.topic === 'сбор' && remoteChat.topic === 'сбор');
+
+  equal('новые части чата одеты в стили',
+    ['.chat-shot', '.chat-voice', '.chat-reacts', '.chat-compose__tools', '.chat-queue',
+      '.chat-lightbox', '.chat-pins', '.chat-search', '.chat-emoji', '.chat-react-picker',
+      '.chat-room__sub[data-chat-typing]']
+      .filter((c) => !chatCss.includes(c)).join(', '), '');
+  check('новый файл стилей подключён к странице', /chat\.css/.test(indexHtml));
+  check('стили чата идут после общей отделки',
+    indexHtml.indexOf('chat.css') > indexHtml.indexOf('refine.css'));
+}
+
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

@@ -227,6 +227,8 @@ create trigger forum_chat_after_create
 
 -- Что можно менять после создания: название, тег, закрытие. Владелец
 -- и код приглашения не меняются запросом — код пересоздаёт отдельная функция.
+-- ЗАМЕНЕНА В КОНЦЕ ФАЙЛА: там к этому добавляются тема и картинка чата.
+-- Правки вносить в конец — эта копия остаётся только для чтения.
 create or replace function public.forum_chat_guard()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -417,6 +419,8 @@ create policy forum_chat_messages_update on public.forum_chat_messages
   for update using (author_id = auth.uid() or public.forum_chat_manager(chat_id))
   with check (author_id = auth.uid() or public.forum_chat_manager(chat_id));
 
+-- ЗАМЕНЕНА В КОНЦЕ ФАЙЛА: там сообщение может быть пустым по тексту, если
+-- к нему приложены файлы, и там же проверяется черновик вложений.
 create or replace function public.forum_chat_message_set_author()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -439,6 +443,8 @@ create trigger forum_chat_message_set_author
   before insert on public.forum_chat_messages
   for each row execute function public.forum_chat_message_set_author();
 
+-- ЗАМЕНЕНА В КОНЦЕ ФАЙЛА: там к защите от подмены добавляется право
+-- закреплять сообщения.
 create or replace function public.forum_chat_message_guard()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -470,7 +476,558 @@ create trigger forum_chat_message_guard
 -- Список чатов со счётчиками — одним запросом, как forum_post_list.
 -- security_invoker = on: строки отбирают политики таблиц, представление
 -- только досчитывает.
+--
+-- САМИ ПРЕДСТАВЛЕНИЯ ОБЪЯВЛЕНЫ В КОНЦЕ ФАЙЛА, во второй части. Это не
+-- беспорядок: расширенные представления читают вложения и реакции, а их
+-- таблицы появляются только там. Postgres разбирает запрос представления
+-- при создании, поэтому «сначала таблицы, потом представление» — не совет,
+-- а условие, без которого файл не запустится.
+--
+-- Правило на будущее: правя список чатов, сообщения или участников, ищи
+-- create view в КОНЦЕ файла. Вторая копия определения здесь была бы ловушкой:
+-- она молча побеждалась бы той, что ниже, и правка «не срабатывала».
 
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- ЧАСТЬ ВТОРАЯ: ВЛОЖЕНИЯ, ОТВЕТЫ, РЕАКЦИИ, ЗАКРЕПЛЁННОЕ, «ПИШЕТ…»
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- Запускать тем же файлом, что и первую часть: он рассчитан на повторный
+-- запуск («create or replace», «if not exists»), и всё, что ниже, добавится
+-- к уже работающей базе без потери переписки.
+--
+-- ЗАЧЕМ ЭТО. Первая версия чата была перепиской текстом, и на живом сервере
+-- так не вышло: в альянсовом чате кидают скриншот разведки, запись замеса
+-- и файл со списком состава — и всё это уезжало в мессенджеры, то есть ровно
+-- туда, откуда чат должен был забрать разговор.
+
+-- ── Что нового в самих чатах ────────────────────────────────────────────────
+
+alter table public.forum_chats
+  add column if not exists topic text not null default '';
+
+alter table public.forum_chats
+  add column if not exists avatar_url text not null default '';
+
+/*
+  ЗАМЕНЯЕТ функцию из первой части (логика про владельца и код приглашения
+  не менялась). Название и тема приводятся к одному виду здесь, а не только
+  в браузере:
+  через REST можно записать что угодно, и «тема» длиной в роман, растянутая
+  над лентой, — это не безобидная шалость.
+*/
+create or replace function public.forum_chat_guard()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then return new; end if;
+  new.owner_id := old.owner_id;
+  new.owner_nick := old.owner_nick;
+  new.created_at := old.created_at;
+  new.kind := old.kind;
+  new.title := left(btrim(new.title), 60);
+  new.topic := left(btrim(coalesce(new.topic, '')), 140);
+  if coalesce(new.avatar_url, '') <> '' and new.avatar_url !~* '^https?://' then
+    new.avatar_url := old.avatar_url;
+  end if;
+  if new.closed and not old.closed and not public.forum_is_staff()
+     and not exists (select 1 from public.forum_chat_members
+                     where chat_id = old.id and user_id = auth.uid() and role = 'owner') then
+    raise exception 'Закрыть чат может владелец чата или модерация';
+  end if;
+  return new;
+end;
+$$;
+
+-- ── Новые колонки сообщений ─────────────────────────────────────────────────
+
+alter table public.forum_chat_messages
+  add column if not exists reply_to_id uuid references public.forum_chat_messages (id) on delete set null;
+
+alter table public.forum_chat_messages
+  add column if not exists pinned boolean not null default false;
+
+alter table public.forum_chat_messages
+  add column if not exists pinned_at timestamptz;
+
+/*
+  ЧЕРНОВИК ВЛОЖЕНИЙ.
+
+  Колонка-посылка: браузер кладёт в неё список уже загруженных файлов, а
+  триггер ниже разбирает его на строки в forum_chat_attachments и обнуляет.
+
+  Зачем так, а не двумя запросами с сайта. PostgREST не умеет вставку
+  «родитель и дети одним запросом», а два запроса дают окно, в котором
+  сообщение уже видно, а файлов в нём ещё нет. Здесь же сообщение и его
+  вложения появляются одной транзакцией — либо всё, либо ничего.
+
+  Колонка живёт один INSERT: на UPDATE триггер принудительно ставит пустой
+  список, поэтому через неё нельзя ни переписать вложения, ни дописать чужие.
+*/
+alter table public.forum_chat_messages
+  add column if not exists draft_attachments jsonb not null default '[]'::jsonb;
+
+create index if not exists forum_chat_messages_pinned
+  on public.forum_chat_messages (chat_id)
+  where pinned and not deleted;
+
+-- ── Вложения ────────────────────────────────────────────────────────────────
+
+create table if not exists public.forum_chat_attachments (
+  id           uuid primary key default gen_random_uuid(),
+  message_id   uuid not null references public.forum_chat_messages (id) on delete cascade,
+  chat_id      uuid not null references public.forum_chats (id) on delete cascade,
+  uploader_id  uuid references public.forum_users (id) on delete set null,
+  kind         text not null check (kind in ('image', 'video', 'audio', 'file')),
+  url          text not null,
+  storage_path text not null default '',
+  name         text not null default '',
+  mime         text not null default '',
+  size_bytes   bigint not null default 0,
+  width        int not null default 0,
+  height       int not null default 0,
+  duration_ms  int not null default 0,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists forum_chat_attachments_message
+  on public.forum_chat_attachments (message_id);
+create index if not exists forum_chat_attachments_chat
+  on public.forum_chat_attachments (chat_id);
+
+alter table public.forum_chat_attachments enable row level security;
+
+/*
+  Строки вложений пишет ТОЛЬКО триггер (security definer): политик на insert
+  и update нет вовсе. Иначе через REST можно было бы привязать к чужому
+  сообщению свою ссылку, а это уже подделка переписки.
+*/
+drop policy if exists forum_chat_attachments_read on public.forum_chat_attachments;
+create policy forum_chat_attachments_read on public.forum_chat_attachments
+  for select using (public.forum_chat_member(chat_id) or public.forum_is_staff());
+
+-- Удалять может тот, кто загрузил, и управляющий чатом: этим сайт убирает
+-- файлы, когда сообщение удаляют, чтобы место в хранилище не пропадало.
+drop policy if exists forum_chat_attachments_delete on public.forum_chat_attachments;
+create policy forum_chat_attachments_delete on public.forum_chat_attachments
+  for delete using (uploader_id = auth.uid() or public.forum_chat_manager(chat_id));
+
+create or replace function public.forum_chat_attachment_limit()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare
+  n int;
+begin
+  select count(*) into n from public.forum_chat_attachments where message_id = new.message_id;
+  if n >= 10 then
+    raise exception 'К одному сообщению можно приложить не больше десяти файлов';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_chat_attachment_limit on public.forum_chat_attachments;
+create trigger forum_chat_attachment_limit
+  before insert on public.forum_chat_attachments
+  for each row execute function public.forum_chat_attachment_limit();
+
+-- ── Реакции ─────────────────────────────────────────────────────────────────
+
+create table if not exists public.forum_chat_reactions (
+  message_id uuid not null references public.forum_chat_messages (id) on delete cascade,
+  user_id    uuid not null references public.forum_users (id) on delete cascade,
+  emoji      text not null,
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id, emoji)
+);
+
+create index if not exists forum_chat_reactions_message
+  on public.forum_chat_reactions (message_id);
+
+alter table public.forum_chat_reactions enable row level security;
+
+/*
+  Сообщение → чат. Нужно политикам: у реакции нет своего chat_id, а спросить
+  «мой ли это чат» можно только по сообщению. Функция security definer,
+  иначе политика на реакциях читала бы таблицу сообщений своими правами
+  и упёрлась бы в рекурсию.
+*/
+create or replace function public.forum_chat_of_message(target uuid)
+returns uuid
+language sql stable security definer set search_path = public
+as $$
+  select chat_id from public.forum_chat_messages where id = target;
+$$;
+
+drop policy if exists forum_chat_reactions_read on public.forum_chat_reactions;
+create policy forum_chat_reactions_read on public.forum_chat_reactions
+  for select using (
+    public.forum_chat_member(public.forum_chat_of_message(message_id)) or public.forum_is_staff()
+  );
+
+drop policy if exists forum_chat_reactions_insert on public.forum_chat_reactions;
+create policy forum_chat_reactions_insert on public.forum_chat_reactions
+  for insert with check (
+    user_id = auth.uid()
+    and public.forum_chat_member(public.forum_chat_of_message(message_id))
+    and public.forum_can_write()
+  );
+
+-- Снять свою реакцию может каждый; чужую — управляющий чатом (например,
+-- если реакцией прикрывают удалённое сообщение).
+drop policy if exists forum_chat_reactions_delete on public.forum_chat_reactions;
+create policy forum_chat_reactions_delete on public.forum_chat_reactions
+  for delete using (
+    user_id = auth.uid() or public.forum_chat_manager(public.forum_chat_of_message(message_id))
+  );
+
+/*
+  Список допустимых реакций.
+
+  Он же лежит в src/forum/rules.js (CHAT_REACTIONS) — браузер подсказывает,
+  база охраняет. Проверка обязательна: без неё «реакцией» можно прислать
+  произвольную строку, а её потом показывать всем в подсказке.
+*/
+create or replace function public.forum_chat_reaction_ok()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.emoji not in ('👍', '❤️', '🔥', '😂', '😮', '😢', '🫡', '👏') then
+    raise exception 'Такой реакции в чате нет';
+  end if;
+  if auth.uid() is not null then
+    new.user_id := auth.uid();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_chat_reaction_ok on public.forum_chat_reactions;
+create trigger forum_chat_reaction_ok
+  before insert on public.forum_chat_reactions
+  for each row execute function public.forum_chat_reaction_ok();
+
+-- ── «Пишет…» ────────────────────────────────────────────────────────────────
+
+/*
+  Отметки о наборе текста. Это СОСТОЯНИЕ, а не запись: строка живёт секунды
+  и гаснет сама. Поэтому истории у таблицы нет, а просроченное вычищается
+  здесь же, при каждой новой отметке, — отдельная служба уборки не нужна.
+
+  Политик на insert нет: писать можно только функцией ниже. Так к таблице
+  не подобраться в обход проверки «ты вообще в этом чате?».
+*/
+create table if not exists public.forum_chat_typing (
+  chat_id uuid not null references public.forum_chats (id) on delete cascade,
+  user_id uuid not null references public.forum_users (id) on delete cascade,
+  nick    text not null default '',
+  at      timestamptz not null default now(),
+  primary key (chat_id, user_id)
+);
+
+create index if not exists forum_chat_typing_fresh
+  on public.forum_chat_typing (chat_id, at desc);
+
+alter table public.forum_chat_typing enable row level security;
+
+drop policy if exists forum_chat_typing_read on public.forum_chat_typing;
+create policy forum_chat_typing_read on public.forum_chat_typing
+  for select using (public.forum_chat_member(chat_id) or public.forum_is_staff());
+
+create or replace function public.forum_chat_typing_touch(target uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then return; end if;
+  if not public.forum_chat_member(target) then return; end if;
+
+  insert into public.forum_chat_typing (chat_id, user_id, nick, at)
+  values (
+    target,
+    auth.uid(),
+    coalesce((select nick from public.forum_users where id = auth.uid()), ''),
+    now()
+  )
+  on conflict (chat_id, user_id) do update set at = now(), nick = excluded.nick;
+
+  -- Просроченное убираем здесь же: отметки живут секунды, и копить их незачем.
+  delete from public.forum_chat_typing
+   where chat_id = target and at < now() - interval '1 minute';
+end;
+$$;
+
+revoke all on function public.forum_chat_typing_touch(uuid) from public, anon;
+grant execute on function public.forum_chat_typing_touch(uuid) to authenticated;
+
+-- ── Приём сообщения с вложениями ────────────────────────────────────────────
+
+/*
+  Этот триггер ЗАМЕНЯЕТ прежнюю версию из первой части: теперь сообщение
+  может быть пустым по тексту, если к нему приложены файлы (картинку часто
+  посылают без подписи), и он же проверяет черновик вложений.
+*/
+create or replace function public.forum_chat_message_set_author()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare
+  files jsonb := coalesce(new.draft_attachments, '[]'::jsonb);
+  count_files int := jsonb_array_length(coalesce(new.draft_attachments, '[]'::jsonb));
+begin
+  if auth.uid() is not null then
+    new.author_id := auth.uid();
+    select nick into new.author_nick from public.forum_users where id = auth.uid();
+  end if;
+
+  if jsonb_typeof(files) <> 'array' then
+    raise exception 'Вложения должны быть списком';
+  end if;
+
+  new.body := left(coalesce(new.body, ''), 2000);
+  if count_files = 0 and char_length(btrim(new.body)) = 0 then
+    raise exception 'Пустое сообщение';
+  end if;
+  if count_files > 10 then
+    raise exception 'К одному сообщению можно приложить не больше десяти файлов';
+  end if;
+
+  /*
+    Файл обязан лежать в папке ЭТОГО чата и быть загруженным ЭТИМ человеком:
+    путь в хранилище начинается с chat/<чат>/<кто>/. Без проверки через
+    колонку-черновик можно было бы сослаться на чужой файл или на файл
+    из другого чата — то есть показать закрытую переписку.
+  */
+  if count_files > 0 then
+    if exists (
+      select 1
+        from jsonb_to_recordset(files)
+          as f(kind text, url text, storage_path text, size_bytes bigint)
+       where f.kind not in ('image', 'video', 'audio', 'file')
+          or f.url !~* '^https?://'
+          /*
+            Потолок веса в базе — самый большой предел из CONFIG.forum.chat,
+            то есть видео (25 МБ). Разбираться, картинка это или голосовое,
+            здесь не нужно: в браузере предел для каждого вида свой, а тут
+            стоит страховка от «через запрос льют гигабайты».
+          */
+          or coalesce(f.size_bytes, 0) > 25000000
+          or coalesce(f.storage_path, '') not like
+             'chat/' || new.chat_id::text || '/' || coalesce(auth.uid()::text, '') || '/%'
+          /*
+            То же, что BLOCKED_EXT в src/forum/media.js: страницы, скрипты
+            и программы. Файл из чата открывается в браузере по ссылке в
+            хранилище, и страница на этом адресе — готовый фишинг «вот новая
+            версия сайта, войди». Клиент такую отправку не даёт, но браузер
+            можно обойти, а базу — нет.
+          */
+          or lower(coalesce(f.storage_path, '')) ~
+             '\.(html?|xhtml|svg|xml|js|mjs|exe|msi|bat|cmd|com|scr|ps1|vbs|jar|apk)$'
+    ) then
+      raise exception 'Вложение не подходит: чужой файл, страница или программа вместо файла, либо слишком большой вес';
+    end if;
+  end if;
+
+  -- Ответ на сообщение из другого чата невозможен.
+  if new.reply_to_id is not null
+     and not exists (select 1 from public.forum_chat_messages m
+                      where m.id = new.reply_to_id and m.chat_id = new.chat_id) then
+    new.reply_to_id := null;
+  end if;
+
+  -- Закрепить сообщение при отправке нельзя: это отдельное действие.
+  new.pinned := false;
+  new.pinned_at := null;
+  return new;
+end;
+$$;
+
+/*
+  Разбор черновика на строки. AFTER INSERT, а не BEFORE: строке вложений нужен
+  идентификатор сообщения, которого до вставки ещё нет.
+*/
+create or replace function public.forum_chat_message_files()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if coalesce(jsonb_array_length(new.draft_attachments), 0) > 0 then
+    insert into public.forum_chat_attachments
+      (message_id, chat_id, uploader_id, kind, url, storage_path, name, mime,
+       size_bytes, width, height, duration_ms)
+    select
+      new.id,
+      new.chat_id,
+      new.author_id,
+      f.kind,
+      f.url,
+      coalesce(f.storage_path, ''),
+      left(coalesce(f.name, ''), 120),
+      left(coalesce(f.mime, ''), 80),
+      coalesce(f.size_bytes, 0),
+      coalesce(f.width, 0),
+      coalesce(f.height, 0),
+      coalesce(f.duration_ms, 0)
+    from jsonb_to_recordset(new.draft_attachments)
+      as f(kind text, url text, storage_path text, name text, mime text,
+           size_bytes bigint, width int, height int, duration_ms int);
+
+    update public.forum_chat_messages set draft_attachments = '[]'::jsonb where id = new.id;
+  end if;
+  return new;
+
+end;
+$$;
+
+drop trigger if exists forum_chat_message_files on public.forum_chat_messages;
+create trigger forum_chat_message_files
+  after insert on public.forum_chat_messages
+  for each row execute function public.forum_chat_message_files();
+
+/*
+  ЗАМЕНЯЕТ функцию из первой части: к защите связей от подмены добавляется
+  закрепление — это право управляющего чатом, а не автора сообщения.
+
+  Текста по-прежнему не касается: сказанное сказано.
+*/
+create or replace function public.forum_chat_message_guard()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then return new; end if;
+
+  new.author_id := old.author_id;
+  new.author_nick := old.author_nick;
+  new.chat_id := old.chat_id;
+  new.created_at := old.created_at;
+  new.body := old.body;
+  new.reply_to_id := old.reply_to_id;
+  new.draft_attachments := '[]'::jsonb;
+
+  if new.pinned is distinct from old.pinned then
+    if not public.forum_chat_manager(old.chat_id) then
+      new.pinned := old.pinned;
+      new.pinned_at := old.pinned_at;
+    else
+      new.pinned_at := case when new.pinned then now() else null end;
+    end if;
+  else
+    new.pinned_at := old.pinned_at;
+  end if;
+
+  if old.deleted then
+    new.deleted := true;
+    new.deleted_reason := old.deleted_reason;
+  end if;
+  return new;
+end;
+$$;
+
+/*
+  Предел закреплённого. Число то же, что CONFIG.forum.chat.pinsMax.
+  Без него «закрепить» превратилось бы в способ держать всю переписку
+  над лентой, и лента стала бы бесполезной.
+*/
+create or replace function public.forum_chat_pin_limit()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare
+  n int;
+begin
+  if new.pinned and not coalesce(old.pinned, false) then
+    select count(*) into n
+      from public.forum_chat_messages
+     where chat_id = new.chat_id and pinned and not deleted;
+    if n >= 20 then
+      raise exception 'В чате уже двадцать закреплённых сообщений';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_chat_pin_limit on public.forum_chat_messages;
+create trigger forum_chat_pin_limit
+  before update on public.forum_chat_messages
+  for each row execute function public.forum_chat_pin_limit();
+
+-- ── Хранилище: файлы чатов ──────────────────────────────────────────────────
+
+/*
+  Отдельный контейнер, а не общий forum-uploads: у чатов свои правила.
+  Файл поста видят все, файл чата — только участники, и выразить это одной
+  политикой на общем контейнере нельзя, не ослабив правила для форума.
+*/
+insert into storage.buckets (id, name, public)
+values ('chat-uploads', 'chat-uploads', true)
+on conflict (id) do nothing;
+
+/*
+  Чат из имени файла.
+
+  Путь файла — chat/<чат>/<кто>/<файл>. Идентификатор чата зашит в путь
+  именно ради правил доступа: политика хранилища не умеет спрашивать
+  «к какому чату относится этот файл» ниоткуда, кроме имени.
+
+  Функция возвращает null, если имя не подходит по форме, — тогда условие
+  forum_chat_member(null) даёт false, и доступ закрыт. Разбирать имя прямо
+  в политике нельзя: `split_part(...)::uuid` на мусорном имени уронил бы
+  запрос ошибкой вместо честного отказа.
+*/
+create or replace function public.forum_chat_path_chat(object_name text)
+returns uuid
+language sql stable security definer set search_path = public
+as $$
+  select case
+    when split_part(object_name, '/', 1) = 'chat'
+     and split_part(object_name, '/', 2) ~
+         '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then split_part(object_name, '/', 2)::uuid
+    else null
+  end;
+$$;
+
+drop policy if exists chat_uploads_read on storage.objects;
+create policy chat_uploads_read on storage.objects
+  for select using (bucket_id = 'chat-uploads');
+
+drop policy if exists chat_uploads_write on storage.objects;
+create policy chat_uploads_write on storage.objects
+  for insert with check (
+    bucket_id = 'chat-uploads'
+    and auth.role() = 'authenticated'
+    -- Своя папка внутри чата: без этого участник перезаписал бы чужой файл.
+    and split_part(name, '/', 3) = auth.uid()::text
+    and public.forum_chat_member(public.forum_chat_path_chat(name))
+    and public.forum_can_write()
+  );
+
+drop policy if exists chat_uploads_delete on storage.objects;
+create policy chat_uploads_delete on storage.objects
+  for delete using (
+    bucket_id = 'chat-uploads'
+    and (
+      split_part(name, '/', 3) = auth.uid()::text
+      or public.forum_chat_manager(public.forum_chat_path_chat(name))
+    )
+  );
+
+-- ── Представления: то, что читает страница ──────────────────────────────────
+
+/*
+  Представления пересоздаются целиком (drop + create), поэтому новые колонки
+  встают в любое место. Порядок колонок здесь не важен: страница читает
+  объекты по именам, а не по номерам.
+
+  ЧТО СЧИТАЕТСЯ НА СТОРОНЕ БАЗЫ. Вложения, реакции и цитата ответа едут
+  вместе с сообщением. Иначе лента из тридцати реплик превратилась бы
+  в сотню запросов: по два-три на каждое сообщение.
+*/
 drop view if exists public.forum_chat_list;
 create view public.forum_chat_list
 with (security_invoker = on) as
@@ -495,7 +1052,20 @@ select
      order by x.created_at desc limit 1) as last_nick,
   (select x.created_at from public.forum_chat_messages x
      where x.chat_id = c.id and x.deleted = false
-     order by x.created_at desc limit 1) as last_at
+     order by x.created_at desc limit 1) as last_at,
+  /*
+    Вид вложения последнего сообщения. У сообщения из одних картинок тела нет
+    вовсе, и без этой колонки список чатов показывал бы пустую строку —
+    будто в чате ничего не писали.
+  */
+  (select a.kind
+     from public.forum_chat_attachments a
+     join public.forum_chat_messages x on x.id = a.message_id
+    where x.chat_id = c.id and x.deleted = false
+    order by x.created_at desc, a.created_at
+    limit 1) as last_kind,
+  (select count(*) from public.forum_chat_messages x
+     where x.chat_id = c.id and x.pinned and x.deleted = false) as pinned_count
 from public.forum_chats c;
 
 grant select on public.forum_chat_list to authenticated;
@@ -508,9 +1078,48 @@ select
   prof.avatar_url as author_avatar,
   prof.alliance_tag as author_alliance,
   prof.role as author_role,
-  prof.is_leader as author_is_leader
+  prof.is_leader as author_is_leader,
+  coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', a.id,
+      'kind', a.kind,
+      'url', a.url,
+      'name', a.name,
+      'mime', a.mime,
+      'size_bytes', a.size_bytes,
+      'width', a.width,
+      'height', a.height,
+      'duration_ms', a.duration_ms
+    ) order by a.created_at)
+      from public.forum_chat_attachments a
+     where a.message_id = x.id
+  ), '[]'::jsonb) as attachments,
+  coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'emoji', r.emoji,
+      'count', r.n,
+      'mine', r.mine,
+      'nicks', r.nicks
+    ))
+      from (
+        select
+          rr.emoji,
+          count(*) as n,
+          bool_or(rr.user_id = auth.uid()) as mine,
+          (array_agg(coalesce(p.nick, '') order by rr.created_at))[1:8] as nicks
+        from public.forum_chat_reactions rr
+        left join public.forum_profiles p on p.id = rr.user_id
+        where rr.message_id = x.id
+        group by rr.emoji
+      ) r
+  ), '[]'::jsonb) as reactions,
+  reply.id as reply_id,
+  reply.author_nick as reply_nick,
+  left(coalesce(reply.body, ''), 200) as reply_body,
+  coalesce(reply.deleted, false) as reply_deleted
 from public.forum_chat_messages x
-left join public.forum_profiles prof on prof.id = x.author_id;
+left join public.forum_profiles prof on prof.id = x.author_id
+left join public.forum_chat_messages reply on reply.id = x.reply_to_id;
 
 grant select on public.forum_chat_message_list to authenticated;
 
@@ -522,12 +1131,37 @@ select
   prof.nick,
   prof.avatar_url,
   prof.alliance_tag,
-  prof.is_leader
+  prof.is_leader,
+  /*
+    Порядок в списке участников: владелец, помощники, остальные.
+
+    Роль лежит словом, и «role.asc» по алфавиту поставил бы владельца
+    последним (admin < member < owner). Локальный адаптер сортирует по смыслу
+    роли — эта колонка нужна, чтобы обе ветки показывали список одинаково.
+  */
+  case m.role when 'owner' then 0 when 'admin' then 1 else 2 end as role_rank
 from public.forum_chat_members m
 join public.forum_profiles prof on prof.id = m.user_id;
 
 grant select on public.forum_chat_member_list to authenticated;
 
-grant select, insert, update, delete on public.forum_chats to authenticated;
-grant select, insert, update, delete on public.forum_chat_members to authenticated;
-grant select, insert, update on public.forum_chat_messages to authenticated;
+-- ── Права ───────────────────────────────────────────────────────────────────
+
+grant select, delete on public.forum_chat_attachments to authenticated;
+grant select, insert, delete on public.forum_chat_reactions to authenticated;
+grant select on public.forum_chat_typing to authenticated;
+
+/*
+  Права на сами таблицы чатов уже выданы в первой части — здесь только то,
+  что появилось вместе с вложениями: новые таблицы и пересозданные
+  представления. Повторный grant безвреден, но две копии одного и того же
+  расходятся ровно в тот день, когда правят одну из них.
+*/
+
+/*
+  ЧТО НАДО СДЕЛАТЬ РУКАМИ ПОСЛЕ ЗАПУСКА.
+
+  Ничего. Файл рассчитан на повторный запуск целиком: он добавит колонки,
+  таблицы, правила хранилища и заменит представления. Переписка, вложения
+  и участники при этом не теряются.
+*/
