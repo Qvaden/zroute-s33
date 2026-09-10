@@ -90,18 +90,36 @@
   background: var(--accent);
 }
 
-/* Форум первый в списке и главный — отделяем его от остальных разделов. */
-.side .nav__link[href="#/forum"] {
-  margin-bottom: 8px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line-soft);
-  border-radius: 10px 10px 0 0;
-  font-weight: 600;
+/*
+  Группы меню: «Общение» (форум, чаты) и «Сервер» (таблицы). Форум и чаты —
+  главное на сайте, и меню должно говорить это раньше, чем содержимое.
+*/
+.nav__group {
+  display: block;
+  margin: 10px 12px 4px;
+  color: var(--mute);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
 }
-.side .nav__link[href="#/forum"].is-active {
-  border-bottom-color: transparent;
+.nav__group:first-child { margin-top: 0; }
+.side .nav__link--primary { font-weight: 600; font-size: 14.5px; }
+.nav__badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
   border-radius: 10px;
+  background: #ff4757;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
+.side .nav__link.is-active .nav__badge { background: #14100c; color: #fff; }
 
 .side__foot {
   margin-top: auto;

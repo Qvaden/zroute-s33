@@ -98,6 +98,7 @@ function userOut(row) {
     about: row.about || '',
     allianceTag: row.alliance_tag || '',
     isBlogger: Boolean(row.is_blogger),
+    isLeader: Boolean(row.is_leader),
     canEditSite: Boolean(row.can_edit_site) || row.role === 'admin',
     createdAt: toDate(row.created_at) ?? new Date(),
     mutedUntil: toDate(row.muted_until),
@@ -638,6 +639,17 @@ export async function setBlogger(userId, isBlogger) {
 }
 
 /**
+ * Отметка лидера альянса: право создавать закрытые чаты. Не роль сайта —
+ * доверие своему альянсу. Выдаёт модерация, снимается тем же нажатием.
+ */
+export async function setLeader(userId, isLeader) {
+  await rest(`/forum_users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: { is_leader: Boolean(isLeader) },
+  });
+}
+
+/**
  * УДАЛЕНИЕ АККАУНТА.
  *
  * Так же, как сброс пароля, это живёт функцией в базе (forum_admin_delete_user):
@@ -697,4 +709,167 @@ export async function markAllNotificationsRead() {
     method: 'PATCH',
     body: { read_at: new Date().toISOString() },
   });
+}
+
+/* ── Закрытые чаты ────────────────────────────────────────────────────────── */
+/*
+  Устройство — в supabase/chats.sql. Здесь только перевод строк базы в объекты
+  и обратно. Кто что видит, решают политики: гость не получит ни одной строки,
+  участник — только свои чаты, модерация — все.
+*/
+
+function chatOut(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    kind: row.kind || 'alliance',
+    allianceTag: row.alliance_tag || '',
+    ownerId: row.owner_id,
+    ownerNick: row.owner_nick || '',
+    inviteCode: row.invite_code || '',
+    maxMembers: Number(row.max_members || 200),
+    closed: Boolean(row.closed),
+    closedReason: row.closed_reason || '',
+    createdAt: toDate(row.created_at) ?? new Date(),
+    memberCount: Number(row.member_count || 0),
+    myRole: row.my_role || null,
+    unread: Number(row.unread_count || 0),
+    lastBody: row.last_body || '',
+    lastNick: row.last_nick || '',
+    lastAt: toDate(row.last_at),
+  };
+}
+
+function chatMessageOut(row) {
+  return {
+    id: row.id,
+    chatId: row.chat_id,
+    authorId: row.author_id,
+    authorNick: row.author_nick || '',
+    authorAvatar: row.author_avatar || '',
+    authorAlliance: row.author_alliance || '',
+    authorRole: row.author_role || 'member',
+    authorIsLeader: Boolean(row.author_is_leader),
+    body: row.body,
+    deleted: Boolean(row.deleted),
+    deletedReason: row.deleted_reason || '',
+    createdAt: toDate(row.created_at) ?? new Date(),
+  };
+}
+
+function chatMemberOut(row) {
+  return {
+    chatId: row.chat_id,
+    userId: row.user_id,
+    nick: row.nick || '',
+    avatarUrl: row.avatar_url || '',
+    allianceTag: row.alliance_tag || '',
+    isLeader: Boolean(row.is_leader),
+    role: row.role || 'member',
+    joinedAt: toDate(row.joined_at) ?? new Date(),
+  };
+}
+
+/** Мои чаты (для модерации — все). Непрочитанные и свежие сверху. */
+export async function listChats() {
+  const rows = await rest('/forum_chat_list?select=*&order=last_at.desc.nullslast,created_at.desc', { retryOnAbort: true });
+  return (Array.isArray(rows) ? rows : []).map(chatOut);
+}
+
+export async function getChat(id) {
+  const rows = await rest(`/forum_chat_list?select=*&id=eq.${encodeURIComponent(id)}&limit=1`);
+  return Array.isArray(rows) && rows[0] ? chatOut(rows[0]) : null;
+}
+
+export async function createChat({ title, kind = 'alliance', allianceTag = '' }) {
+  const rows = await rest('/forum_chats', {
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { title: String(title), kind, alliance_tag: String(allianceTag || '') },
+  });
+  const created = Array.isArray(rows) ? rows[0] : rows;
+  return (await getChat(created.id)) ?? chatOut(created);
+}
+
+export async function joinChat(code) {
+  const id = await rest('/rpc/forum_chat_join', { method: 'POST', body: { code: String(code).trim() } });
+  return String(id).replace(/"/g, '');
+}
+
+export async function leaveChat(chatId) {
+  const me = currentUserId();
+  await rest(`/forum_chat_members?chat_id=eq.${encodeURIComponent(chatId)}&user_id=eq.${encodeURIComponent(me)}`, { method: 'DELETE' });
+}
+
+export async function listChatMembers(chatId) {
+  const rows = await rest(`/forum_chat_member_list?select=*&chat_id=eq.${encodeURIComponent(chatId)}&order=role.asc,nick.asc`);
+  return (Array.isArray(rows) ? rows : []).map(chatMemberOut);
+}
+
+export async function setChatMemberRole(chatId, userId, role) {
+  await rest(`/forum_chat_members?chat_id=eq.${encodeURIComponent(chatId)}&user_id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH', body: { role },
+  });
+}
+
+export async function kickChatMember(chatId, userId) {
+  await rest(`/forum_chat_members?chat_id=eq.${encodeURIComponent(chatId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+/**
+ * Сообщения — последние `limit`, в хронологическом порядке. `before` —
+ * для подгрузки истории вверх: дата самого старого уже показанного.
+ */
+export async function listChatMessages(chatId, { limit = 60, before = null } = {}) {
+  const params = new URLSearchParams();
+  params.set('select', '*');
+  params.set('chat_id', `eq.${chatId}`);
+  params.set('order', 'created_at.desc');
+  params.set('limit', String(limit));
+  if (before) params.set('created_at', `lt.${new Date(before).toISOString()}`);
+  const rows = await rest(`/forum_chat_message_list?${params}`, { retryOnAbort: true });
+  return (Array.isArray(rows) ? rows : []).map(chatMessageOut).reverse();
+}
+
+export async function sendChatMessage(chatId, body) {
+  const rows = await rest('/forum_chat_messages', {
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { chat_id: chatId, body: String(body) },
+  });
+  const created = Array.isArray(rows) ? rows[0] : rows;
+  return chatMessageOut(created);
+}
+
+export async function deleteChatMessage(id, reason = '') {
+  await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH', body: { deleted: true, deleted_reason: String(reason || '') },
+  });
+}
+
+export async function markChatRead(chatId) {
+  const me = currentUserId();
+  if (!me) return;
+  await rest(`/forum_chat_members?chat_id=eq.${encodeURIComponent(chatId)}&user_id=eq.${encodeURIComponent(me)}`, {
+    method: 'PATCH', body: { last_read_at: new Date().toISOString() },
+  }).catch(() => {});
+}
+
+export async function updateChat(chatId, patch) {
+  const body = {};
+  if (patch.title != null) body.title = String(patch.title);
+  if (patch.allianceTag != null) body.alliance_tag = String(patch.allianceTag);
+  if (patch.closed != null) body.closed = Boolean(patch.closed);
+  if (patch.closedReason != null) body.closed_reason = String(patch.closedReason);
+  await rest(`/forum_chats?id=eq.${encodeURIComponent(chatId)}`, { method: 'PATCH', body });
+}
+
+export async function rotateChatCode(chatId) {
+  const code = await rest('/rpc/forum_chat_rotate_code', { method: 'POST', body: { target: chatId } });
+  return String(code).replace(/"/g, '');
+}
+
+/** Модерация: удалить чат целиком со всеми сообщениями. */
+export async function adminDeleteChat(chatId) {
+  await rest(`/forum_chats?id=eq.${encodeURIComponent(chatId)}`, { method: 'DELETE' });
 }

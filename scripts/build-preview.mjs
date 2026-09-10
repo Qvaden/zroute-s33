@@ -28,6 +28,7 @@ import { renderAlliance } from '../src/pages/alliance.js';
 import { renderQuarter } from '../src/pages/quarter-final.js';
 import { renderBot } from '../src/pages/bot.js';
 import { renderForum } from '../src/pages/forum.js';
+import { renderChats } from '../src/pages/chats.js';
 import { computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 
 const data = await loadAll();
@@ -72,6 +73,7 @@ const quarterStandings = computeStandings(
 */
 const NAV = [
   { id: 'forum', label: 'Форум', html: renderForum(view, { ready: false, loading: false }) },
+  { id: 'chats', label: 'Чаты', html: renderChats({ ready: false, loading: false, error: '', me: null, chats: [] }) },
   { id: 'home', label: 'Итоги недели', html: renderHome(view) },
   { id: 'quarter', label: 'Кварт', html: renderQuarter({ standings: quarterStandings, quarter }) },
   { id: 'ladder', label: 'Рейтинг', html: renderLadder(view) },

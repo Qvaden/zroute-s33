@@ -24,6 +24,7 @@ import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { roleBadge, roleLabel } from '../forum/roles.js';
+import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -539,8 +540,9 @@ function renderWhoAmI(s) {
         ${avatar(s.me.nick, s.me.avatarUrl)}
         <span class="forum-me__body">
           <b>${nickLink(s.me.nick)}</b>
-          <small>${roleBadge(s.me) || esc(roleLabel(s.me))}</small>
+          <small>${roleBadge(s.me) || esc(roleLabel(s.me))}${s.me.isLeader ? leaderBadge() : ''}</small>
         </span>
+        <a class="forum-btn forum-btn--ghost forum-chats-link" href="#/chats">Чаты</a>
         <button type="button" class="forum-btn forum-btn--ghost forum-bell"
                 data-forum-notify-open aria-label="Уведомления"
                 ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>

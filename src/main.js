@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=31';
-import { loadAll, capabilities, db } from './data/index.js?v=31';
-import { validateDataset } from './data/contract.js?v=31';
+import { CONFIG } from '../config.js?v=32';
+import { loadAll, capabilities, db } from './data/index.js?v=32';
+import { validateDataset } from './data/contract.js?v=32';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,21 +9,22 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=31';
-import { renderHome } from './pages/home.js?v=31';
-import { renderLadder } from './pages/ladder.js?v=31';
-import { renderQuarter } from './pages/quarter-final.js?v=31';
-import { renderTimeline } from './pages/timeline.js?v=31';
-import { renderGuide } from './pages/guide.js?v=31';
-import { renderBot } from './pages/bot.js?v=31';
-import { renderAlliance } from './pages/alliance.js?v=31';
-import { computeAchievements } from './logic/achievements.js?v=31';
-import { esc } from './ui/helpers.js?v=31';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=31';
+} from './logic/standings.js?v=32';
+import { renderHome } from './pages/home.js?v=32';
+import { renderLadder } from './pages/ladder.js?v=32';
+import { renderQuarter } from './pages/quarter-final.js?v=32';
+import { renderTimeline } from './pages/timeline.js?v=32';
+import { renderGuide } from './pages/guide.js?v=32';
+import { renderBot } from './pages/bot.js?v=32';
+import { renderAlliance } from './pages/alliance.js?v=32';
+import { computeAchievements } from './logic/achievements.js?v=32';
+import { esc } from './ui/helpers.js?v=32';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=32';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=31';
-import './ui/timeline-controls.js?v=31';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=31';
+import './ui/ladder-controls.js?v=32';
+import './ui/timeline-controls.js?v=32';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=32';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=32';
 
 /*
   РАЗДЕЛЫ.
@@ -43,7 +44,13 @@ import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=31';
   разметку — ему нужен свой запуск и остановка при уходе.
 */
 const ROUTES = [
-  { id: 'forum', label: 'Форум', live: true },
+  /*
+    Форум — первый и главный: сайт из «таблицы итогов» стал местом, где
+    сервер разговаривает. Таблицы никуда не делись, они ниже, но входная
+    дверь — обсуждение. Чаты — второй пункт: закрытые комнаты альянсов.
+  */
+  { id: 'forum', label: 'Форум', live: true, primary: true },
+  { id: 'chats', label: 'Чаты', live: true, primary: true },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -91,11 +98,37 @@ function renderNav(activeId) {
     цветом об этом говорит только тем, кто видит: без атрибута незрячий
     слышит семь одинаковых ссылок и не знает, какая открыта.
   */
-  nav.innerHTML = ROUTES.map(
-    (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}"${
-      r.id === activeId ? ' aria-current="page"' : ''
-    }>${r.label}</a>`
-  ).join('');
+  const link = (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}${
+      r.primary ? ' nav__link--primary' : ''
+    }"${r.id === activeId ? ' aria-current="page"' : ''}>${r.label}${
+      r.id === 'chats' ? '<span class="nav__badge" data-nav-chats-badge hidden></span>' : ''
+    }</a>`;
+  const primary = ROUTES.filter((r) => r.primary);
+  const rest = ROUTES.filter((r) => !r.primary);
+  /*
+    Две группы с подписью между ними: «Общение» и «Сервер». Меню читается
+    как оглавление, а не как семь равнозначных ссылок, — сразу видно, что
+    на сайте главное.
+  */
+  nav.innerHTML =
+    `<span class="nav__group">Общение</span>${primary.map(link).join('')}` +
+    `<span class="nav__group">Сервер</span>${rest.map(link).join('')}`;
+  refreshChatsBadge();
+}
+
+/*
+  Счётчик непрочитанных у пункта «Чаты». Считается при каждой смене раздела
+  и раз в минуту — этого хватает: внутри чата свои обновления.
+*/
+let badgeTimer = 0;
+async function refreshChatsBadge() {
+  const n = await unreadChatsTotal();
+  const el = nav.querySelector('[data-nav-chats-badge]');
+  if (!el) return;
+  el.hidden = !n;
+  el.textContent = n > 99 ? '99+' : String(n);
+  window.clearTimeout(badgeTimer);
+  badgeTimer = window.setTimeout(refreshChatsBadge, 60000);
 }
 
 /* ── Боковое меню ─────────────────────────────────────────────────────────── */
@@ -256,6 +289,7 @@ function render() {
     // Карточка альянса не своя вкладка, поэтому в меню подсвечиваем рейтинг,
     // откуда сюда и приходят.
     unmountForum();
+    unmountChats();
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
     path = `/alliance/${param}`;
@@ -267,6 +301,7 @@ function render() {
       Ник в адресе закодирован, а русские буквы браузер кодирует сам:
       без decodeURIComponent пришло бы «%D0%9A%D0%BE...» вместо имени.
     */
+    unmountChats();
     renderNav('forum');
     app.innerHTML = '';
     mountUser(app, decodeURIComponent(param));
@@ -275,7 +310,15 @@ function render() {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
     renderNav(route.id);
 
-    if (route.live) {
+    if (route.id === 'chats') {
+      unmountForum();
+      app.innerHTML = '';
+      // Второй сегмент — id чата; ссылка-приглашение: #/chats/join/<код>.
+      const rest = location.hash.replace(/^#\/?chats\/?/, '');
+      mountChats(app, rest ? decodeURIComponent(rest) : null);
+      path = rest ? '/chats/room' : '/chats';
+    } else if (route.live) {
+      unmountChats();
       /*
         Живому разделу нельзя просто подставить строку: он сам решает, что
         показать, потому что ждёт ответа хранилища. Второй сегмент адреса —
@@ -291,6 +334,7 @@ function render() {
       path = param ? `/forum/${param}` : '/forum';
     } else {
       unmountForum();
+      unmountChats();
       app.innerHTML = route.id === 'quarter'
         ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
         : route.id === 'bot'
@@ -314,7 +358,7 @@ function render() {
     попасть на пост, а не в начало страницы. Форум сам возвращает прокрутку
     после перерисовки, и внешний scrollTo здесь спорил бы с ним.
   */
-  const keepScroll = id === 'forum' && param;
+  const keepScroll = (id === 'forum' && param) || id === 'chats';
   if (!keepScroll) window.scrollTo(0, 0);
 
   trackPageview(path);
@@ -356,7 +400,7 @@ async function boot() {
     и она допишется, когда данные приедут. А сами данные грузятся фоном.
   */
   const { id, param } = parseHash();
-  const liveFirst = id === 'forum' || (id === 'user' && param);
+  const liveFirst = id === 'forum' || id === 'chats' || (id === 'user' && param);
 
   app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
   if (liveFirst) {

@@ -3121,7 +3121,11 @@ console.log('\nQ. Форум');
 
   const mainJs = await readFile('src/main.js', 'utf8');
   check('форум — первый раздел в меню',
-    /const ROUTES = \[\s*\{ id: 'forum'/.test(mainJs));
+    /const ROUTES = \[[\s\S]{0,600}?\{ id: 'forum'/.test(mainJs) &&
+    mainJs.indexOf("{ id: 'forum'") < mainJs.indexOf("{ id: 'home'"));
+  check('чаты — второй раздел, сразу за форумом',
+    /\{ id: 'chats', label: 'Чаты', live: true/.test(mainJs) &&
+    mainJs.indexOf("{ id: 'chats'") < mainJs.indexOf("{ id: 'home'"));
   check('пустой адрес открывает форум', /id \|\| 'forum'/.test(mainJs));
   check('итоги VS остались отдельным разделом', /id: 'home'/.test(mainJs));
   check('хронология осталась отдельным разделом', /id: 'timeline'/.test(mainJs));
@@ -3149,12 +3153,12 @@ console.log('\nQ. Форум');
     /retryOnAbort = false/.test(clientJs));
   check('повтор по таймауту включён у чтения ленты',
     /retryOnAbort: true/.test(forumDbJs));
-  check('повтор по таймауту у ленты, поста и комментариев — три места',
-    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 3);
+  check('повтор по таймауту у ленты, поста, комментариев и чатов — пять мест',
+    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 5);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
-  check('живые вкладки — форум и страница участника',
-    /id === 'forum' \|\| \(id === 'user' && param\)/.test(mainJs));
+  check('живые вкладки — форум, чаты и страница участника',
+    /id === 'forum' \|\| id === 'chats' \|\| \(id === 'user' && param\)/.test(mainJs));
 
   /*
     ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.

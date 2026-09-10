@@ -59,6 +59,9 @@ function emptyState() {
     polls: [],
     pollVotes: [],
     notifications: [],
+    chats: [],
+    chatMembers: [],
+    chatMessages: [],
   };
 }
 
@@ -102,6 +105,7 @@ function userOut(u) {
     about: u.about || '',
     allianceTag: u.allianceTag || '',
     isBlogger: Boolean(u.isBlogger),
+    isLeader: Boolean(u.isLeader),
     canEditSite: Boolean(u.canEditSite) || u.role === 'admin',
     createdAt: toDate(u.createdAt) ?? new Date(),
     mutedUntil: toDate(u.mutedUntil),
@@ -922,5 +926,209 @@ export async function markAllNotificationsRead() {
   for (const n of s.notifications) {
     if (n.userId === s.me && !n.readAt) n.readAt = stamp;
   }
+  write(s);
+}
+
+/* ── Закрытые чаты (локально, в одном браузере) ───────────────────────────── */
+
+function meOrThrow(s) {
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+  return me;
+}
+const isStaff = (u) => u && (u.role === 'admin' || u.role === 'moderator');
+const memberOf = (s, chatId, userId) => s.chatMembers.find((m) => m.chatId === chatId && m.userId === userId);
+const canManage = (s, chatId, me) => isStaff(me) || ['owner', 'admin'].includes(memberOf(s, chatId, me.id)?.role);
+
+function chatView(s, c, meId) {
+  const members = s.chatMembers.filter((m) => m.chatId === c.id);
+  const mine = members.find((m) => m.userId === meId);
+  const msgs = s.chatMessages.filter((x) => x.chatId === c.id && !x.deleted);
+  const last = msgs[msgs.length - 1];
+  const since = mine ? new Date(mine.lastReadAt).getTime() : 0;
+  return {
+    ...c,
+    createdAt: new Date(c.createdAt),
+    memberCount: members.length,
+    myRole: mine?.role ?? null,
+    unread: msgs.filter((x) => new Date(x.createdAt).getTime() > since && x.authorId !== meId).length,
+    lastBody: last?.body ?? '',
+    lastNick: last?.authorNick ?? '',
+    lastAt: last ? new Date(last.createdAt) : null,
+  };
+}
+
+export async function setLeader(userId, isLeader) {
+  const s = read();
+  if (!isStaff(meOrThrow(s))) throw new Error('Недостаточно прав');
+  const user = s.users.find((u) => u.id === userId);
+  if (!user) throw new Error('Игрок не найден');
+  user.isLeader = Boolean(isLeader);
+  write(s);
+}
+
+export async function listChats() {
+  const s = read();
+  if (!s.me) return [];
+  const me = s.users.find((u) => u.id === s.me);
+  return s.chats
+    .filter((c) => isStaff(me) || memberOf(s, c.id, s.me))
+    .map((c) => chatView(s, c, s.me))
+    .sort((a, b) => (b.lastAt ?? b.createdAt) - (a.lastAt ?? a.createdAt));
+}
+
+export async function getChat(id) {
+  const s = read();
+  const c = s.chats.find((x) => x.id === id);
+  if (!c || !s.me) return null;
+  const me = s.users.find((u) => u.id === s.me);
+  if (!isStaff(me) && !memberOf(s, id, s.me)) return null;
+  return chatView(s, c, s.me);
+}
+
+export async function createChat({ title, kind = 'alliance', allianceTag = '' }) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!me.isLeader && !isStaff(me)) throw new Error('Чаты создают лидеры альянсов');
+  const clean = String(title).trim().slice(0, 60);
+  if (clean.length < 2) throw new Error('Название чата короче двух символов');
+  const c = {
+    id: newId('c'), title: clean, kind, allianceTag: String(allianceTag).trim().slice(0, 12),
+    ownerId: me.id, ownerNick: me.nick, inviteCode: Math.random().toString(36).slice(2, 10),
+    maxMembers: 200, closed: false, closedReason: '', createdAt: new Date().toISOString(),
+  };
+  s.chats.push(c);
+  s.chatMembers.push({ chatId: c.id, userId: me.id, role: 'owner', joinedAt: c.createdAt, lastReadAt: c.createdAt });
+  write(s);
+  return chatView(s, c, me.id);
+}
+
+export async function joinChat(code) {
+  const s = read();
+  const me = meOrThrow(s);
+  const c = s.chats.find((x) => x.inviteCode === String(code).trim().toLowerCase());
+  if (!c) throw new Error('Такого приглашения нет — проверьте код');
+  if (c.closed) throw new Error('Чат закрыт');
+  if (!memberOf(s, c.id, me.id)) {
+    if (s.chatMembers.filter((m) => m.chatId === c.id).length >= c.maxMembers) throw new Error('В чате уже 200 участников');
+    const now = new Date().toISOString();
+    s.chatMembers.push({ chatId: c.id, userId: me.id, role: 'member', joinedAt: now, lastReadAt: now });
+    write(s);
+  }
+  return c.id;
+}
+
+export async function leaveChat(chatId) {
+  const s = read();
+  const me = meOrThrow(s);
+  s.chatMembers = s.chatMembers.filter((m) => !(m.chatId === chatId && m.userId === me.id));
+  write(s);
+}
+
+export async function listChatMembers(chatId) {
+  const s = read();
+  const order = { owner: 0, admin: 1, member: 2 };
+  return s.chatMembers
+    .filter((m) => m.chatId === chatId)
+    .map((m) => {
+      const u = s.users.find((x) => x.id === m.userId);
+      return { chatId, userId: m.userId, nick: u?.nick ?? '—', avatarUrl: u?.avatarUrl ?? '', allianceTag: u?.allianceTag ?? '', isLeader: Boolean(u?.isLeader), role: m.role, joinedAt: new Date(m.joinedAt) };
+    })
+    .sort((a, b) => order[a.role] - order[b.role] || a.nick.localeCompare(b.nick, 'ru'));
+}
+
+export async function setChatMemberRole(chatId, userId, role) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!canManage(s, chatId, me)) throw new Error('Недостаточно прав');
+  const m = memberOf(s, chatId, userId);
+  if (!m) throw new Error('Участник не найден');
+  if (m.role === 'owner' && !isStaff(me)) throw new Error('Владельца чата не разжаловать');
+  m.role = role;
+  write(s);
+}
+
+export async function kickChatMember(chatId, userId) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!canManage(s, chatId, me)) throw new Error('Недостаточно прав');
+  const m = memberOf(s, chatId, userId);
+  if (m?.role === 'owner' && !isStaff(me)) throw new Error('Владельца чата выгнать нельзя');
+  s.chatMembers = s.chatMembers.filter((x) => !(x.chatId === chatId && x.userId === userId));
+  write(s);
+}
+
+export async function listChatMessages(chatId, { limit = 60, before = null } = {}) {
+  const s = read();
+  let list = s.chatMessages.filter((x) => x.chatId === chatId);
+  if (before) list = list.filter((x) => new Date(x.createdAt) < new Date(before));
+  return list.slice(-limit).map((x) => {
+    const u = s.users.find((y) => y.id === x.authorId);
+    return { ...x, createdAt: new Date(x.createdAt), authorAvatar: u?.avatarUrl ?? '', authorAlliance: u?.allianceTag ?? '', authorRole: u?.role ?? 'member', authorIsLeader: Boolean(u?.isLeader) };
+  });
+}
+
+export async function sendChatMessage(chatId, body) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (me.banned) throw new Error('Вам запрещено писать');
+  if (!memberOf(s, chatId, me.id) && !isStaff(me)) throw new Error('Вы не участник этого чата');
+  const c = s.chats.find((x) => x.id === chatId);
+  if (!c || c.closed) throw new Error('Чат закрыт');
+  const text = String(body).slice(0, 2000);
+  if (!text.trim()) throw new Error('Пустое сообщение');
+  const m = { id: newId('m'), chatId, authorId: me.id, authorNick: me.nick, body: text, deleted: false, deletedReason: '', createdAt: new Date().toISOString() };
+  s.chatMessages.push(m);
+  write(s);
+  return { ...m, createdAt: new Date(m.createdAt), authorAvatar: me.avatarUrl ?? '', authorAlliance: me.allianceTag ?? '', authorRole: me.role, authorIsLeader: Boolean(me.isLeader) };
+}
+
+export async function deleteChatMessage(id, reason = '') {
+  const s = read();
+  const me = meOrThrow(s);
+  const m = s.chatMessages.find((x) => x.id === id);
+  if (!m) return;
+  if (m.authorId !== me.id && !canManage(s, m.chatId, me)) throw new Error('Недостаточно прав');
+  m.deleted = true;
+  m.deletedReason = String(reason || '');
+  write(s);
+}
+
+export async function markChatRead(chatId) {
+  const s = read();
+  const m = s.me ? memberOf(s, chatId, s.me) : null;
+  if (m) { m.lastReadAt = new Date().toISOString(); write(s); }
+}
+
+export async function updateChat(chatId, patch) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!canManage(s, chatId, me)) throw new Error('Недостаточно прав');
+  const c = s.chats.find((x) => x.id === chatId);
+  if (!c) throw new Error('Чат не найден');
+  if (patch.title != null) c.title = String(patch.title).trim().slice(0, 60);
+  if (patch.allianceTag != null) c.allianceTag = String(patch.allianceTag).trim().slice(0, 12);
+  if (patch.closed != null) c.closed = Boolean(patch.closed);
+  if (patch.closedReason != null) c.closedReason = String(patch.closedReason);
+  write(s);
+}
+
+export async function rotateChatCode(chatId) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!canManage(s, chatId, me)) throw new Error('Недостаточно прав');
+  const c = s.chats.find((x) => x.id === chatId);
+  if (!c) throw new Error('Чат не найден');
+  c.inviteCode = Math.random().toString(36).slice(2, 10);
+  write(s);
+  return c.inviteCode;
+}
+
+export async function adminDeleteChat(chatId) {
+  const s = read();
+  if (!isStaff(meOrThrow(s))) throw new Error('Недостаточно прав');
+  s.chats = s.chats.filter((c) => c.id !== chatId);
+  s.chatMembers = s.chatMembers.filter((m) => m.chatId !== chatId);
+  s.chatMessages = s.chatMessages.filter((m) => m.chatId !== chatId);
   write(s);
 }

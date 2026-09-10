@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=15';
-import { esc } from '../ui/helpers.js?v=15';
-import { mapDataset } from '../data/adapters/_map.js?v=15';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=15';
-import { validateDataset } from '../data/contract.js?v=15';
+import { CONFIG } from '../../config.js?v=16';
+import { esc } from '../ui/helpers.js?v=16';
+import { mapDataset } from '../data/adapters/_map.js?v=16';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=16';
+import { validateDataset } from '../data/contract.js?v=16';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=15';
-import { renderHome } from '../pages/home.js?v=15';
+} from '../logic/standings.js?v=16';
+import { renderHome } from '../pages/home.js?v=16';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=15';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=15';
+} from '../db/account.js?v=16';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=15';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=15';
-import { roleLabel } from '../forum/roles.js?v=15';
-import { prepareImage, uploadPath } from './image.js?v=15';
+} from './store.js?v=16';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=16';
+import { roleLabel } from '../forum/roles.js?v=16';
+import { prepareImage, uploadPath } from './image.js?v=16';
 import {
   applyMarks,
   applyEvents,
@@ -86,7 +86,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=15';
+} from './edit.js?v=16';
 import {
   getDraft,
   saveDraft,
@@ -104,22 +104,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=15';
-import { renderShell } from './shell.js?v=15';
-import { renderLogin } from './login.js?v=15';
-import { renderOverview } from './screens/overview.js?v=15';
-import { renderWeek, describe } from './screens/week.js?v=15';
-import { renderAlliances } from './screens/alliances.js?v=15';
-import { renderEvents } from './screens/events.js?v=15';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=15';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=15';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=15';
-import { renderQuarter } from './screens/quarter.js?v=15';
-import { renderPresident } from './screens/president.js?v=15';
-import { renderPlayers } from './screens/players.js?v=15';
-import { renderModeration } from './screens/moderation.js?v=15';
-import { forum } from '../forum/index.js?v=15';
-import { deletionReason } from '../forum/rules.js?v=15';
+} from './draft.js?v=16';
+import { renderShell } from './shell.js?v=16';
+import { renderLogin } from './login.js?v=16';
+import { renderOverview } from './screens/overview.js?v=16';
+import { renderWeek, describe } from './screens/week.js?v=16';
+import { renderAlliances } from './screens/alliances.js?v=16';
+import { renderEvents } from './screens/events.js?v=16';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=16';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=16';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=16';
+import { renderQuarter } from './screens/quarter.js?v=16';
+import { renderPresident } from './screens/president.js?v=16';
+import { renderPlayers } from './screens/players.js?v=16';
+import { renderModeration } from './screens/moderation.js?v=16';
+import { renderChatsAdmin } from './screens/chats.js?v=16';
+import { forum } from '../forum/index.js?v=16';
+import { deletionReason } from '../forum/rules.js?v=16';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -136,6 +137,7 @@ const SCREENS = [
   */
   { id: 'moderation', label: 'Жалобы', render: renderModeration },
   { id: 'players', label: 'Игроки', render: renderPlayers },
+  { id: 'chats', label: 'Чаты', render: renderChatsAdmin },
 ];
 
 const root = document.getElementById('admin');
@@ -221,7 +223,7 @@ function render() {
     переход по панели упирался бы в запрос к форуму, включая экраны, которые
     к форуму отношения не имеют.
   */
-  if (screen.id === 'players' || screen.id === 'moderation') {
+  if (screen.id === 'players' || screen.id === 'moderation' || screen.id === 'chats') {
     loadForumScreen(screen.id);
   }
 
@@ -1195,6 +1197,9 @@ async function loadForumScreen(screenId) {
       // Игроки — вкладка владельца: только он управляет людьми. Модератору
       // тащить весь список бессмысленно — ему он всё равно не покажется.
       if (canManagePeople(account)) view.forum.users = await forum.listUsers();
+    } else if (screenId === 'chats') {
+      // Модерации база отдаёт все чаты; обычному участнику — только свои.
+      if (canModerate(account)) view.forum.chats = await forum.listChats();
     } else if (canModerate(account)) {
       view.forum.reports = await forum.listReports();
     }
@@ -1537,6 +1542,130 @@ document.addEventListener('click', async (e) => {
         blogBtn.textContent = isBlogger ? 'Снять блогера' : 'Сделать блогером';
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  const leadBtn = e.target.closest('[data-player-leader]');
+  if (leadBtn) {
+    const nick = leadBtn.dataset.playerNick;
+    const isLeader = leadBtn.dataset.playerLead === '1';
+    leadBtn.disabled = true;
+    leadBtn.textContent = isLeader ? 'Снимаем…' : 'Назначаем…';
+    try {
+      await forum.setLeader(leadBtn.dataset.playerLeader, !isLeader);
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        isLeader
+          ? `<b>${esc(nick)} больше не лидер.</b> Созданные им чаты остались — закрыть их можно на вкладке «Чаты».`
+          : `<b>${esc(nick)} теперь лидер альянса.</b> Он может создавать закрытые чаты и давать код приглашения.`,
+        'ok'
+      );
+    } catch (err) {
+      if (leadBtn.isConnected) {
+        leadBtn.disabled = false;
+        leadBtn.textContent = isLeader ? 'Снять лидера' : 'Сделать лидером';
+      }
+      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  /* ── Форум: чаты ── */
+
+  const chatOpen = e.target.closest('[data-chat-open]');
+  if (chatOpen) {
+    const id = chatOpen.dataset.chatOpen;
+    view.forum.chatOpenId = view.forum.chatOpenId === id ? null : id;
+    view.forum.chatMessages = null;
+    view.forum.chatMembers = null;
+    view.forum.chatError = '';
+    render();
+    if (view.forum.chatOpenId) {
+      try {
+        const [messages, members] = await Promise.all([
+          forum.listChatMessages(id, { limit: 100 }),
+          forum.listChatMembers(id),
+        ]);
+        if (view.forum.chatOpenId !== id) return;
+        view.forum.chatMessages = messages;
+        view.forum.chatMembers = members;
+      } catch (err) {
+        view.forum.chatError = String(err?.message ?? err);
+      }
+      render();
+    }
+    return;
+  }
+
+  const chatClose = e.target.closest('[data-chat-close]');
+  if (chatClose) {
+    const id = chatClose.dataset.chatClose;
+    const closing = chatClose.dataset.chatClosed !== '1';
+    const reason = closing ? (prompt('Причина закрытия (увидят участники):', 'по решению модерации') ?? null) : '';
+    if (reason === null) return;
+    chatClose.disabled = true;
+    try {
+      await forum.updateChat(id, { closed: closing, closedReason: reason });
+      view.forum.loadedFor = null;
+      render();
+      showForumResult('[data-chats-result]', closing ? '<b>Чат закрыт.</b> Писать в него больше нельзя, история осталась.' : '<b>Чат снова открыт.</b>', 'ok');
+    } catch (err) {
+      chatClose.disabled = false;
+      showForumResult('[data-chats-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  const chatDelete = e.target.closest('[data-chat-delete]');
+  if (chatDelete) {
+    const title = chatDelete.dataset.chatTitle || 'чат';
+    if (!confirm(`Удалить «${title}» со всеми сообщениями? Это необратимо.`)) return;
+    chatDelete.disabled = true;
+    try {
+      await forum.adminDeleteChat(chatDelete.dataset.chatDelete);
+      view.forum.loadedFor = null;
+      view.forum.chatOpenId = null;
+      render();
+      showForumResult('[data-chats-result]', `<b>«${esc(title)}» удалён.</b>`, 'ok');
+    } catch (err) {
+      chatDelete.disabled = false;
+      showForumResult('[data-chats-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  const chatKick = e.target.closest('[data-chat-kick]');
+  if (chatKick) {
+    const id = view.forum.chatOpenId;
+    if (!id || !confirm('Выгнать из чата?')) return;
+    chatKick.disabled = true;
+    try {
+      await forum.kickChatMember(id, chatKick.dataset.chatKick);
+      view.forum.chatMembers = await forum.listChatMembers(id);
+      render();
+    } catch (err) {
+      chatKick.disabled = false;
+      showForumResult('[data-chats-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  const chatMsgDel = e.target.closest('[data-chat-msg-delete]');
+  if (chatMsgDel) {
+    const reason = prompt('Причина удаления (увидят участники):', 'нарушение правил');
+    if (reason === null) return;
+    chatMsgDel.disabled = true;
+    try {
+      await forum.deleteChatMessage(chatMsgDel.dataset.chatMsgDelete, reason);
+      const m = (view.forum.chatMessages ?? []).find((x) => x.id === chatMsgDel.dataset.chatMsgDelete);
+      if (m) { m.deleted = true; m.deletedReason = reason; }
+      render();
+    } catch (err) {
+      chatMsgDel.disabled = false;
+      showForumResult('[data-chats-result]', esc(String(err?.message ?? err)), 'err');
     }
     return;
   }

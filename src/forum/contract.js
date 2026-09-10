@@ -168,6 +168,74 @@
  * @property {() => Promise<ForumNotification[]>} listNotifications  Свежие сверху, только свои.
  * @property {(ids: string[]) => Promise<void>} markNotificationsRead
  * @property {() => Promise<void>} markAllNotificationsRead
+ *
+ * Закрытые чаты (см. supabase/chats.sql). Создаёт лидер альянса
+ * (ForumUser.isLeader) или модерация; читают только участники и модерация.
+ * @property {(userId: string, isLeader: boolean) => Promise<void>} setLeader
+ * @property {() => Promise<ForumChat[]>} listChats
+ * @property {(id: string) => Promise<ForumChat|null>} getChat
+ * @property {(draft: {title: string, kind?: 'alliance'|'inter', allianceTag?: string}) => Promise<ForumChat>} createChat
+ * @property {(code: string) => Promise<string>} joinChat  Возвращает id чата.
+ * @property {(chatId: string) => Promise<void>} leaveChat
+ * @property {(chatId: string) => Promise<ForumChatMember[]>} listChatMembers
+ * @property {(chatId: string, userId: string, role: 'admin'|'member') => Promise<void>} setChatMemberRole
+ * @property {(chatId: string, userId: string) => Promise<void>} kickChatMember
+ * @property {(chatId: string, opts?: {limit?: number, before?: Date|null}) => Promise<ForumChatMessage[]>} listChatMessages
+ * @property {(chatId: string, body: string) => Promise<ForumChatMessage>} sendChatMessage
+ * @property {(id: string, reason?: string) => Promise<void>} deleteChatMessage
+ * @property {(chatId: string) => Promise<void>} markChatRead
+ * @property {(chatId: string, patch: {title?: string, allianceTag?: string, closed?: boolean, closedReason?: string}) => Promise<void>} updateChat
+ * @property {(chatId: string) => Promise<string>} rotateChatCode
+ * @property {(chatId: string) => Promise<void>} adminDeleteChat
+ */
+
+/**
+ * @typedef {Object} ForumChat
+ * @property {string} id
+ * @property {string} title
+ * @property {'alliance'|'inter'} kind
+ * @property {string} allianceTag
+ * @property {string|null} ownerId
+ * @property {string} ownerNick
+ * @property {string} inviteCode   Виден только участникам (политики базы).
+ * @property {number} maxMembers
+ * @property {boolean} closed
+ * @property {string} closedReason
+ * @property {Date} createdAt
+ * @property {number} memberCount
+ * @property {'owner'|'admin'|'member'|null} myRole
+ * @property {number} unread
+ * @property {string} lastBody
+ * @property {string} lastNick
+ * @property {Date|null} lastAt
+ */
+
+/**
+ * @typedef {Object} ForumChatMember
+ * @property {string} chatId
+ * @property {string} userId
+ * @property {string} nick
+ * @property {string} avatarUrl
+ * @property {string} allianceTag
+ * @property {boolean} isLeader
+ * @property {'owner'|'admin'|'member'} role
+ * @property {Date} joinedAt
+ */
+
+/**
+ * @typedef {Object} ForumChatMessage
+ * @property {string} id
+ * @property {string} chatId
+ * @property {string|null} authorId
+ * @property {string} authorNick
+ * @property {string} authorAvatar
+ * @property {string} authorAlliance
+ * @property {string} authorRole
+ * @property {boolean} authorIsLeader
+ * @property {string} body
+ * @property {boolean} deleted
+ * @property {string} deletedReason
+ * @property {Date} createdAt
  */
 
 export {};
