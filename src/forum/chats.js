@@ -4,6 +4,9 @@
  * Тот же приём, что у форума (mount.js): состояние в одном объекте, страница
  * перерисовывается строкой целиком, набранный текст переживает перерисовку.
  *
+ * Страница — полноэкранный мессенджер: высоту от шапки сайта считает
+ * fitFullscreen ниже, действия с чатом живут в меню ⋯.
+ *
  * КАК ПРИХОДЯТ НОВЫЕ СООБЩЕНИЯ. Опросом раз в несколько секунд, пока вкладка
  * видна. Не Realtime-подпиской Supabase — она требует их клиентскую
  * библиотеку и веб-сокет, а проект держится на правиле «обычные ES-модули,
@@ -29,6 +32,7 @@ const state = {
   members: [],
   membersOpen: false,
   inviteOpen: false,
+  menuOpen: false,
   createOpen: false,
   hasMore: false,
   sending: false,
@@ -40,6 +44,33 @@ let token = 0;
 let timer = 0;
 let listTimer = 0;
 let draft = '';
+let headWatch = null;
+
+/*
+  ПОЛНОЭКРАННЫЙ РЕЖИМ.
+
+  Высота мессенджера считается от шапки сайта, и её рост — не константа:
+  президентская доска приезжает вместе с данными, телефон в альбоме
+  переносит строку. Поэтому шапку меряем и следим за ней, а ответ кладём
+  в --chat-head-h на контейнере — его читает refine.css. Без этого любая
+  зашитая цифра то оставляла бы под шапкой щель, то уводила кнопку
+  отправки под нижний край экрана.
+*/
+function fitFullscreen() {
+  if (!host) return;
+  const head = document.querySelector('.site-head');
+  host.style.setProperty('--chat-head-h', `${head ? head.offsetHeight : 0}px`);
+}
+
+function watchHead() {
+  headWatch?.disconnect();
+  fitFullscreen();
+  const head = document.querySelector('.site-head');
+  if (head && typeof ResizeObserver !== 'undefined') {
+    headWatch = new ResizeObserver(fitFullscreen);
+    headWatch.observe(head);
+  }
+}
 
 /* ── Отрисовка ──────────────────────────────────────────────────────────── */
 
@@ -101,6 +132,7 @@ async function openChat(id) {
   state.members = [];
   state.membersOpen = false;
   state.inviteOpen = false;
+  state.menuOpen = false;
   state.hasMore = false;
   state.loading = true;
   draft = '';
@@ -267,9 +299,30 @@ function wire() {
   });
 
   document.addEventListener('click', async (e) => {
-    if (!host || !e.target.closest || !host.contains(e.target)) return;
+    if (!host || !e.target.closest) return;
     const t = e.target;
 
+    /*
+      Меню ⋯ закрывается кликом мимо него — по всему окну, не только
+      по полю чата: открытое меню не должно переживать уход внимания.
+      Меню убираем из DOM точечно, без перерисовки страницы: клик мог
+      прийтись по полю ввода или по другому чату в списке, и полная
+      перерисовка отняла бы у них фокус и переход посреди нажатия.
+    */
+    if (state.menuOpen && !t.closest('[data-chat-menu]')) {
+      state.menuOpen = false;
+      host.querySelector('.chat-menu__pop')?.remove();
+      host.querySelector('[data-chat-menu-toggle]')?.setAttribute('aria-expanded', 'false');
+    }
+    if (!host.contains(t)) return;
+
+    if (t.closest('[data-chat-menu-toggle]')) {
+      state.menuOpen = !state.menuOpen;
+      state.membersOpen = false;
+      state.inviteOpen = false;
+      paint();
+      return;
+    }
     if (t.closest('[data-chat-create-toggle]')) {
       state.createOpen = !state.createOpen;
       paint();
@@ -279,6 +332,7 @@ function wire() {
     if (t.closest('[data-chat-members-toggle]')) {
       state.membersOpen = !state.membersOpen;
       state.inviteOpen = false;
+      state.menuOpen = false;
       if (state.membersOpen && state.openId) {
         state.members = await forum.listChatMembers(state.openId).catch(() => []);
       }
@@ -288,6 +342,7 @@ function wire() {
     if (t.closest('[data-chat-invite]')) {
       state.inviteOpen = !state.inviteOpen;
       state.membersOpen = false;
+      state.menuOpen = false;
       paint();
       return;
     }
@@ -313,6 +368,8 @@ function wire() {
     }
     const leave = t.closest('[data-chat-leave]');
     if (leave && state.openId) {
+      state.menuOpen = false;
+      paint();
       if (!confirm('Выйти из чата? Вернуться можно будет только по коду.')) return;
       await withBusy(leave, '…', async () => {
         await forum.leaveChat(state.openId);
@@ -323,6 +380,8 @@ function wire() {
     }
     const close = t.closest('[data-chat-close]');
     if (close && state.openId) {
+      state.menuOpen = false;
+      paint();
       const reason = prompt('Причина закрытия (увидят участники):', '') ?? null;
       if (reason === null) return;
       await withBusy(close, '…', async () => {
@@ -334,6 +393,8 @@ function wire() {
     }
     const reopen = t.closest('[data-chat-reopen]');
     if (reopen && state.openId) {
+      state.menuOpen = false;
+      paint();
       await withBusy(reopen, '…', async () => {
         await forum.updateChat(state.openId, { closed: false, closedReason: '' });
         await loadList();
@@ -393,8 +454,15 @@ function wire() {
 
   // Enter — отправить, Shift+Enter — перенос. Как в любом мессенджере;
   // на телефоне Enter в textarea остаётся переносом (там есть кнопка).
+  // Esc закрывает меню ⋯, не трогая ничего больше.
   document.addEventListener('keydown', (e) => {
-    if (!host || !e.target.matches?.('[data-chat-input]')) return;
+    if (!host) return;
+    if (e.key === 'Escape' && state.menuOpen) {
+      state.menuOpen = false;
+      paint();
+      return;
+    }
+    if (!e.target.matches?.('[data-chat-input]')) return;
     const coarse = window.matchMedia?.('(pointer: coarse)').matches;
     if (e.key === 'Enter' && !e.shiftKey && !coarse) {
       e.preventDefault();
@@ -417,6 +485,7 @@ export async function mountChats(container, param = null) {
   host = container;
   token++;
   wire();
+  watchHead();
 
   state.loading = true;
   state.error = '';
@@ -472,12 +541,15 @@ export function unmountChats() {
   host = null;
   token++;
   stopPolling();
+  headWatch?.disconnect();
+  headWatch = null;
   state.openId = null;
   state.open = null;
   state.messages = [];
   state.members = [];
   state.membersOpen = false;
   state.inviteOpen = false;
+  state.menuOpen = false;
   state.createOpen = false;
   draft = '';
 }
