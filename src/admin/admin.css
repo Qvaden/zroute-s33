@@ -1225,3 +1225,27 @@ body.guide-color-modal-open{overflow:hidden}
   line-height: 1.55;
 }
 .adm-modal__note b { color: var(--dim); }
+
+/* ── Чаты ─────────────────────────────────────────────────────────────────── */
+.adm-badge--leader { color: #5cc8ff; border-color: rgba(92,200,255,.35); background: rgba(92,200,255,.1); }
+.adm-chats { display: grid; gap: 8px; }
+.adm-chat { border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.02); }
+.adm-chat.is-closed { opacity: .7; }
+.adm-chat.is-open { border-color: rgba(255,106,43,.4); }
+.adm-chat__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; }
+.adm-chat__who { min-width: 0; flex: 1 1 260px; }
+.adm-chat__who b { display: block; font-size: 14.5px; }
+.adm-chat__who small { display: block; margin-top: 2px; color: var(--mute); font-size: 11.5px; }
+.adm-chat__acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.adm-chat__detail { display: grid; gap: 14px; padding: 0 14px 14px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+@media (min-width: 900px) { .adm-chat__detail { grid-template-columns: 260px 1fr; } }
+.adm-chat__members ul, .adm-chat__messages ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.adm-chat__members li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 13px; }
+.adm-chat__messages li { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.03); font-size: 13px; }
+.adm-chat__messages li.is-deleted { opacity: .55; }
+.adm-chat__msg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; font-size: 12px; }
+.adm-chat__msg-head time { color: var(--mute); font-size: 11px; }
+.adm-chat__msg-del { margin-left: auto; padding: 0 6px; border: 0; background: none; color: var(--mute); cursor: pointer; }
+.adm-chat__msg-del:hover { color: var(--loss); }
+.adm-chat__msg-body { display: block; color: var(--dim); line-height: 1.45; overflow-wrap: anywhere; }
+.adm-btn--sm { min-height: 28px; padding: 3px 9px; font-size: 12px; }

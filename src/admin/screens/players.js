@@ -127,6 +127,12 @@ export function renderPlayers(view) {
           не ограничивает: это только метка у постов и блок блога на странице.
         </p>
         <p class="muted">
+          <b>Лидер альянса</b> — тот, кто может создавать закрытые чаты
+          (альянсовые и межальянсовые, до 200 человек). Не роль и не право
+          на сайт: доверие своему альянсу. Чаты и их участников видно на
+          вкладке «Чаты».
+        </p>
+        <p class="muted">
           Пароль показывается один раз и только вам — передайте его человеку сами.
           Сохранённого пароля не существует: база хранит не его, а необратимый
           отпечаток, поэтому подсмотреть старый нельзя даже владельцу.
@@ -155,7 +161,7 @@ function renderRow(user, me) {
   return `
     <div class="adm-player" data-player="${esc(user.id)}">
       <div class="adm-player__who">
-        <b>${esc(user.nick)}${roleBadge(user, { short: true })}</b>
+        <b>${esc(user.nick)}${roleBadge(user, { short: true })}${user.isLeader ? ' <span class="adm-badge adm-badge--leader">лидер</span>' : ''}</b>
         <small>с ${esc(shortDate(user.createdAt))}</small>
       </div>
 
@@ -199,6 +205,12 @@ function renderRow(user, me) {
                         data-player-nick="${esc(user.nick)}"
                         data-player-blog="${user.isBlogger ? '1' : ''}">
                   ${user.isBlogger ? 'Снять блогера' : 'Сделать блогером'}
+                </button>
+                <button type="button" class="adm-btn"
+                        data-player-leader="${esc(user.id)}"
+                        data-player-nick="${esc(user.nick)}"
+                        data-player-lead="${user.isLeader ? '1' : ''}">
+                  ${user.isLeader ? 'Снять лидера' : 'Сделать лидером'}
                 </button>
                 <button type="button" class="adm-btn"
                         data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"

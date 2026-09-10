@@ -2340,6 +2340,18 @@ console.log('\nQ. Форум');
     localAdapter.capabilities.isShared === false && supabaseAdapter.capabilities.isShared === true);
 
   /*
+    Страница участника в черновом режиме. Профили читал только forum/profile.js
+    напрямую из базы, и без базы нажатие на ник давало «Не удалось связаться
+    с базой». Теперь локальный адаптер отдаёт профиль сам, а profile.js идёт
+    к нему, если тот умеет.
+  */
+  check('локальный адаптер умеет профили',
+    ['getProfile', 'getUserPosts', 'saveProfile'].every((m) => typeof localAdapter[m] === 'function'));
+  const profileSource = await readFile('src/forum/profile.js', 'utf8');
+  check('profile.js ходит к адаптеру, если тот умеет профили',
+    /typeof forum\.getProfile === 'function'/.test(profileSource) && /if \(ownProfiles\) return forum\.getProfile/.test(profileSource));
+
+  /*
     АДРЕС ПРОЕКТА ПРИВОДИТСЯ К ОДНОМУ ВИДУ.
 
     В панели Supabase адрес показан в разделе Data API уже с хвостом
@@ -3109,7 +3121,11 @@ console.log('\nQ. Форум');
 
   const mainJs = await readFile('src/main.js', 'utf8');
   check('форум — первый раздел в меню',
-    /const ROUTES = \[\s*\{ id: 'forum'/.test(mainJs));
+    /const ROUTES = \[[\s\S]{0,600}?\{ id: 'forum'/.test(mainJs) &&
+    mainJs.indexOf("{ id: 'forum'") < mainJs.indexOf("{ id: 'home'"));
+  check('чаты — второй раздел, сразу за форумом',
+    /\{ id: 'chats', label: 'Чаты', live: true/.test(mainJs) &&
+    mainJs.indexOf("{ id: 'chats'") < mainJs.indexOf("{ id: 'home'"));
   check('пустой адрес открывает форум', /id \|\| 'forum'/.test(mainJs));
   check('итоги VS остались отдельным разделом', /id: 'home'/.test(mainJs));
   check('хронология осталась отдельным разделом', /id: 'timeline'/.test(mainJs));
@@ -3137,12 +3153,12 @@ console.log('\nQ. Форум');
     /retryOnAbort = false/.test(clientJs));
   check('повтор по таймауту включён у чтения ленты',
     /retryOnAbort: true/.test(forumDbJs));
-  check('повтор по таймауту у ленты, поста и комментариев — три места',
-    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 3);
+  check('повтор по таймауту у ленты, поста, комментариев и чатов — пять мест',
+    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 5);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
-  check('живые вкладки — форум и страница участника',
-    /id === 'forum' \|\| \(id === 'user' && param\)/.test(mainJs));
+  check('живые вкладки — форум, чаты и страница участника',
+    /id === 'forum' \|\| id === 'chats' \|\| \(id === 'user' && param\)/.test(mainJs));
 
   /*
     ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.
@@ -3606,7 +3622,21 @@ console.log('\nS. Чистые функции');
   check('форма создания опроса в композиторе',
     /data-forum-poll-toggle/.test(pagesSourcePoll) && /poll_question/.test(pagesSourcePoll));
   check('предел вариантов опроса в коде',
-    /idx >= 8/.test(mountSourcePoll));
+    /POLL_OPTIONS_MAX = 8/.test(mountSourcePoll) && /idx >= POLL_OPTIONS_MAX/.test(mountSourcePoll));
+
+  /*
+    Что обязано пережить перерисовку: у редактора (div contenteditable) нет
+    свойства .name, поэтому имя поля читается атрибутом; раскрытая форма поста
+    и опрос восстанавливаются по наличию атрибута, а не по его значению.
+  */
+  check('имя поля для снимка читается атрибутом, а не свойством',
+    /const name = el\.getAttribute\('name'\)/.test(mountSourcePoll));
+  check('раскрытая форма поста переживает перерисовку',
+    /hasAttribute\('data-forum-composer'\)/.test(mountSourcePoll));
+  check('форма опроса переживает перерисовку',
+    /snapshot\.poll/.test(mountSourcePoll) && /appendPollOption\(container\)/.test(mountSourcePoll));
+  check('Ctrl+Enter отправляет и из редактора',
+    /area\.matches\('\[data-editor\]'\)/.test(mountSourcePoll));
 }
 
 /* ── Уведомления: правила те же, что у триггеров базы ── */

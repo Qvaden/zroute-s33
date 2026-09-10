@@ -22,8 +22,9 @@
 import { esc, plural } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
-import { postBody, excerpt, editorHtml, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { roleBadge, roleLabel } from '../forum/roles.js';
+import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -81,18 +82,34 @@ export function renderForum(view, state = {}) {
     ...state,
   };
 
+  /*
+    ДВЕ КОЛОНКИ НА ШИРОКОМ ЭКРАНЕ, ОДНА НА ТЕЛЕФОНЕ.
+
+    Раньше всё шло одной лентой сверху вниз: сводка, тема недели, горячее,
+    топ игроков, правила — и только потом сама лента. На мониторе до первого
+    поста приходилось прокручивать полтора экрана. Теперь контекст (сводка,
+    горячее, топ, правила) стоит боковой колонкой справа, а лента начинается
+    сразу. На телефоне колонки складываются в прежнем порядке — там боковой
+    колонке места нет, а порядок «сначала контекст» проверен.
+  */
   return `
-    ${renderChronicleBand(view?.events ?? [])}
-    ${renderWelcome(s)}
-    ${renderWeekTheme(view)}
-    ${renderHotTopics(s)}
-    ${renderLeaderboard(s)}
-    ${renderRules()}
-    ${renderAccountBar(s)}
-    ${renderNotifications(s)}
-    ${renderComposer(s)}
-    ${renderFeedControls(s)}
-    ${renderFeed(s)}`;
+    <div class="forum-layout">
+      <aside class="forum-side" aria-label="Сводка и правила">
+        ${renderChronicleBand(view?.events ?? [])}
+        ${renderWeekTheme(view)}
+        ${renderHotTopics(s)}
+        ${renderLeaderboard(s)}
+        ${renderRules()}
+      </aside>
+      <div class="forum-main">
+        ${renderWelcome(s)}
+        ${renderAccountBar(s)}
+        ${renderNotifications(s)}
+        ${renderComposer(s)}
+        ${renderFeedControls(s)}
+        ${renderFeed(s)}
+      </div>
+    </div>`;
 }
 
 /* ── Хроника сервера: новая подача ────────────────────────────────────────── */
@@ -134,9 +151,9 @@ function renderChronicleBand(events) {
   const captures = server.filter((e) => e.type === 'server_capture').length;
   const defended = server.filter((e) => e.type === 'server_defended').length;
 
-  // Пять свежих: больше на телефоне уже требует прокрутки, а полоса должна
-  // читаться целиком.
-  const recent = all.slice(0, 5);
+  // Четыре свежих: в боковой колонке больше уже требует прокрутки, а полоса
+  // должна читаться целиком.
+  const recent = all.slice(0, 4);
 
   // Заголовок — самая последняя запись. У исходов вердикт уже сформулирован
   // («Захватили Столицу сервера 36»), у остальных типов это название записи.
@@ -203,14 +220,20 @@ function renderChronicleBand(events) {
 function renderWelcome(s) {
   if (!s.ready || !s.posts.length || s.me) return '';
 
-  const total = s.total ?? s.posts.length;
+  /*
+    Точное число тем база не отдаёт: лента знает лишь «есть ли ещё страница».
+    Пока не долистали до конца, честнее сказать «больше N», чем назвать
+    число, которое на следующей странице окажется неправдой.
+  */
+  const shown = s.posts.length;
+  const more = Number(s.total) > shown;
   return `
     <section class="panel forum-welcome" data-forum-welcome>
       <span class="forum-welcome__mark" aria-hidden="true">👋</span>
       <div class="forum-welcome__body">
         <b>Добро пожаловать на форум сервера 33</b>
         <p class="muted">
-          Здесь уже ${esc(plural(total, 'тема', 'темы', 'тем'))}. Заходите обсудить
+          Здесь уже ${more ? 'больше ' : ''}${esc(plural(shown, 'тема', 'темы', 'тем'))}. Заходите обсудить
           игру, альянсы и всё, что происходит на сервере.
         </p>
       </div>
@@ -221,7 +244,7 @@ function renderWelcome(s) {
 }
 
 /**
- * ЕЖЕНЕДЕЛЬНАЯ ТЕМА — «рубрики-римпления».
+ * ЕЖЕНЕДЕЛЬНАЯ ТЕМА — «рубрика недели».
  *
  * Админ заводит её как обычный текст с ключом forum-theme на вкладке «Тексты»
  * (заголовок — название рубрики, текст — как писать в неё). Форум берёт блок
@@ -517,12 +540,14 @@ function renderWhoAmI(s) {
         ${avatar(s.me.nick, s.me.avatarUrl)}
         <span class="forum-me__body">
           <b>${nickLink(s.me.nick)}</b>
-          <small>${roleBadge(s.me) || esc(roleLabel(s.me))}</small>
+          <small>${roleBadge(s.me) || esc(roleLabel(s.me))}${s.me.isLeader ? leaderBadge() : ''}</small>
         </span>
+        <a class="forum-btn forum-btn--ghost forum-chats-link" href="#/chats">Чаты</a>
         <button type="button" class="forum-btn forum-btn--ghost forum-bell"
                 data-forum-notify-open aria-label="Уведомления"
                 ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>
-<span class="forum-bell__label">Уведомления</span>
+<svg class="forum-bell__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="forum-bell__label">Уведомления</span>
           ${
             s.notifyUnread > 0
               ? `<span class="forum-bell__badge" data-forum-notify-badge>${s.notifyUnread}</span>`
@@ -1038,7 +1063,9 @@ export function renderPostCard(p, s) {
       ${p.poll ? renderPoll(p.poll, s) : ''}
 
       ${
-        !isOpen && p.body.length > 220
+        // По видимому тексту, а не по HTML: жирный абзац в три слова —
+        // это не «длинный пост», хотя разметки в нём больше 220 символов.
+        !isOpen && textOf(p.body).length > 220
           ? `<a class="forum-post__expand" href="#/forum/${esc(p.id)}">Читать целиком</a>`
           : ''
       }`

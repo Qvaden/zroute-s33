@@ -11,6 +11,15 @@
  */
 import { rest, uploadFile, publicFileUrl, currentUserId } from '../db/client.js';
 import { prepareImage, uploadPath } from '../ui/image-prep.js';
+import { forum } from './index.js';
+
+/*
+  Если выбранный адаптер форума сам умеет профили (локальный режим), ходим
+  к нему, а не в базу: в черновом режиме базы нет, и страница участника
+  падала с «Не удалось связаться с базой». Рабочий адаптер этих методов
+  не имеет — для него всё по-прежнему читается из forum_profiles ниже.
+*/
+const ownProfiles = typeof forum.getProfile === 'function';
 
 const toDate = (v) => (v ? new Date(v) : null);
 
@@ -62,6 +71,7 @@ function profileFrom(row) {
 export async function getProfile(nick) {
   const clean = String(nick ?? '').trim();
   if (!clean) return null;
+  if (ownProfiles) return forum.getProfile(clean);
 
   /*
     Сравнение без учёта регистра: ссылка из чата может прийти в любом виде,
@@ -77,6 +87,7 @@ export async function getProfile(nick) {
 
 /** Последние посты участника — для его страницы. */
 export async function getUserPosts(userId, limit = 10) {
+  if (ownProfiles) return forum.getUserPosts(userId, limit);
   const rows = await rest(
     `/forum_post_list?select=*&author_id=eq.${encodeURIComponent(userId)}` +
       `&deleted=is.false&order=created_at.desc&limit=${Number(limit)}`
@@ -95,6 +106,7 @@ export async function getUserPosts(userId, limit = 10) {
  * @param {{about?: string, allianceTag?: string}} patch
  */
 export async function saveProfile(patch) {
+  if (ownProfiles) return forum.saveProfile(patch);
   const myId = currentUserId();
   if (!myId) throw new Error('Сначала войдите');
 
@@ -124,6 +136,7 @@ export async function saveProfile(patch) {
  * @returns {Promise<string>} публичная ссылка
  */
 export async function uploadAvatar(file) {
+  if (ownProfiles) throw new Error('В локальном режиме аватарку загрузить некуда — хранилища нет');
   const myId = currentUserId();
   if (!myId) throw new Error('Сначала войдите');
 
@@ -157,6 +170,7 @@ export async function uploadAvatar(file) {
 
 /** Убрать аватарку: вернуться к букве в цветном квадрате. */
 export async function clearAvatar() {
+  if (ownProfiles) return;
   const myId = currentUserId();
   if (!myId) throw new Error('Сначала войдите');
 
