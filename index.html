@@ -63,7 +63,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=33">
+  <link rel="modulepreload" href="./src/main.js?v=34">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -76,7 +76,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=10">
+  <link rel="stylesheet" href="./src/forum.css?v=11">
   <!--
     Телефон — последним слоем.
 
@@ -98,12 +98,23 @@
     Один файл на сайт и панель: правила для select уже лежали в четырёх местах
     admin.css и спорили друг с другом.
   -->
-  <link rel="stylesheet" href="./src/controls.css?v=2">
+  <link rel="stylesheet" href="./src/controls.css?v=4">
   <!--
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
   <link rel="stylesheet" href="./src/refine.css?v=4">
+  <!--
+    Чат — последним слоем.
+
+    Устройство мессенджера (сетка, список, лента, пузыри) лежит в refine.css
+    и оттуда не переезжает: тот файл отвечает за отделку всего сайта.
+    Здесь только то, что появилось с новыми возможностями — вложения, ответы,
+    реакции, закреплённое, поиск, смайлы и просмотр картинки. Подключён после
+    всех, потому что описывает состояния (идёт загрузка, ошибка, переход
+    к сообщению), которые обязаны побеждать базовый вид.
+  -->
+  <link rel="stylesheet" href="./src/chat.css?v=2">
   <script>
     try {
       if (localStorage.getItem('s33-loader-seen') === '1') {
@@ -195,7 +206,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=33"></script>
+  <script type="module" src="./src/main.js?v=34"></script>
 
   <script>
     /*

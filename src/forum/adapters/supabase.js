@@ -42,9 +42,14 @@ import {
   currentUserId,
   auth,
   rest,
+  uploadFile,
+  uploadFileWithProgress,
+  deleteFile,
   nickDomain,
   isConfigured,
 } from '../../db/client.js';
+import { prepareImage } from '../../ui/image-prep.js';
+import { CHAT_LIMITS, checkFile, nameOf, storageName, audioDuration } from '../media.js';
 
 export const name = 'общая база (Supabase)';
 
@@ -716,6 +721,16 @@ export async function markAllNotificationsRead() {
   Устройство — в supabase/chats.sql. Здесь только перевод строк базы в объекты
   и обратно. Кто что видит, решают политики: гость не получит ни одной строки,
   участник — только свои чаты, модерация — все.
+
+  ЧТО ЗДЕСЬ ПОЯВИЛОСЬ С ВЛОЖЕНИЯМИ. Файл сначала едет в хранилище, и только
+  потом появляется сообщение со ссылкой на него (uploadChatFile →
+  sendChatMessage). Обратный порядок оставлял бы в ленте сообщение с файлом,
+  которого нет, — битую картинку, видную всем.
+
+  Второе: вложения уходят в базу ОДНИМ запросом вместе с сообщением, колонкой
+  draft_attachments. У PostgREST нет вложенной вставки «родитель и дети разом»,
+  а два запроса дали бы окно, в котором сообщение уже видно, а файлов в нём
+  ещё нет. Разбирает эту колонку на строки триггер базы — см. chats.sql.
 */
 
 function chatOut(row) {
@@ -724,6 +739,8 @@ function chatOut(row) {
     title: row.title,
     kind: row.kind || 'alliance',
     allianceTag: row.alliance_tag || '',
+    topic: row.topic || '',
+    avatarUrl: row.avatar_url || '',
     ownerId: row.owner_id,
     ownerNick: row.owner_nick || '',
     inviteCode: row.invite_code || '',
@@ -736,11 +753,37 @@ function chatOut(row) {
     unread: Number(row.unread_count || 0),
     lastBody: row.last_body || '',
     lastNick: row.last_nick || '',
+    lastKind: row.last_kind || '',
     lastAt: toDate(row.last_at),
+    pinnedCount: Number(row.pinned_count || 0),
   };
 }
 
-function chatMessageOut(row) {
+/** Вложение: строки базы в объект контракта. */
+function attachmentOut(row) {
+  return {
+    id: row.id,
+    kind: row.kind || 'file',
+    url: row.url,
+    name: row.name || '',
+    mime: row.mime || '',
+    sizeBytes: Number(row.size_bytes || 0),
+    width: Number(row.width || 0),
+    height: Number(row.height || 0),
+    durationMs: Number(row.duration_ms || 0),
+  };
+}
+
+/**
+ * Сообщение строки базы в объект контракта.
+ *
+ * Экспортируется ради теста паритета (tests/contract.test.js): набор полей
+ * здесь и в локальном адаптере обязан совпадать, иначе переключение
+ * источника данных однажды покажет в чате пустые вложения.
+ */
+export function chatMessageOut(row) {
+  const attachments = Array.isArray(row.attachments) ? row.attachments : [];
+  const reactions = Array.isArray(row.reactions) ? row.reactions : [];
   return {
     id: row.id,
     chatId: row.chat_id,
@@ -754,6 +797,18 @@ function chatMessageOut(row) {
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
     createdAt: toDate(row.created_at) ?? new Date(),
+    pinned: Boolean(row.pinned),
+    attachments: attachments.map(attachmentOut),
+    reactions: reactions.map((r) => ({
+      emoji: r.emoji,
+      count: Number(r.count || 0),
+      mine: Boolean(r.mine),
+      nicks: Array.isArray(r.nicks) ? r.nicks : [],
+    })),
+    replyToId: row.reply_id || null,
+    replyNick: row.reply_nick || '',
+    replyBody: row.reply_body || '',
+    replyDeleted: Boolean(row.reply_deleted),
   };
 }
 
@@ -819,6 +874,10 @@ export async function kickChatMember(chatId, userId) {
 /**
  * Сообщения — последние `limit`, в хронологическом порядке. `before` —
  * для подгрузки истории вверх: дата самого старого уже показанного.
+ *
+ * Представление отдаёт вложения, реакции и цитату ответа сразу с сообщением.
+ * Иначе на каждое сообщение пришлось бы по два-три запроса, и лента из
+ * тридцати реплик превратилась бы в сотню обращений к базе.
  */
 export async function listChatMessages(chatId, { limit = 60, before = null } = {}) {
   const params = new URLSearchParams();
@@ -831,20 +890,68 @@ export async function listChatMessages(chatId, { limit = 60, before = null } = {
   return (Array.isArray(rows) ? rows : []).map(chatMessageOut).reverse();
 }
 
-export async function sendChatMessage(chatId, body) {
+/** Одно сообщение целиком — после отправки: в ответе вставки нет вложений и реакций. */
+async function getChatMessage(id) {
+  const rows = await rest(`/forum_chat_message_list?select=*&id=eq.${encodeURIComponent(id)}&limit=1`);
+  return Array.isArray(rows) && rows[0] ? chatMessageOut(rows[0]) : null;
+}
+
+/**
+ * Отправка: текст, ответ на другое сообщение и уже загруженные вложения.
+ *
+ * Пустое тело допустимо, только если есть вложения — картинку часто посылают
+ * без подписи. Проверяет это и база: триггер смотрит на ту же колонку
+ * draft_attachments и на пустое сообщение без файлов отвечает отказом.
+ */
+export async function sendChatMessage(chatId, body, { replyToId = null, attachments = [] } = {}) {
+  const text = String(body ?? '').slice(0, CHAT_LIMITS.messageMax);
+  const files = (Array.isArray(attachments) ? attachments : []).filter((a) => a?.url);
+  if (!text.trim() && !files.length) throw new Error('Пустое сообщение');
+  if (files.length > CHAT_LIMITS.attachmentsMax) {
+    throw new Error(`К сообщению можно приложить не больше ${CHAT_LIMITS.attachmentsMax} файлов`);
+  }
+
   const rows = await rest('/forum_chat_messages', {
     method: 'POST',
     prefer: 'return=representation',
-    body: { chat_id: chatId, body: String(body) },
+    body: {
+      chat_id: chatId,
+      body: text,
+      reply_to_id: replyToId || null,
+      draft_attachments: files.map((a) => ({
+        kind: a.kind,
+        url: a.url,
+        storage_path: a.storagePath || '',
+        name: a.name || '',
+        mime: a.mime || '',
+        size_bytes: a.sizeBytes || 0,
+        width: a.width || 0,
+        height: a.height || 0,
+        duration_ms: a.durationMs || 0,
+      })),
+    },
   });
   const created = Array.isArray(rows) ? rows[0] : rows;
-  return chatMessageOut(created);
+  return (await getChatMessage(created.id)) ?? chatMessageOut(created);
 }
 
+/**
+ * Мягкое удаление плюс уборка файлов.
+ *
+ * Порядок обратный загрузке, но по той же причине: сначала сообщение теряет
+ * вложения и только потом файлы исчезают из хранилища. Удали файлы первыми —
+ * и в ленте на секунду осталась бы картинка, которая уже не открывается.
+ */
 export async function deleteChatMessage(id, reason = '') {
   await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(id)}`, {
-    method: 'PATCH', body: { deleted: true, deleted_reason: String(reason || '') },
+    method: 'PATCH', body: { deleted: true, deleted_reason: String(reason || ''), pinned: false },
   });
+  const rows = await rest(`/forum_chat_attachments?select=id,storage_path&message_id=eq.${encodeURIComponent(id)}`)
+    .catch(() => []);
+  await rest(`/forum_chat_attachments?message_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (row.storage_path) await deleteFile('chat-uploads', row.storage_path).catch(() => {});
+  }
 }
 
 export async function markChatRead(chatId) {
@@ -855,12 +962,191 @@ export async function markChatRead(chatId) {
   }).catch(() => {});
 }
 
+/* ── Вложения ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Файл в хранилище. Возвращает заготовку вложения — её принимает
+ * sendChatMessage.
+ *
+ * Путь объекта: `chat/<чат>/<кто>/<файл>`. Идентификатор чата в пути — не
+ * украшение: на нём держится правило доступа хранилища. Оно проверяет, что
+ * загружающий состоит в этом чате, и без чата в пути такую проверку сделать
+ * нечем. Владелец в пути — чтобы нельзя было перезаписать чужой файл.
+ *
+ * Картинки сжимаются в браузере (prepareImage → JPEG 1600 px): скриншот
+ * с телефона весит 3–8 МБ, а бесплатное хранилище — 1 ГБ на весь проект.
+ * Видео не сжимается: перекодировать его в браузере без библиотек нельзя,
+ * а тянуть их в проект, который собирается без сборки, — против правила.
+ */
+export async function uploadChatFile(chatId, file, { onProgress = null } = {}) {
+  const me = currentUserId();
+  if (!me) throw new Error('Сначала войдите');
+
+  const check = checkFile(file);
+  if (!check.ok) throw new Error(check.error);
+  const kind = check.kind;
+
+  let bytes = file;
+  let contentType = file.type || 'application/octet-stream';
+  let ext = String(file.name || '').split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') ?? '';
+
+  if (kind === 'image') {
+    bytes = await prepareImage(file, 'photo');
+    contentType = 'image/jpeg';
+    ext = 'jpg';
+  }
+
+  const path = `chat/${chatId}/${me}/${storageName(file, ext)}`;
+  const url = await uploadFileWithProgress({
+    bucket: 'chat-uploads',
+    path,
+    bytes,
+    contentType,
+    onProgress,
+  });
+
+  /*
+    Длительность голосового берём из самого файла: MediaRecorder пишет её
+    не всегда, а полоска проигрывателя без числа секунд выглядит недоделкой.
+    Ошибка чтения не отменяет отправку — тогда будет 0 и проигрыватель
+    покажет длительность сам.
+  */
+  const durationMs = kind === 'audio' ? await audioDuration(bytes).catch(() => 0) : 0;
+
+  return {
+    kind,
+    url,
+    storagePath: path,
+    name: nameOf(file),
+    mime: contentType,
+    sizeBytes: Number(bytes.size || file.size || 0),
+    width: 0,
+    height: 0,
+    durationMs,
+  };
+}
+
+/** Картинка чата. Ложится в то же хранилище, но сжимается до 256 точек. */
+export async function uploadChatAvatar(chatId, file) {
+  const me = currentUserId();
+  if (!me) throw new Error('Сначала войдите');
+  const blob = await prepareImage(file, 'avatar');
+  const path = `chat/${chatId}/${me}/${storageName(file, 'jpg')}`;
+  const url = await uploadFile({ bucket: 'chat-uploads', path, bytes: blob, contentType: 'image/jpeg' });
+  await updateChat(chatId, { avatarUrl: url });
+  return url;
+}
+
+/* ── Реакции, закрепления, поиск, «пишет…» ────────────────────────────────── */
+
+/**
+ * Поставить или снять реакцию.
+ *
+ * Проверяем наличие отдельным запросом, а не «вставить и посмотреть»: у пары
+ * (сообщение, человек, эмодзи) стоит первичный ключ, и повторная вставка
+ * вернула бы ошибку нарушения ключа — то есть «нельзя», хотя человек всего
+ * лишь снимал свою же реакцию.
+ */
+export async function toggleChatReaction(messageId, emoji) {
+  const me = currentUserId();
+  if (!me) throw new Error('Сначала войдите');
+  const where = `message_id=eq.${encodeURIComponent(messageId)}&user_id=eq.${encodeURIComponent(me)}` +
+    `&emoji=eq.${encodeURIComponent(emoji)}`;
+
+  const rows = await rest(`/forum_chat_reactions?select=emoji&${where}&limit=1`);
+  if (Array.isArray(rows) && rows.length) {
+    await rest(`/forum_chat_reactions?${where}`, { method: 'DELETE' });
+  } else {
+    await rest('/forum_chat_reactions', { method: 'POST', body: { message_id: messageId, emoji } });
+  }
+}
+
+export async function pinChatMessage(messageId, pinned) {
+  await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}`, {
+    method: 'PATCH',
+    body: { pinned: Boolean(pinned), pinned_at: pinned ? new Date().toISOString() : null },
+  });
+}
+
+export async function listChatPinned(chatId) {
+  const rows = await rest(
+    `/forum_chat_message_list?select=*&chat_id=eq.${encodeURIComponent(chatId)}` +
+      `&pinned=is.true&deleted=is.false&order=pinned_at.desc&limit=${CHAT_LIMITS.pinsMax}`
+  );
+  return (Array.isArray(rows) ? rows : []).map(chatMessageOut);
+}
+
+/**
+ * Поиск по переписке: по тексту и по имени файла.
+ *
+ * Два запроса, а не один с соединением: PostgREST не умеет искать по колонке
+ * вложенной таблицы так, чтобы это осталось одним запросом, а имя файла —
+ * ровно то, по чему в чате ищут чаще всего («смета.pdf»). Результаты
+ * складываются по идентификатору, поэтому одно и то же сообщение не встанет
+ * в списке дважды.
+ */
+export async function searchChatMessages(chatId, query, { limit = CHAT_LIMITS.searchLimit } = {}) {
+  const q = String(query ?? '').trim();
+  if (q.length < 2) return [];
+  const safe = q.replace(/[%_*(),]/g, ' ').trim();
+  if (!safe) return [];
+  const encoded = encodeURIComponent(safe);
+  const chat = encodeURIComponent(chatId);
+
+  const [byBody, byName] = await Promise.all([
+    rest(`/forum_chat_message_list?select=*&chat_id=eq.${chat}&deleted=is.false` +
+      `&body=ilike.*${encoded}*&order=created_at.desc&limit=${limit}`).catch(() => []),
+    rest(`/forum_chat_attachments?select=message_id&chat_id=eq.${chat}&name=ilike.*${encoded}*&limit=${limit}`)
+      .catch(() => []),
+  ]);
+
+  const found = new Map();
+  for (const row of Array.isArray(byBody) ? byBody : []) found.set(row.id, chatMessageOut(row));
+
+  const ids = [...new Set((Array.isArray(byName) ? byName : []).map((r) => r.message_id))]
+    .filter((id) => !found.has(id))
+    .slice(0, limit);
+  if (ids.length) {
+    const rows = await rest(
+      `/forum_chat_message_list?select=*&id=in.(${ids.map(encodeURIComponent).join(',')})` +
+        `&deleted=is.false&order=created_at.desc`
+    ).catch(() => []);
+    for (const row of Array.isArray(rows) ? rows : []) found.set(row.id, chatMessageOut(row));
+  }
+
+  return [...found.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+}
+
+/**
+ * Отметка «пишу». Функция базы, а не вставка строки: политики на таблицу
+ * отметок писались бы ради одной колонки, а заодно пришлось бы чистить
+ * накопленное. Функция и обновляет мою отметку, и убирает чужие просроченные.
+ */
+export async function touchChatTyping(chatId) {
+  if (!currentUserId()) return;
+  await rest('/rpc/forum_chat_typing_touch', { method: 'POST', body: { target: chatId } }).catch(() => {});
+}
+
+export async function listChatTyping(chatId) {
+  const since = new Date(Date.now() - CHAT_LIMITS.typingMs).toISOString();
+  const rows = await rest(
+    `/forum_chat_typing?select=user_id,nick&chat_id=eq.${encodeURIComponent(chatId)}` +
+      `&at=gt.${encodeURIComponent(since)}`
+  ).catch(() => []);
+  return (Array.isArray(rows) ? rows : []).map((r) => ({ userId: r.user_id, nick: r.nick || '' })).filter((r) => r.nick);
+}
+
+/* ── Настройки чата ───────────────────────────────────────────────────────── */
+
 export async function updateChat(chatId, patch) {
   const body = {};
   if (patch.title != null) body.title = String(patch.title);
   if (patch.allianceTag != null) body.alliance_tag = String(patch.allianceTag);
+  if (patch.topic != null) body.topic = String(patch.topic).slice(0, CHAT_LIMITS.topicMax);
+  if (patch.avatarUrl != null) body.avatar_url = String(patch.avatarUrl);
   if (patch.closed != null) body.closed = Boolean(patch.closed);
   if (patch.closedReason != null) body.closed_reason = String(patch.closedReason);
+  if (!Object.keys(body).length) return;
   await rest(`/forum_chats?id=eq.${encodeURIComponent(chatId)}`, { method: 'PATCH', body });
 }
 
@@ -869,7 +1155,18 @@ export async function rotateChatCode(chatId) {
   return String(code).replace(/"/g, '');
 }
 
-/** Модерация: удалить чат целиком со всеми сообщениями. */
+/**
+ * Модерация: удалить чат целиком со всеми сообщениями.
+ *
+ * Файлы убираем руками до удаления чата: каскад в базе снесёт строки вложений,
+ * но в хранилище они останутся навсегда, и никто уже не найдёт, чьи они.
+ * Поэтому список путей берём заранее — после удаления чата их негде взять.
+ */
 export async function adminDeleteChat(chatId) {
+  const rows = await rest(`/forum_chat_attachments?select=storage_path&chat_id=eq.${encodeURIComponent(chatId)}`)
+    .catch(() => []);
   await rest(`/forum_chats?id=eq.${encodeURIComponent(chatId)}`, { method: 'DELETE' });
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (row.storage_path) await deleteFile('chat-uploads', row.storage_path).catch(() => {});
+  }
 }

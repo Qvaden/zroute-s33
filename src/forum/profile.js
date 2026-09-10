@@ -9,7 +9,7 @@
  * для понятных сообщений: любую можно обойти запросом мимо сайта, и тогда
  * откажет база.
  */
-import { rest, uploadFile, publicFileUrl, currentUserId } from '../db/client.js';
+import { rest, uploadFile, deleteFile, publicFileUrl, currentUserId } from '../db/client.js';
 import { prepareImage, uploadPath } from '../ui/image-prep.js';
 import { forum } from './index.js';
 
@@ -222,7 +222,7 @@ export async function attachImage(targetType, targetId, file) {
       Файл при этом уже лежит в хранилище и стал бы мусором, на который никто
       не ссылается. Убираем его сразу: место в бесплатном хранилище общее.
     */
-    await deleteStorageFile('forum-uploads', path).catch(() => {});
+    await deleteFile('forum-uploads', path).catch(() => {});
     throw err;
   }
 }
@@ -230,27 +230,8 @@ export async function attachImage(targetType, targetId, file) {
 /** Открепить картинку: убрать и запись, и файл. */
 export async function detachImage(id, storagePath) {
   await rest(`/forum_attachments?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (storagePath) await deleteStorageFile('forum-uploads', storagePath).catch(() => {});
+  if (storagePath) await deleteFile('forum-uploads', storagePath).catch(() => {});
 }
 
-/**
- * Удаление файла из хранилища.
- *
- * Отдельно от rest: у хранилища свой путь и свой ответ. Ошибку глотать нельзя
- * молча — но и ронять из-за неё удаление записи тоже: запись без файла это
- * битая картинка, а файл без записи всего лишь занятое место.
- */
-async function deleteStorageFile(bucket, path) {
-  const { baseUrl, readSession, apiKey } = await import('../db/client.js');
-  const token = readSession()?.access_token;
-
-  await fetch(`${baseUrl()}/storage/v1/object/${bucket}/${path}`, {
-    method: 'DELETE',
-    headers: {
-      apikey: apiKey(),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
 
 export { publicFileUrl };

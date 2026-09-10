@@ -462,6 +462,97 @@ export async function uploadFile({ bucket, path, bytes, contentType = 'applicati
   return publicFileUrl(bucket, clean);
 }
 
+/**
+ * Та же загрузка, но с ходом выполнения.
+ *
+ * Нарочно отдельный путь на XMLHttpRequest, а не украшение над fetch:
+ * у fetch нет способа узнать, сколько байтов уже ушло, а для чата это
+ * не косметика. Видео на 20 МБ едет с телефона по мобильной сети десятки
+ * секунд; без полоски человек считает, что кнопка не сработала, и жмёт её
+ * снова — то есть грузит второй такой же файл.
+ *
+ * Заголовки и разбор ошибок те же, что у uploadFile: расходиться им нельзя,
+ * иначе один и тот же отказ базы выглядел бы по-разному на аватаре и в чате.
+ *
+ * @param {{bucket: string, path: string, bytes: Blob, contentType?: string,
+ *          onProgress?: ((part: number) => void)|null}} opts
+ * @returns {Promise<string>} публичная ссылка на файл
+ */
+export function uploadFileWithProgress({ bucket, path, bytes, contentType = 'application/octet-stream', onProgress = null }) {
+  requireConfig();
+  const token = readSession()?.access_token;
+  const clean = String(path).replace(/^\/+/, '');
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${baseUrl()}/storage/v1/object/${bucket}/${clean}`);
+
+    const headers = keyHeaders(token);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.setRequestHeader('x-upsert', 'false');
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.min(1, e.loaded / e.total));
+      };
+    }
+
+    xhr.onerror = () => reject(new Error('Не удалось загрузить файл. Проверьте интернет.'));
+    xhr.ontimeout = () => reject(new Error('Загрузка не уложилась в отведённое время — попробуйте файл поменьше'));
+    xhr.onabort = () => reject(new Error('Загрузка отменена'));
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(publicFileUrl(bucket, clean));
+        return;
+      }
+      const data = safe(() => JSON.parse(xhr.responseText), null);
+      const raw = data?.message || data?.error || `ошибка ${xhr.status}`;
+
+      if (/Bucket not found/i.test(raw)) {
+        reject(new Error(
+          `В базе нет хранилища «${bucket}». Его создаёт supabase/chats.sql — запустите его заново.`
+        ));
+        return;
+      }
+      if (/exceeded the maximum allowed size|Entity too large|413/i.test(raw)) {
+        reject(new Error('Файл больше, чем разрешает хранилище. Загрузите файл поменьше.'));
+        return;
+      }
+      if (/row-level security|Unauthorized|new row violates/i.test(raw)) {
+        reject(new Error('База отказала в загрузке: в этот чат вам прикреплять файлы нельзя'));
+        return;
+      }
+      reject(new Error(raw));
+    };
+
+    xhr.send(bytes);
+  });
+}
+
+/**
+ * Удаление файла из хранилища.
+ *
+ * Живёт здесь, а не в адаптере форума: это тот же транспорт, что и загрузка,
+ * и одно место для заголовков. Ошибку глотать нельзя молча — но и ронять
+ * из-за неё удаление записи тоже: запись без файла это битая картинка,
+ * а файл без записи всего лишь занятое место.
+ */
+export async function deleteFile(bucket, path) {
+  const token = readSession()?.access_token;
+  const clean = String(path ?? '').replace(/^\/+/, '');
+  if (!clean) return;
+
+  const res = await fetch(`${baseUrl()}/storage/v1/object/${bucket}/${clean}`, {
+    method: 'DELETE',
+    headers: keyHeaders(token),
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Не удалось удалить файл из хранилища (${res.status})`);
+  }
+}
+
 /** Публичная ссылка на файл в хранилище. */
 export function publicFileUrl(bucket, path) {
   return `${baseUrl()}/storage/v1/object/public/${bucket}/${String(path).replace(/^\/+/, '')}`;

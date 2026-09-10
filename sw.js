@@ -21,7 +21,7 @@
   Версию поднимаем при изменении списка ниже: активация чистит кэши прошлых
   версий, и без смены версии старый список остался бы лежать рядом с новым.
 */
-const CACHE = 'zroute-s33-v10';
+const CACHE = 'zroute-s33-v12';
 
 /*
   Минимум для первого офлайн-открытия. Добавляем поштучно и не падаем,
@@ -46,6 +46,7 @@ const SHELL = [
   './src/mobile.css',
   './src/controls.css',
   './src/refine.css',
+  './src/chat.css',
   './src/main.js',
   './manifest.webmanifest',
   './public/icons/icon-192.svg',

@@ -181,12 +181,27 @@
  * @property {(chatId: string, userId: string, role: 'admin'|'member') => Promise<void>} setChatMemberRole
  * @property {(chatId: string, userId: string) => Promise<void>} kickChatMember
  * @property {(chatId: string, opts?: {limit?: number, before?: Date|null}) => Promise<ForumChatMessage[]>} listChatMessages
- * @property {(chatId: string, body: string) => Promise<ForumChatMessage>} sendChatMessage
+ * @property {(chatId: string, body: string, opts?: {replyToId?: string|null, attachments?: ChatAttachmentDraft[]}) => Promise<ForumChatMessage>} sendChatMessage
  * @property {(id: string, reason?: string) => Promise<void>} deleteChatMessage
  * @property {(chatId: string) => Promise<void>} markChatRead
- * @property {(chatId: string, patch: {title?: string, allianceTag?: string, closed?: boolean, closedReason?: string}) => Promise<void>} updateChat
+ * @property {(chatId: string, patch: {title?: string, allianceTag?: string, topic?: string, avatarUrl?: string, closed?: boolean, closedReason?: string}) => Promise<void>} updateChat
  * @property {(chatId: string) => Promise<string>} rotateChatCode
  * @property {(chatId: string) => Promise<void>} adminDeleteChat
+ *
+ * Вложения. Загрузка отделена от отправки намеренно: файл сначала едет
+ * в хранилище, и только потом появляется сообщение со ссылкой на него.
+ * Обратный порядок оставлял бы в ленте сообщение с файлом, которого нет, —
+ * то есть битую картинку, видную всем. Ход загрузки нужен странице, чтобы
+ * показать полоску: видео едет десятки секунд, и без полоски человек решит,
+ * что кнопка не сработала.
+ * @property {(chatId: string, file: File, opts?: {onProgress?: (part: number) => void, durationMs?: number}) => Promise<ChatAttachmentDraft>} uploadChatFile
+ * @property {(chatId: string, file: File) => Promise<string>} uploadChatAvatar  Картинка чата; возвращает ссылку.
+ * @property {(messageId: string, emoji: string) => Promise<void>} toggleChatReaction
+ * @property {(messageId: string, pinned: boolean) => Promise<void>} pinChatMessage
+ * @property {(chatId: string) => Promise<ForumChatMessage[]>} listChatPinned
+ * @property {(chatId: string, query: string, opts?: {limit?: number}) => Promise<ForumChatMessage[]>} searchChatMessages
+ * @property {(chatId: string) => Promise<void>} touchChatTyping  Отметка «пишу»: гаснет сама через CONFIG.forum.chat.typingMs.
+ * @property {(chatId: string) => Promise<ForumChatTyping[]>} listChatTyping
  */
 
 /**
@@ -195,6 +210,8 @@
  * @property {string} title
  * @property {'alliance'|'inter'} kind
  * @property {string} allianceTag
+ * @property {string} topic         Короткое описание чата: о чём он и какие в нём правила.
+ * @property {string} avatarUrl     Картинка чата; пусто — показывается метка из букв.
  * @property {string|null} ownerId
  * @property {string} ownerNick
  * @property {string} inviteCode   Виден только участникам (политики базы).
@@ -207,7 +224,71 @@
  * @property {number} unread
  * @property {string} lastBody
  * @property {string} lastNick
+ * @property {string} lastKind     Вид вложения последнего сообщения: 'image', 'file'… Пусто, если вложение только текстовое.
  * @property {Date|null} lastAt
+ * @property {number} pinnedCount  Сколько сообщений закреплено.
+ */
+
+/**
+ * Вложение сообщения.
+ *
+ * Хранится отдельной строкой, а не списком внутри сообщения: файл нужно
+ * уметь удалить поимённо (чат удаляют — файлы должны уйти вместе с ним),
+ * а предел числа вложений проще держать триггером на строку.
+ *
+ * @typedef {Object} ForumChatAttachment
+ * @property {string} id
+ * @property {'image'|'video'|'audio'|'file'} kind
+ * @property {string} url            Прямая ссылка на файл.
+ * @property {string} name           Имя файла, как его видит человек.
+ * @property {string} mime
+ * @property {number} sizeBytes
+ * @property {number} width          Пиксели, если это картинка или видео; иначе 0.
+ * @property {number} height
+ * @property {number} durationMs     Длительность голосового; иначе 0.
+ */
+
+/**
+ * Вложение, уже лежащее в хранилище, но ещё не привязанное к сообщению.
+ * Возвращает uploadChatFile, принимает sendChatMessage.
+ *
+ * @typedef {Object} ChatAttachmentDraft
+ * @property {'image'|'video'|'audio'|'file'} kind
+ * @property {string} url
+ * @property {string} [storagePath]  Путь в хранилище; у локального режима пусто.
+ * @property {string} name
+ * @property {string} [mime]
+ * @property {number} [sizeBytes]
+ * @property {number} [width]
+ * @property {number} [height]
+ * @property {number} [durationMs]
+ */
+
+/**
+ * Реакция на сообщение в чате.
+ *
+ * В чате реакции другие, чем на форуме: там это «согласен — не согласен»,
+ * здесь быстрый отклик на реплику, и счёт идёт не к очкам, а к разговору.
+ * `mine` — поставил ли её текущий участник: база считает это тем же запросом,
+ * чтобы страница не делала второй запрос на каждое сообщение.
+ *
+ * @typedef {Object} ForumChatReaction
+ * @property {string} emoji
+ * @property {number} count
+ * @property {boolean} mine
+ * @property {string[]} nicks        Кто поставил; имена для подсказки.
+ */
+
+/**
+ * Кто-то пишет в чат прямо сейчас.
+ *
+ * Отметка живёт в базе несколько секунд и не хранит историю: «пишет…» —
+ * это состояние, а не запись. Гаснет сама, поэтому закрытая вкладка
+ * не оставляет человека вечно печатающим.
+ *
+ * @typedef {Object} ForumChatTyping
+ * @property {string} userId
+ * @property {string} nick
  */
 
 /**
@@ -236,6 +317,13 @@
  * @property {boolean} deleted
  * @property {string} deletedReason
  * @property {Date} createdAt
+ * @property {ForumChatAttachment[]} attachments
+ * @property {ForumChatReaction[]} reactions
+ * @property {boolean} pinned
+ * @property {string|null} replyToId     На кого отвечают.
+ * @property {string} replyNick          Ник автора того сообщения, копией: он мог удалить аккаунт.
+ * @property {string} replyBody          Кусок текста, чтобы ответ читался без перехода.
+ * @property {boolean} replyDeleted
  */
 
 export {};

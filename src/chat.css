@@ -1,0 +1,941 @@
+/*
+  ЧАТЫ: ВЛОЖЕНИЯ, РЕАКЦИИ, ПАНЕЛИ.
+
+  ЧТО ЭТО ЗА ФАЙЛ. Устройство самого мессенджера — сетка, список, лента,
+  пузыри — лежит в refine.css и оттуда не переезжает: тот файл отвечает
+  за общую отделку сайта, и трогать его ради чата значило бы двигать мебель
+  во всей квартире из-за одной комнаты.
+
+  Здесь только то, что появилось вместе с возможностями: вложения, ответы,
+  реакции, закреплённое, поиск, шторка эмодзи и просмотр картинки. Файл
+  подключён последним, поэтому его правила — последнее слово; это и нужно,
+  потому что ниже собраны состояния (`is-error`, `is-dropping`, `is-flash`),
+  которые обязаны побеждать базовый вид.
+
+  ЧЕМ ДУМАЛИ, КОГДА РИСОВАЛИ. Строка в чате — это разговор, а не документ:
+  картинки показываются до текста, служебные кнопки не занимают места, пока
+  на них не навели, а всё, что может занять пол-экрана (закреплённое, поиск,
+  настройки), живёт отдельной полосой над лентой и убирается одним нажатием.
+  Аудитория заходит с телефона, поэтому на узком экране кнопки вырастают
+  до 40–44 пикселов, а панели занимают почти весь экран.
+*/
+
+/* ── Список чатов: фильтр и картинки ─────────────────────────────────────── */
+
+.chat-filters {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  padding: 0 10px 8px;
+}
+
+.chat-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-filter:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.2); }
+.chat-filter.is-on {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--text);
+}
+.chat-filter b {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #14100c;
+  font-size: 10.5px;
+  line-height: 1;
+}
+
+/* Картинка чата вместо метки из букв: тот же размер, чтобы список не прыгал. */
+.chat-item__mark--img,
+.chat-room__mark--img,
+.chat-settings__shot--img {
+  object-fit: cover;
+  background: var(--raised-2);
+}
+
+/*
+  ── Создание чата: поле вида ────────────────────────────────────────────────
+
+  Вид выбирается своим списком (ui/select.js), а не системным <select>: вид
+  открытого списка — половина впечатления от формы. Список раскрывается вниз
+  или вверх, как обычное меню, и здесь ему нужно только место в строке.
+*/
+.chat-create__kind { min-width: 0; }
+.chat-create__kind .sel { width: 100%; }
+.chat-create__kind .sel__btn { min-height: 42px; }
+.chat-create__kind .sel__text b { font-size: 13px; }
+.chat-create__kind .sel__text small { font-size: 10.5px; }
+
+/* ── Шапка комнаты: инструменты ──────────────────────────────────────────── */
+
+.chat-room__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  margin-left: auto;
+}
+
+.chat-tool {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-tool:hover { border-color: var(--line); color: var(--text); }
+.chat-tool.is-on {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text);
+}
+.chat-tool__badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #14100c;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+/* «Ковыль печатает…» в подписи — цветом, а не курсивом: курсив на 11 пикселах
+   на телефоне читается хуже прямого. */
+.chat-room__sub[data-chat-typing] { color: var(--accent); }
+
+/*
+  «Пишет…» встаёт на место подписи с составом — там же, где её и ищут.
+  Цветом, а не значком: строка маленькая, и лишний значок в ней читался бы
+  как ещё одна кнопка.
+*/
+.chat-room__sub[data-chat-typing] {
+  color: var(--accent);
+  font-style: italic;
+}
+
+/* ── Полосы панелей: закреплённое, поиск, настройки, участники ───────────── */
+
+.chat-pins,
+.chat-search,
+.chat-settings,
+.chat-members {
+  flex: none;
+  max-height: 46%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.014);
+}
+
+.chat-pins__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 4px;
+  font-size: 12.5px;
+}
+.chat-pins__head b { font-size: 12.5px; }
+.chat-pins__head .muted { flex: 1; font-size: 11px; }
+
+.chat-panel__x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--mute);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-panel__x:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+
+.chat-panel__empty {
+  margin: 0;
+  padding: 6px 12px 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Участники: ник с метками слева, действия управления справа. */
+.chat-members__list {
+  margin: 0;
+  padding: 0 6px 8px;
+  list-style: none;
+}
+.chat-members__list .chat-member { display: flex; align-items: center; gap: 8px; padding: 5px 7px; border-radius: 9px; }
+.chat-members__list .chat-member:hover { background: rgba(255, 255, 255, 0.035); }
+.chat-member__who { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.chat-member__who small { font-size: 10.5px; }
+.chat-member__acts { display: flex; gap: 2px; margin-left: auto; }
+
+/* Закреплённое: строка = «кто · когда · что», нажатие ведёт к сообщению. */
+.chat-pins__list { margin: 0; padding: 0 6px 8px; list-style: none; }
+.chat-pin {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 9px;
+}
+.chat-pin:hover { background: rgba(255, 255, 255, 0.04); }
+.chat-pin__go {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-pin__who { display: flex; align-items: baseline; gap: 8px; }
+.chat-pin__who b { font-size: 12.5px; }
+.chat-pin__who time { color: var(--mute); font-size: 10.5px; }
+.chat-pin__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* Поиск: поле во всю ширину полосы, результаты — тем же списком. */
+.chat-search__form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 10px 7px;
+}
+.chat-search__icon { flex: none; color: var(--mute); }
+.chat-search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.chat-search__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.12);
+}
+.chat-search__list { margin: 0; padding: 0 6px; list-style: none; }
+.chat-found {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-found:hover { background: rgba(255, 255, 255, 0.045); }
+.chat-found__who { display: flex; align-items: baseline; gap: 8px; }
+.chat-found__who b { font-size: 12.5px; }
+.chat-found__who time { color: var(--mute); font-size: 10.5px; }
+.chat-found__text { color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.chat-found__text mark,
+.chat-search mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text);
+}
+
+/* Настройки чата. */
+.chat-settings__form { display: grid; gap: 8px; padding: 4px 12px 12px; }
+.chat-settings__ava { display: flex; align-items: center; gap: 12px; }
+.chat-settings__shot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--ava, var(--raised-2));
+  color: #10131a;
+  font-family: Unbounded, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+.chat-settings__ava-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chat-settings__upload { cursor: pointer; text-decoration: underline dotted; }
+.chat-settings__row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.chat-settings__acts { display: flex; gap: 6px; }
+.chat-settings__danger {
+  margin: 0 12px 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 71, 87, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 71, 87, 0.05);
+}
+.chat-settings__danger p { margin: 0 0 8px; font-size: 11.5px; line-height: 1.5; }
+
+/* ── Вложения в сообщении ────────────────────────────────────────────────── */
+
+.chat-shots {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0 4px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.chat-shots--1 { grid-template-columns: 1fr; }
+.chat-shots--2 { grid-template-columns: 1fr 1fr; }
+.chat-shots--3,
+.chat-shots--4 { grid-template-columns: 1fr 1fr; }
+
+.chat-shot {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: zoom-in;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+.chat-shots--1 .chat-shot img { max-height: 380px; object-fit: contain; }
+.chat-shot:hover img { filter: brightness(1.08); }
+
+/* «+3» на последней картинке: вместо стены мелких превью. */
+.chat-shot__more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 7, 10, 0.58);
+  color: #fff;
+  font-family: Unbounded, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chat-video { margin: 2px 0 4px; }
+.chat-video video {
+  display: block;
+  width: 100%;
+  max-height: 380px;
+  border-radius: 10px;
+  background: #000;
+}
+.chat-video__cap { display: block; margin-top: 3px; font-size: 10.5px; }
+
+/* Голосовое: своя рамка вокруг системного проигрывателя — иначе он выглядит
+   чужим пятном посреди пузыря. */
+.chat-voice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0 5px;
+  padding: 6px 10px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.chat-voice__mark { font-size: 15px; }
+.chat-voice audio { flex: 1; min-width: 0; height: 34px; }
+.chat-voice__time {
+  flex: none;
+  color: var(--mute);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Файл: карточка со значком, именем и весом. */
+.chat-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 3px 0 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  text-decoration: none;
+}
+.chat-file:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.chat-file__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 16px;
+}
+.chat-file__body { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.chat-file__body b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.chat-file__body small { font-size: 10.5px; }
+.chat-file__dl { flex: none; color: var(--dim); }
+.chat-file:hover .chat-file__dl { color: var(--accent); }
+
+/*
+  У файла и голосового превью нет: вместо картинки — значок вида. Квадрат
+  тот же, поэтому строка очереди не прыгает, когда рядом едет снимок экрана.
+*/
+.chat-drop__shot--mark {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 17px;
+}
+
+/* ── Ответ, реакции, действия ────────────────────────────────────────────── */
+
+.chat-quote {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 5px 8px 5px 9px;
+  border: 0;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 0 8px 8px 0;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-quote:hover { background: rgba(0, 0, 0, 0.32); }
+.chat-quote__who { color: var(--accent); font-size: 11px; font-weight: 700; }
+.chat-quote__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: 11.5px;
+}
+.chat-quote__text.is-gone { font-style: italic; color: var(--mute); }
+
+.chat-reacts { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0 1px; }
+.chat-react {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-react b { font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.chat-react:hover { border-color: rgba(255, 255, 255, 0.24); color: var(--text); }
+.chat-react.is-mine {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+}
+.chat-react--add { padding: 2px 7px; opacity: 0.75; }
+.chat-react--add:hover { opacity: 1; }
+
+/*
+  Выбор реакции — всплывающая полоска, а не отдельное окно: поставить смайлик
+  это одно движение, и оно не должно стоить трёх.
+*/
+.chat-react-picker {
+  position: absolute;
+  z-index: 25;
+  bottom: calc(100% + 4px);
+  left: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 232px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised-2);
+  box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.9);
+}
+.chat-msg.is-mine .chat-react-picker { left: auto; right: 8px; }
+.chat-react-picker__item {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-react-picker__item:hover { background: rgba(255, 255, 255, 0.08); transform: scale(1.12); }
+.chat-react-picker__item.is-mine { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+/* Кнопки действий. На мониторе появляются при наведении, на телефоне видны
+   всегда и приглушены: подсказки «наведи курсор» там не существует. */
+.chat-msg { position: relative; }
+.chat-msg__acts {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  align-self: center;
+  opacity: 0;
+  transition: opacity 0.14s var(--ease);
+}
+.chat-msg:hover > .chat-msg__acts,
+.chat-msg:focus-within > .chat-msg__acts { opacity: 1; }
+.chat-msg.is-mine > .chat-msg__acts { order: -1; }
+
+.chat-msg__act {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-msg__act:hover { border-color: var(--line); color: var(--text); }
+
+.chat-msg__pop {
+  position: absolute;
+  z-index: 26;
+  top: calc(100% + 2px);
+  right: 6px;
+  min-width: 208px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised-2);
+  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.85), 0 4px 18px -10px rgba(0, 0, 0, 0.6);
+}
+.chat-msg.is-mine .chat-msg__pop { right: auto; left: 6px; }
+
+.chat-msg__pin { margin-right: auto; opacity: 0.85; }
+
+/* Подсветка сообщения, к которому перешли по ссылке. */
+.chat-msg.is-flash .chat-msg__bubble {
+  animation: chat-flash 1.1s var(--ease) 2;
+}
+@keyframes chat-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 106, 43, 0); }
+  40% { box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.35); }
+}
+
+/* Полоска «новые сообщения» — как в мессенджерах: видно, откуда читать. */
+.chat-newline { display: grid; place-items: center; margin: 10px 0 6px; }
+.chat-newline span {
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/*
+  Пустая лента: «тут пока тихо» и приглашение написать первым. Стоит по центру
+  ленты, а не липнет к шапке: пустое место сверху читается как недогрузка.
+*/
+.chat-msgs__empty {
+  margin: auto;
+  padding: 24px 18px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Прокрутка вниз ──────────────────────────────────────────────────────── */
+
+.chat-tobottom {
+  position: sticky;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px auto 0;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised-2);
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 10px 26px -14px rgba(0, 0, 0, 0.85);
+}
+.chat-tobottom:hover { color: var(--text); }
+.chat-tobottom.is-fresh { border-color: var(--accent); color: var(--accent); }
+.chat-tobottom[hidden] { display: none; }
+
+/* ── Ввод ────────────────────────────────────────────────────────────────── */
+
+.chat-compose { flex-wrap: wrap; }
+.chat-compose__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-compose__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  /* Кнопки выравниваются по нижнему краю поля ввода, а не по его середине:
+     поле растёт при наборе, и «поехавшие» иконки читаются как поломка. */
+  padding-bottom: 3px;
+}
+.chat-compose__tools .chat-tool { width: 38px; height: 38px; }
+
+.chat-compose__hint { width: 100%; margin: 6px 2px 0; font-size: 10.5px; line-height: 1.4; }
+.chat-compose.has-queue .chat-compose__hint { display: none; }
+
+/* Вложение кладётся карточкой над полем: видно, что отправляется. */
+.chat-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.chat-drop {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: min(100%, 320px);
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.chat-drop.is-error { border-color: rgba(255, 71, 87, 0.42); background: rgba(255, 71, 87, 0.06); }
+.chat-drop__shot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.3);
+  object-fit: cover;
+  font-size: 17px;
+}
+.chat-drop__body { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.chat-drop__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.chat-drop__meta { color: var(--mute); font-size: 10.5px; }
+.chat-drop.is-error .chat-drop__meta { color: #ffb3ba; }
+
+.chat-drop__bar {
+  display: block;
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+.chat-drop__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff9a4a, var(--accent));
+  transition: width 0.18s linear;
+}
+
+.chat-drop__x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+}
+.chat-drop__x:hover { background: rgba(255, 71, 87, 0.14); color: #ffb3ba; }
+
+/* Строка ответа над полем ввода. */
+.chat-reply-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.chat-reply-banner__bar {
+  flex: none;
+  width: 3px;
+  align-self: stretch;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.chat-reply-banner__body { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.chat-reply-banner__body b { font-size: 11.5px; }
+.chat-reply-banner__body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+/* ── Смайлы ──────────────────────────────────────────────────────────────── */
+
+.chat-emoji {
+  width: 100%;
+  max-height: 196px;
+  margin-top: 6px;
+  padding: 6px 6px 2px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.chat-emoji__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 0 5px;
+}
+.chat-emoji__title {
+  flex: none;
+  width: 100%;
+  padding: 0 4px 3px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.chat-emoji__item {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-emoji__item:hover { background: rgba(255, 255, 255, 0.07); }
+
+/* ── Запись голосового ───────────────────────────────────────────────────── */
+
+.chat-recording {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+}
+.chat-recording__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff4757;
+  animation: rec-blink 1.1s infinite;
+}
+@keyframes rec-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.28; } }
+.chat-recording__time {
+  font-family: Unbounded, sans-serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.chat-recording__note { flex: 1; min-width: 0; font-size: 12px; }
+.chat-recording__send { margin-left: auto; }
+
+/* ── Перетаскивание файлов ───────────────────────────────────────────────── */
+
+/*
+  Подсветка окна при перетаскивании: без неё человек не знает, что чат умеет
+  принимать файлы, и тащит их в мессенджер.
+*/
+.chat-room.is-dropping::after {
+  content: 'Отпустите файл — он уйдёт в этот чат';
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--r-lg);
+  background: rgba(10, 11, 13, 0.82);
+  color: var(--text);
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+.chat-room { position: relative; }
+
+/* ── Просмотр картинки ───────────────────────────────────────────────────── */
+
+.chat-lightbox {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  place-items: center;
+  padding: 16px;
+  background: rgba(6, 7, 10, 0.92);
+  backdrop-filter: blur(6px);
+}
+.chat-lightbox__img {
+  max-width: min(100%, 1200px);
+  max-height: min(84vh, 900px);
+  border-radius: 10px;
+  object-fit: contain;
+}
+.chat-lightbox__x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+}
+.chat-lightbox__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-lightbox__nav--prev { left: 12px; }
+.chat-lightbox__nav--next { right: 12px; }
+.chat-lightbox__foot {
+  position: absolute;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+}
+
+/* ── Телефон: крупнее кнопки, панели на весь экран ───────────────────────── */
+
+@media (max-width: 759px) {
+  .chat-room__tools { gap: 0; }
+  .chat-tool { width: 38px; height: 38px; }
+
+  /* Пальцем по 28 пикселам не попасть: действия сообщения растут до 34. */
+  .chat-msg__act { width: 34px; height: 34px; }
+  .chat-msg__acts { opacity: 1; }
+
+  .chat-panels,
+  .chat-pins,
+  .chat-search,
+  .chat-settings,
+  .chat-members { max-height: 58%; }
+
+  .chat-compose__tools .chat-tool { width: 40px; height: 40px; }
+  .chat-emoji { max-height: 42vh; }
+  .chat-emoji__item { width: 40px; height: 40px; font-size: 21px; }
+  .chat-drop { width: 100%; }
+  .chat-react-picker { max-width: 260px; }
+  .chat-react-picker__item { width: 36px; height: 36px; font-size: 19px; }
+  .chat-lightbox { padding: 8px; }
+  .chat-lightbox__nav { width: 40px; height: 56px; }
+}
+
+/* ── Телефон и планшет: подсказки «наведи курсор» там не работают ────────── */
+
+@media (hover: none) {
+  .chat-msg__acts { opacity: 1; }
+  .chat-tool:hover,
+  .chat-msg__act:hover { border-color: transparent; color: var(--dim); }
+}
+
+/* ── Монитор: комната шире, сетка картинок заметнее ──────────────────────── */
+
+@media (min-width: 880px) {
+  .chat-shots--3,
+  .chat-shots--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chat-emoji { max-height: 240px; }
+  .chat-room.is-dropping::after { font-size: 16px; }
+}

@@ -143,6 +143,210 @@
   color: var(--text);
 }
 
+/* ── Свой список выбора (ui/select.js) ────────────────────────────────────── */
+
+/*
+  ЗАЧЕМ СВОЙ, ЕСЛИ ЕСТЬ СИСТЕМНЫЙ.
+
+  Выше сказано, что открытый список системного <select> трогать не надо,
+  и это правда для длинных списков: разделы форума, недели в панели. Там
+  системный выбор удобнее — крупный, с прокруткой пальцем, знакомый.
+
+  Но есть другой случай: вариантов два-пять, и у каждого есть подпись, зачем
+  он. «Альянсовый — штаб одного альянса» против «Межальянсовый — несколько
+  альянсов». Системный список подпись показать не может, и человек выбирает
+  вслепую по одному слову. Для этого случая сделан свой список: с ролями
+  listbox/option, полной клавиатурой и шторкой снизу на телефоне — то есть
+  с тем, чем системный и был хорош.
+
+  Разметку и поведение рисует ui/select.js, здесь — только вид.
+*/
+.sel {
+  position: relative;
+  min-width: 0;
+}
+
+.sel__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 34px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s var(--ease), background 0.16s var(--ease), box-shadow 0.16s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.sel__btn:hover { border-color: rgba(255, 255, 255, 0.2); }
+.sel__btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.14);
+}
+
+/* Стрелка — та же, что у стилизованного <select> выше, чтобы два поля
+   с выбором не выглядели элементами из разных сайтов. */
+.sel__caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.sel__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.sel__text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.sel__text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+.sel__text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mute);
+  font-size: 11px;
+}
+
+.sel--sm .sel__btn { min-height: 38px; }
+.sel--sm .sel__text b { font-size: 13px; }
+
+.sel__pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 232px;
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised-2);
+  box-shadow: 0 20px 46px -20px rgba(0, 0, 0, 0.9), 0 4px 18px -10px rgba(0, 0, 0, 0.65);
+  animation: sel-in 0.14s var(--ease);
+}
+.sel__pop[hidden] { display: none; }
+
+@keyframes sel-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.sel__opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sel__opt:hover,
+.sel__opt:focus-visible { background: rgba(255, 255, 255, 0.05); color: var(--text); outline: none; }
+.sel__opt.is-on {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--text);
+}
+.sel__opt.is-on .sel__mark { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.sel__opt .sel__check { flex: none; margin-left: auto; color: var(--accent); opacity: 0; }
+.sel__opt.is-on .sel__check { opacity: 1; }
+
+.sel__none { display: block; padding: 10px 12px; font-size: 13px; }
+
+/*
+  СПИСОК, ПЕРЕНЕСЁННЫЙ В КООРДИНАТЫ ОКНА (см. place() в select.js).
+
+  Так он не обрезается краем колонки чата: у панелей стоит overflow: hidden,
+  и список, нарисованный внутри поля, на коротком окне терял нижние пункты.
+  Координаты считает поведение — здесь только их применение.
+*/
+.sel--fixed .sel__pop {
+  position: fixed;
+  top: var(--sel-top, 0);
+  left: var(--sel-left, 0);
+  right: auto;
+  width: var(--sel-width, 232px);
+  min-width: 0;
+}
+/* Место снизу занято: список раскрывается вверх и въезжает снизу вверх. */
+.sel--up .sel__pop { animation: sel-up 0.14s var(--ease); }
+
+/* Затемнение под шторкой: на мониторе список — обычное меню, и оно не нужно. */
+.sel__veil { display: none; }
+
+/*
+  ТЕЛЕФОН: СПИСОК СТАНОВИТСЯ ШТОРКОЙ СНИЗУ.
+
+  Это возвращает то, за что системный список и держался: на узком экране
+  варианты крупные, во всю ширину, под большим пальцем, а не мелкое меню,
+  приклеенное к полю в середине формы.
+*/
+@media (max-width: 759px) {
+  .sel--fixed .sel__pop,
+  .sel__pop {
+    position: fixed;
+    z-index: 60;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    min-width: 0;
+    top: auto;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    max-height: min(62vh, 460px);
+    padding: 6px;
+    border-radius: 16px;
+    animation: sel-up 0.18s var(--ease);
+  }
+  .sel__opt { min-height: 58px; }
+  .sel__text b { font-size: 15px; }
+  .sel__text small { font-size: 12px; }
+  .sel__veil {
+    display: block;
+    position: fixed;
+    z-index: 55;
+    inset: 0;
+    background: rgba(5, 6, 8, 0.62);
+    backdrop-filter: blur(2px);
+  }
+  .sel__veil[hidden] { display: none; }
+}
+
+@keyframes sel-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* ── Флажки и переключатели ───────────────────────────────────────────────── */
 
 /*
