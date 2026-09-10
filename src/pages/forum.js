@@ -22,7 +22,7 @@
 import { esc, plural } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
-import { postBody, excerpt, editorHtml, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { roleBadge, roleLabel } from '../forum/roles.js';
 import { CONFIG } from '../../config.js';
 
@@ -203,14 +203,20 @@ function renderChronicleBand(events) {
 function renderWelcome(s) {
   if (!s.ready || !s.posts.length || s.me) return '';
 
-  const total = s.total ?? s.posts.length;
+  /*
+    Точное число тем база не отдаёт: лента знает лишь «есть ли ещё страница».
+    Пока не долистали до конца, честнее сказать «больше N», чем назвать
+    число, которое на следующей странице окажется неправдой.
+  */
+  const shown = s.posts.length;
+  const more = Number(s.total) > shown;
   return `
     <section class="panel forum-welcome" data-forum-welcome>
       <span class="forum-welcome__mark" aria-hidden="true">👋</span>
       <div class="forum-welcome__body">
         <b>Добро пожаловать на форум сервера 33</b>
         <p class="muted">
-          Здесь уже ${esc(plural(total, 'тема', 'темы', 'тем'))}. Заходите обсудить
+          Здесь уже ${more ? 'больше ' : ''}${esc(plural(shown, 'тема', 'темы', 'тем'))}. Заходите обсудить
           игру, альянсы и всё, что происходит на сервере.
         </p>
       </div>
@@ -221,7 +227,7 @@ function renderWelcome(s) {
 }
 
 /**
- * ЕЖЕНЕДЕЛЬНАЯ ТЕМА — «рубрики-римпления».
+ * ЕЖЕНЕДЕЛЬНАЯ ТЕМА — «рубрика недели».
  *
  * Админ заводит её как обычный текст с ключом forum-theme на вкладке «Тексты»
  * (заголовок — название рубрики, текст — как писать в неё). Форум берёт блок
@@ -1038,7 +1044,9 @@ export function renderPostCard(p, s) {
       ${p.poll ? renderPoll(p.poll, s) : ''}
 
       ${
-        !isOpen && p.body.length > 220
+        // По видимому тексту, а не по HTML: жирный абзац в три слова —
+        // это не «длинный пост», хотя разметки в нём больше 220 символов.
+        !isOpen && textOf(p.body).length > 220
           ? `<a class="forum-post__expand" href="#/forum/${esc(p.id)}">Читать целиком</a>`
           : ''
       }`

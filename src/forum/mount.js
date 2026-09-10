@@ -141,12 +141,33 @@ function captureInput() {
     if (key) forms[key] = el.type === 'checkbox' ? el.checked : (el.matches('[contenteditable]') ? el.innerHTML : el.value);
   });
 
-  // Раскрытые <details>: правила, форма поста.
+  /*
+    Раскрытые <details>: правила, форма поста. Проверяем наличие атрибута,
+    а не его значение: `data-forum-rules` стоит без значения, и в dataset это
+    пустая строка — ложь. Из-за этого ключ не находился, и раскрытая форма
+    поста складывалась при каждой перерисовке вместе с набранным текстом.
+  */
   const open = [];
   host.querySelectorAll('details[open]').forEach((d) => {
-    const key = d.dataset.forumRules ? 'rules' : d.dataset.forumComposer ? 'composer' : null;
+    const key = d.hasAttribute('data-forum-rules')
+      ? 'rules'
+      : d.hasAttribute('data-forum-composer') ? 'composer' : null;
     if (key) open.push(key);
   });
+
+  /*
+    Опрос в форме нового поста: раскрыт ли он и сколько вариантов добавлено
+    кнопкой «Ещё вариант». Разметка рисует только два поля, остальные
+    появляются по нажатию — после перерисовки их надо создать заново,
+    иначе третий и следующие варианты вместе с текстом пропадут.
+  */
+  const pollForm = host.querySelector('[data-forum-poll-form]');
+  const poll = pollForm
+    ? {
+        open: !pollForm.hidden,
+        options: host.querySelectorAll('[data-forum-poll-options] .forum-field').length,
+      }
+    : null;
 
   /*
     Пароль не сохраняем осознанно: держать его в памяти между перерисовками
@@ -155,6 +176,7 @@ function captureInput() {
   return {
     forms,
     open,
+    poll,
     focus: fieldKey(document.activeElement),
     scroll: window.scrollY,
   };
@@ -162,6 +184,23 @@ function captureInput() {
 
 function restoreInput(snapshot) {
   if (!snapshot || !host) return;
+
+  /*
+    Сначала возвращаем форму опроса в прежний вид — и только потом значения:
+    поля вариантов 3+ надо создать до того, как в них будет что записывать.
+  */
+  if (snapshot.poll) {
+    const pollForm = host.querySelector('[data-forum-poll-form]');
+    if (pollForm) {
+      pollForm.hidden = !snapshot.poll.open;
+      const container = host.querySelector('[data-forum-poll-options]');
+      if (container) {
+        while (container.querySelectorAll('.forum-field').length < snapshot.poll.options) {
+          appendPollOption(container);
+        }
+      }
+    }
+  }
 
   for (const [key, value] of Object.entries(snapshot.forms)) {
     if (!value) continue;
@@ -201,25 +240,35 @@ function restoreInput(snapshot) {
  * разметка между перерисовками меняется.
  */
 function fieldKey(el) {
-  if (!el || !host || !host.contains(el) || !el.name) return null;
+  if (!el || !host || typeof el.closest !== 'function' || !host.contains(el)) return null;
+
+  /*
+    Имя поля читаем атрибутом, а не свойством. У input и select свойство
+    `name` есть, а у редактора (contenteditable <div name="body">) — нет:
+    для div это просто атрибут, и `el.name` даёт undefined. Из-за этого
+    редактор не попадал в снимок, и набранный текст комментария или поста
+    исчезал при любой перерисовке — например, после лайка соседнему посту.
+  */
+  const name = el.getAttribute('name');
+  if (!name) return null;
 
   // Поиск по ленте живёт вне форм, но терять набранное при перерисовке нельзя.
   if (el.matches('[data-forum-search]')) return 'search';
 
   const commentForm = el.closest('[data-forum-comment-form]');
-  if (commentForm) return `comment:${commentForm.dataset.forumCommentForm}:${el.name}`;
+  if (commentForm) return `comment:${commentForm.dataset.forumCommentForm}:${name}`;
 
   const newPost = el.closest('[data-forum-new]');
-  if (newPost) return `new:${el.name}`;
+  if (newPost) return `new:${name}`;
 
   const auth = el.closest('[data-forum-auth]');
-  if (auth) return `auth:${el.name}`;
+  if (auth) return `auth:${name}`;
 
   const report = el.closest('[data-forum-report-form]');
-  if (report) return `report:${el.name}`;
+  if (report) return `report:${name}`;
 
   const editForm = el.closest('[data-forum-edit-form]');
-  if (editForm) return `edit:${editForm.dataset.forumEditForm}:${el.name}`;
+  if (editForm) return `edit:${editForm.dataset.forumEditForm}:${name}`;
 
   return null;
 }
@@ -258,6 +307,25 @@ function setFieldValue(el, value) {
   } else {
     el.value = value;
   }
+}
+
+/** Сколько вариантов ответа может быть у опроса. */
+const POLL_OPTIONS_MAX = 8;
+
+/**
+ * Добавить поле ещё одного варианта в форму опроса. Одна функция на кнопку
+ * «Ещё вариант» и на восстановление формы после перерисовки — чтобы поля
+ * в обоих случаях были одинаковыми.
+ */
+function appendPollOption(container) {
+  const idx = container.querySelectorAll('.forum-field').length;
+  if (idx >= POLL_OPTIONS_MAX) return null;
+  const label = document.createElement('label');
+  label.className = 'forum-field';
+  label.innerHTML = `<span>Вариант ${idx + 1}</span>
+    <input type="text" name="poll_option_${idx}" maxlength="120" placeholder="Вариант ответа">`;
+  container.appendChild(label);
+  return label;
 }
 
 /** Редактор пуст, когда в нём не осталось видимого текста. */
@@ -856,14 +924,7 @@ function wire() {
     const pollAdd = t.closest('[data-forum-poll-add]');
     if (pollAdd && host.contains(pollAdd)) {
       const container = host.querySelector('[data-forum-poll-options]');
-      if (!container) return;
-      const idx = container.querySelectorAll('.forum-field').length;
-      if (idx >= 8) return;
-      const label = document.createElement('label');
-      label.className = 'forum-field';
-      label.innerHTML = `<span>Вариант ${idx + 1}</span>
-        <input type="text" name="poll_option_${idx}" maxlength="120" placeholder="Вариант ответа">`;
-      container.appendChild(label);
+      if (container) appendPollOption(container);
       return;
     }
 
@@ -1379,7 +1440,7 @@ function wire() {
       if (pollForm && !pollForm.hidden) {
         const question = form.poll_question?.value?.trim();
         const options = [];
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < POLL_OPTIONS_MAX; i++) {
           const opt = form[`poll_option_${i}`]?.value?.trim();
           if (opt) options.push(opt);
         }
@@ -1591,7 +1652,14 @@ function wire() {
     */
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       const area = e.target;
-      if (area?.tagName !== 'TEXTAREA' || !host.contains(area)) return;
+      /*
+        Текст поста и комментария набирается в редакторе (contenteditable),
+        а не в textarea: раньше проверялся только TEXTAREA, и Ctrl+Enter
+        в редакторе ничего не делал — подсказка про горячую клавишу врала.
+      */
+      const isEditor = typeof area?.matches === 'function'
+        && (area.tagName === 'TEXTAREA' || area.matches('[data-editor]'));
+      if (!isEditor || !host.contains(area)) return;
       const form = area.closest('form');
       if (!form) return;
       e.preventDefault();

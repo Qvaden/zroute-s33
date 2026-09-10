@@ -686,6 +686,75 @@ export async function listUsers() {
   return s.users.map(userOut).sort((a, b) => a.nick.localeCompare(b.nick, 'ru'));
 }
 
+/* ── Страница участника ───────────────────────────────────────────────────── */
+
+/*
+  Профиль в локальном режиме. Раньше страница участника ходила за ним
+  в базу напрямую (forum/profile.js) — и в черновом режиме, где базы нет,
+  нажатие на ник давало «Не удалось связаться с базой». Это неверно:
+  локальный режим обязан показывать всё, что показывает рабочий, иначе его
+  нельзя ни проверить, ни показать.
+*/
+
+/** @param {string} nick */
+export async function getProfile(nick) {
+  const s = read();
+  const key = String(nick ?? '').trim().toLowerCase();
+  const u = s.users.find((x) => x.nick.toLowerCase() === key);
+  if (!u) return null;
+
+  const mine = s.posts.filter((p) => p.authorId === u.id && !p.deleted);
+  const myComments = s.comments.filter((c) => c.authorId === u.id && !c.deleted);
+  const ids = new Set([...mine.map((p) => p.id), ...myComments.map((c) => c.id)]);
+  const likes = s.reactions.filter((r) => r.reactionId === 'like' && ids.has(r.targetId)).length;
+  const blog = mine.filter((p) => p.category === 'blog');
+
+  return {
+    ...userOut(u),
+    postCount: mine.length,
+    commentCount: myComments.length,
+    likesReceived: likes,
+    blogViews: blog.reduce((sum, p) => sum + Number(p.views || 0), 0),
+    blogPostCount: blog.length,
+  };
+}
+
+/**
+ * Посты участника — в том же виде, что отдаёт база (snake_case): страница
+ * участника читает их именно так, и локальный режим не должен отличаться.
+ */
+export async function getUserPosts(userId, limit = 10) {
+  const s = read();
+  return s.posts
+    .filter((p) => p.authorId === userId && !p.deleted)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, Number(limit))
+    .map((p) => {
+      const out = postOut(s, p);
+      return {
+        id: out.id,
+        title: out.title,
+        body: out.body,
+        category: out.category,
+        created_at: p.createdAt,
+        views: out.views,
+        score: out.score,
+        comment_count: out.commentCount,
+      };
+    });
+}
+
+export async function saveProfile(patch) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+  if (patch.about != null) me.about = String(patch.about).trim().slice(0, 200);
+  if (patch.allianceTag != null) {
+    me.allianceTag = String(patch.allianceTag).trim().toUpperCase().replace(/\s+/g, '').slice(0, 12);
+  }
+  write(s);
+}
+
 /**
  * Сброс пароля. В локальном режиме паролей нет вовсе, поэтому честно
  * отказываемся вместо того, чтобы изобразить успех: администратор должен
