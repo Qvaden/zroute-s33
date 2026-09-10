@@ -81,18 +81,34 @@ export function renderForum(view, state = {}) {
     ...state,
   };
 
+  /*
+    ДВЕ КОЛОНКИ НА ШИРОКОМ ЭКРАНЕ, ОДНА НА ТЕЛЕФОНЕ.
+
+    Раньше всё шло одной лентой сверху вниз: сводка, тема недели, горячее,
+    топ игроков, правила — и только потом сама лента. На мониторе до первого
+    поста приходилось прокручивать полтора экрана. Теперь контекст (сводка,
+    горячее, топ, правила) стоит боковой колонкой справа, а лента начинается
+    сразу. На телефоне колонки складываются в прежнем порядке — там боковой
+    колонке места нет, а порядок «сначала контекст» проверен.
+  */
   return `
-    ${renderChronicleBand(view?.events ?? [])}
-    ${renderWelcome(s)}
-    ${renderWeekTheme(view)}
-    ${renderHotTopics(s)}
-    ${renderLeaderboard(s)}
-    ${renderRules()}
-    ${renderAccountBar(s)}
-    ${renderNotifications(s)}
-    ${renderComposer(s)}
-    ${renderFeedControls(s)}
-    ${renderFeed(s)}`;
+    <div class="forum-layout">
+      <aside class="forum-side" aria-label="Сводка и правила">
+        ${renderChronicleBand(view?.events ?? [])}
+        ${renderWeekTheme(view)}
+        ${renderHotTopics(s)}
+        ${renderLeaderboard(s)}
+        ${renderRules()}
+      </aside>
+      <div class="forum-main">
+        ${renderWelcome(s)}
+        ${renderAccountBar(s)}
+        ${renderNotifications(s)}
+        ${renderComposer(s)}
+        ${renderFeedControls(s)}
+        ${renderFeed(s)}
+      </div>
+    </div>`;
 }
 
 /* ── Хроника сервера: новая подача ────────────────────────────────────────── */
@@ -134,9 +150,9 @@ function renderChronicleBand(events) {
   const captures = server.filter((e) => e.type === 'server_capture').length;
   const defended = server.filter((e) => e.type === 'server_defended').length;
 
-  // Пять свежих: больше на телефоне уже требует прокрутки, а полоса должна
-  // читаться целиком.
-  const recent = all.slice(0, 5);
+  // Четыре свежих: в боковой колонке больше уже требует прокрутки, а полоса
+  // должна читаться целиком.
+  const recent = all.slice(0, 4);
 
   // Заголовок — самая последняя запись. У исходов вердикт уже сформулирован
   // («Захватили Столицу сервера 36»), у остальных типов это название записи.

@@ -1,0 +1,416 @@
+/*
+  СЛОЙ ОТДЕЛКИ — ПОСЛЕДНИЙ В КАСКАДЕ.
+
+  Зачем отдельный файл, а не правки по месту. Стили сайта накопились слоями
+  за восемь версий (styles-v8, forum, mobile, controls), и в каждом файле
+  одни и те же значения отступов и размеров повторены десятками строк.
+  Править плотность по одному правилу — значит трогать сотни строк в четырёх
+  файлах и спорить с их порядком. Слой поверх делает то же самое из одного
+  места и подключается последним, поэтому его слово решающее.
+
+  Что здесь делается:
+    1. ПЛОТНОСТЬ. Панели, отступы между ними, кегль подписей, высота
+       кнопок — везде на шаг компактнее. Информации на экране больше,
+       воздуха между ней меньше, но не меньше, чем нужно пальцу.
+    2. ФОРУМ В ДВЕ КОЛОНКИ. На мониторе контекст (сводка, горячее, топ,
+       правила) уходит в правую колонку, лента начинается сверху. На телефоне
+       складывается в одну колонку в прежнем порядке.
+    3. ЕДИНАЯ СИСТЕМА СОСТОЯНИЙ. Одинаковый фокус, наведение, нажатие
+       у всех кнопок и ссылок — сейчас они у форума и у таблиц разные.
+    4. АККУРАТНЫЕ ДЕТАЛИ: полосы прокрутки, выделение, скругления,
+       тени — один набор на весь сайт.
+*/
+
+/* ── Токены плотности ─────────────────────────────────────────────────────── */
+:root {
+  --r-sm: 7px;
+  --r: 12px;
+  --r-lg: 16px;
+  --gap: 12px;
+  --pad: 16px;
+  --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 1px 2px rgba(0,0,0,.35), 0 10px 30px -18px rgba(0,0,0,.8);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+body { font-size: 14.5px; line-height: 1.5; }
+
+/* Тонкая полоса прокрутки на всём сайте: системная широкая белая на тёмном
+   фоне выглядит чужеродно. */
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.14) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(255,255,255,.12); border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.22); }
+
+/* ── Общие блоки: компактнее ──────────────────────────────────────────────── */
+#app { padding-top: 18px; padding-bottom: 40px; }
+@media (min-width: 760px) { #app { padding-top: 22px; } }
+
+.panel {
+  padding: var(--pad);
+  margin-bottom: var(--gap);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+@media (min-width: 760px) { .panel { padding: 18px 20px; } }
+
+.hero {
+  padding: 18px var(--pad);
+  margin-bottom: var(--gap);
+  border-radius: var(--r-lg);
+}
+@media (min-width: 760px) { .hero { padding: 22px 24px; } }
+
+.panel__head { margin-bottom: 12px; }
+.panel__head h2 { font-size: clamp(16px, 2.2vw, 19px); }
+.eyebrow { font-size: 10px; letter-spacing: .14em; }
+.grid-2 { gap: var(--gap); }
+.muted { font-size: .86em; }
+
+/* ── Единая система состояний ─────────────────────────────────────────────── */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.forum-field input:focus,
+.forum-field select:focus,
+.forum-field textarea:focus,
+.forum-editor:focus,
+.search input:focus { box-shadow: var(--ring); }
+
+/* Наведение на карточки и строки — одно и то же лёгкое поднятие. */
+@media (hover: hover) {
+  .forum-post:not(.forum-post--deleted):hover,
+  .forum-hot__item a:hover,
+  .forum-lead__row:hover,
+  .quart-card:hover,
+  .achievement:hover {
+    border-color: rgba(255,255,255,.14);
+  }
+}
+
+/* ── Кнопки: один рост на весь сайт ───────────────────────────────────────── */
+.forum-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.forum-btn--wide { margin: 2px 0 var(--gap); }
+.forum-act { padding: 4px 8px; font-size: 11px; border-radius: 7px; }
+
+.seg__btn { min-height: 34px; padding: 0 12px; font-size: 12.5px; }
+.pick__btn { min-height: 34px; }
+
+/* ── Боковое меню сайта ───────────────────────────────────────────────────── */
+:root { --side-w: 220px; }
+.side { gap: 14px; padding: 14px 12px 12px; }
+.side .nav__link { padding: 8px 12px; font-size: 13px; }
+
+/* ── ФОРУМ: две колонки ───────────────────────────────────────────────────── */
+.forum-layout { display: grid; gap: 0; align-items: start; }
+.forum-side, .forum-main { min-width: 0; }
+
+@media (min-width: 1180px) {
+  .forum-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+  }
+  /* Лента — слева, контекст — справа. В разметке контекст стоит первым,
+     чтобы на телефоне он же был первым в потоке. */
+  .forum-side { order: 2; position: sticky; top: 76px; }
+  .forum-main { order: 1; }
+  /* В колонке панели уже: убираем крупные отступы героя. */
+  .forum-side .hero, .forum-side .panel { padding: 14px 16px; }
+  .forum-side .forum-chron__title { font-size: 19px; }
+  .forum-side .forum-chron__stats { grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 10px; }
+  .forum-side .forum-chron__stat { padding: 8px 9px; border-radius: 9px; }
+  .forum-side .forum-chron__stat b { font-size: 17px; }
+  .forum-side .forum-chron__stat span { font-size: 9.5px; }
+  .forum-side .forum-chron__feed { gap: 5px; margin-bottom: 10px; }
+  .forum-side .forum-chron__item { padding: 4px 9px; font-size: 11.5px; }
+  .forum-side .hero::after { display: none; }
+}
+@media (min-width: 1440px) {
+  .forum-layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; }
+}
+
+/* Боковая колонка выше экрана — пусть прокручивается сама, а не обрезается. */
+@media (min-width: 1180px) {
+  .forum-side {
+    max-height: calc(100vh - 92px);
+    overflow-y: auto;
+    padding-right: 2px;
+    scrollbar-width: none;
+  }
+  .forum-side::-webkit-scrollbar { display: none; }
+}
+
+/* ── ФОРУМ: сводка ─────────────────────────────────────────────────────────── */
+.forum-chron { padding-bottom: 14px; }
+.forum-chron__head { margin-bottom: 6px; }
+.forum-chron__title { font-size: clamp(19px, 2.8vw, 26px); }
+.forum-chron__date { margin-top: 5px; font-size: 12px; }
+.forum-chron__stats { margin: 12px 0 10px; gap: 8px; }
+.forum-chron__stat { padding: 9px 10px; border-radius: 10px; }
+.forum-chron__stat b { font-size: 18px; }
+.forum-chron__stat span { margin-top: 3px; font-size: 10px; }
+.forum-chron__feed { margin-bottom: 10px; gap: 6px; }
+.forum-chron__item { padding: 5px 10px; font-size: 11.5px; }
+.forum-chron__more { font-size: 12px; }
+
+/* ── ФОРУМ: блоки контекста ───────────────────────────────────────────────── */
+.forum-welcome { padding: 12px 14px; gap: 10px; }
+.forum-welcome__mark { font-size: 20px; }
+.forum-welcome__body b { font-size: 13.5px; }
+.forum-welcome__body p { margin: 2px 0 0; font-size: 12.5px; }
+
+.forum-theme { padding: 12px 14px; }
+.forum-theme__title { font-size: 15px; margin: 4px 0 0; }
+.forum-theme__body { font-size: 12.5px; margin-top: 4px; }
+
+.forum-hot { padding: 12px 14px; }
+.forum-hot__head { margin-bottom: 6px; font-size: 13px; }
+.forum-hot__list { display: grid; gap: 4px; }
+.forum-hot__item a { padding: 7px 9px; border-radius: 8px; }
+.forum-hot__title { font-size: 12.5px; }
+.forum-hot__meta { font-size: 11px; }
+
+.forum-lead { padding: 12px 14px; }
+.forum-lead__head { margin-bottom: 8px; font-size: 13px; }
+.forum-lead__list { gap: 2px; }
+.forum-lead__row { padding: 6px 6px; gap: 8px; border-radius: 8px; }
+.forum-lead__rank { width: 20px; font-size: 11.5px; }
+.forum-lead__row .forum-ava { width: 26px; height: 26px; border-radius: 7px; font-size: 11px; }
+.forum-lead__who b { font-size: 12.5px; }
+.forum-lead__who small { font-size: 10.5px; }
+.forum-lead__score b { font-size: 12.5px; }
+.seg--lead .seg__btn { min-height: 26px; padding: 0 9px; font-size: 11px; }
+
+.forum-rules { padding: 0; }
+.forum-rules__summary { padding: 11px 14px; gap: 10px; }
+.forum-rules__mark { width: 26px; height: 26px; font-size: 13px; }
+.forum-rules__label b { font-size: 13px; }
+.forum-rules__label small { font-size: 11px; }
+.forum-rules__list { padding: 0 14px 4px 30px; }
+.forum-rules__item { margin-bottom: 8px; }
+.forum-rules__item b { font-size: 12.5px; }
+.forum-rules__item p { margin: 2px 0 0; font-size: 12px; }
+.forum-rules__sanctions { margin: 8px 14px; padding: 10px 12px; }
+.forum-rules__sanctions li { font-size: 12px; }
+.forum-rules__note { margin: 0 14px 12px; font-size: 11.5px; }
+
+/* ── ФОРУМ: аккаунт и уведомления ─────────────────────────────────────────── */
+.forum-account { padding: 10px 14px; }
+.forum-me { gap: 9px; }
+.forum-me .forum-ava { width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px; }
+.forum-me__body b { font-size: 13px; }
+.forum-me__body small { font-size: 10.5px; }
+.forum-me .forum-btn { min-height: 32px; padding: 5px 11px; font-size: 12px; }
+.forum-bell__badge { top: -6px; right: -6px; min-width: 16px; height: 16px; font-size: 10px; }
+
+.forum-notice { padding: 12px 14px; }
+.forum-notice p { font-size: 12.5px; }
+
+.forum-notify { padding: 10px 14px; }
+.forum-notify__link { padding: 7px 8px; }
+.forum-notify__text { font-size: 12.5px; }
+.forum-notify__preview { font-size: 11.5px; }
+.forum-notify__time { font-size: 10.5px; }
+
+.forum-auth__head { margin-bottom: 8px; }
+.forum-auth__fields { gap: 8px; }
+.forum-auth__actions { margin-top: 10px; gap: 6px; }
+.forum-auth__note { margin-top: 8px; font-size: 11.5px; }
+
+/* ── ФОРУМ: формы ──────────────────────────────────────────────────────────── */
+.forum-field { margin-bottom: 9px; }
+.forum-field > span { margin-bottom: 4px; font-size: 11px; }
+.forum-field input,
+.forum-field select,
+.forum-field textarea { padding: 8px 11px; border-radius: 9px; }
+.forum-editor { padding: 9px 11px; border-radius: 9px; min-height: 96px; }
+.forum-reply .forum-editor { min-height: 64px; }
+
+.forum-composer { padding: 0; }
+.forum-composer__summary { padding: 11px 14px; gap: 10px; }
+.forum-composer__plus { width: 26px; height: 26px; font-size: 16px; }
+.forum-composer__summary b { font-size: 13px; }
+.forum-composer form { padding: 4px 14px 14px; }
+.forum-composer__rules { margin: 8px 0; font-size: 11.5px; }
+.forum-composer__actions { gap: 6px; }
+
+.forum-md { padding: 6px; gap: 4px; margin: 6px 0 8px; border-radius: 9px; }
+.forum-md__row { gap: 3px; }
+.forum-md__btn { min-width: 28px; height: 28px; padding: 0 7px; font-size: 12px; border-radius: 6px; }
+.forum-md__color { width: 16px; height: 16px; }
+.forum-md__capt { font-size: 10px; }
+
+.forum-attach { gap: 8px; }
+.forum-attach__btn { min-height: 32px; padding: 5px 10px; font-size: 12px; }
+.forum-attach__hint { font-size: 10.5px; }
+
+.forum-poll-creator { margin: 4px 0 8px; }
+.forum-poll-form { padding: 10px 12px; margin-top: 8px; }
+
+/* ── ФОРУМ: управление лентой ──────────────────────────────────────────────── */
+.ctl--forum { gap: 6px; margin-bottom: var(--gap); }
+.forum-search { flex: 1 1 200px; }
+.forum-search input { min-height: 34px; padding-top: 6px; padding-bottom: 6px; }
+
+/* ── ФОРУМ: лента ──────────────────────────────────────────────────────────── */
+.forum-feed { gap: 8px; }
+.forum-post { padding: 13px 15px; }
+@media (min-width: 760px) { .forum-post { padding: 14px 18px; } }
+
+.forum-post__head { gap: 9px; margin-bottom: 8px; }
+.forum-post__head .forum-ava { width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px; }
+.forum-post__by b { font-size: 13px; }
+.forum-post__by time { font-size: 10.5px; }
+.forum-post__cat { padding: 3px 8px; font-size: 10px; }
+.forum-post__trail { padding: 2px 8px; font-size: 10px; }
+
+.forum-post__title { margin-bottom: 5px; font-size: clamp(15px, 1.9vw, 17.5px); line-height: 1.25; }
+.forum-post__body { font-size: 13px; line-height: 1.58; }
+.forum-post__body p { margin-bottom: 6px; }
+.forum-post__expand { margin-top: 2px; font-size: 12px; }
+
+.forum-shots { margin-top: 8px; gap: 6px; }
+.forum-shots img { border-radius: 8px; }
+
+.forum-post__foot { gap: 8px; margin-top: 9px; padding-top: 8px; }
+.forum-post__comments, .forum-post__views { font-size: 12px; }
+.forum-post__acts { gap: 2px; }
+
+.forum-react { gap: 4px; }
+.forum-react__btn { min-height: 28px; padding: 3px 8px; font-size: 12px; border-radius: 7px; }
+.forum-react__btn b { font-size: 11.5px; }
+.forum-emoji__pop { padding: 4px; gap: 2px; border-radius: 9px; }
+.forum-emoji__item { min-width: 30px; height: 30px; font-size: 14px; }
+
+.forum-post--deleted { padding: 10px 14px; }
+.forum-post__gone { gap: 9px; }
+.forum-post__gone b { font-size: 12.5px; }
+.forum-post__gone p { margin: 1px 0 0; font-size: 12px; }
+
+/* Опрос */
+.forum-poll { margin-top: 8px; padding: 10px 12px; border-radius: 9px; }
+.forum-poll__head { margin-bottom: 6px; }
+.forum-poll__question { font-size: 13px; }
+.forum-poll__total { font-size: 11px; }
+.forum-poll__options { gap: 4px; }
+.forum-poll__opt { padding: 6px 9px; border-radius: 7px; }
+.forum-poll__text { font-size: 12.5px; }
+.forum-poll__num { font-size: 11px; }
+.forum-poll__hint { margin-top: 6px; font-size: 11px; }
+
+/* Обсуждение */
+.forum-thread { margin-top: 10px; padding-top: 10px; }
+.forum-thread__title { margin-bottom: 6px; font-size: 13px; }
+.forum-thread__list { margin-bottom: 10px; }
+.forum-comment { gap: 8px; padding: 8px 0; }
+.forum-comment .forum-ava--sm { width: 24px; height: 24px; border-radius: 6px; font-size: 10.5px; }
+.forum-comment__head { gap: 6px; margin-bottom: 2px; }
+.forum-comment__head b { font-size: 12.5px; }
+.forum-comment__head time { font-size: 10px; }
+.forum-comment__body p { margin-bottom: 4px; font-size: 12.5px; line-height: 1.55; }
+.forum-comment__foot { gap: 4px; margin-top: 4px; }
+.forum-comment__foot .forum-react__btn { min-height: 24px; padding: 2px 7px; font-size: 11px; }
+.forum-comment--none, .forum-comment--deleted { padding: 6px 0; font-size: 12px; }
+.forum-reply__actions { margin-top: 6px; }
+
+.forum-empty { padding: 26px 18px; text-align: center; }
+.forum-empty h2 { font-size: 17px; margin: 4px 0 6px; }
+.forum-empty p { font-size: 12.5px; }
+
+/* Окна */
+.forum-modal__box { padding: 16px; border-radius: var(--r-lg); }
+.forum-modal__box h3 { font-size: 15px; margin-bottom: 10px; }
+.forum-modal__rules { gap: 4px; }
+.forum-modal__rule { padding: 7px 9px; border-radius: 8px; }
+.forum-modal__rule b { font-size: 12.5px; }
+.forum-modal__rule small { font-size: 11px; }
+.forum-modal__actions { gap: 6px; margin-top: 10px; }
+
+.forum-toast { padding: 9px 14px; font-size: 12.5px; }
+
+/* ── ФОРУМ: страница участника ────────────────────────────────────────────── */
+.forum-profile__top { gap: 12px; }
+.forum-profile__nick { font-size: clamp(18px, 3vw, 24px); }
+.forum-profile__meta { gap: 6px; font-size: 12px; }
+.forum-profile__about { font-size: 13px; }
+.forum-profile__stats { gap: 8px; }
+.forum-profile__stat { padding: 9px 10px; border-radius: 10px; }
+.forum-profile__stat b { font-size: 18px; }
+.forum-profile__stat span { font-size: 10px; }
+.forum-rank { padding: 12px 14px; }
+.forum-rank__achs { gap: 4px; }
+.forum-rank__ach { padding: 3px 8px; font-size: 11px; }
+.forum-profile__posts li { padding: 8px 0; }
+.forum-profile__posts a { font-size: 13px; }
+.forum-profile__post-meta { font-size: 11px; }
+.forum-profile__post-text { font-size: 12px; margin-top: 2px; }
+
+/* ── Остальной сайт: та же плотность ──────────────────────────────────────── */
+.hero__num { font-size: clamp(46px, 11vw, 80px); }
+.hero__dates { margin-top: 6px; font-size: 13px; }
+.leader { margin-top: 16px; padding: 11px 13px; gap: 12px; }
+.leader__name { font-size: clamp(17px, 4vw, 23px); }
+.leader__pts { font-size: clamp(26px, 7vw, 38px); }
+.split { margin-top: 14px; gap: 12px; }
+.tiles { gap: 5px; }
+
+.lad__row { min-height: 0; }
+.site-foot { padding: 14px 18px 26px; font-size: 12px; }
+.site-foot p { font-size: 12px; }
+
+/* Кнопка меню в шапке — компактнее. */
+.burger { min-height: 36px; padding: 0 11px; }
+
+/* ── Появление контента ──────────────────────────────────────────────────── */
+/* Панели появляются мягко и один раз, без скачков. */
+@media (prefers-reduced-motion: no-preference) {
+  .forum-main > .panel,
+  .forum-main > .forum-feed > .forum-post {
+    animation: refine-in .32s var(--ease) both;
+  }
+  .forum-feed > .forum-post:nth-child(2) { animation-delay: 30ms; }
+  .forum-feed > .forum-post:nth-child(3) { animation-delay: 60ms; }
+  .forum-feed > .forum-post:nth-child(4) { animation-delay: 90ms; }
+  .forum-feed > .forum-post:nth-child(n+5) { animation-delay: 110ms; }
+}
+@keyframes refine-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Телефон ─────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  #app { padding-top: 14px; }
+  .panel, .hero { padding: 13px 14px; margin-bottom: 10px; }
+  .forum-post { padding: 12px 13px; }
+  .forum-feed { gap: 8px; }
+  .forum-chron__stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .forum-chron__stat:last-child { grid-column: auto; }
+  .forum-chron__stat { padding: 8px; }
+  .forum-chron__stat b { font-size: 16px; }
+  .forum-chron__stat span { font-size: 9.5px; }
+  .forum-post__title { font-size: 15px; }
+  .forum-post__acts { width: 100%; margin-left: 0; justify-content: flex-end; }
+  /* На телефоне высота кнопок остаётся пальцевой. */
+  .forum-btn { min-height: 40px; }
+  .forum-react__btn { min-height: 32px; }
+}
+
+/* ── Панель администратора: та же плотность ───────────────────────────────── */
+.adm-top { padding: 9px 14px; gap: 8px 12px; }
+.adm-nav__link { padding: 7px 11px; font-size: 12.5px; }
+.adm-btn { min-height: 36px; padding: 7px 13px; font-size: 13px; border-radius: 9px; }
+.adm-main { padding-top: 18px; }
+.adm-hero { margin-bottom: 16px; }
+.adm-lead { font-size: 13.5px; margin-top: 6px; }
+.adm-stats { gap: 8px; }
+.adm-stat { padding: 10px 12px; border-radius: 10px; }
+.adm-grid { gap: var(--gap); }
+.adm-kv { gap: 7px; }
+.adm-chip { min-height: 32px; font-size: 12.5px; }
