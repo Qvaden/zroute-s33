@@ -32,39 +32,12 @@
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-body { font-size: 14.5px; line-height: 1.5; }
-
 /* Тонкая полоса прокрутки на всём сайте: системная широкая белая на тёмном
    фоне выглядит чужеродно. */
 * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.14) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(255,255,255,.12); border: 2px solid transparent; background-clip: padding-box; }
 *::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.22); }
-
-/* ── Общие блоки: компактнее ──────────────────────────────────────────────── */
-#app { padding-top: 18px; padding-bottom: 40px; }
-@media (min-width: 760px) { #app { padding-top: 22px; } }
-
-.panel {
-  padding: var(--pad);
-  margin-bottom: var(--gap);
-  border-radius: var(--r);
-  box-shadow: var(--shadow);
-}
-@media (min-width: 760px) { .panel { padding: 18px 20px; } }
-
-.hero {
-  padding: 18px var(--pad);
-  margin-bottom: var(--gap);
-  border-radius: var(--r-lg);
-}
-@media (min-width: 760px) { .hero { padding: 22px 24px; } }
-
-.panel__head { margin-bottom: 12px; }
-.panel__head h2 { font-size: clamp(16px, 2.2vw, 19px); }
-.eyebrow { font-size: 10px; letter-spacing: .14em; }
-.grid-2 { gap: var(--gap); }
-.muted { font-size: .86em; }
 
 /* ── Единая система состояний ─────────────────────────────────────────────── */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
@@ -88,24 +61,6 @@ body { font-size: 14.5px; line-height: 1.5; }
     border-color: rgba(255,255,255,.14);
   }
 }
-
-/* ── Кнопки: один рост на весь сайт ───────────────────────────────────────── */
-.forum-btn {
-  min-height: 38px;
-  padding: 8px 14px;
-  border-radius: 9px;
-  font-size: 13px;
-}
-.forum-btn--wide { margin: 2px 0 var(--gap); }
-.forum-act { padding: 4px 8px; font-size: 11px; border-radius: 7px; }
-
-.seg__btn { min-height: 34px; padding: 0 12px; font-size: 12.5px; }
-.pick__btn { min-height: 34px; }
-
-/* ── Боковое меню сайта ───────────────────────────────────────────────────── */
-:root { --side-w: 220px; }
-.side { gap: 14px; padding: 14px 12px 12px; }
-.side .nav__link { padding: 8px 12px; font-size: 13px; }
 
 /* ── ФОРУМ: две колонки ───────────────────────────────────────────────────── */
 .forum-layout { display: grid; gap: 0; align-items: start; }
@@ -145,6 +100,76 @@ body { font-size: 14.5px; line-height: 1.5; }
   }
   .forum-side::-webkit-scrollbar { display: none; }
 }
+
+/* ── Появление контента ──────────────────────────────────────────────────── */
+/* Панели появляются мягко и один раз, без скачков. */
+@media (prefers-reduced-motion: no-preference) {
+  .forum-main > .panel,
+  .forum-main > .forum-feed > .forum-post {
+    animation: refine-in .32s var(--ease) both;
+  }
+  .forum-feed > .forum-post:nth-child(2) { animation-delay: 30ms; }
+  .forum-feed > .forum-post:nth-child(3) { animation-delay: 60ms; }
+  .forum-feed > .forum-post:nth-child(4) { animation-delay: 90ms; }
+  .forum-feed > .forum-post:nth-child(n+5) { animation-delay: 110ms; }
+}
+@keyframes refine-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+  ПЛОТНОСТЬ — ТОЛЬКО ОТ ПЛАНШЕТА И ШИРЕ.
+
+  Телефонная вёрстка в mobile.css выверена по 360px вручную: размеры под
+  палец, кегль под чтение на ходу. Ужимать её сверху — значит ломать её
+  (первая версия слоя так и сделала: колокольчик уведомлений сжался до
+  пустого квадрата, ник — до нуля). Поэтому всё, что про плотность,
+  живёт от 761px, а телефон получает только точечные правки ниже.
+*/
+@media (min-width: 761px) {
+/* ── Общие блоки: компактнее ──────────────────────────────────────────────── */
+#app { padding-top: 18px; padding-bottom: 40px; }
+@media (min-width: 760px) { #app { padding-top: 22px; } }
+
+.panel {
+  padding: var(--pad);
+  margin-bottom: var(--gap);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+@media (min-width: 760px) { .panel { padding: 18px 20px; } }
+
+.hero {
+  padding: 18px var(--pad);
+  margin-bottom: var(--gap);
+  border-radius: var(--r-lg);
+}
+@media (min-width: 760px) { .hero { padding: 22px 24px; } }
+
+.panel__head { margin-bottom: 12px; }
+.panel__head h2 { font-size: clamp(16px, 2.2vw, 19px); }
+.eyebrow { font-size: 10px; letter-spacing: .14em; }
+.grid-2 { gap: var(--gap); }
+.muted { font-size: .86em; }
+
+/* ── Кнопки: один рост на весь сайт ───────────────────────────────────────── */
+.forum-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.forum-btn--wide { margin: 2px 0 var(--gap); }
+.forum-act { padding: 4px 8px; font-size: 11px; border-radius: 7px; }
+
+.seg__btn { min-height: 34px; padding: 0 12px; font-size: 12.5px; }
+.pick__btn { min-height: 34px; }
+
+/* ── Боковое меню сайта ───────────────────────────────────────────────────── */
+:root { --side-w: 220px; }
+.side { gap: 14px; padding: 14px 12px 12px; }
+.side .nav__link { padding: 8px 12px; font-size: 13px; }
 
 /* ── ФОРУМ: сводка ─────────────────────────────────────────────────────────── */
 .forum-chron { padding-bottom: 14px; }
@@ -367,41 +392,26 @@ body { font-size: 14.5px; line-height: 1.5; }
 /* Кнопка меню в шапке — компактнее. */
 .burger { min-height: 36px; padding: 0 11px; }
 
-/* ── Появление контента ──────────────────────────────────────────────────── */
-/* Панели появляются мягко и один раз, без скачков. */
-@media (prefers-reduced-motion: no-preference) {
-  .forum-main > .panel,
-  .forum-main > .forum-feed > .forum-post {
-    animation: refine-in .32s var(--ease) both;
-  }
-  .forum-feed > .forum-post:nth-child(2) { animation-delay: 30ms; }
-  .forum-feed > .forum-post:nth-child(3) { animation-delay: 60ms; }
-  .forum-feed > .forum-post:nth-child(4) { animation-delay: 90ms; }
-  .forum-feed > .forum-post:nth-child(n+5) { animation-delay: 110ms; }
-}
-@keyframes refine-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
 }
 
-/* ── Телефон ─────────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-  #app { padding-top: 14px; }
-  .panel, .hero { padding: 13px 14px; margin-bottom: 10px; }
-  .forum-post { padding: 12px 13px; }
-  .forum-feed { gap: 8px; }
-  .forum-chron__stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .forum-chron__stat:last-child { grid-column: auto; }
-  .forum-chron__stat { padding: 8px; }
-  .forum-chron__stat b { font-size: 16px; }
-  .forum-chron__stat span { font-size: 9.5px; }
-  .forum-post__title { font-size: 15px; }
-  .forum-post__acts { width: 100%; margin-left: 0; justify-content: flex-end; }
-  /* На телефоне высота кнопок остаётся пальцевой. */
-  .forum-btn { min-height: 40px; }
-  .forum-react__btn { min-height: 32px; }
+/* ── Колокольчик уведомлений ─────────────────────────────────────────────── */
+/* Иконка стоит всегда: на широком экране — перед словом, на телефоне —
+   одна (mobile.css прячет подпись), и тогда кнопка — квадрат под палец. */
+.forum-bell { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.forum-bell__icon { width: 17px; height: 17px; flex: 0 0 auto; }
+
+@media (max-width: 760px) {
+  .forum-bell { min-width: 44px; min-height: 44px; padding: 0 11px; }
+  .forum-bell__icon { width: 20px; height: 20px; }
+  /* Строка «аватар · ник · кнопки» переносится, а не давит ник до нуля. */
+  .forum-me { flex-wrap: wrap; gap: 8px 10px; }
+  .forum-me__body { flex: 1 1 120px; }
+  .forum-me .forum-btn { flex: 0 0 auto; }
 }
 
+/* Панель администратора: результаты вносят с телефона, там клетки крупные
+   намеренно — плотность только от планшета. */
+@media (min-width: 761px) {
 /* ── Панель администратора: та же плотность ───────────────────────────────── */
 .adm-top { padding: 9px 14px; gap: 8px 12px; }
 .adm-nav__link { padding: 7px 11px; font-size: 12.5px; }
@@ -414,3 +424,4 @@ body { font-size: 14.5px; line-height: 1.5; }
 .adm-grid { gap: var(--gap); }
 .adm-kv { gap: 7px; }
 .adm-chip { min-height: 32px; font-size: 12.5px; }
+}
