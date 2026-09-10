@@ -733,7 +733,14 @@ export async function markAllNotificationsRead() {
   ещё нет. Разбирает эту колонку на строки триггер базы — см. chats.sql.
 */
 
-function chatOut(row) {
+/**
+ * Чат строки базы в объект контракта.
+ *
+ * Экспортируется ради теста паритета (tests/contract.test.js): список чатов
+ * рисуется из этих полей, и пропажа одного из них (последнее вложение, число
+ * закреплённых) в одной из веток прошла бы незамеченной.
+ */
+export function chatOut(row) {
   return {
     id: row.id,
     title: row.title,
@@ -857,7 +864,7 @@ export async function leaveChat(chatId) {
 }
 
 export async function listChatMembers(chatId) {
-  const rows = await rest(`/forum_chat_member_list?select=*&chat_id=eq.${encodeURIComponent(chatId)}&order=role.asc,nick.asc`);
+  const rows = await rest(`/forum_chat_member_list?select=*&chat_id=eq.${encodeURIComponent(chatId)}&order=role_rank.asc,nick.asc`);
   return (Array.isArray(rows) ? rows : []).map(chatMemberOut);
 }
 

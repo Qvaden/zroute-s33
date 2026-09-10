@@ -2348,6 +2348,58 @@ console.log('\nQ. Форум');
   equal('локальный адаптер реализует контракт целиком', missingLocal.join(', '), '');
   equal('адаптер базы реализует контракт целиком', missingSupabase.join(', '), '');
 
+  /*
+    ВЫЗОВЫ СО СТРАНИЦ ПРОТИВ СПИСКА МЕТОДОВ.
+
+    Список выше — обещание; здесь проверка, что обещанием пользуются. Опечатка
+    в имени (forum.listPinned вместо listChatPinned) не роняет сайт при загрузке:
+    она ждёт нажатия кнопки, и в момент нажатия всё уже выложено.
+
+    Два правила, а не одно. Первое: метод, которого нет НИ В ОДНОЙ ветке, —
+    ошибка в коде страницы. Второе: метод, который есть только в одной ветке,
+    обязан вызываться под проверкой — так устроены профили: локальный адаптер
+    умеет их сам, а с базой страница профиля ходит в неё напрямую (см. проверку
+    выше). Без второй половины правила падение случается ровно в тот день,
+    когда источник данных переключат.
+  */
+  const callerFiles = ['src/forum/chats.js', 'src/forum/mount.js', 'src/forum/profile.js'];
+  const callerSources = await Promise.all(callerFiles.map((f) => readFile(f, 'utf8')));
+
+  const everywhere = new Set();
+  const problems = [];
+  callerFiles.forEach((file, i) => {
+    const src = callerSources[i];
+    for (const m of src.matchAll(/\bforum\.([A-Za-z_]\w*)\s*\(/g)) {
+      const name = m[1];
+      everywhere.add(name);
+      const inLocal = typeof localAdapter[name] === 'function';
+      const inRemote = typeof supabaseAdapter[name] === 'function';
+      if (!inLocal && !inRemote) {
+        problems.push(`${file}: ${name} — такого метода нет нигде`);
+      } else if (!inLocal || !inRemote) {
+        /*
+          Проверка перед вызовом бывает и общей: profile.js спрашивает один раз
+          «умеет ли адаптер профили» и держит ответ в константе ownProfiles.
+          Поэтому принимаем два вида: прямой typeof у самого вызова или
+          `if (<константа>)` с таким же typeof рядом, в одной строке-проверке.
+        */
+        const direct = new RegExp(`typeof forum\\.${name}\\s*===\\s*'function'`).test(src);
+        const guards = [...src.matchAll(/const (\w+) = typeof forum\.(\w+)\s*===\s*'function'/g)]
+          .map((g) => g[1]);
+        const flat = src.replace(/\s+/g, ' ');
+        const viaConstant = guards.some((g) => new RegExp(
+          `if \\(${g}\\)[^;]{0,90}forum\\.${name}\\s*\\(`
+        ).test(flat));
+        if (!direct && !viaConstant) {
+          problems.push(`${file}: ${name} — есть только в одной ветке и вызван без проверки`);
+        }
+      }
+    }
+  });
+  equal('каждый вызов со страниц ведёт к существующему методу', problems.join('; '), '');
+  check('вызовов со страниц достаточно много, чтобы проверка что-то значила',
+    everywhere.size >= 10, `найдено вызовов: ${everywhere.size}`);
+
   check('оба адаптера честно объявляют, видят ли записи другие люди',
     localAdapter.capabilities.isShared === false && supabaseAdapter.capabilities.isShared === true);
 
@@ -4147,6 +4199,94 @@ console.log(`\n${'─'.repeat(52)}`);
     /\.forum-modal__box/.test(await readFile('src/forum.css', 'utf8')));
   check('в вопросе может быть поле причины',
     /name="reason"/.test(chatsPage) && /field:\s*true/.test(chatBehavior));
+
+  /*
+    ПОРЯДОК В SQL — НЕ ПРИДИРКА.
+
+    Представление, читающее таблицу, Postgres разбирает при создании: если
+    таблицы вложений ещё нет, «create view» падает, и человек, запускающий
+    файл в панели Supabase, получает ошибку на середине. А если определение
+    представления по ошибке осталось в двух местах, побеждает нижнее — и
+    правка в верхнем молча не работает. Обе беды здесь и проверяются.
+  */
+  const sqlAt = (needle) => chatSql.indexOf(needle);
+  check('таблицы вложений объявлены раньше представления, которое их читает',
+    sqlAt('create table if not exists public.forum_chat_attachments')
+      < sqlAt('create view public.forum_chat_message_list'));
+  check('таблица реакций объявлена раньше представления',
+    sqlAt('create table if not exists public.forum_chat_reactions')
+      < sqlAt('create view public.forum_chat_message_list'));
+  check('права на представление выданы после его создания',
+    sqlAt('create view public.forum_chat_list') < sqlAt('grant select on public.forum_chat_list'));
+
+  const definitions = {};
+  for (const m of chatSql.matchAll(/create (?:or replace )?(view|table|trigger|policy|function|index)\s+(?:if not exists\s+)?([\w.]+)/g)) {
+    const key = `${m[1]} ${m[2]}`;
+    definitions[key] = (definitions[key] ?? 0) + 1;
+  }
+  /*
+    Повторы допустимы ровно у трёх функций: их первая версия объявлена в начале
+    файла, вторая — в конце, с новыми правилами. Postgres оставляет последнюю,
+    поэтому каждая помечена в файле словами «ЗАМЕНЕНА В КОНЦЕ ФАЙЛА». Всё
+    остальное продублировано быть не должно: вторая копия представления или
+    правила — это правка, которая не сработает.
+  */
+  const replacedOnPurpose = new Set([
+    'function public.forum_chat_guard',
+    'function public.forum_chat_message_guard',
+    'function public.forum_chat_message_set_author',
+  ]);
+  const unexpected = Object.entries(definitions)
+    .filter(([key, n]) => n > 1 && !replacedOnPurpose.has(key) && !key.startsWith('index '))
+    .map(([key, n]) => `${key} × ${n}`);
+  equal('ничего, кроме трёх задуманных замен, в файле не продублировано', unexpected.join('; '), '');
+  /* Каждая заменяемая функция обязана быть помечена в ОБЕИХ копиях: у старой —
+     «заменена в конце файла», у новой — «заменяет функцию из первой части». */
+  equal('у каждой заменяемой функции помечены обе копии',
+    [
+      (chatSql.match(/ЗАМЕНЕНА В КОНЦЕ ФАЙЛА/g) ?? []).length,
+      (chatSql.match(/ЗАМЕНЯЕТ функцию из первой части/g) ?? []).length,
+    ].join(','), '3,2');
+  check('представления не объявлены дважды — правка попадёт туда, куда её пишут',
+    (chatSql.match(/create view public\.forum_chat_/g) ?? []).length === 3);
+
+  /* ── Список чатов: обе ветки отдают одни и те же поля ── */
+
+  const { chatOut } = await import('../src/forum/adapters/supabase.js');
+  const { chatView } = await import('../src/forum/adapters/local.js');
+
+  const listState = {
+    me: 'u1',
+    users: [{ id: 'u1', nick: 'Иванов', avatarUrl: '', allianceTag: 'TAG', role: 'member', isLeader: true }],
+    chatMembers: [{ chatId: 'c1', userId: 'u1', role: 'owner', joinedAt: '2026-09-01T09:00:00.000Z', lastReadAt: '2026-09-01T09:30:00.000Z' }],
+    chatMessages: [{ id: 'm1', chatId: 'c1', authorId: 'u1', authorNick: 'Иванов', body: 'привет', createdAt: '2026-09-01T10:00:00.000Z', pinned: true }],
+    chatAttachments: [{ id: 'a1', messageId: 'm1', kind: 'video', url: 'https://example.com/v.mp4' }],
+    chatReactions: [],
+    chatTyping: [],
+  };
+  const chatRow = {
+    id: 'c1', title: 'Штаб', kind: 'alliance', alliance_tag: 'TAG', topic: 'сбор', avatar_url: '',
+    owner_id: 'u1', owner_nick: 'Иванов', invite_code: 'abcdefgh', max_members: 200,
+    closed: false, closed_reason: '', created_at: '2026-09-01T09:00:00.000Z',
+    member_count: 1, my_role: 'owner', unread_count: 0, last_body: 'привет', last_nick: 'Иванов',
+    last_kind: 'video', last_at: '2026-09-01T10:00:00.000Z', pinned_count: 1,
+  };
+  const localChat = chatView(listState, {
+    id: 'c1', title: 'Штаб', kind: 'alliance', allianceTag: 'TAG', topic: 'сбор', avatarUrl: '',
+    ownerId: 'u1', ownerNick: 'Иванов', inviteCode: 'abcdefgh', maxMembers: 200,
+    closed: false, closedReason: '', createdAt: '2026-09-01T09:00:00.000Z',
+  }, 'u1');
+  const remoteChat = chatOut(chatRow);
+  const chatDrift = [
+    ...Object.keys(localChat).filter((k) => !(k in remoteChat)),
+    ...Object.keys(remoteChat).filter((k) => !(k in localChat)),
+  ];
+  equal('обе ветки отдают один и тот же чат в списке', chatDrift.join(', '), '');
+  check('в списке видно последнее вложение и число закреплённых',
+    localChat.lastKind === 'video' && remoteChat.lastKind === 'video'
+      && localChat.pinnedCount === 1 && remoteChat.pinnedCount === 1);
+  check('тема и картинка чата доезжают из обеих веток',
+    localChat.topic === 'сбор' && remoteChat.topic === 'сбор');
 
   equal('новые части чата одеты в стили',
     ['.chat-shot', '.chat-voice', '.chat-reacts', '.chat-compose__tools', '.chat-queue',

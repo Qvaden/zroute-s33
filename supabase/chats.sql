@@ -227,6 +227,8 @@ create trigger forum_chat_after_create
 
 -- Что можно менять после создания: название, тег, закрытие. Владелец
 -- и код приглашения не меняются запросом — код пересоздаёт отдельная функция.
+-- ЗАМЕНЕНА В КОНЦЕ ФАЙЛА: там к этому добавляются тема и картинка чата.
+-- Правки вносить в конец — эта копия остаётся только для чтения.
 create or replace function public.forum_chat_guard()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -417,6 +419,8 @@ create policy forum_chat_messages_update on public.forum_chat_messages
   for update using (author_id = auth.uid() or public.forum_chat_manager(chat_id))
   with check (author_id = auth.uid() or public.forum_chat_manager(chat_id));
 
+-- ЗАМЕНЕНА В КОНЦЕ ФАЙЛА: там сообщение может быть пустым по тексту, если
+-- к нему приложены файлы, и там же проверяется черновик вложений.
 create or replace function public.forum_chat_message_set_author()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -439,6 +443,8 @@ create trigger forum_chat_message_set_author
   before insert on public.forum_chat_messages
   for each row execute function public.forum_chat_message_set_author();
 
+-- ЗАМЕНЕНА В КОНЦЕ ФАЙЛА: там к защите от подмены добавляется право
+-- закреплять сообщения.
 create or replace function public.forum_chat_message_guard()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -470,67 +476,17 @@ create trigger forum_chat_message_guard
 -- Список чатов со счётчиками — одним запросом, как forum_post_list.
 -- security_invoker = on: строки отбирают политики таблиц, представление
 -- только досчитывает.
+--
+-- САМИ ПРЕДСТАВЛЕНИЯ ОБЪЯВЛЕНЫ В КОНЦЕ ФАЙЛА, во второй части. Это не
+-- беспорядок: расширенные представления читают вложения и реакции, а их
+-- таблицы появляются только там. Postgres разбирает запрос представления
+-- при создании, поэтому «сначала таблицы, потом представление» — не совет,
+-- а условие, без которого файл не запустится.
+--
+-- Правило на будущее: правя список чатов, сообщения или участников, ищи
+-- create view в КОНЦЕ файла. Вторая копия определения здесь была бы ловушкой:
+-- она молча побеждалась бы той, что ниже, и правка «не срабатывала».
 
-drop view if exists public.forum_chat_list;
-create view public.forum_chat_list
-with (security_invoker = on) as
-select
-  c.*,
-  (select count(*) from public.forum_chat_members m where m.chat_id = c.id) as member_count,
-  (select m.role from public.forum_chat_members m
-     where m.chat_id = c.id and m.user_id = auth.uid()) as my_role,
-  (select m.last_read_at from public.forum_chat_members m
-     where m.chat_id = c.id and m.user_id = auth.uid()) as my_last_read_at,
-  (select count(*) from public.forum_chat_messages x
-     where x.chat_id = c.id and x.deleted = false
-       and x.created_at > coalesce(
-         (select m.last_read_at from public.forum_chat_members m
-            where m.chat_id = c.id and m.user_id = auth.uid()), 'epoch'::timestamptz)
-       and x.author_id is distinct from auth.uid()) as unread_count,
-  (select x.body from public.forum_chat_messages x
-     where x.chat_id = c.id and x.deleted = false
-     order by x.created_at desc limit 1) as last_body,
-  (select x.author_nick from public.forum_chat_messages x
-     where x.chat_id = c.id and x.deleted = false
-     order by x.created_at desc limit 1) as last_nick,
-  (select x.created_at from public.forum_chat_messages x
-     where x.chat_id = c.id and x.deleted = false
-     order by x.created_at desc limit 1) as last_at
-from public.forum_chats c;
-
-grant select on public.forum_chat_list to authenticated;
-
-drop view if exists public.forum_chat_message_list;
-create view public.forum_chat_message_list
-with (security_invoker = on) as
-select
-  x.*,
-  prof.avatar_url as author_avatar,
-  prof.alliance_tag as author_alliance,
-  prof.role as author_role,
-  prof.is_leader as author_is_leader
-from public.forum_chat_messages x
-left join public.forum_profiles prof on prof.id = x.author_id;
-
-grant select on public.forum_chat_message_list to authenticated;
-
-drop view if exists public.forum_chat_member_list;
-create view public.forum_chat_member_list
-with (security_invoker = on) as
-select
-  m.*,
-  prof.nick,
-  prof.avatar_url,
-  prof.alliance_tag,
-  prof.is_leader
-from public.forum_chat_members m
-join public.forum_profiles prof on prof.id = m.user_id;
-
-grant select on public.forum_chat_member_list to authenticated;
-
-grant select, insert, update, delete on public.forum_chats to authenticated;
-grant select, insert, update, delete on public.forum_chat_members to authenticated;
-grant select, insert, update on public.forum_chat_messages to authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- ЧАСТЬ ВТОРАЯ: ВЛОЖЕНИЯ, ОТВЕТЫ, РЕАКЦИИ, ЗАКРЕПЛЁННОЕ, «ПИШЕТ…»
@@ -554,7 +510,9 @@ alter table public.forum_chats
   add column if not exists avatar_url text not null default '';
 
 /*
-  Название и тема приводятся к одному виду здесь, а не только в браузере:
+  ЗАМЕНЯЕТ функцию из первой части (логика про владельца и код приглашения
+  не менялась). Название и тема приводятся к одному виду здесь, а не только
+  в браузере:
   через REST можно записать что угодно, и «тема» длиной в роман, растянутая
   над лентой, — это не безобидная шалость.
 */
@@ -930,9 +888,10 @@ create trigger forum_chat_message_files
   for each row execute function public.forum_chat_message_files();
 
 /*
-  Правка сообщения. Текста по-прежнему не касается (сказанное сказано),
-  но теперь решает ещё два вопроса: закрепление (это право управляющего,
-  а не автора) и защита связей от подмены.
+  ЗАМЕНЯЕТ функцию из первой части: к защите связей от подмены добавляется
+  закрепление — это право управляющего чатом, а не автора сообщения.
+
+  Текста по-прежнему не касается: сказанное сказано.
 */
 create or replace function public.forum_chat_message_guard()
 returns trigger
@@ -1172,7 +1131,15 @@ select
   prof.nick,
   prof.avatar_url,
   prof.alliance_tag,
-  prof.is_leader
+  prof.is_leader,
+  /*
+    Порядок в списке участников: владелец, помощники, остальные.
+
+    Роль лежит словом, и «role.asc» по алфавиту поставил бы владельца
+    последним (admin < member < owner). Локальный адаптер сортирует по смыслу
+    роли — эта колонка нужна, чтобы обе ветки показывали список одинаково.
+  */
+  case m.role when 'owner' then 0 when 'admin' then 1 else 2 end as role_rank
 from public.forum_chat_members m
 join public.forum_profiles prof on prof.id = m.user_id;
 
@@ -1184,9 +1151,12 @@ grant select, delete on public.forum_chat_attachments to authenticated;
 grant select, insert, delete on public.forum_chat_reactions to authenticated;
 grant select on public.forum_chat_typing to authenticated;
 
-grant select, insert, update, delete on public.forum_chats to authenticated;
-grant select, insert, update, delete on public.forum_chat_members to authenticated;
-grant select, insert, update on public.forum_chat_messages to authenticated;
+/*
+  Права на сами таблицы чатов уже выданы в первой части — здесь только то,
+  что появилось вместе с вложениями: новые таблицы и пересозданные
+  представления. Повторный grant безвреден, но две копии одного и того же
+  расходятся ровно в тот день, когда правят одну из них.
+*/
 
 /*
   ЧТО НАДО СДЕЛАТЬ РУКАМИ ПОСЛЕ ЗАПУСКА.

@@ -1043,7 +1043,14 @@ export function chatMessageView(s, x, meId) {
   };
 }
 
-function chatView(s, c, meId) {
+/**
+ * Чат в том же виде, что отдаёт представление базы (forum_chat_list).
+ *
+ * Экспортируется ради теста паритета: список чатов рисуется из этих полей,
+ * и пропажа одного из них (последнее вложение, число закреплённых) в одной
+ * из веток прошла бы незамеченной — до дня, когда источник переключат.
+ */
+export function chatView(s, c, meId) {
   const members = s.chatMembers.filter((m) => m.chatId === c.id);
   const mine = members.find((m) => m.userId === meId);
   const msgs = s.chatMessages.filter((x) => x.chatId === c.id && !x.deleted);
