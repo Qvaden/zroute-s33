@@ -14,6 +14,17 @@
  * ЧЕГО ЗДЕСЬ НЕТ. Реакций, вложений, правки сообщений. Чат это разговор:
  * короткие реплики, быстро. Всё, что требует «оформить», живёт на форуме,
  * а из чата туда ведёт ссылка.
+ *
+ * ПОЛНОЭКРАННЫЙ МЕССЕНДЖЕР. Страница ведёт себя не как статья, а как
+ * мессенджер: занимает всё окно под шапкой сайта, список и комната
+ * скроллятся каждая сама, ввод прижат к низу. Высоту окна считает и кладёт
+ * в --chat-head-h поведение (fitFullscreen в src/forum/chats.js), а не CSS:
+ * рост шапки не константа.
+ *
+ * Все действия с чатом — в меню ⋯ у заголовка комнаты. Строка кнопок
+ * «Пригласить · Выйти · Закрыть» переносилась на телефоне и толкала
+ * название в две строки; выпадающее меню — то, к чему рука привыкла
+ * в любом мессенджере.
  */
 import { esc, plural } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
@@ -31,6 +42,8 @@ import { roleBadge } from '../forum/roles.js';
  * @property {import('../forum/contract.js').ForumChatMessage[]} messages
  * @property {import('../forum/contract.js').ForumChatMember[]} members
  * @property {boolean} membersOpen
+ * @property {boolean} inviteOpen
+ * @property {boolean} menuOpen
  * @property {boolean} createOpen
  * @property {boolean} hasMore
  * @property {boolean} sending
@@ -197,25 +210,53 @@ function renderRoom(s) {
   }
   const isMgr = ['owner', 'admin'].includes(c.myRole) || s.me.role === 'admin' || s.me.role === 'moderator';
   const kindWord = c.kind === 'inter' ? 'межальянсовый' : 'альянсовый';
+  const membersWord = plural(c.memberCount, 'участник', 'участника', 'участников');
+  const initial = (c.allianceTag || c.title).trim().slice(0, 2).toUpperCase();
+
+  /*
+    Меню ⋯ собирается из тех же действий, что раньше стояли строкой кнопок.
+    Пункт «Участники» — для всех: состав чата интересует не только
+    управляющим. «Выйти» не показывают создателю: он уходит из чата
+    только удалив чат целиком, и кнопка «Выйти» сбивала бы с толку.
+  */
+  const menu = [
+    `<button type="button" class="chat-menu__item" role="menuitem" data-chat-members-toggle>
+      Участники<span class="chat-menu__count">${esc(c.memberCount)}</span>
+    </button>`,
+    isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-invite>Пригласить по коду</button>` : '',
+    c.myRole && c.myRole !== 'owner'
+      ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-leave>Выйти из чата</button>`
+      : '',
+    isMgr && !c.closed
+      ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-close>Закрыть чат</button>`
+      : '',
+    isMgr && c.closed
+      ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-reopen>Снова открыть</button>`
+      : '',
+  ].filter(Boolean).join('');
 
   return `
     <header class="chat-room__head">
-      <a class="chat-room__back forum-btn forum-btn--ghost" href="#/chats" aria-label="К списку чатов">‹</a>
+      <a class="chat-room__back" href="#/chats" aria-label="К списку чатов">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <span class="chat-room__mark" style="--ava:${esc(nickColor(c.title))}" aria-hidden="true">${esc(initial)}</span>
       <div class="chat-room__who">
         <b class="chat-room__title">${esc(c.title)}</b>
-        <small class="muted">
-          ${esc(kindWord)}${c.allianceTag ? ` · ${esc(c.allianceTag)}` : ''} ·
-          <button type="button" class="chat-room__members-btn" data-chat-members-toggle>
-            ${esc(plural(c.memberCount, 'участник', 'участника', 'участников'))}
-          </button>
+        <small class="chat-room__sub muted">
+          ${esc(kindWord)}${c.allianceTag ? ` · ${esc(c.allianceTag)}` : ''} · ${esc(membersWord)}
           ${c.closed ? ' · <span class="chat-room__closed">закрыт</span>' : ''}
         </small>
       </div>
-      <div class="chat-room__acts">
-        ${isMgr ? `<button type="button" class="forum-act" data-chat-invite>Пригласить</button>` : ''}
-        ${c.myRole && c.myRole !== 'owner' ? `<button type="button" class="forum-act" data-chat-leave>Выйти</button>` : ''}
-        ${isMgr && !c.closed ? `<button type="button" class="forum-act" data-chat-close>Закрыть</button>` : ''}
-        ${isMgr && c.closed ? `<button type="button" class="forum-act" data-chat-reopen>Открыть</button>` : ''}
+      <div class="chat-menu" data-chat-menu>
+        <button type="button" class="chat-room__dots" data-chat-menu-toggle
+                aria-haspopup="menu" aria-expanded="${s.menuOpen ? 'true' : 'false'}" aria-label="Действия с чатом">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">
+            <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+          </svg>
+        </button>
+        ${s.menuOpen ? `<div class="chat-menu__pop" role="menu">${menu}</div>` : ''}
       </div>
     </header>
 
