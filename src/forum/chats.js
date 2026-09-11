@@ -14,7 +14,7 @@
  */
 import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
-import { renderChats, renderScrollArea, renderChatList } from '../pages/chats.js';
+import { renderChats, renderScrollArea, renderChatList, renderMessage } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
 import { uploadFile, currentUserId } from '../db/client.js';
 
@@ -361,17 +361,23 @@ async function tick() {
       const f = byId.get(m.id);
       if (!f) return m;
       /*
-        Аватарки и реакции обновляем всегда, когда они появились:
-        пришедшее с сервера поле авторитетнее локального. Раньше
-        существующее сообщение не трогалось вовсе, и аватарка,
-        потерянная при отправке, не возвращалась до перезагрузки.
+        Аватарки обновляем, если сервер прислал, а локально пусто.
+        Реакции — мерж по максимуму: reactChatMessage — fire-and-forget,
+        и следующий тик может прилететь до того, как сервер примет реакцию.
+        Без мержа локальная реакция исчезала бы на 1–4 секунды.
       */
-      if (f.deleted !== m.deleted
-        || (!m.authorAvatar && f.authorAvatar)
-        || JSON.stringify(f.reactions || {}) !== JSON.stringify(m.reactions || {})
-        || JSON.stringify(f.poll || null) !== JSON.stringify(m.poll || null)) {
+      const avatarChanged = !m.authorAvatar && f.authorAvatar;
+      const serverR = f.reactions || {};
+      const localR = m.reactions || {};
+      const mergedR = { ...serverR };
+      for (const [emoji, count] of Object.entries(localR)) {
+        if ((mergedR[emoji] || 0) < count) mergedR[emoji] = count;
+      }
+      const reactionsChanged = JSON.stringify(mergedR) !== JSON.stringify(m.reactions || {});
+      const pollChanged = JSON.stringify(f.poll || null) !== JSON.stringify(m.poll || null);
+      if (f.deleted !== m.deleted || avatarChanged || reactionsChanged || pollChanged) {
         changed = true;
-        return f;
+        return { ...f, reactions: mergedR };
       }
       return m;
     });
@@ -427,7 +433,11 @@ async function send(form) {
     if (id !== state.openId) return;
     state.messages.push(m);
     chatDrafts.set(id, '');
-    if (input) { input.value = ''; autosize(input); }
+    if (input) {
+      input.value = '';
+      // Отложенный autosize: не блокирует текущий кадр, клавиатура не прыгает.
+      requestAnimationFrame(() => autosize(input));
+    }
     /*
       В рабочем режиме файл уже в хранилище, локальный preview больше не нужен.
       В локальном режиме адрес превью и есть адрес вложения — отзывать его
@@ -440,11 +450,18 @@ async function send(form) {
     const c = state.chats.find((x) => x.id === id);
     if (c) { c.lastBody = body || (attachments.length ? '📎 Вложение' : '📊 Опрос'); c.lastNick = state.me.nick; c.lastAt = m.createdAt; }
     /*
-      Обновляем только ленту, список и мета-данные над вводом.
-      Сам textarea НЕ пересоздаём — иначе на телефоне закрывается
-      клавиатура, а восстановить её программно после await уже нельзя.
+      КЛЮЧЕВОЙ ФИКС «ТАНЦУЮЩЕЙ КЛАВИАТУРЫ».
+
+      После отправки НЕ вызываем paintMessages (не заменяем весь innerHTML
+      ленты) и НЕ трогаем autosize. Вместо этого дописываем ОДИН <li> в
+      конец существующего <ol class="chat-msgs"> — браузер делает один
+      layout, а не полный пересбор. Клавиатура не прыгает.
+
+      Прокрутку вниз тоже не делаем: пользователь уже внизу (он только
+      что написал), новое сообщение появляется прямо над вводом.
     */
-    paintMessages({ stick: true });
+    appendMessageToDOM(m);
+
     paintList();
     paintComposerMeta();
   } catch (err) {
@@ -467,6 +484,7 @@ async function send(form) {
 /** Обновить ответ/опрос над полем ввода, не пересоздавая сам textarea. */
 function paintComposerMeta() {
   if (!host) return;
+  // Баннер «Ответ для …».
   const replyBox = host.querySelector('.chat-reply-banner');
   if (replyBox) {
     if (!state.replyingTo) replyBox.remove();
@@ -481,6 +499,57 @@ function paintComposerMeta() {
         <button type="button" class="chat-reply-banner__cancel" data-chat-reply-cancel title="Отменить ответ">✕</button>
       </div>`);
   }
+  // Чип «Опрос: …» (после применения опроса, до отправки).
+  const pollChip = host.querySelector('.chat-pending-poll');
+  if (pollChip && !state.pollDraft) pollChip.remove();
+  // Форма создания опроса.
+  const pollForm = host.querySelector('[data-chat-poll-form]');
+  if (pollForm && !state.pollOpen) pollForm.remove();
+}
+
+/**
+ * Дописать одно сообщение в конец ленты — без пересборки innerHTML.
+ *
+ * Замена paintMessages при отправке: один вставленный <li> не вызывает
+ * пересчёт layout ленты, и клавиатура на телефоне не прыгает.
+ */
+function appendMessageToDOM(m) {
+  if (!host) return;
+  const scroll = host.querySelector('[data-chat-scroll]');
+  let msgs = scroll?.querySelector('.chat-msgs');
+  // Лента может быть пустым плейсхолдером — тогда рисуем ленту целиком.
+  if (!msgs) {
+    const area = scroll?.querySelector('.chat-room__scroll') ?? scroll;
+    if (!area) { paintMessages({ stick: true }); return; }
+    area.innerHTML = renderScrollArea(state);
+    scroll.scrollTop = scroll.scrollHeight;
+    return;
+  }
+
+  const isMgr = state.open && (
+    state.open.myRole === 'owner' || state.open.myRole === 'admin' ||
+    state.open.ownerId === state.me?.id || state.me?.role === 'admin' || state.me?.role === 'moderator'
+  );
+  const prev = state.messages.length > 1 ? state.messages[state.messages.length - 2] : null;
+  const grouped = prev && prev.authorId === m.authorId && !prev.deleted
+    && m.createdAt - prev.createdAt < 5 * 60 * 1000
+    && !m.replyTo && !m.poll;
+  const day = new Date(m.createdAt);
+  const dayStr = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+  // Если день изменился — вставляем заголовок дня.
+  if (prev) {
+    const prevDay = new Date(prev.createdAt);
+    const prevDayStr = `${prevDay.getFullYear()}-${prevDay.getMonth()}-${prevDay.getDate()}`;
+    if (prevDayStr !== dayStr) {
+      const dayLabel = day.toDateString() === new Date().toDateString()
+        ? 'Сегодня'
+        : new Date(Date.now() - 86400000).toDateString() === day.toDateString()
+          ? 'Вчера'
+          : day.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+      msgs.insertAdjacentHTML('beforeend', `<div class="chat-day"><span>${esc(dayLabel)}</span></div>`);
+    }
+  }
+  msgs.insertAdjacentHTML('beforeend', renderMessage(m, state, isMgr, grouped));
 }
 
 async function withBusy(btn, label, fn) {
