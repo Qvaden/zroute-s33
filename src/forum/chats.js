@@ -52,6 +52,7 @@ let token = 0;
 let timer = 0;
 let listTimer = 0;
 let headWatch = null;
+let vvWatch = null;
 
 /** Черновики по чатам: id -> набранный текст. */
 const chatDrafts = new Map();
@@ -63,7 +64,15 @@ let renderedChatId;
 function fitFullscreen() {
   if (!host) return;
   const head = document.querySelector('.site-head');
+  const vv = window.visualViewport;
+  /*
+    Телефонная клавиатура сжимает visualViewport, но не всегда пересчитывает
+    100dvh: ввод оказывался под клавиатурой. Берём реальную видимую высоту —
+    на десктопе она совпадает с окном, на телефоне корректно уменьшается.
+  */
+  const visible = Math.round(vv ? vv.height : window.innerHeight);
   host.style.setProperty('--chat-head-h', `${head ? head.offsetHeight : 0}px`);
+  host.style.setProperty('--chat-vh', `${visible}px`);
 }
 
 function watchHead() {
@@ -73,6 +82,19 @@ function watchHead() {
   if (head && typeof ResizeObserver !== 'undefined') {
     headWatch = new ResizeObserver(fitFullscreen);
     headWatch.observe(head);
+  }
+  if (vvWatch) { vvWatch(); vvWatch = null; }
+  const vv = window.visualViewport;
+  if (vv) {
+    const onResize = () => fitFullscreen();
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    window.addEventListener('resize', onResize);
+    vvWatch = () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+      window.removeEventListener('resize', onResize);
+    };
   }
 }
 
@@ -200,8 +222,8 @@ function dropFile(index) {
   paintPending();
 }
 
-function clearPendingFiles() {
-  for (const f of state.pendingFiles) URL.revokeObjectURL(f.preview);
+function clearPendingFiles({ keepUrls = false } = {}) {
+  if (!keepUrls) for (const f of state.pendingFiles) URL.revokeObjectURL(f.preview);
   state.pendingFiles = [];
   paintPending();
 }
@@ -406,26 +428,39 @@ async function send(form) {
     state.messages.push(m);
     chatDrafts.set(id, '');
     if (input) { input.value = ''; autosize(input); }
-    clearPendingFiles();
+    /*
+      В рабочем режиме файл уже в хранилище, локальный preview больше не нужен.
+      В локальном режиме адрес превью и есть адрес вложения — отзывать его
+      нельзя, иначе сообщение сразу покажет битую картинку.
+    */
+    clearPendingFiles({ keepUrls: !forum.capabilities?.isShared });
     state.pollDraft = null;
     state.pollOpen = false;
     state.replyingTo = null;
-    paintComposerMeta();
     const c = state.chats.find((x) => x.id === id);
     if (c) { c.lastBody = body || (attachments.length ? '📎 Вложение' : '📊 Опрос'); c.lastNick = state.me.nick; c.lastAt = m.createdAt; }
+    /*
+      Обновляем только ленту, список и мета-данные над вводом.
+      Сам textarea НЕ пересоздаём — иначе на телефоне закрывается
+      клавиатура, а восстановить её программно после await уже нельзя.
+    */
     paintMessages({ stick: true });
     paintList();
+    paintComposerMeta();
   } catch (err) {
     notice(String(err?.message ?? err));
   } finally {
     state.sending = false;
+    if (btn?.isConnected) btn.disabled = false;
     /*
-      После отправки — полная перерисовка: убирает баннер ответа, форму
-      опроса и выбранные файлы. Ввод восстанавливается (пустой), фокус
-      возвращается в поле — клавиатура остаётся.
+      Фокус возвращаем в поле ввода, но только если оно уже было
+      активным: на телефоне «слепой» focus() после await не открывает
+      клавиатуру, а закрытая клавиатура при работающем вводе выглядит
+      как баг.
     */
-    paintFull({ stick: true });
-    host?.querySelector('[data-chat-input]')?.focus({ preventScroll: true });
+    if (input && document.activeElement === btn) {
+      input.focus({ preventScroll: true });
+    }
   }
 }
 
@@ -687,6 +722,25 @@ function wire() {
       return;
     }
 
+    /* Реакция: сразу инкремент локально и запрос в базу.
+       Обрабатываем ДО панели реакций, чтобы клик по эмодзи внутри popup
+       не съедался обработчиком открытия/закрытия popup. */
+    const react = t.closest('[data-chat-react]');
+    if (react) {
+      const [msgId, emoji] = String(react.dataset.chatReact || '').split(':');
+      if (msgId && emoji) {
+        const m = state.messages.find((x) => x.id === msgId);
+        if (m) {
+          m.reactions = m.reactions || {};
+          m.reactions[emoji] = (m.reactions[emoji] || 0) + 1;
+          paintMessages();
+        }
+        forum.reactChatMessage?.(msgId, emoji).catch(() => {});
+        host.querySelectorAll('.chat-msg__reactions-pop.is-open').forEach((el) => el.classList.remove('is-open'));
+      }
+      return;
+    }
+
     /* Панель реакций: открыть/закрыть по нажатию (на телефоне hover нет). */
     const picker = t.closest('[data-chat-react-picker]');
     if (picker) {
@@ -705,23 +759,6 @@ function wire() {
       host.querySelector(`#${CSS.escape(jump.dataset.chatJump)}`)?.scrollIntoView({
         behavior: 'smooth', block: 'center',
       });
-      return;
-    }
-
-    /* Реакция: сразу инкремент локально и запрос в базу. */
-    const react = t.closest('[data-chat-react]');
-    if (react) {
-      const [msgId, emoji] = String(react.dataset.chatReact || '').split(':');
-      if (msgId && emoji) {
-        const m = state.messages.find((x) => x.id === msgId);
-        if (m) {
-          m.reactions = m.reactions || {};
-          m.reactions[emoji] = (m.reactions[emoji] || 0) + 1;
-          paintMessages();
-        }
-        forum.reactChatMessage?.(msgId, emoji).catch(() => {});
-        host.querySelector('.chat-msg__reactions-pop')?.remove();
-      }
       return;
     }
 
@@ -935,6 +972,8 @@ export function unmountChats() {
   stopPolling();
   headWatch?.disconnect();
   headWatch = null;
+  vvWatch?.();
+  vvWatch = null;
   state.openId = null;
   state.open = null;
   state.messages = [];

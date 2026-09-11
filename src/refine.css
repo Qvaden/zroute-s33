@@ -437,6 +437,11 @@ body:has(.chat-layout) .site-foot { display: none; }
   gap: 10px;
   height: calc(100vh - var(--chat-head-h, 58px));
   height: calc(100dvh - var(--chat-head-h, 58px));
+  /*
+    Поверх — высота от visualViewport. На телефоне она честно уменьшается,
+    когда открыта клавиатура, и ввод остаётся над ней, а не под ней.
+  */
+  height: calc(var(--chat-vh, 100dvh) - var(--chat-head-h, 58px));
 }
 
 /*
@@ -1249,6 +1254,15 @@ body:has(.chat-layout) .site-foot { display: none; }
   .chat-compose { padding: 6px; gap: 6px; }
   .chat-compose__input { padding: 9px 13px; font-size: 16px; }
   .chat-compose__send { width: 44px; height: 44px; }
+  /*
+    Safari на телефоне масштабирует страницу при фокусе, если шрифт поля
+    меньше 16px. Все поля чата — не исключение: форма создания чата и форма
+    опроса тоже должны иметь 16px, иначе пользователь увидит «дёргание»
+    экрана при нажатии.
+  */
+  .chat-create input,
+  .chat-poll-creator__q,
+  .chat-poll-creator__opt { font-size: 16px; }
 }
 
 /* ── Монитор: список и комната рядом ──────────────────────────────────────── */
