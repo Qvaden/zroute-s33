@@ -181,12 +181,15 @@
  * @property {(chatId: string, userId: string, role: 'admin'|'member') => Promise<void>} setChatMemberRole
  * @property {(chatId: string, userId: string) => Promise<void>} kickChatMember
  * @property {(chatId: string, opts?: {limit?: number, before?: Date|null}) => Promise<ForumChatMessage[]>} listChatMessages
- * @property {(chatId: string, body: string) => Promise<ForumChatMessage>} sendChatMessage
+ * @property {(chatId: string, body: string, opts?: {attachments?: any[], poll?: any, replyTo?: any}) => Promise<ForumChatMessage>} sendChatMessage
  * @property {(id: string, reason?: string) => Promise<void>} deleteChatMessage
  * @property {(chatId: string) => Promise<void>} markChatRead
  * @property {(chatId: string, patch: {title?: string, allianceTag?: string, closed?: boolean, closedReason?: string}) => Promise<void>} updateChat
  * @property {(chatId: string) => Promise<string>} rotateChatCode
+ * @property {(chatId: string) => Promise<void>} deleteChat
  * @property {(chatId: string) => Promise<void>} adminDeleteChat
+ * @property {(messageId: string, optionIndex: number) => Promise<void>} [voteChatPoll]
+ * @property {(messageId: string, reaction: string) => Promise<void>} [reactChatMessage]
  */
 
 /**
@@ -233,6 +236,10 @@
  * @property {string} authorRole
  * @property {boolean} authorIsLeader
  * @property {string} body
+ * @property {any[]} [attachments]
+ * @property {any|null} [poll]
+ * @property {any|null} [replyTo]
+ * @property {Record<string, number>} [reactions]
  * @property {boolean} deleted
  * @property {string} deletedReason
  * @property {Date} createdAt

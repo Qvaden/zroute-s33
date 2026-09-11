@@ -751,6 +751,10 @@ function chatMessageOut(row) {
     authorRole: row.author_role || 'member',
     authorIsLeader: Boolean(row.author_is_leader),
     body: row.body,
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    poll: row.poll || null,
+    replyTo: row.reply_to || null,
+    reactions: row.reactions && typeof row.reactions === 'object' ? row.reactions : {},
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
     createdAt: toDate(row.created_at) ?? new Date(),
@@ -831,20 +835,83 @@ export async function listChatMessages(chatId, { limit = 60, before = null } = {
   return (Array.isArray(rows) ? rows : []).map(chatMessageOut).reverse();
 }
 
-export async function sendChatMessage(chatId, body) {
+export async function sendChatMessage(chatId, body, opts = {}) {
+  const me = await currentUser();
+  const payload = { chat_id: chatId, body: String(body || '') };
+  if (Array.isArray(opts.attachments) && opts.attachments.length) payload.attachments = opts.attachments;
+  if (opts.poll) payload.poll = opts.poll;
+  if (opts.replyTo) payload.reply_to = opts.replyTo;
+
   const rows = await rest('/forum_chat_messages', {
     method: 'POST',
     prefer: 'return=representation',
-    body: { chat_id: chatId, body: String(body) },
+    body: payload,
   });
   const created = Array.isArray(rows) ? rows[0] : rows;
-  return chatMessageOut(created);
+  const out = chatMessageOut(created);
+  /*
+    ВАЖНО: ответ от /forum_chat_messages — это сырая строка таблицы, где
+    нет join с forum_profiles (аватарка, тег, роль). Подставляем из текущего
+    пользователя сразу, чтобы аватарка автора не пропадала в момент отправки.
+  */
+  if (!out.authorAvatar && me?.avatarUrl) out.authorAvatar = me.avatarUrl;
+  if (!out.authorAlliance && me?.allianceTag) out.authorAlliance = me.allianceTag;
+  if (!out.authorRole && me?.role) out.authorRole = me.role;
+  if (!out.authorIsLeader && me?.isLeader) out.authorIsLeader = Boolean(me.isLeader);
+  return out;
 }
 
 export async function deleteChatMessage(id, reason = '') {
   await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH', body: { deleted: true, deleted_reason: String(reason || '') },
   });
+}
+
+export async function reactChatMessage(messageId, emoji) {
+  const rows = await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}&select=reactions`);
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  const reactions = (row && typeof row.reactions === 'object' && row.reactions) ? { ...row.reactions } : {};
+  reactions[emoji] = (reactions[emoji] || 0) + 1;
+  await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}`, {
+    method: 'PATCH',
+    body: { reactions },
+  }).catch(() => {});
+}
+
+export async function voteChatPoll(messageId, optionIndex) {
+  const rows = await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}&select=poll`);
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  if (!row?.poll || !Array.isArray(row.poll.options)) return;
+  const me = currentUserId();
+  if (!me) return;
+  const poll = { ...row.poll };
+  const opt = poll.options[optionIndex];
+  if (!opt) return;
+
+  opt.voters = Array.isArray(opt.voters) ? opt.voters : [];
+  const idx = opt.voters.indexOf(me);
+  if (idx >= 0) {
+    opt.voters.splice(idx, 1);
+  } else {
+    if (!poll.multiple) {
+      for (const o of poll.options) {
+        if (Array.isArray(o.voters)) o.voters = o.voters.filter((v) => v !== me);
+        o.votes = (o.voters || []).length;
+      }
+    }
+    opt.voters.push(me);
+  }
+  opt.votes = opt.voters.length;
+  poll.total = new Set(poll.options.flatMap((o) => o.voters || [])).size;
+
+  await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}`, {
+    method: 'PATCH',
+    body: { poll },
+  }).catch(() => {});
+}
+
+export async function deleteChat(chatId) {
+  await rest(`/forum_chats?id=eq.${encodeURIComponent(chatId)}`, { method: 'DELETE' });
 }
 
 export async function markChatRead(chatId) {

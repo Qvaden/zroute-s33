@@ -1,24 +1,27 @@
 /**
  * ЗАКРЫТЫЕ ЧАТЫ — ПОВЕДЕНИЕ.
  *
- * Тот же приём, что у форума (mount.js): состояние в одном объекте, страница
- * перерисовывается строкой целиком, набранный текст переживает перерисовку.
+ * ГЛАВНОЕ ОТЛИЧИЕ ОТ ПРОШЛОЙ ВЕРСИИ — ИНКРЕМЕНТАЛЬНАЯ ПЕРЕРИСОВКА.
  *
- * Страница — полноэкранный мессенджер: высоту от шапки сайта считает
- * fitFullscreen ниже, действия с чатом живут в меню ⋯.
+ * Фоновый опрос (tick) и обновление списка чатов больше НЕ заменяют
+ * host.innerHTML целиком. Обновляется только лента сообщений или список
+ * чатов. Композер (textarea) при этом физически не пересоздаётся:
+ * фокус остаётся, клавиатура на телефоне не закрывается, курсор не
+ * прыгает. Полная перерисовка — только при смене чата или экрана.
  *
- * КАК ПРИХОДЯТ НОВЫЕ СООБЩЕНИЯ. Опросом раз в несколько секунд, пока вкладка
- * видна. Не Realtime-подпиской Supabase — она требует их клиентскую
- * библиотеку и веб-сокет, а проект держится на правиле «обычные ES-модули,
- * без сборки». Опрос спрашивает только «что новее последнего у меня», это
- * один дешёвый запрос; при 200 людях в чате и вкладке в фоне — ноль запросов.
- * Если однажды понадобится мгновенность — точка замены одна: tick().
+ * ЧЕРНОВИКИ ПО ЧАТАМ. Начал писать в одном чате, перешёл в другой —
+ * текст сохранён и вернётся при переключении назад.
  */
 import { forum } from './index.js';
-import { renderChats } from '../pages/chats.js';
+import { esc } from '../ui/helpers.js';
+import { renderChats, renderScrollArea, renderChatList } from '../pages/chats.js';
+import { prepareImage } from '../ui/image-prep.js';
+import { uploadFile, currentUserId } from '../db/client.js';
 
 const POLL_MS = 4000;
 const POLL_MS_LIST = 15000;
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 const state = {
   ready: false,
@@ -34,8 +37,13 @@ const state = {
   inviteOpen: false,
   menuOpen: false,
   createOpen: false,
+  pollOpen: false,
   hasMore: false,
   sending: false,
+  pendingFiles: [],
+  replyingTo: null,
+  pollDraft: null,
+  lightbox: null,
 };
 
 let host = null;
@@ -43,19 +51,15 @@ let wired = false;
 let token = 0;
 let timer = 0;
 let listTimer = 0;
-let draft = '';
 let headWatch = null;
 
-/*
-  ПОЛНОЭКРАННЫЙ РЕЖИМ.
+/** Черновики по чатам: id -> набранный текст. */
+const chatDrafts = new Map();
+/** Какой чат сейчас отрисован в DOM — чтобы не пересоздавать его без нужды. */
+let renderedChatId;
 
-  Высота мессенджера считается от шапки сайта, и её рост — не константа:
-  президентская доска приезжает вместе с данными, телефон в альбоме
-  переносит строку. Поэтому шапку меряем и следим за ней, а ответ кладём
-  в --chat-head-h на контейнере — его читает refine.css. Без этого любая
-  зашитая цифра то оставляла бы под шапкой щель, то уводила кнопку
-  отправки под нижний край экрана.
-*/
+/* ── Полноэкранный режим ────────────────────────────────────────────────── */
+
 function fitFullscreen() {
   if (!host) return;
   const head = document.querySelector('.site-head');
@@ -76,22 +80,79 @@ function watchHead() {
 
 function paint({ stick = false } = {}) {
   if (!host) return;
-  const scroll = host.querySelector('[data-chat-scroll]');
+  const needsFull = renderedChatId !== state.openId
+    || !host.querySelector('.chat-layout')
+    || state.menuOpen || state.membersOpen || state.inviteOpen
+    || state.pollOpen || state.createOpen;
+  if (needsFull) paintFull({ stick });
+  else { paintMessages({ stick }); paintList(); }
+}
+
+/**
+ * Полная перерисовка. Сохраняет и восстанавливает: черновик по чату,
+ * фокус и позицию курсора, позицию скролла ленты.
+ */
+function paintFull({ stick = false } = {}) {
+  if (!host) return;
+
   const input = host.querySelector('[data-chat-input]');
-  if (input) draft = input.value;
+  const wasFocused = input && document.activeElement === input;
+  const selStart = input?.selectionStart ?? null;
+  const selEnd = input?.selectionEnd ?? null;
+  if (input && state.openId) chatDrafts.set(state.openId, input.value);
+
+  const scroll = host.querySelector('[data-chat-scroll]');
   const atBottom = scroll ? scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80 : true;
   const prevHeight = scroll?.scrollHeight ?? 0;
   const prevTop = scroll?.scrollTop ?? 0;
 
   host.innerHTML = renderChats(state);
+  renderedChatId = state.openId;
 
   const nextInput = host.querySelector('[data-chat-input]');
-  if (nextInput && draft) { nextInput.value = draft; autosize(nextInput); }
+  if (nextInput) {
+    nextInput.value = state.openId ? (chatDrafts.get(state.openId) || '') : '';
+    autosize(nextInput);
+    if (wasFocused) {
+      nextInput.focus({ preventScroll: true });
+      if (selStart != null && selEnd != null) {
+        try { nextInput.setSelectionRange(selStart, selEnd); } catch { /* не все браузеры */ }
+      }
+    }
+  }
+
   const nextScroll = host.querySelector('[data-chat-scroll]');
   if (nextScroll) {
     if (stick || atBottom) nextScroll.scrollTop = nextScroll.scrollHeight;
     else nextScroll.scrollTop = prevTop + (nextScroll.scrollHeight - prevHeight);
   }
+}
+
+/**
+ * ТОЧЕЧНАЯ ПЕРЕРИСОВКА ЛЕНТЫ.
+ * Заменяет только содержимое .chat-room__scroll. Композер и поле ввода
+ * не трогаются вообще — это и есть фикс сброса клавиатуры.
+ */
+function paintMessages({ stick = false } = {}) {
+  if (!host) return;
+  const scroll = host.querySelector('[data-chat-scroll]');
+  if (!scroll) { paintFull({ stick }); return; }
+
+  const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80;
+  const prevHeight = scroll.scrollHeight;
+  const prevTop = scroll.scrollTop;
+
+  scroll.innerHTML = renderScrollArea(state);
+
+  if (stick || atBottom) scroll.scrollTop = scroll.scrollHeight;
+  else scroll.scrollTop = prevTop + (scroll.scrollHeight - prevHeight);
+}
+
+/** Точечная перерисовка списка чатов (счётчики непрочитанного). */
+function paintList() {
+  if (!host) return;
+  const area = host.querySelector('[data-chat-list-area]');
+  if (area) area.innerHTML = renderChatList(state);
 }
 
 function autosize(el) {
@@ -106,6 +167,99 @@ function notice(text) {
   t.textContent = text;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2600);
+}
+
+/* ── Вложения ───────────────────────────────────────────────────────────── */
+
+function addFiles(fileList) {
+  const room = MAX_FILES - state.pendingFiles.length;
+  const files = [...fileList].slice(0, room);
+  for (const file of files) {
+    if (file.size > MAX_FILE_SIZE) {
+      notice(`«${file.name}» больше 25 МБ — не влезет`);
+      continue;
+    }
+    state.pendingFiles.push({
+      file,
+      name: file.name || 'файл',
+      preview: URL.createObjectURL(file),
+      isImage: String(file.type || '').startsWith('image/'),
+      isVideo: String(file.type || '').startsWith('video/'),
+      isAudio: String(file.type || '').startsWith('audio/'),
+      size: file.size,
+    });
+  }
+  paintPending();
+}
+
+function dropFile(index) {
+  const item = state.pendingFiles[index];
+  if (!item) return;
+  URL.revokeObjectURL(item.preview);
+  state.pendingFiles.splice(index, 1);
+  paintPending();
+}
+
+function clearPendingFiles() {
+  for (const f of state.pendingFiles) URL.revokeObjectURL(f.preview);
+  state.pendingFiles = [];
+  paintPending();
+}
+
+/** Перерисовать полосу выбранных файлов, не трогая textarea. */
+function paintPending() {
+  if (!host) return;
+  const wrap = host.querySelector('.chat-pending-files');
+  if (!wrap) return;
+  if (!state.pendingFiles.length) {
+    wrap.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.hidden = false;
+  wrap.innerHTML = state.pendingFiles.map((f, i) => `
+    <div class="chat-pending-file">
+      ${f.isImage ? `<img src="${f.preview}" alt="">` : '<span class="chat-pending-file__icon">📄</span>'}
+      <span class="chat-pending-file__name">${esc(f.name)}</span>
+      <button type="button" class="chat-pending-file__drop" data-chat-drop-file="${i}" title="Убрать">✕</button>
+    </div>
+  `).join('');
+}
+
+async function uploadChatFiles() {
+  if (!state.pendingFiles.length) return [];
+  const shared = forum.capabilities?.isShared;
+
+  if (!shared) {
+    return state.pendingFiles.map((f) => ({
+      name: f.name, url: f.preview, size: f.size,
+      isImage: f.isImage, isVideo: f.isVideo, isAudio: f.isAudio,
+    }));
+  }
+
+  const uid = currentUserId();
+  if (!uid) throw new Error('Сначала войдите');
+
+  const results = [];
+  for (const f of state.pendingFiles) {
+    if (f.isImage) {
+      const blob = await prepareImage(f.file, 'photo');
+      const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+      const path = `${uid}/chat/${name}`;
+      const url = await uploadFile({ bucket: 'forum-uploads', path, bytes: blob, contentType: 'image/jpeg' });
+      results.push({ name: f.name, url, size: blob.size, isImage: true, isVideo: false, isAudio: false });
+    } else {
+      const ext = (f.name.split('.').pop() || 'bin').toLowerCase();
+      const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const path = `${uid}/chat/${name}`;
+      const url = await uploadFile({
+        bucket: 'forum-uploads', path, bytes: f.file,
+        contentType: f.file.type || 'application/octet-stream',
+      });
+      results.push({ name: f.name, url, size: f.size, isImage: false, isVideo: f.isVideo, isAudio: f.isAudio });
+    }
+  }
+  return results;
 }
 
 /* ── Данные ─────────────────────────────────────────────────────────────── */
@@ -133,13 +287,19 @@ async function openChat(id) {
   state.membersOpen = false;
   state.inviteOpen = false;
   state.menuOpen = false;
+  state.pollOpen = false;
+  state.replyingTo = null;
+  state.pollDraft = null;
+  state.lightbox = null;
   state.hasMore = false;
   state.loading = true;
-  draft = '';
-  paint({ stick: true });
+  paintFull({ stick: true });
 
   try {
-    const [chat, messages] = await Promise.all([forum.getChat(id), forum.listChatMessages(id, { limit: 60 })]);
+    const [chat, messages] = await Promise.all([
+      forum.getChat(id),
+      forum.listChatMessages(id, { limit: 60 }),
+    ]);
     if (my !== token) return;
     if (!chat) {
       state.open = null;
@@ -152,7 +312,7 @@ async function openChat(id) {
       forum.markChatRead(id).then(() => {
         const c = state.chats.find((x) => x.id === id);
         if (c) c.unread = 0;
-        paint();
+        paintList();
       });
     }
   } catch (err) {
@@ -160,7 +320,7 @@ async function openChat(id) {
     state.error = String(err?.message ?? err);
   }
   state.loading = false;
-  paint({ stick: true });
+  paintFull({ stick: true });
 }
 
 /** Только новые сообщения — с даты последнего у нас. */
@@ -168,26 +328,36 @@ async function tick() {
   if (!host || !state.openId || document.hidden) return;
   const my = token;
   const id = state.openId;
-  const last = state.messages[state.messages.length - 1];
   try {
     const fresh = await forum.listChatMessages(id, { limit: 60 });
     if (my !== token || id !== state.openId) return;
     const known = new Set(state.messages.map((m) => m.id));
     const added = fresh.filter((m) => !known.has(m.id));
-    // Удалённые модерацией — обновляем на месте.
     const byId = new Map(fresh.map((m) => [m.id, m]));
     let changed = added.length > 0;
     state.messages = state.messages.map((m) => {
       const f = byId.get(m.id);
-      if (f && f.deleted !== m.deleted) { changed = true; return f; }
+      if (!f) return m;
+      /*
+        Аватарки и реакции обновляем всегда, когда они появились:
+        пришедшее с сервера поле авторитетнее локального. Раньше
+        существующее сообщение не трогалось вовсе, и аватарка,
+        потерянная при отправке, не возвращалась до перезагрузки.
+      */
+      if (f.deleted !== m.deleted
+        || (!m.authorAvatar && f.authorAvatar)
+        || JSON.stringify(f.reactions || {}) !== JSON.stringify(m.reactions || {})
+        || JSON.stringify(f.poll || null) !== JSON.stringify(m.poll || null)) {
+        changed = true;
+        return f;
+      }
       return m;
     });
     if (added.length) {
       state.messages = [...state.messages, ...added].sort((a, b) => a.createdAt - b.createdAt);
       if (added.some((m) => m.authorId !== state.me?.id)) forum.markChatRead(id).catch(() => {});
     }
-    if (changed) paint();
-    void last;
+    if (changed) paintMessages();
   } catch {
     /* сеть моргнула — следующий тик попробует снова */
   }
@@ -199,7 +369,7 @@ function startPolling() {
   listTimer = window.setInterval(async () => {
     if (document.hidden) return;
     await loadList();
-    paint();
+    paintList();
   }, POLL_MS_LIST);
 }
 
@@ -215,23 +385,66 @@ function stopPolling() {
 async function send(form) {
   const input = form.querySelector('[data-chat-input]');
   const body = String(input?.value ?? '').trim();
-  if (!body || state.sending || !state.openId) return;
+  const files = [...state.pendingFiles];
+  const poll = state.pollDraft;
+  if ((!body && !files.length && !poll) || state.sending || !state.openId) return;
+
   state.sending = true;
+  const btn = form.querySelector('.chat-compose__send');
+  if (btn) btn.disabled = true;
+
   const id = state.openId;
+  const reply = state.replyingTo;
   try {
-    const m = await forum.sendChatMessage(id, body);
+    const attachments = await uploadChatFiles();
+    const m = await forum.sendChatMessage(id, body, {
+      attachments,
+      poll,
+      replyTo: reply ? { id: reply.id, authorNick: reply.authorNick, body: reply.body } : null,
+    });
     if (id !== state.openId) return;
     state.messages.push(m);
-    draft = '';
+    chatDrafts.set(id, '');
     if (input) { input.value = ''; autosize(input); }
+    clearPendingFiles();
+    state.pollDraft = null;
+    state.pollOpen = false;
+    state.replyingTo = null;
+    paintComposerMeta();
     const c = state.chats.find((x) => x.id === id);
-    if (c) { c.lastBody = body; c.lastNick = state.me.nick; c.lastAt = m.createdAt; }
+    if (c) { c.lastBody = body || (attachments.length ? '📎 Вложение' : '📊 Опрос'); c.lastNick = state.me.nick; c.lastAt = m.createdAt; }
+    paintMessages({ stick: true });
+    paintList();
   } catch (err) {
     notice(String(err?.message ?? err));
   } finally {
     state.sending = false;
-    paint({ stick: true });
+    /*
+      После отправки — полная перерисовка: убирает баннер ответа, форму
+      опроса и выбранные файлы. Ввод восстанавливается (пустой), фокус
+      возвращается в поле — клавиатура остаётся.
+    */
+    paintFull({ stick: true });
     host?.querySelector('[data-chat-input]')?.focus({ preventScroll: true });
+  }
+}
+
+/** Обновить ответ/опрос над полем ввода, не пересоздавая сам textarea. */
+function paintComposerMeta() {
+  if (!host) return;
+  const replyBox = host.querySelector('.chat-reply-banner');
+  if (replyBox) {
+    if (!state.replyingTo) replyBox.remove();
+  } else if (state.replyingTo) {
+    const form = host.querySelector('[data-chat-send]');
+    form?.insertAdjacentHTML('beforebegin', `
+      <div class="chat-reply-banner">
+        <div class="chat-reply-banner__info">
+          <span class="chat-reply-banner__label">Ответ для <b>${esc(state.replyingTo.authorNick)}</b></span>
+          <span class="chat-reply-banner__text muted">${esc(state.replyingTo.body)}</span>
+        </div>
+        <button type="button" class="chat-reply-banner__cancel" data-chat-reply-cancel title="Отменить ответ">✕</button>
+      </div>`);
   }
 }
 
@@ -247,6 +460,8 @@ async function withBusy(btn, label, fn) {
     if (btn.isConnected) { btn.disabled = false; btn.textContent = was; }
   }
 }
+
+/* ── События ────────────────────────────────────────────────────────────── */
 
 function wire() {
   if (wired) return;
@@ -302,19 +517,33 @@ function wire() {
     if (!host || !e.target.closest) return;
     const t = e.target;
 
-    /*
-      Меню ⋯ закрывается кликом мимо него — по всему окну, не только
-      по полю чата: открытое меню не должно переживать уход внимания.
-      Меню убираем из DOM точечно, без перерисовки страницы: клик мог
-      прийтись по полю ввода или по другому чату в списке, и полная
-      перерисовка отняла бы у них фокус и переход посреди нажатия.
-    */
     if (state.menuOpen && !t.closest('[data-chat-menu]')) {
       state.menuOpen = false;
       host.querySelector('.chat-menu__pop')?.remove();
       host.querySelector('[data-chat-menu-toggle]')?.setAttribute('aria-expanded', 'false');
     }
+    if (!t.closest('[data-chat-react-picker]')) {
+      host.querySelectorAll('.chat-msg__reactions-pop.is-open').forEach((el) => el.classList.remove('is-open'));
+    }
     if (!host.contains(t)) return;
+
+    /* Лайтбокс: открыть по картинке, закрыть по фону или кнопке. */
+    const lightOpen = t.closest('[data-chat-lightbox]');
+    if (lightOpen) {
+      state.lightbox = lightOpen.dataset.chatLightbox;
+      host.querySelector('.chat-lightbox')?.remove();
+      host.insertAdjacentHTML('beforeend', `
+        <div class="chat-lightbox" data-chat-lightbox-close>
+          <img src="${esc(state.lightbox)}" alt="" class="chat-lightbox__img">
+          <button type="button" class="chat-lightbox__close" aria-label="Закрыть">✕</button>
+        </div>`);
+      return;
+    }
+    if (t.closest('[data-chat-lightbox-close]')) {
+      state.lightbox = null;
+      host.querySelector('.chat-lightbox')?.remove();
+      return;
+    }
 
     if (t.closest('[data-chat-menu-toggle]')) {
       state.menuOpen = !state.menuOpen;
@@ -378,6 +607,23 @@ function wire() {
       });
       return;
     }
+
+    /* Удаление чата: создателем или модерацией. */
+    const delChat = t.closest('[data-chat-delete]');
+    if (delChat && state.openId) {
+      state.menuOpen = false;
+      paint();
+      const title = state.open?.title || 'этот чат';
+      if (!confirm(`Удалить чат «${title}» навсегда? Сообщения и участники будут удалены без возврата.`)) return;
+      await withBusy(delChat, '…', async () => {
+        await forum.deleteChat(state.openId);
+        await loadList();
+        location.hash = '#/chats';
+        notice('Чат удалён навсегда');
+      });
+      return;
+    }
+
     const close = t.closest('[data-chat-close]');
     if (close && state.openId) {
       state.menuOpen = false;
@@ -422,6 +668,129 @@ function wire() {
       });
       return;
     }
+
+    /* Ответить. */
+    const replyBtn = t.closest('[data-chat-msg-reply]');
+    if (replyBtn) {
+      state.replyingTo = {
+        id: replyBtn.dataset.chatMsgReply,
+        authorNick: replyBtn.dataset.nick || '',
+        body: replyBtn.dataset.excerpt || '',
+      };
+      paintComposerMeta();
+      host?.querySelector('[data-chat-input]')?.focus({ preventScroll: true });
+      return;
+    }
+    if (t.closest('[data-chat-reply-cancel]')) {
+      state.replyingTo = null;
+      paintComposerMeta();
+      return;
+    }
+
+    /* Панель реакций: открыть/закрыть по нажатию (на телефоне hover нет). */
+    const picker = t.closest('[data-chat-react-picker]');
+    if (picker) {
+      const pop = picker.querySelector('.chat-msg__reactions-pop');
+      if (pop) {
+        const open = pop.classList.contains('is-open');
+        host.querySelectorAll('.chat-msg__reactions-pop.is-open').forEach((el) => el.classList.remove('is-open'));
+        if (!open) pop.classList.add('is-open');
+      }
+      return;
+    }
+
+    /* Переход к сообщению, на которое ответили. */
+    const jump = t.closest('[data-chat-jump]');
+    if (jump) {
+      host.querySelector(`#${CSS.escape(jump.dataset.chatJump)}`)?.scrollIntoView({
+        behavior: 'smooth', block: 'center',
+      });
+      return;
+    }
+
+    /* Реакция: сразу инкремент локально и запрос в базу. */
+    const react = t.closest('[data-chat-react]');
+    if (react) {
+      const [msgId, emoji] = String(react.dataset.chatReact || '').split(':');
+      if (msgId && emoji) {
+        const m = state.messages.find((x) => x.id === msgId);
+        if (m) {
+          m.reactions = m.reactions || {};
+          m.reactions[emoji] = (m.reactions[emoji] || 0) + 1;
+          paintMessages();
+        }
+        forum.reactChatMessage?.(msgId, emoji).catch(() => {});
+        host.querySelector('.chat-msg__reactions-pop')?.remove();
+      }
+      return;
+    }
+
+    /* Голос в опросе. */
+    const vote = t.closest('[data-chat-vote]');
+    if (vote) {
+      const [msgId, rawIdx] = String(vote.dataset.chatVote || '').split(':');
+      const idx = Number(rawIdx);
+      if (msgId && Number.isInteger(idx)) {
+        const m = state.messages.find((x) => x.id === msgId);
+        if (m?.poll) {
+          const meId = state.me?.id;
+          const opt = m.poll.options?.[idx];
+          if (opt) {
+            opt.voters = Array.isArray(opt.voters) ? opt.voters : [];
+            const mine = opt.voters.indexOf(meId);
+            if (mine >= 0) opt.voters.splice(mine, 1);
+            else if (!m.poll.multiple) {
+              for (const o of m.poll.options) o.voters = (o.voters || []).filter((v) => v !== meId);
+              opt.voters.push(meId);
+            } else opt.voters.push(meId);
+            m.poll.total = new Set(m.poll.options.flatMap((o) => o.voters || [])).size;
+            paintMessages();
+          }
+        }
+        forum.voteChatPoll?.(msgId, idx).catch(() => {});
+      }
+      return;
+    }
+
+    /* Опрос: открыть/закрыть форму, прикрепить. */
+    if (t.closest('[data-chat-poll-toggle]')) {
+      state.pollOpen = !state.pollOpen;
+      paint();
+      return;
+    }
+    if (t.closest('[data-chat-poll-apply]')) {
+      const box = host.querySelector('[data-chat-poll-form]');
+      const q = String(box?.querySelector('[name="pollQuestion"]')?.value ?? '').trim();
+      const options = [...(box?.querySelectorAll('.chat-poll-creator__opt') ?? [])]
+        .map((el) => String(el.value ?? '').trim())
+        .filter(Boolean);
+      if (q.length < 3 || options.length < 2) {
+        notice('Нужен вопрос и хотя бы два варианта');
+        return;
+      }
+      const multiple = Boolean(box?.querySelector('[name="pollMultiple"]')?.checked);
+      state.pollDraft = {
+        question: q,
+        multiple,
+        options: options.map((text) => ({ text, votes: 0, voters: [] })),
+        total: 0,
+      };
+      state.pollOpen = false;
+      paintFull();
+      return;
+    }
+    if (t.closest('[data-chat-poll-clear]')) {
+      state.pollDraft = null;
+      paintFull();
+      return;
+    }
+
+    const dropBtn = t.closest('[data-chat-drop-file]');
+    if (dropBtn) {
+      dropFile(Number(dropBtn.dataset.chatDropFile));
+      return;
+    }
+
     const del = t.closest('[data-chat-msg-delete]');
     if (del) {
       const id = del.dataset.chatMsgDelete;
@@ -432,7 +801,7 @@ function wire() {
       await withBusy(del, '', async () => {
         await forum.deleteChatMessage(id, reason);
         if (m) { m.deleted = true; m.deletedReason = reason; }
-        paint();
+        paintMessages();
       });
       return;
     }
@@ -443,8 +812,32 @@ function wire() {
         const older = await forum.listChatMessages(state.openId, { limit: 60, before: oldest });
         state.messages = [...older, ...state.messages];
         state.hasMore = older.length >= 60;
-        paint();
+        paintMessages();
       });
+    }
+  });
+
+  /* Выбор файлов через скрепку. */
+  document.addEventListener('change', (e) => {
+    if (!host || !host.contains(e.target)) return;
+    if (e.target.matches?.('[data-chat-file-input]')) {
+      addFiles(e.target.files ?? []);
+      e.target.value = '';
+    }
+  });
+
+  /* Вставка скриншота из буфера обмена (Ctrl+V). */
+  document.addEventListener('paste', (e) => {
+    const input = e.target?.closest?.('[data-chat-input]');
+    if (!input || !host?.contains(input)) return;
+    const items = [...(e.clipboardData?.items ?? [])];
+    const files = items
+      .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (files.length) {
+      e.preventDefault();
+      addFiles(files);
     }
   });
 
@@ -452,15 +845,19 @@ function wire() {
     if (host && e.target.matches?.('[data-chat-input]')) autosize(e.target);
   });
 
-  // Enter — отправить, Shift+Enter — перенос. Как в любом мессенджере;
-  // на телефоне Enter в textarea остаётся переносом (там есть кнопка).
-  // Esc закрывает меню ⋯, не трогая ничего больше.
   document.addEventListener('keydown', (e) => {
     if (!host) return;
-    if (e.key === 'Escape' && state.menuOpen) {
-      state.menuOpen = false;
-      paint();
-      return;
+    if (e.key === 'Escape') {
+      if (state.lightbox) {
+        state.lightbox = null;
+        host.querySelector('.chat-lightbox')?.remove();
+        return;
+      }
+      if (state.menuOpen) {
+        state.menuOpen = false;
+        paint();
+        return;
+      }
     }
     if (!e.target.matches?.('[data-chat-input]')) return;
     const coarse = window.matchMedia?.('(pointer: coarse)').matches;
@@ -477,10 +874,6 @@ function wire() {
 
 /* ── Входы ──────────────────────────────────────────────────────────────── */
 
-/**
- * @param {HTMLElement} container
- * @param {string|null} param  id чата или "join/<code>".
- */
 export async function mountChats(container, param = null) {
   host = container;
   token++;
@@ -489,7 +882,7 @@ export async function mountChats(container, param = null) {
 
   state.loading = true;
   state.error = '';
-  paint();
+  paintFull();
 
   try {
     state.ready = await forum.isReady();
@@ -497,19 +890,18 @@ export async function mountChats(container, param = null) {
     state.ready = false;
     state.error = String(err?.message ?? err);
     state.loading = false;
-    paint();
+    paintFull();
     return;
   }
-  if (!state.ready) { state.loading = false; paint(); return; }
+  if (!state.ready) { state.loading = false; paintFull(); return; }
 
   try {
     state.me = await forum.currentUser();
   } catch {
     state.me = null;
   }
-  if (!state.me) { state.loading = false; paint(); return; }
+  if (!state.me) { state.loading = false; paintFull(); return; }
 
-  // Ссылка-приглашение: #/chats/join/<code>.
   if (param && param.startsWith('join/')) {
     const code = param.slice(5);
     try {
@@ -532,7 +924,7 @@ export async function mountChats(container, param = null) {
     state.openId = null;
     state.open = null;
     state.messages = [];
-    paint();
+    paintFull();
   }
   startPolling();
 }
@@ -551,7 +943,12 @@ export function unmountChats() {
   state.inviteOpen = false;
   state.menuOpen = false;
   state.createOpen = false;
-  draft = '';
+  state.pollOpen = false;
+  state.replyingTo = null;
+  state.pollDraft = null;
+  state.lightbox = null;
+  clearPendingFiles();
+  renderedChatId = undefined;
 }
 
 /** Сколько непрочитанных всего — для счётчика в меню. */
@@ -565,4 +962,3 @@ export async function unreadChatsTotal() {
     return 0;
   }
 }
-

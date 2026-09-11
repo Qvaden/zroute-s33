@@ -1,30 +1,12 @@
 /**
  * ЗАКРЫТЫЕ ЧАТЫ — РАЗМЕТКА.
  *
- * Чистые функции от состояния, как и у форума: ни одного обращения к базе
- * или к DOM. Поведение — в src/forum/chats.js.
+ * Чистые функции от состояния: ни одного обращения к базе или к DOM.
+ * Поведение — в src/forum/chats.js.
  *
- * УСТРОЙСТВО СТРАНИЦЫ. Два вида:
+ * УСТРОЙСТВО СТРАНИЦЫ:
  *   #/chats            — список моих чатов (+ вступить по коду, + создать).
- *   #/chats/<id>       — сам чат: лента снизу вверх, липкий ввод.
- *
- * На мониторе список и открытый чат стоят рядом, как в любом мессенджере;
- * на телефоне — один экран за раз, с кнопкой «назад».
- *
- * ЧЕГО ЗДЕСЬ НЕТ. Реакций, вложений, правки сообщений. Чат это разговор:
- * короткие реплики, быстро. Всё, что требует «оформить», живёт на форуме,
- * а из чата туда ведёт ссылка.
- *
- * ПОЛНОЭКРАННЫЙ МЕССЕНДЖЕР. Страница ведёт себя не как статья, а как
- * мессенджер: занимает всё окно под шапкой сайта, список и комната
- * скроллятся каждая сама, ввод прижат к низу. Высоту окна считает и кладёт
- * в --chat-head-h поведение (fitFullscreen в src/forum/chats.js), а не CSS:
- * рост шапки не константа.
- *
- * Все действия с чатом — в меню ⋯ у заголовка комнаты. Строка кнопок
- * «Пригласить · Выйти · Закрыть» переносилась на телефоне и толкала
- * название в две строки; выпадающее меню — то, к чему рука привыкла
- * в любом мессенджере.
+ *   #/chats/<id>       — сам чат: лента снизу вверх, липкий ввод, вложения, опросы.
  */
 import { esc, plural } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
@@ -45,8 +27,13 @@ import { roleBadge } from '../forum/roles.js';
  * @property {boolean} inviteOpen
  * @property {boolean} menuOpen
  * @property {boolean} createOpen
+ * @property {boolean} pollOpen
  * @property {boolean} hasMore
  * @property {boolean} sending
+ * @property {any[]} [pendingFiles]
+ * @property {any|null} [pollDraft]
+ * @property {any|null} [replyingTo]
+ * @property {string|null} [lightbox]
  */
 
 export function renderChats(s) {
@@ -78,18 +65,19 @@ export function renderChats(s) {
         ${renderChatListHead(s)}
         ${renderJoin(s)}
         ${s.createOpen ? renderCreateForm(s) : ''}
-        ${renderChatList(s)}
+        <div class="chat-list__area" data-chat-list-area>${renderChatList(s)}</div>
       </aside>
       <section class="chat-room" aria-live="polite">
         ${s.openId ? renderRoom(s) : renderRoomPlaceholder(s)}
       </section>
+      ${s.lightbox ? renderLightbox(s.lightbox) : ''}
     </div>`;
 }
 
 /* ── Список ─────────────────────────────────────────────────────────────── */
 
-function renderChatListHead(s) {
-  const canCreate = s.me.isLeader || s.me.role === 'admin' || s.me.role === 'moderator';
+export function renderChatListHead(s) {
+  const canCreate = s.me?.isLeader || s.me?.role === 'admin' || s.me?.role === 'moderator';
   return `
     <header class="chat-list__head">
       <div>
@@ -105,7 +93,7 @@ function renderChatListHead(s) {
     </header>`;
 }
 
-function renderJoin() {
+export function renderJoin() {
   return `
     <form class="chat-join" data-chat-join>
       <input class="chat-join__input" name="code" inputmode="text" autocomplete="off"
@@ -114,7 +102,7 @@ function renderJoin() {
     </form>`;
 }
 
-function renderCreateForm(s) {
+export function renderCreateForm(s) {
   return `
     <form class="chat-create" data-chat-create>
       <label class="forum-field">
@@ -131,7 +119,7 @@ function renderCreateForm(s) {
         </label>
         <label class="forum-field">
           <span>Тег</span>
-          <input name="allianceTag" maxlength="12" value="${esc(s.me.allianceTag || '')}" placeholder="TAG">
+          <input name="allianceTag" maxlength="12" value="${esc(s.me?.allianceTag || '')}" placeholder="TAG">
         </label>
       </div>
       <p class="chat-create__note muted">
@@ -146,7 +134,7 @@ function renderCreateForm(s) {
     </form>`;
 }
 
-function renderChatList(s) {
+export function renderChatList(s) {
   if (s.loading && !s.chats.length) {
     return '<div class="chat-list__empty muted">Загружаем…</div>';
   }
@@ -154,7 +142,7 @@ function renderChatList(s) {
     return `
       <div class="chat-list__empty">
         <b>Пока ни одного чата</b>
-        <p class="muted">Попросите код у лидера альянса${s.me.isLeader ? ' или создайте свой' : ''}.</p>
+        <p class="muted">Попросите код у лидера альянса${s.me?.isLeader ? ' или создайте свой' : ''}.</p>
       </div>`;
   }
   return `
@@ -163,7 +151,7 @@ function renderChatList(s) {
     </ul>`;
 }
 
-function renderChatItem(c, active) {
+export function renderChatItem(c, active) {
   const initial = (c.allianceTag || c.title).trim().slice(0, 2).toUpperCase();
   const last = c.lastBody
     ? `<span class="chat-item__last"><b>${esc(c.lastNick)}:</b> ${esc(plainExcerpt(c.lastBody, 60))}</span>`
@@ -189,13 +177,22 @@ function renderChatItem(c, active) {
 
 /* ── Комната ────────────────────────────────────────────────────────────── */
 
-function renderRoomPlaceholder(s) {
+export function renderRoomPlaceholder(s) {
   return `
     <div class="chat-room__blank">
       <span class="chat-room__blank-mark" aria-hidden="true">💬</span>
       <b>Выберите чат</b>
-      <p class="muted">${s.chats.length ? 'Слева — ваши чаты.' : 'Введите код приглашения или создайте чат.'}</p>
+      <p class="muted">${s.chats?.length ? 'Слева — ваши чаты.' : 'Введите код приглашения или создайте чат.'}</p>
     </div>`;
+}
+
+export function renderScrollArea(s) {
+  const c = s.open;
+  const isMgr = c && (
+    c.myRole === 'owner' || c.myRole === 'admin' ||
+    c.ownerId === s.me?.id || s.me?.role === 'admin' || s.me?.role === 'moderator'
+  );
+  return `${c && s.hasMore ? `<button type="button" class="chat-room__more forum-act" data-chat-more>Показать раньше</button>` : ''}${renderMessages(s, isMgr)}`;
 }
 
 function renderRoom(s) {
@@ -208,30 +205,28 @@ function renderRoom(s) {
         <a class="forum-btn forum-btn--ghost" href="#/chats">К списку</a>
       </div>`;
   }
-  const isMgr = ['owner', 'admin'].includes(c.myRole) || s.me.role === 'admin' || s.me.role === 'moderator';
+  const isOwner = c.myRole === 'owner' || (c.ownerId && c.ownerId === s.me?.id);
+  const isMgr = isOwner || c.myRole === 'admin' || s.me?.role === 'admin' || s.me?.role === 'moderator';
   const kindWord = c.kind === 'inter' ? 'межальянсовый' : 'альянсовый';
   const membersWord = plural(c.memberCount, 'участник', 'участника', 'участников');
   const initial = (c.allianceTag || c.title).trim().slice(0, 2).toUpperCase();
 
-  /*
-    Меню ⋯ собирается из тех же действий, что раньше стояли строкой кнопок.
-    Пункт «Участники» — для всех: состав чата интересует не только
-    управляющим. «Выйти» не показывают создателю: он уходит из чата
-    только удалив чат целиком, и кнопка «Выйти» сбивала бы с толку.
-  */
   const menu = [
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-members-toggle>
-      Участники<span class="chat-menu__count">${esc(c.memberCount)}</span>
+      👥 Участники<span class="chat-menu__count">${esc(c.memberCount)}</span>
     </button>`,
-    isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-invite>Пригласить по коду</button>` : '',
+    isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-invite>🔗 Пригласить по коду</button>` : '',
     c.myRole && c.myRole !== 'owner'
-      ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-leave>Выйти из чата</button>`
+      ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-leave>🚪 Выйти из чата</button>`
       : '',
     isMgr && !c.closed
-      ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-close>Закрыть чат</button>`
+      ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-close>🔒 Закрыть чат</button>`
       : '',
     isMgr && c.closed
-      ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-reopen>Снова открыть</button>`
+      ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-reopen>🔓 Снова открыть</button>`
+      : '',
+    (isOwner || s.me?.role === 'admin')
+      ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-delete>🗑️ Удалить чат навсегда</button>`
       : '',
   ].filter(Boolean).join('');
 
@@ -264,19 +259,18 @@ function renderRoom(s) {
     ${s.inviteOpen ? renderInvite(c) : ''}
 
     <div class="chat-room__scroll" data-chat-scroll>
-      ${s.hasMore ? `<button type="button" class="chat-room__more forum-act" data-chat-more>Показать раньше</button>` : ''}
-      ${renderMessages(s, isMgr)}
+      ${renderScrollArea(s)}
     </div>
 
     ${renderComposer(s, c)}`;
 }
 
-function renderMembers(s, isMgr) {
+export function renderMembers(s, isMgr) {
   const roleWord = { owner: 'создатель', admin: 'помощник', member: '' };
   return `
     <div class="chat-members" data-chat-members>
       <ul class="chat-members__list">
-        ${s.members.map((m) => `
+        ${(s.members || []).map((m) => `
           <li class="chat-member">
             ${avatar(m.nick, m.avatarUrl)}
             <span class="chat-member__who">
@@ -284,7 +278,7 @@ function renderMembers(s, isMgr) {
               ${m.isLeader ? leaderBadge() : ''}
               <small class="muted">${esc([m.allianceTag, roleWord[m.role]].filter(Boolean).join(' · '))}</small>
             </span>
-            ${isMgr && m.role !== 'owner' && m.userId !== s.me.id ? `
+            ${isMgr && m.role !== 'owner' && m.userId !== s.me?.id ? `
               <span class="chat-member__acts">
                 <button type="button" class="forum-act" data-chat-member-role="${esc(m.userId)}"
                         data-role="${m.role === 'admin' ? 'member' : 'admin'}">
@@ -297,7 +291,7 @@ function renderMembers(s, isMgr) {
     </div>`;
 }
 
-function renderInvite(c) {
+export function renderInvite(c) {
   const link = `${location.origin}${location.pathname}#/chats/join/${esc(c.inviteCode)}`;
   return `
     <div class="chat-invite" data-chat-invite-panel>
@@ -313,7 +307,7 @@ function renderInvite(c) {
     </div>`;
 }
 
-function renderMessages(s, isMgr) {
+export function renderMessages(s, isMgr) {
   if (s.loading && !s.messages.length) return '<div class="chat-msgs__empty muted">Загружаем…</div>';
   if (!s.messages.length) {
     return `
@@ -329,18 +323,18 @@ function renderMessages(s, isMgr) {
     if (!prev || dayKey(prev.createdAt) !== day) {
       out += `<div class="chat-day"><span>${esc(dayLabel(m.createdAt))}</span></div>`;
     }
-    // Подряд от одного автора в пределах 5 минут — склеиваем в группу.
     const grouped = prev && prev.authorId === m.authorId && !prev.deleted
       && dayKey(prev.createdAt) === day
-      && m.createdAt - prev.createdAt < 5 * 60 * 1000;
+      && (m.createdAt - prev.createdAt < 5 * 60 * 1000)
+      && !m.replyTo && !m.poll;
     out += renderMessage(m, s, isMgr, grouped);
     prev = m;
   }
   return `<ol class="chat-msgs">${out}</ol>`;
 }
 
-function renderMessage(m, s, isMgr, grouped) {
-  const mine = m.authorId === s.me.id;
+export function renderMessage(m, s, isMgr, grouped) {
+  const mine = m.authorId === s.me?.id;
   if (m.deleted) {
     return `
       <li class="chat-msg chat-msg--gone ${mine ? 'is-mine' : ''}" id="m-${esc(m.id)}">
@@ -348,9 +342,13 @@ function renderMessage(m, s, isMgr, grouped) {
       </li>`;
   }
   const canDelete = mine || isMgr;
+  // Устойчивый аватар: проверяем сообщение, затем профиль текущего юзера, затем список участников
+  const memberAvatar = s.members?.find((mb) => mb.userId === m.authorId)?.avatarUrl;
+  const avaUrl = m.authorAvatar || (mine ? s.me?.avatarUrl : '') || memberAvatar || '';
+
   return `
     <li class="chat-msg ${mine ? 'is-mine' : ''} ${grouped ? 'is-grouped' : ''}" id="m-${esc(m.id)}">
-      ${grouped ? '<span class="chat-msg__gap"></span>' : avatar(m.authorNick, m.authorAvatar)}
+      ${grouped ? '<span class="chat-msg__gap"></span>' : avatar(m.authorNick, avaUrl)}
       <div class="chat-msg__bubble">
         ${grouped ? '' : `
           <div class="chat-msg__head">
@@ -359,33 +357,212 @@ function renderMessage(m, s, isMgr, grouped) {
             ${m.authorIsLeader ? leaderBadge() : ''}
             ${m.authorAlliance ? `<small class="chat-msg__tag">${esc(m.authorAlliance)}</small>` : ''}
           </div>`}
-        <div class="chat-msg__body">${postBody(m.body)}</div>
+
+        ${m.replyTo ? renderReplyQuote(m.replyTo) : ''}
+        ${m.body ? `<div class="chat-msg__body">${postBody(m.body)}</div>` : ''}
+        ${m.attachments?.length ? renderAttachments(m.attachments) : ''}
+        ${m.poll ? renderPoll(m.id, m.poll, s.me?.id) : ''}
+        ${renderReactionsBar(m.id, m.reactions)}
+
         <div class="chat-msg__meta">
           <time title="${esc(fullTime(m.createdAt))}">${esc(clock(m.createdAt))}</time>
+          <button type="button" class="chat-msg__reply-btn" data-chat-msg-reply="${esc(m.id)}"
+                  data-nick="${esc(m.authorNick)}" data-excerpt="${esc(plainExcerpt(m.body || 'Вложение', 50))}"
+                  title="Ответить" aria-label="Ответить">↩</button>
+          <div class="chat-msg__react-trigger" data-chat-react-picker="${esc(m.id)}">
+            <button type="button" class="chat-msg__react-btn" title="Поставить реакцию">😊</button>
+            <div class="chat-msg__reactions-pop">
+              ${['👍', '❤️', '🔥', '😂', '😮', '😢', '👏'].map((em) => `
+                <button type="button" class="chat-msg__em-btn" data-chat-react="${esc(m.id)}:${em}">${em}</button>
+              `).join('')}
+            </div>
+          </div>
           ${canDelete ? `<button type="button" class="chat-msg__del" data-chat-msg-delete="${esc(m.id)}" aria-label="Удалить">✕</button>` : ''}
         </div>
       </div>
     </li>`;
 }
 
-function renderComposer(s, c) {
+function renderReplyQuote(r) {
+  return `
+    <div class="chat-reply-quote" data-chat-jump="m-${esc(r.id)}">
+      <span class="chat-reply-quote__nick">${esc(r.authorNick)}</span>
+      <span class="chat-reply-quote__body">${esc(plainExcerpt(r.body || 'Вложение', 60))}</span>
+    </div>`;
+}
+
+function renderAttachments(atts) {
+  if (!Array.isArray(atts) || !atts.length) return '';
+  return `
+    <div class="chat-attachments">
+      ${atts.map((a) => {
+        if (a.isImage || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(a.url || a.name || '')) {
+          return `<div class="chat-attach chat-attach--img">
+            <img src="${esc(a.url)}" alt="${esc(a.name || 'Скриншот')}" loading="lazy"
+                 data-chat-lightbox="${esc(a.url)}">
+          </div>`;
+        }
+        if (a.isVideo || /\.(mp4|webm|mov)$/i.test(a.url || a.name || '')) {
+          return `<div class="chat-attach chat-attach--video">
+            <video src="${esc(a.url)}" controls preload="metadata" playsinline></video>
+          </div>`;
+        }
+        if (a.isAudio || /\.(mp3|wav|ogg|m4a|aac)$/i.test(a.url || a.name || '')) {
+          return `<div class="chat-attach chat-attach--audio">
+            <audio src="${esc(a.url)}" controls preload="metadata"></audio>
+          </div>`;
+        }
+        return `<a class="chat-attach chat-attach--file" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" download="${esc(a.name || 'file')}">
+          <span class="chat-attach__icon">📁</span>
+          <span class="chat-attach__name">${esc(a.name || 'Файл')}</span>
+          ${a.size ? `<span class="chat-attach__size muted">${esc(formatSize(a.size))}</span>` : ''}
+        </a>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderPoll(msgId, p, myId) {
+  if (!p) return '';
+  const total = Number(p.total || 0);
+  return `
+    <div class="chat-poll" data-chat-poll="${esc(msgId)}">
+      <div class="chat-poll__head">
+        <span class="chat-poll__badge">📊 Опрос</span>
+        <b class="chat-poll__question">${esc(p.question)}</b>
+      </div>
+      <div class="chat-poll__options">
+        ${(p.options || []).map((o, idx) => {
+          const votes = Number(o.votes || (o.voters ? o.voters.length : 0));
+          const pct = total > 0 ? Math.round((votes / total) * 100) : 0;
+          const isVoted = Array.isArray(o.voters) && myId && o.voters.includes(myId);
+          return `
+            <button type="button" class="chat-poll__opt ${isVoted ? 'is-voted' : ''}"
+                    data-chat-vote="${esc(msgId)}:${idx}">
+              <div class="chat-poll__bar" style="width:${pct}%"></div>
+              <span class="chat-poll__text">${esc(o.text)}</span>
+              <span class="chat-poll__stat">${pct}% (${votes})</span>
+            </button>`;
+        }).join('')}
+      </div>
+      <div class="chat-poll__foot muted">
+        <span>Всего голосов: ${total}</span>
+        ${p.multiple ? '<span>(несколько ответов)</span>' : ''}
+      </div>
+    </div>`;
+}
+
+function renderReactionsBar(msgId, reactions) {
+  if (!reactions || typeof reactions !== 'object') return '';
+  const list = Object.entries(reactions).filter(([, count]) => count > 0);
+  if (!list.length) return '';
+  return `
+    <div class="chat-reactions">
+      ${list.map(([em, count]) => `
+        <button type="button" class="chat-reaction-chip" data-chat-react="${esc(msgId)}:${esc(em)}">
+          <span>${esc(em)}</span><b>${esc(count)}</b>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+/* ── Композер ───────────────────────────────────────────────────────────── */
+
+export function renderComposer(s, c) {
   if (c.closed) {
     return `<p class="chat-compose__locked muted">Чат закрыт${c.closedReason ? `: ${esc(c.closedReason)}` : ''}. Писать нельзя.</p>`;
   }
   if (!c.myRole) {
     return `<p class="chat-compose__locked muted">Вы смотрите этот чат как модерация — писать могут только участники.</p>`;
   }
-  if (s.me.banned) {
+  if (s.me?.banned) {
     return `<p class="chat-compose__locked muted">Вам запрещено писать.</p>`;
   }
+
   return `
-    <form class="chat-compose" data-chat-send>
-      <textarea class="chat-compose__input" name="body" rows="1" maxlength="2000" required
-                placeholder="Сообщение…" aria-label="Сообщение" data-chat-input></textarea>
-      <button type="submit" class="chat-compose__send" aria-label="Отправить" ${s.sending ? 'disabled' : ''}>
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
-      </button>
-    </form>`;
+    <div class="chat-compose-wrap">
+      ${s.replyingTo ? renderReplyBanner(s.replyingTo) : ''}
+      ${s.pollDraft ? `
+        <div class="chat-pending-poll">
+          <span>📊 Опрос: <b>${esc(s.pollDraft.question)}</b></span>
+          <button type="button" class="chat-pending-poll__drop" data-chat-poll-clear title="Убрать опрос">✕</button>
+        </div>` : ''}
+      ${s.pollOpen ? renderPollCreator(s) : ''}
+      <div class="chat-pending-files" data-chat-pending-list ${s.pendingFiles?.length ? '' : 'hidden'}>
+        ${(s.pendingFiles || []).map((f, i) => `
+          <div class="chat-pending-file">
+            ${f.isImage ? `<img src="${esc(f.preview)}" alt="">` : `<span class="chat-pending-file__icon">📄</span>`}
+            <span class="chat-pending-file__name">${esc(f.name)}</span>
+            <button type="button" class="chat-pending-file__drop" data-chat-drop-file="${i}" title="Убрать">✕</button>
+          </div>
+        `).join('')}
+      </div>
+
+      <form class="chat-compose" data-chat-send>
+        <div class="chat-compose__acts-left">
+          <label class="chat-compose__btn" title="Прикрепить фото, видео или файл">
+            <input type="file" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt"
+                   data-chat-file-input hidden>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </label>
+          <button type="button" class="chat-compose__btn" data-chat-poll-toggle title="Создать опрос">
+            📊
+          </button>
+        </div>
+
+        <textarea class="chat-compose__input" name="body" rows="1" maxlength="2000"
+                  placeholder="Сообщение или вставьте скриншот (Ctrl+V)…" aria-label="Сообщение" data-chat-input></textarea>
+
+        <button type="submit" class="chat-compose__send" aria-label="Отправить" ${s.sending ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+        </button>
+      </form>
+    </div>`;
+}
+
+function renderReplyBanner(r) {
+  return `
+    <div class="chat-reply-banner">
+      <div class="chat-reply-banner__info">
+        <span class="chat-reply-banner__label">Ответ для <b>${esc(r.authorNick)}</b></span>
+        <span class="chat-reply-banner__text muted">${esc(plainExcerpt(r.body || 'Вложение', 50))}</span>
+      </div>
+      <button type="button" class="chat-reply-banner__cancel" data-chat-reply-cancel title="Отменить ответ">✕</button>
+    </div>`;
+}
+
+function renderPollCreator(s = {}) {
+  const d = s.pollDraft || {};
+  const opts = d.options?.length ? d.options : [{ text: '' }, { text: '' }, { text: '' }];
+  const labels = ['Вариант 1', 'Вариант 2', 'Вариант 3 (необязательно)'];
+  return `
+    <div class="chat-poll-creator" data-chat-poll-form>
+      <div class="chat-poll-creator__head">
+        <b>📊 Создание опроса</b>
+        <button type="button" class="chat-poll-creator__close" data-chat-poll-toggle>✕</button>
+      </div>
+      <input class="chat-poll-creator__q" name="pollQuestion" placeholder="Вопрос для опроса…"
+             maxlength="140" value="${esc(d.question || '')}">
+      <div class="chat-poll-creator__options" data-chat-poll-options>
+        ${opts.slice(0, 3).map((o, i) => `
+          <input class="chat-poll-creator__opt" placeholder="${esc(labels[i] || `Вариант ${i + 1}`)}"
+                 maxlength="60" value="${esc(o.text || '')}">
+        `).join('')}
+      </div>
+      <div class="chat-poll-creator__foot">
+        <label class="chat-poll-creator__multi">
+          <input type="checkbox" name="pollMultiple" ${d.multiple ? 'checked' : ''}> <span>Несколько вариантов</span>
+        </label>
+        <button type="button" class="forum-btn forum-btn--primary forum-btn--sm" data-chat-poll-apply>Прикрепить опрос</button>
+      </div>
+    </div>`;
+}
+
+function renderLightbox(url) {
+  return `
+    <div class="chat-lightbox" data-chat-lightbox-close>
+      <img src="${esc(url)}" alt="Увеличенное изображение" class="chat-lightbox__img">
+      <button type="button" class="chat-lightbox__close" aria-label="Закрыть">✕</button>
+    </div>`;
 }
 
 /* ── Мелочи ─────────────────────────────────────────────────────────────── */
@@ -405,16 +582,26 @@ function plainExcerpt(src, max) {
 }
 
 function dayKey(d) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const dt = d instanceof Date ? d : new Date(d);
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
 }
 
 function dayLabel(d, now = new Date()) {
-  if (dayKey(d) === dayKey(now)) return 'Сегодня';
+  const dt = d instanceof Date ? d : new Date(d);
+  if (dayKey(dt) === dayKey(now)) return 'Сегодня';
   const y = new Date(now); y.setDate(y.getDate() - 1);
-  if (dayKey(d) === dayKey(y)) return 'Вчера';
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  if (dayKey(dt) === dayKey(y)) return 'Вчера';
+  return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
 function clock(d) {
-  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const dt = d instanceof Date ? d : new Date(d);
+  return dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatSize(bytes) {
+  const b = Number(bytes || 0);
+  if (b < 1024) return `${b} Б`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} КБ`;
+  return `${(b / (1024 * 1024)).toFixed(1)} МБ`;
 }

@@ -113,10 +113,20 @@ create table if not exists public.forum_chat_messages (
   author_id      uuid references public.forum_users (id) on delete set null,
   author_nick    text not null default '',
   body           text not null,
+  attachments    jsonb not null default '[]'::jsonb,
+  poll           jsonb default null,
+  reply_to       jsonb default null,
+  reactions      jsonb not null default '{}'::jsonb,
   deleted        boolean not null default false,
   deleted_reason text not null default '',
   created_at     timestamptz not null default now()
 );
+
+alter table public.forum_chat_messages
+  add column if not exists attachments jsonb not null default '[]'::jsonb,
+  add column if not exists poll jsonb default null,
+  add column if not exists reply_to jsonb default null,
+  add column if not exists reactions jsonb not null default '{}'::jsonb;
 
 create index if not exists forum_chat_messages_chat_time
   on public.forum_chat_messages (chat_id, created_at desc);
@@ -179,7 +189,7 @@ create policy forum_chats_update on public.forum_chats
 
 drop policy if exists forum_chats_delete on public.forum_chats;
 create policy forum_chats_delete on public.forum_chats
-  for delete using (public.forum_is_staff());
+  for delete using (public.forum_is_staff() or owner_id = auth.uid());
 
 -- Создатель становится владельцем чата автоматически: одной транзакцией,
 -- иначе чат мог бы остаться без единого участника.
@@ -412,10 +422,12 @@ create policy forum_chat_messages_insert on public.forum_chat_messages
   );
 
 -- Удаление мягкое, как у постов: сообщение остаётся заглушкой с причиной.
+-- Обновлять могут участники (реакции, опросы), но какие поля реально меняются
+-- решает триггер ниже.
 drop policy if exists forum_chat_messages_update on public.forum_chat_messages;
 create policy forum_chat_messages_update on public.forum_chat_messages
-  for update using (author_id = auth.uid() or public.forum_chat_manager(chat_id))
-  with check (author_id = auth.uid() or public.forum_chat_manager(chat_id));
+  for update using (author_id = auth.uid() or public.forum_chat_member(chat_id))
+  with check (author_id = auth.uid() or public.forum_chat_member(chat_id));
 
 create or replace function public.forum_chat_message_set_author()
 returns trigger
@@ -427,7 +439,9 @@ begin
     select nick into new.author_nick from public.forum_users where id = auth.uid();
   end if;
   new.body := left(new.body, 2000);
-  if char_length(btrim(new.body)) = 0 then
+  if char_length(btrim(new.body)) = 0
+     and coalesce(new.attachments, '[]'::jsonb) = '[]'::jsonb
+     and new.poll is null then
     raise exception 'Пустое сообщение';
   end if;
   return new;
@@ -443,18 +457,37 @@ create or replace function public.forum_chat_message_guard()
 returns trigger
 language plpgsql security definer set search_path = public
 as $$
+declare
+  is_mgr boolean;
 begin
   if auth.uid() is null then return new; end if;
   new.author_id := old.author_id;
   new.author_nick := old.author_nick;
   new.chat_id := old.chat_id;
   new.created_at := old.created_at;
-  -- Правки текста нет: чат это разговор, сказанное сказано. Меняется только
-  -- флаг удаления и причина.
+  -- Правки текста нет: чат это разговор, сказанное сказано.
   new.body := old.body;
+  -- Вложения, опрос и ссылка на ответ замораживаются после создания.
+  new.attachments := old.attachments;
+  new.reply_to := old.reply_to;
+
+  -- Опрос может двигаться только если это опросное сообщение; голосует участник.
+  if old.poll is null then
+    new.poll := old.poll;
+  end if;
+
+  is_mgr := public.forum_chat_manager(old.chat_id);
   if old.deleted then
     new.deleted := true;
     new.deleted_reason := old.deleted_reason;
+  elsif new.deleted then
+    if old.author_id is distinct from auth.uid() and not is_mgr then
+      new.deleted := false;
+      new.deleted_reason := '';
+    end if;
+  else
+    new.deleted := false;
+    new.deleted_reason := '';
   end if;
   return new;
 end;
@@ -487,7 +520,14 @@ select
          (select m.last_read_at from public.forum_chat_members m
             where m.chat_id = c.id and m.user_id = auth.uid()), 'epoch'::timestamptz)
        and x.author_id is distinct from auth.uid()) as unread_count,
-  (select x.body from public.forum_chat_messages x
+  (select coalesce(
+      nullif(x.body, ''),
+      case
+        when x.poll is not null then '📊 Опрос'
+        when x.attachments is not null and x.attachments <> '[]'::jsonb then '📎 Вложение'
+        else ''
+      end
+    ) from public.forum_chat_messages x
      where x.chat_id = c.id and x.deleted = false
      order by x.created_at desc limit 1) as last_body,
   (select x.author_nick from public.forum_chat_messages x

@@ -945,6 +945,11 @@ function chatView(s, c, meId) {
   const mine = members.find((m) => m.userId === meId);
   const msgs = s.chatMessages.filter((x) => x.chatId === c.id && !x.deleted);
   const last = msgs[msgs.length - 1];
+  const lastText = last
+    ? (last.body
+      || (last.poll ? '📊 Опрос' : '')
+      || (last.attachments?.length ? '📎 Вложение' : ''))
+    : '';
   const since = mine ? new Date(mine.lastReadAt).getTime() : 0;
   return {
     ...c,
@@ -952,7 +957,7 @@ function chatView(s, c, meId) {
     memberCount: members.length,
     myRole: mine?.role ?? null,
     unread: msgs.filter((x) => new Date(x.createdAt).getTime() > since && x.authorId !== meId).length,
-    lastBody: last?.body ?? '',
+    lastBody: lastText,
     lastNick: last?.authorNick ?? '',
     lastAt: last ? new Date(last.createdAt) : null,
   };
@@ -1064,23 +1069,54 @@ export async function listChatMessages(chatId, { limit = 60, before = null } = {
   if (before) list = list.filter((x) => new Date(x.createdAt) < new Date(before));
   return list.slice(-limit).map((x) => {
     const u = s.users.find((y) => y.id === x.authorId);
-    return { ...x, createdAt: new Date(x.createdAt), authorAvatar: u?.avatarUrl ?? '', authorAlliance: u?.allianceTag ?? '', authorRole: u?.role ?? 'member', authorIsLeader: Boolean(u?.isLeader) };
+    return {
+      ...x,
+      createdAt: new Date(x.createdAt),
+      authorAvatar: u?.avatarUrl ?? '',
+      authorAlliance: u?.allianceTag ?? '',
+      authorRole: u?.role ?? 'member',
+      authorIsLeader: Boolean(u?.isLeader),
+      attachments: Array.isArray(x.attachments) ? x.attachments : [],
+      poll: x.poll || null,
+      replyTo: x.replyTo || null,
+      reactions: x.reactions && typeof x.reactions === 'object' ? x.reactions : {},
+    };
   });
 }
 
-export async function sendChatMessage(chatId, body) {
+export async function sendChatMessage(chatId, body, opts = {}) {
   const s = read();
   const me = meOrThrow(s);
   if (me.banned) throw new Error('Вам запрещено писать');
   if (!memberOf(s, chatId, me.id) && !isStaff(me)) throw new Error('Вы не участник этого чата');
   const c = s.chats.find((x) => x.id === chatId);
   if (!c || c.closed) throw new Error('Чат закрыт');
-  const text = String(body).slice(0, 2000);
-  if (!text.trim()) throw new Error('Пустое сообщение');
-  const m = { id: newId('m'), chatId, authorId: me.id, authorNick: me.nick, body: text, deleted: false, deletedReason: '', createdAt: new Date().toISOString() };
+  const text = String(body || '').slice(0, 2000);
+  if (!text.trim() && !opts.attachments?.length && !opts.poll) throw new Error('Пустое сообщение');
+  const m = {
+    id: newId('m'),
+    chatId,
+    authorId: me.id,
+    authorNick: me.nick,
+    body: text,
+    attachments: Array.isArray(opts.attachments) ? opts.attachments : [],
+    poll: opts.poll || null,
+    replyTo: opts.replyTo || null,
+    reactions: {},
+    deleted: false,
+    deletedReason: '',
+    createdAt: new Date().toISOString(),
+  };
   s.chatMessages.push(m);
   write(s);
-  return { ...m, createdAt: new Date(m.createdAt), authorAvatar: me.avatarUrl ?? '', authorAlliance: me.allianceTag ?? '', authorRole: me.role, authorIsLeader: Boolean(me.isLeader) };
+  return {
+    ...m,
+    createdAt: new Date(m.createdAt),
+    authorAvatar: me.avatarUrl ?? '',
+    authorAlliance: me.allianceTag ?? '',
+    authorRole: me.role,
+    authorIsLeader: Boolean(me.isLeader),
+  };
 }
 
 export async function deleteChatMessage(id, reason = '') {
@@ -1091,6 +1127,54 @@ export async function deleteChatMessage(id, reason = '') {
   if (m.authorId !== me.id && !canManage(s, m.chatId, me)) throw new Error('Недостаточно прав');
   m.deleted = true;
   m.deletedReason = String(reason || '');
+  write(s);
+}
+
+export async function deleteChat(chatId) {
+  const s = read();
+  const me = meOrThrow(s);
+  const c = s.chats.find((x) => x.id === chatId);
+  if (!c) return;
+  const isOwner = c.ownerId === me.id;
+  if (!isOwner && !isStaff(me)) throw new Error('Удалить чат может только создатель или модерация');
+  s.chats = s.chats.filter((x) => x.id !== chatId);
+  s.chatMembers = s.chatMembers.filter((m) => m.chatId !== chatId);
+  s.chatMessages = s.chatMessages.filter((m) => m.chatId !== chatId);
+  write(s);
+}
+
+export async function reactChatMessage(messageId, emoji) {
+  const s = read();
+  const m = s.chatMessages.find((x) => x.id === messageId);
+  if (!m) return;
+  m.reactions = m.reactions || {};
+  m.reactions[emoji] = (m.reactions[emoji] || 0) + 1;
+  write(s);
+}
+
+export async function voteChatPoll(messageId, optionIndex) {
+  const s = read();
+  const me = meOrThrow(s);
+  const m = s.chatMessages.find((x) => x.id === messageId);
+  if (!m || !m.poll || !Array.isArray(m.poll.options)) return;
+  const poll = m.poll;
+  const opt = poll.options[optionIndex];
+  if (!opt) return;
+  opt.voters = Array.isArray(opt.voters) ? opt.voters : [];
+  const idx = opt.voters.indexOf(me.id);
+  if (idx >= 0) {
+    opt.voters.splice(idx, 1);
+  } else {
+    if (!poll.multiple) {
+      for (const o of poll.options) {
+        if (Array.isArray(o.voters)) o.voters = o.voters.filter((v) => v !== me.id);
+        o.votes = (o.voters || []).length;
+      }
+    }
+    opt.voters.push(me.id);
+  }
+  opt.votes = opt.voters.length;
+  poll.total = new Set(poll.options.flatMap((o) => o.voters || [])).size;
   write(s);
 }
 
