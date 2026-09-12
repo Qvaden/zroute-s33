@@ -983,8 +983,8 @@ export async function setTyping(chatId) {
   await rest('/rpc/forum_chat_set_typing', { method: 'POST', body: { target_chat: chatId } }).catch(() => {});
 }
 
-export async function createDM(otherUserId) {
-  const id = await rest('/rpc/forum_chat_create_dm', { method: 'POST', body: { other_user: otherUserId } });
+export async function createDM(otherUserNick) {
+  const id = await rest('/rpc/forum_chat_create_dm', { method: 'POST', body: { other_nick: otherUserNick } });
   return String(id).replace(/"/g, '');
 }
 

@@ -193,7 +193,7 @@
  * @property {(chatId: string, messageId: string) => Promise<void>} [pinChatMessage]
  * @property {(chatId: string) => Promise<void>} [unpinChatMessage]
  * @property {(chatId: string) => Promise<void>} [setTyping]
- * @property {(otherUserId: string) => Promise<string>} [createDM]
+ * @property {(otherUserNick: string) => Promise<string>} [createDM]  Возвращает id чата.
  * @property {() => Promise<{userId: string, nick: string, avatarUrl: string, allianceTag: string, messageCount: number}[]>} [chatLeaderboard]
  */
 

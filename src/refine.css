@@ -551,6 +551,20 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-size: 13px;
   font-weight: 700;
 }
+.chat-item__avatar {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.chat-room__avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+}
 
 .chat-item__body { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .chat-item__row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
@@ -900,6 +914,12 @@ body:has(.chat-layout) .site-foot { display: none; }
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+}
+/* Плейсхолдер для contenteditable — как в редакторе форума. */
+.chat-compose__input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--mute);
+  pointer-events: none;
 }
 .chat-compose__send {
   display: grid;

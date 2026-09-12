@@ -951,6 +951,9 @@ function chatView(s, c, meId) {
       || (last.attachments?.length ? '📎 Вложение' : ''))
     : '';
   const since = mine ? new Date(mine.lastReadAt).getTime() : 0;
+  const pinned = c.pinnedMessageId
+    ? s.chatMessages.find((m) => m.id === c.pinnedMessageId && !m.deleted)
+    : null;
   return {
     ...c,
     createdAt: new Date(c.createdAt),
@@ -965,8 +968,8 @@ function chatView(s, c, meId) {
     lastNick: last?.authorNick ?? '',
     lastAt: last ? new Date(last.createdAt) : null,
     avatarUrl: c.avatarUrl || '',
-    pinnedBody: null,
-    pinnedNick: null,
+    pinnedBody: pinned ? pinned.body?.slice(0, 80) || '' : null,
+    pinnedNick: pinned ? pinned.authorNick || null : null,
   };
 }
 
@@ -1206,7 +1209,7 @@ export async function voteChatPoll(messageId, optionIndex) {
 export async function markChatRead(chatId) {
   const s = read();
   const m = s.me ? memberOf(s, chatId, s.me) : null;
-  if (m) { m.lastReadAt = new Date().toISOString(); write(s); }
+  if (m) { m.lastReadAt = new Date().toISOString(); m.lastSeenAt = new Date().toISOString(); write(s); }
 }
 
 export async function updateChat(chatId, patch) {
@@ -1268,11 +1271,12 @@ export async function setTyping(chatId) {
   /* Локальный режим: nobody else is reading, typing indicator is meaningless. */
 }
 
-export async function createDM(otherUserId) {
+export async function createDM(otherUserNick) {
   const s = read();
   const me = meOrThrow(s);
-  const other = s.users.find((u) => u.id === otherUserId);
+  const other = s.users.find((u) => u.nick.toLowerCase() === String(otherUserNick).toLowerCase());
   if (!other) throw new Error('Игрок не найден');
+  const otherUserId = other.id;
   const existing = s.chats.find((c) =>
     c.kind === 'dm' &&
     s.chatMembers.some((m) => m.chatId === c.id && m.userId === me.id) &&
@@ -1304,9 +1308,15 @@ export async function createDM(otherUserId) {
 
 export async function chatLeaderboard() {
   const s = read();
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartMs = weekStart.getTime();
   const counts = {};
   for (const m of s.chatMessages) {
     if (m.deleted || !m.authorId) continue;
+    const created = new Date(m.createdAt).getTime();
+    if (created < weekStartMs) continue;
     counts[m.authorId] = (counts[m.authorId] || 0) + 1;
   }
   return Object.entries(counts)

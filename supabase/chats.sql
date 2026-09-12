@@ -229,6 +229,10 @@ begin
     insert into public.forum_chat_members (chat_id, user_id, role)
     values (new.id, new.owner_id, 'owner')
     on conflict do nothing;
+    -- Достижение «создал чат».
+    insert into public.forum_chat_achievements (user_id, kind)
+    values (new.owner_id, 'created_chat')
+    on conflict do nothing;
   end if;
   return new;
 end;
@@ -803,6 +807,17 @@ begin
     values (new.author_id, 'chatter_1000') on conflict do nothing;
   end if;
 
+  -- seven_day_streak: сообщения в 7 разных днях за последние 7 дней.
+  select count(distinct date(created_at)) into streak_count
+  from public.forum_chat_messages
+  where author_id = new.author_id and deleted = false
+    and created_at >= now() - interval '7 days';
+
+  if streak_count >= 7 then
+    insert into public.forum_chat_achievements (user_id, kind)
+    values (new.author_id, 'seven_day_streak') on conflict do nothing;
+  end if;
+
   return new;
 end;
 $$;
@@ -821,17 +836,31 @@ create trigger forum_chat_achievement_check
 -- при создании ЛС проверяем, что между двумя пользователями нет
 -- уже существующего dm-чата, и переиспользуем его.
 
-create or replace function public.forum_chat_create_dm(other_user uuid)
+-- ── Личные сообщения (ЛС) ────────────────────────────────────────────────
+
+-- ЛС — это обычный чат с kind = 'dm'. Отдельный вид не нужен:
+-- при создании ЛС проверяем, что между двумя пользователями нет
+-- уже существующего dm-чата, и переиспользуем его.
+
+create or replace function public.forum_chat_create_dm(other_nick text)
 returns uuid
 language plpgsql security definer set search_path = public
 as $$
 declare
+  other_user uuid;
   existing_id uuid;
   new_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'Сначала войдите';
   end if;
+
+  -- Look up user_id by nick
+  select id into other_user from public.forum_users where lower(nick) = lower(other_nick) limit 1;
+  if other_user is null then
+    raise exception 'Игрок не найден';
+  end if;
+
   if other_user = auth.uid() then
     raise exception 'Нельзя написать самому себе';
   end if;
@@ -869,8 +898,8 @@ begin
 end;
 $$;
 
-revoke all on function public.forum_chat_create_dm(uuid) from public, anon;
-grant execute on function public.forum_chat_create_dm(uuid) to authenticated;
+revoke all on function public.forum_chat_create_dm(text) from public, anon;
+grant execute on function public.forum_chat_create_dm(text) to authenticated;
 
 -- Обновляем constraint kind, чтобы включить 'dm'.
 alter table public.forum_chats drop constraint if exists forum_chats_kind_check;
@@ -908,26 +937,25 @@ returns trigger
 language plpgsql security definer set search_path = public
 as $$
 declare
-  nick text;
-  user_rec record;
+  mention_nick text;
+  target_user_id uuid;
   chat_title text;
-  nick_pos int;
 begin
   if new.author_id is null then return new; end if;
 
   select title into chat_title from public.forum_chats where id = new.chat_id;
 
   -- Парсим @Ник из тела сообщения.
-  for nick in
+  for mention_nick in
     select m[1] from regexp_matches(new.body, '@([A-Za-zА-Яа-яЁё0-9_]{2,40})', 'g') as m
   loop
-    select id, nick into user_rec from public.forum_users where lower(nick) = lower(nick) limit 1;
-    if user_rec.id is not null and user_rec.id <> new.author_id then
+    select id into target_user_id from public.forum_users where lower(nick) = lower(mention_nick) limit 1;
+    if target_user_id is not null and target_user_id <> new.author_id then
       -- Проверяем, что получатель — участник чата.
-      if exists (select 1 from public.forum_chat_members where chat_id = new.chat_id and user_id = user_rec.id) then
+      if exists (select 1 from public.forum_chat_members where chat_id = new.chat_id and user_id = target_user_id) then
         insert into public.forum_notifications (user_id, actor_id, actor_nick, kind, preview)
         values (
-          user_rec.id,
+          target_user_id,
           new.author_id,
           new.author_nick,
           'mention',

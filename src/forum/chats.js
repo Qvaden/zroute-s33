@@ -127,7 +127,7 @@ function paintFull({ stick = false } = {}) {
   const wasFocused = input && document.activeElement === input;
   const selStart = input?.selectionStart ?? null;
   const selEnd = input?.selectionEnd ?? null;
-  if (input && state.openId) chatDrafts.set(state.openId, input.value);
+  if (input && state.openId) chatDrafts.set(state.openId, input.innerHTML);
 
   const scroll = host.querySelector('[data-chat-scroll]');
   const atBottom = scroll ? scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80 : true;
@@ -139,13 +139,19 @@ function paintFull({ stick = false } = {}) {
 
   const nextInput = host.querySelector('[data-chat-input]');
   if (nextInput) {
-    nextInput.value = state.openId ? (chatDrafts.get(state.openId) || '') : '';
+    nextInput.innerHTML = state.openId ? (chatDrafts.get(state.openId) || '') : '';
     autosize(nextInput);
     if (wasFocused) {
       nextInput.focus({ preventScroll: true });
-      if (selStart != null && selEnd != null) {
-        try { nextInput.setSelectionRange(selStart, selEnd); } catch { /* не все браузеры */ }
-      }
+      // contenteditable: ставим курсор в конец.
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(nextInput);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch { /* не все браузеры */ }
     }
   }
 
@@ -209,6 +215,8 @@ function paintGoBottom() {
 }
 
 function autosize(el) {
+  if (!el) return;
+  // contenteditable не имеет rows, но scrollHeight работает так же.
   el.style.height = 'auto';
   el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
 }
@@ -476,7 +484,16 @@ function stopPolling() {
 
 async function send(form) {
   const input = form.querySelector('[data-chat-input]');
-  const body = String(input?.value ?? '').trim();
+  // contenteditable div: innerHTML сохраняет <span style="color:…">.
+  // textContent для проверки пустоты (игнорируем <br>, &nbsp;).
+  const rawHtml = input?.innerHTML ?? '';
+  const body = rawHtml
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .trim()
+    ? rawHtml
+    : '';
   const files = [...state.pendingFiles];
   const poll = state.pollDraft;
   if ((!body && !files.length && !poll) || state.sending || !state.openId) return;
@@ -498,8 +515,7 @@ async function send(form) {
     state.messages.push(m);
     chatDrafts.set(id, '');
     if (input) {
-      input.value = '';
-      // Отложенный autosize: не блокирует текущий кадр, клавиатура не прыгает.
+      input.innerHTML = '';
       requestAnimationFrame(() => autosize(input));
     }
     /*
@@ -1272,12 +1288,9 @@ function wire() {
     }
   }
 
-  /* Запросить разрешение на уведомления. */
-  async function requestNotificationPermission() {
-    if (typeof Notification === 'undefined') return;
-    if (Notification.permission === 'default') {
-      await Notification.requestPermission().catch(() => {});
-    }
+  /* Запросить разрешение на уведомления при первом открытии чата. */
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
   }
 }
 

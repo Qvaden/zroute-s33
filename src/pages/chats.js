@@ -219,6 +219,9 @@ export function renderChatList(s) {
 
 export function renderChatItem(c, active) {
   const initial = (c.allianceTag || c.title).trim().slice(0, 2).toUpperCase();
+  const mark = c.avatarUrl
+    ? `<img class="chat-item__avatar" src="${esc(c.avatarUrl)}" alt="" loading="lazy" width="42" height="42">`
+    : `<span class="chat-item__mark" style="--ava:${esc(nickColor(c.title))}">${esc(initial)}</span>`;
   const last = c.lastBody
     ? `<span class="chat-item__last"><b>${esc(c.lastNick)}:</b> ${esc(plainExcerpt(c.lastBody, 60))}</span>`
     : `<span class="chat-item__last muted">Сообщений ещё нет</span>`;
@@ -226,7 +229,7 @@ export function renderChatItem(c, active) {
     <li>
       <a class="chat-item ${active ? 'is-active' : ''} ${c.closed ? 'is-closed' : ''}" href="#/chats/${esc(c.id)}"
          ${active ? 'aria-current="page"' : ''}>
-        <span class="chat-item__mark" style="--ava:${esc(nickColor(c.title))}">${esc(initial)}</span>
+        ${mark}
         <span class="chat-item__body">
           <span class="chat-item__row">
             <span class="chat-item__title">${esc(c.title)}</span>
@@ -308,7 +311,9 @@ function renderRoom(s) {
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7"/></svg>
       </a>
-      <span class="chat-room__mark" style="--ava:${esc(nickColor(c.title))}" aria-hidden="true">${esc(initial)}</span>
+      ${c.avatarUrl
+        ? `<img class="chat-room__avatar" src="${esc(c.avatarUrl)}" alt="" width="36" height="36">`
+        : `<span class="chat-room__mark" style="--ava:${esc(nickColor(c.title))}" aria-hidden="true">${esc(initial)}</span>`}
       <div class="chat-room__who">
         <b class="chat-room__title">${esc(c.title)}</b>
         <small class="chat-room__sub muted">
@@ -621,8 +626,8 @@ export function renderComposer(s, c) {
           </button>
         </div>
 
-        <textarea class="chat-compose__input" name="body" rows="1" maxlength="2000"
-                  placeholder="Сообщение или вставьте скриншот (Ctrl+V)…" aria-label="Сообщение" data-chat-input></textarea>
+        <div class="chat-compose__input" contenteditable="true" role="textbox"
+             data-chat-input data-placeholder="Сообщение или вставьте скриншот (Ctrl+V)…" aria-label="Сообщение"></div>
 
         <button type="submit" class="chat-compose__send" aria-label="Отправить" ${s.sending ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
