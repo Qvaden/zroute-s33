@@ -1087,3 +1087,21 @@ create policy push_subscriptions_delete on public.push_subscriptions
   for delete using (user_id = auth.uid() or public.forum_is_staff());
 
 grant select, insert, delete on public.push_subscriptions to authenticated;
+
+-- Автора подписки подставляет триггер: как в forum_posts.
+create or replace function public.push_subscription_author()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is not null then
+    new.user_id := auth.uid();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists push_subscription_author on public.push_subscriptions;
+create trigger push_subscription_author
+  before insert on public.push_subscriptions
+  for each row execute function public.push_subscription_author();
