@@ -1041,9 +1041,10 @@ export async function deleteEventComment(id, reason = '') {
 /* ── Web Push подписки ─────────────────────────────────────────────────── */
 
 export async function savePushSubscription(endpoint, keys) {
+  // Если подписка на этот endpoint уже есть — убираем, потом вставляем.
+  await rest(`/push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`, { method: 'DELETE' }).catch(() => {});
   await rest('/push_subscriptions', {
     method: 'POST',
-    prefer: 'resolution=merge-duplicates',
     body: { endpoint, keys },
   });
 }
