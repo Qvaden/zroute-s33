@@ -362,7 +362,7 @@ export function renderMessage(m, s, isMgr, grouped) {
         ${m.body ? `<div class="chat-msg__body">${postBody(m.body)}</div>` : ''}
         ${m.attachments?.length ? renderAttachments(m.attachments) : ''}
         ${m.poll ? renderPoll(m.id, m.poll, s.me?.id) : ''}
-        ${renderReactionsBar(m.id, m.reactions)}
+        ${renderReactionsBar(m.id, m.reactions, s.me?.id)}
 
         <div class="chat-msg__meta">
           <time title="${esc(fullTime(m.createdAt))}">${esc(clock(m.createdAt))}</time>
@@ -451,15 +451,17 @@ function renderPoll(msgId, p, myId) {
     </div>`;
 }
 
-function renderReactionsBar(msgId, reactions) {
+function renderReactionsBar(msgId, reactions, meId) {
   if (!reactions || typeof reactions !== 'object') return '';
-  const list = Object.entries(reactions).filter(([, count]) => count > 0);
+  const list = Object.entries(reactions)
+    .map(([em, voters]) => ({ em, count: Array.isArray(voters) ? voters.length : 0, mine: Array.isArray(voters) && meId ? voters.includes(meId) : false }))
+    .filter((r) => r.count > 0);
   if (!list.length) return '';
   return `
     <div class="chat-reactions">
-      ${list.map(([em, count]) => `
-        <button type="button" class="chat-reaction-chip" data-chat-react="${esc(msgId)}:${esc(em)}">
-          <span>${esc(em)}</span><b>${esc(count)}</b>
+      ${list.map((r) => `
+        <button type="button" class="chat-reaction-chip${r.mine ? ' is-mine' : ''}" data-chat-react="${esc(msgId)}:${esc(r.em)}">
+          <span>${esc(r.em)}</span><b>${r.count}</b>
         </button>
       `).join('')}
     </div>`;

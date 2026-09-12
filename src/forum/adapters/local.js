@@ -1145,10 +1145,28 @@ export async function deleteChat(chatId) {
 
 export async function reactChatMessage(messageId, emoji) {
   const s = read();
+  const me = meOrThrow(s);
   const m = s.chatMessages.find((x) => x.id === messageId);
   if (!m) return;
   m.reactions = m.reactions || {};
-  m.reactions[emoji] = (m.reactions[emoji] || 0) + 1;
+
+  // Найти текущую реакцию пользователя.
+  let currentEmoji = null;
+  for (const [key, voters] of Object.entries(m.reactions)) {
+    if (Array.isArray(voters) && voters.includes(me.id)) { currentEmoji = key; break; }
+  }
+
+  // Убрать из старого.
+  if (currentEmoji && m.reactions[currentEmoji]) {
+    m.reactions[currentEmoji] = m.reactions[currentEmoji].filter((id) => id !== me.id);
+    if (!m.reactions[currentEmoji].length) delete m.reactions[currentEmoji];
+  }
+
+  // Поставить в новый, если не снятие.
+  if (currentEmoji !== emoji) {
+    m.reactions[emoji] = [...(m.reactions[emoji] || []), me.id];
+  }
+
   write(s);
 }
 

@@ -362,16 +362,27 @@ async function tick() {
       if (!f) return m;
       /*
         Аватарки обновляем, если сервер прислал, а локально пусто.
-        Реакции — мерж по максимуму: reactChatMessage — fire-and-forget,
-        и следующий тик может прилететь до того, как сервер примет реакцию.
-        Без мержа локальная реакция исчезала бы на 1–4 секунды.
+        Реакции — мерж: берём серверные массивы голосующих как основу.
+        Если реакция текущего пользователя ещё не дошла до сервера
+        (fire-and-forget), добавляем её локально, чтобы не мигала.
       */
+      const meId = state.me?.id;
       const avatarChanged = !m.authorAvatar && f.authorAvatar;
       const serverR = f.reactions || {};
       const localR = m.reactions || {};
-      const mergedR = { ...serverR };
-      for (const [emoji, count] of Object.entries(localR)) {
-        if ((mergedR[emoji] || 0) < count) mergedR[emoji] = count;
+      const mergedR = {};
+      for (const [k, v] of Object.entries(serverR)) {
+        if (Array.isArray(v)) mergedR[k] = [...v];
+      }
+      if (meId) {
+        const serverHasMe = Object.values(mergedR).some((v) => v.includes(meId));
+        let localEmoji = null;
+        for (const [k, v] of Object.entries(localR)) {
+          if (Array.isArray(v) && v.includes(meId)) { localEmoji = k; break; }
+        }
+        if (localEmoji && !serverHasMe) {
+          mergedR[localEmoji] = [...(mergedR[localEmoji] || []), meId];
+        }
       }
       const reactionsChanged = JSON.stringify(mergedR) !== JSON.stringify(m.reactions || {});
       const pollChanged = JSON.stringify(f.poll || null) !== JSON.stringify(m.poll || null);
@@ -791,17 +802,32 @@ function wire() {
       return;
     }
 
-    /* Реакция: сразу инкремент локально и запрос в базу.
-       Обрабатываем ДО панели реакций, чтобы клик по эмодзи внутри popup
-       не съедался обработчиком открытия/закрытия popup. */
+    /* Реакция: один пользователь — одна реакция на сообщение.
+       Повторный клик по тому же эмодзи снимает его. Клик по другому —
+       заменяет. Обрабатываем ДО панели реакций, чтобы клик по эмодзи
+       внутри popup не съедался обработчиком открытия/закрытия popup. */
     const react = t.closest('[data-chat-react]');
     if (react) {
       const [msgId, emoji] = String(react.dataset.chatReact || '').split(':');
       if (msgId && emoji) {
         const m = state.messages.find((x) => x.id === msgId);
-        if (m) {
+        const meId = state.me?.id;
+        if (m && meId) {
           m.reactions = m.reactions || {};
-          m.reactions[emoji] = (m.reactions[emoji] || 0) + 1;
+          // Найти, какой эмодзи пользователь уже выбрал.
+          let current = null;
+          for (const [k, v] of Object.entries(m.reactions)) {
+            if (Array.isArray(v) && v.includes(meId)) { current = k; break; }
+          }
+          // Убрать из старого.
+          if (current && m.reactions[current]) {
+            m.reactions[current] = m.reactions[current].filter((id) => id !== meId);
+            if (!m.reactions[current].length) delete m.reactions[current];
+          }
+          // Поставить в новый, если это не повторный клик (снятие).
+          if (current !== emoji) {
+            m.reactions[emoji] = [...(m.reactions[emoji] || []), meId];
+          }
           paintMessages();
         }
         forum.reactChatMessage?.(msgId, emoji).catch(() => {});

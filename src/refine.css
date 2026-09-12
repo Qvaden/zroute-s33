@@ -1213,7 +1213,12 @@ body:has(.chat-layout) .site-foot { display: none; }
   cursor: pointer;
 }
 .chat-reaction-chip:hover { border-color: var(--accent); }
+.chat-reaction-chip.is-mine {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
 .chat-reaction-chip b { color: var(--mute); font-size: 10.5px; }
+.chat-reaction-chip.is-mine b { color: var(--accent); }
 
 /* ── Чаты без базы и без входа ───────────────────────────────────────────── */
 

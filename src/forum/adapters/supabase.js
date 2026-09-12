@@ -868,10 +868,34 @@ export async function deleteChatMessage(id, reason = '') {
 }
 
 export async function reactChatMessage(messageId, emoji) {
+  const me = currentUserId();
+  if (!me) return;
   const rows = await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}&select=reactions`);
   const row = Array.isArray(rows) ? rows[0] : rows;
-  const reactions = (row && typeof row.reactions === 'object' && row.reactions) ? { ...row.reactions } : {};
-  reactions[emoji] = (reactions[emoji] || 0) + 1;
+  const src = (row && typeof row.reactions === 'object' && row.reactions) ? row.reactions : {};
+  // Глубокая копия: реакции — массивы id, мутация原物 сломает кэш.
+  const reactions = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (Array.isArray(v)) reactions[k] = [...v];
+  }
+
+  // Найти, какой эмодзи этот пользователь уже выбрал.
+  let currentEmoji = null;
+  for (const [key, voters] of Object.entries(reactions)) {
+    if (voters.includes(me)) { currentEmoji = key; break; }
+  }
+
+  // Убрать из старого.
+  if (currentEmoji && reactions[currentEmoji]) {
+    reactions[currentEmoji] = reactions[currentEmoji].filter((id) => id !== me);
+    if (!reactions[currentEmoji].length) delete reactions[currentEmoji];
+  }
+
+  // Поставить в новый, если это не повторный клик (снятие).
+  if (currentEmoji !== emoji) {
+    reactions[emoji] = [...(reactions[emoji] || []), me];
+  }
+
   await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}`, {
     method: 'PATCH',
     body: { reactions },
