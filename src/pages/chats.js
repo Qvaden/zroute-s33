@@ -291,6 +291,7 @@ function renderRoom(s) {
     isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-rename>✏️ Переименовать</button>` : '',
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-search-toggle>🔍 ${s.searchOpen ? 'Скрыть поиск' : 'Поиск по сообщениям'}</button>`,
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-export>📥 Экспорт истории</button>`,
+    `<button type="button" class="chat-menu__item" role="menuitem" data-chat-push>🔔 Push-уведомления</button>`,
     c.myRole && c.myRole !== 'owner'
       ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-leave>🚪 Выйти из чата</button>`
       : '',

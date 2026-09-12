@@ -34,6 +34,17 @@ export function renderQuarter({ standings, quarter } = {}) {
   const periodNumber = period.number ? String(period.number).padStart(2, '0') : '—';
   const progress = (period.weeks ?? []).length;
 
+  // Расчёт даты конца текущего Кварта и дней до следующего.
+  const now = new Date();
+  const weeks = period.weeks ?? [];
+  const lastWeek = weeks[weeks.length - 1];
+  const endDate = lastWeek?.endDate ? new Date(lastWeek.endDate) : null;
+  const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - now) / 86400000)) : null;
+  const nextQuarterStart = endDate ? new Date(endDate.getTime() + 86400000) : null;
+  const nextQuarterLabel = nextQuarterStart
+    ? nextQuarterStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+    : '';
+
   return `
     <section class="quart-page">
       <header class="quart-hero">
@@ -52,6 +63,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         </div>
         <div class="quart-hero__bottom">
           <span><b>${progress}</b> из 4 недель периода</span>
+          ${daysLeft != null ? `<span class="quart-hero__countdown">До конца Кварта: <b>${daysLeft}</b> ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
           <span class="quart-hero__legend"><i class="quart-led quart-led--on"></i><i class="quart-led"></i><i class="quart-led"></i><i class="quart-led"></i></span>
         </div>
       </header>

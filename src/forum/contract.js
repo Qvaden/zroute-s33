@@ -195,6 +195,11 @@
  * @property {(chatId: string) => Promise<void>} [setTyping]
  * @property {(otherUserNick: string) => Promise<string>} [createDM]  Возвращает id чата.
  * @property {() => Promise<{userId: string, nick: string, avatarUrl: string, allianceTag: string, messageCount: number}[]>} [chatLeaderboard]
+ * @property {(eventId: string) => Promise<ForumEventComment[]>} [listEventComments]
+ * @property {(eventId: string, body: string) => Promise<ForumEventComment>} [addEventComment]
+ * @property {(id: string, reason?: string) => Promise<void>} [deleteEventComment]
+ * @property {(endpoint: string, keys: Record<string,string>) => Promise<void>} [savePushSubscription]
+ * @property {(endpoint: string) => Promise<void>} [removePushSubscription]
  */
 
 /**
@@ -250,6 +255,18 @@
  * @property {any|null} [poll]
  * @property {any|null} [replyTo]
  * @property {Record<string, number>} [reactions]
+ * @property {boolean} deleted
+ * @property {string} deletedReason
+ * @property {Date} createdAt
+ */
+
+/**
+ * @typedef {Object} ForumEventComment
+ * @property {string} id
+ * @property {string} eventId
+ * @property {string|null} authorId
+ * @property {string} authorNick
+ * @property {string} body
  * @property {boolean} deleted
  * @property {string} deletedReason
  * @property {Date} createdAt

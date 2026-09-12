@@ -998,3 +998,58 @@ export async function chatLeaderboard() {
     messageCount: Number(r.message_count || 0),
   }));
 }
+
+/* ── Комментарии к летописи ────────────────────────────────────────────── */
+
+function eventCommentOut(row) {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    authorId: row.author_id,
+    authorNick: row.author_nick || '',
+    body: row.body,
+    deleted: Boolean(row.deleted),
+    deletedReason: row.deleted_reason || '',
+    createdAt: toDate(row.created_at) ?? new Date(),
+  };
+}
+
+export async function listEventComments(eventId) {
+  const rows = await rest(
+    `/forum_event_comments?select=*&event_id=eq.${encodeURIComponent(eventId)}&order=created_at.asc`
+  );
+  return (Array.isArray(rows) ? rows : []).map(eventCommentOut);
+}
+
+export async function addEventComment(eventId, body) {
+  const rows = await rest('/forum_event_comments', {
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { event_id: eventId, body: String(body) },
+  });
+  const created = Array.isArray(rows) ? rows[0] : rows;
+  return eventCommentOut(created);
+}
+
+export async function deleteEventComment(id, reason = '') {
+  await rest(`/forum_event_comments?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: { deleted: true, deleted_reason: String(reason || '') },
+  });
+}
+
+/* ── Web Push подписки ─────────────────────────────────────────────────── */
+
+export async function savePushSubscription(endpoint, keys) {
+  await rest('/push_subscriptions', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates',
+    body: { endpoint, keys },
+  });
+}
+
+export async function removePushSubscription(endpoint) {
+  await rest(`/push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`, {
+    method: 'DELETE',
+  });
+}

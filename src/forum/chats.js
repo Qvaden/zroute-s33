@@ -81,6 +81,16 @@ function fitFullscreen() {
   host.style.setProperty('--chat-vh', `${visible}px`);
 }
 
+/** Base64url → Uint8Array (для VAPID-ключа). */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const arr = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) arr[i] = rawData.charCodeAt(i);
+  return arr;
+}
+
 function watchHead() {
   headWatch?.disconnect();
   fitFullscreen();
@@ -1168,6 +1178,44 @@ function wire() {
       state.dmOpen = !state.dmOpen;
       paintFull();
       if (state.dmOpen) host.querySelector('[data-chat-dm] input[name="nick"]')?.focus({ preventScroll: true });
+      return;
+    }
+
+    /* Web Push подписка. */
+    const pushBtn = t.closest('[data-chat-push]');
+    if (pushBtn) {
+      state.menuOpen = false;
+      host.querySelector('.chat-menu__pop')?.remove();
+      host.querySelector('[data-chat-menu-toggle]')?.setAttribute('aria-expanded', 'false');
+      try {
+        if (!('Notification' in window)) { notice('Браузер не поддерживает уведомления'); return; }
+        if (!('serviceWorker' in navigator)) { notice('Service Worker не поддерживается'); return; }
+
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { notice('Разрешение на уведомления не выдано'); return; }
+
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          // VAPID-ключ: после генерации вписать свой публичный сюда
+          // и приватный в секреты Edge Function.
+          // Генерация: npx web-push generate-vapid-keys
+          const vapidPublicKey = (document.querySelector('meta[name="vapid-public-key"]')?.content) || '';
+          const vapidBytes = vapidPublicKey ? urlBase64ToUint8Array(vapidPublicKey) : null;
+          if (!vapidBytes) { notice('Push-ключ не настроен. Установите мету vapid-public-key.'); return; }
+          try {
+            sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes });
+          } catch {
+            notice('Не удалось подписаться на push. Попробуйте позже.');
+            return;
+          }
+        }
+        const keys = sub.keys || {};
+        await forum.savePushSubscription?.(sub.endpoint, keys);
+        notice('✅ Push-уведомления включены');
+      } catch (err) {
+        notice(String(err?.message ?? err));
+      }
       return;
     }
   });

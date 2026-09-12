@@ -441,7 +441,11 @@ function renderItem(e) {
     Запись без подробностей не делаем раскрывающейся: нажатие, после которого
     ничего не происходит, читается как поломка.
   */
-  if (!hasMore) return `<li ${attrs}>${head}</li>`;
+  if (!hasMore) return `<li ${attrs}>
+      ${head}
+      <button type="button" class="tl__comments-toggle" data-tl-comments-for="${esc(e.id)}">💬 Комментарии</button>
+      <div class="tl__comments-box" data-tl-comments-box="${esc(e.id)}"></div>
+    </li>`;
 
   return `
     <li ${attrs}>
@@ -454,5 +458,7 @@ function renderItem(e) {
           ${renderEventGallery(e)}
         </div>
       </details>
+      <button type="button" class="tl__comments-toggle" data-tl-comments-for="${esc(e.id)}">💬 Комментарии</button>
+      <div class="tl__comments-box" data-tl-comments-box="${esc(e.id)}"></div>
     </li>`;
 }

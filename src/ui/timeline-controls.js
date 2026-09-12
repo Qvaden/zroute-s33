@@ -13,6 +13,8 @@
   делегирование на document — чтобы его можно было и подключить модулем
   в настоящем сайте, и дословно вставить в собранное одним файлом превью.
 */
+import { forum } from '../forum/index.js';
+
 (function () {
   'use strict';
 
@@ -31,6 +33,43 @@
 
   function each(list, fn) {
     Array.prototype.forEach.call(list, fn);
+  }
+
+  /** Рендер комментариев под событием. */
+  function renderEventComments(box, eventId, list) {
+    if (!box) return;
+    if (!Array.isArray(list) || !list.length) {
+      box.innerHTML = '<p class="muted" style="margin:4px 0;font-size:11px">Комментариев нет. Будь первым!</p>' +
+        '<form class="tl__comment-form" data-tl-comment-form="' + box.dataset.tlCommentsFor + '">' +
+          '<input name="body" placeholder="Напишите комментарий…" maxlength="2000" required>' +
+          '<button type="submit">Отправить</button>' +
+        '</form>';
+      return;
+    }
+    box.innerHTML =
+      '<ol class="tl__comments-list">' +
+        list.map(function (c) {
+          var deleted = c.deleted ? '<span class="muted" style="font-size:11px">(удалено)</span>' : '';
+          var time = c.createdAt ? new Date(c.createdAt).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+          return '<li class="tl__comment">' +
+            '<span class="tl__comment-avatar" style="background:' + (c.authorAvatar ? 'url(' + c.authorAvatar + ')' : 'linear-gradient(135deg, #3a3a4a, #1f1f2f)') + '">' +
+              (c.authorAvatar ? '<img src="' + c.authorAvatar + '" alt="">' : c.authorNick.charAt(0).toUpperCase()) +
+            '</span>' +
+            '<div class="tl__comment-body">' +
+              '<div class="tl__comment-head">' +
+                '<a class="tl__comment-nick" href="#/user/' + encodeURIComponent(c.authorNick) + '">' + c.authorNick + '</a>' +
+                '<span class="tl__comment-time">' + time + '</span>' +
+                '<button type="button" class="tl__comment-del" data-tl-comment-del="' + c.id + '" title="Удалить">✕</button>' +
+              '</div>' +
+              '<p class="tl__comment-text">' + (c.deleted ? '<em>Комментарий удалён</em>' : c.body) + '</p>' +
+            '</div>' +
+          '</li>';
+        }).join('') +
+      '</ol>' +
+      '<form class="tl__comment-form" data-tl-comment-form="' + box.dataset.tlCommentsFor + '">' +
+        '<input name="body" placeholder="Напишите комментарий…" maxlength="2000" required>' +
+        '<button type="submit">Отправить</button>' +
+      '</form>';
   }
 
   /** Попадает ли месяц вида «2026-09» в выбранный год и месяц. */
@@ -328,6 +367,68 @@
       currentWeek = weekBtn.dataset.tlWeek;
       applyWeeks();
     }
+
+    /* ── Комментарии к событиям ─────────────────────────────────────── */
+    var commentToggle = e.target.closest('[data-tl-comments-for]');
+    if (commentToggle) {
+      var eventId = commentToggle.dataset.tlCommentsFor;
+      if (!eventId) return;
+      var box = document.querySelector('[data-tl-comments-box="' + CSS.escape(eventId) + '"]');
+      if (!box) return;
+      // Повторный клик — свернуть
+      if (box.classList.contains('is-loaded')) {
+        box.innerHTML = '';
+        box.classList.remove('is-loaded');
+        return;
+      }
+      box.classList.add('is-loaded');
+      box.innerHTML = '<p class="muted" style="margin:4px 0;font-size:11px">Загружаем…</p>';
+      forum.listEventComments(eventId).then(function (list) {
+        renderEventComments(box, eventId, list);
+      }).catch(function () {
+        box.innerHTML = '<p class="muted" style="margin:4px 0;font-size:11px">Не удалось загрузить.</p>';
+      });
+      return;
+    }
+
+    var commentDel = e.target.closest('[data-tl-comment-del]');
+    if (commentDel) {
+      var cid = commentDel.dataset.tlCommentDel;
+      var container = commentDel.closest('[data-tl-comments-box]');
+      if (!container || !cid) return;
+      if (!confirm('Удалить комментарий?')) return;
+      forum.deleteEventComment(cid).then(function () {
+        var evId = container.dataset.tlCommentsBox;
+        return forum.listEventComments(evId);
+      }).then(function (list) {
+        renderEventComments(container, container.dataset.tlCommentsBox, list);
+      }).catch(function (err) {
+        alert(String(err?.message ?? err));
+      });
+      return;
+    }
+  });
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest('[data-tl-comment-form]');
+    if (!form) return;
+    e.preventDefault();
+    var eventId = form.dataset.tlCommentForm;
+    var input = form.querySelector('input[name="body"]');
+    if (!input || !input.value.trim()) return;
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    forum.addEventComment(eventId, input.value).then(function () {
+      input.value = '';
+      var box = form.closest('[data-tl-comments-box]');
+      return forum.listEventComments(eventId).then(function (list) {
+        renderEventComments(box, eventId, list);
+      });
+    }).catch(function (err) {
+      alert(String(err?.message ?? err));
+    }).finally(function () {
+      if (btn) btn.disabled = false;
+    });
   });
 
   // Esc закрывает выпадающий список, если он раскрылся и загородил страницу;

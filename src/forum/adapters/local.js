@@ -1327,3 +1327,52 @@ export async function chatLeaderboard() {
     .sort((a, b) => b.messageCount - a.messageCount)
     .slice(0, 20);
 }
+
+/* ── Комментарии к летописи ────────────────────────────────────────────── */
+
+export async function listEventComments(eventId) {
+  const s = read();
+  return (s.eventComments || [])
+    .filter((c) => c.eventId === eventId)
+    .map((c) => ({
+      ...c,
+      createdAt: new Date(c.createdAt),
+    }));
+}
+
+export async function addEventComment(eventId, body) {
+  const s = read();
+  const me = meOrThrow(s);
+  const text = String(body).trim().slice(0, 2000);
+  if (!text) throw new Error('Пустой комментарий');
+  const c = {
+    id: newId('ec'),
+    eventId,
+    authorId: me.id,
+    authorNick: me.nick,
+    body: text,
+    deleted: false,
+    deletedReason: '',
+    createdAt: new Date().toISOString(),
+  };
+  if (!s.eventComments) s.eventComments = [];
+  s.eventComments.push(c);
+  write(s);
+  return { ...c, createdAt: new Date(c.createdAt) };
+}
+
+export async function deleteEventComment(id, reason = '') {
+  const s = read();
+  const me = meOrThrow(s);
+  const c = (s.eventComments || []).find((x) => x.id === id);
+  if (!c) return;
+  if (c.authorId !== me.id && !isStaff(me)) throw new Error('Недостаточно прав');
+  c.deleted = true;
+  c.deletedReason = String(reason || '');
+  write(s);
+}
+
+/* ── Web Push подписки (noop в локальном режиме) ───────────────────────── */
+
+export async function savePushSubscription() {}
+export async function removePushSubscription() {}

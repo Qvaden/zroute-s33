@@ -74,6 +74,38 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/* ── Web Push: показать уведомление даже когда вкладка закрыта ──────── */
+
+self.addEventListener('push', (event) => {
+  let data = { title: 'Сервер 33', body: '' };
+  try {
+    data = Object.assign(data, event.data?.json?.());
+  } catch {
+    try { data.body = String(event.data?.text?.() ?? ''); } catch { /* ignore */ }
+  }
+  event.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: './public/icons/icon-192.svg',
+    badge: './public/icons/icon-32.svg',
+    data: data,
+    tag: data.tag || undefined,
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url?.includes?.(self.location.origin)) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(self.location.origin);
+    })
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 

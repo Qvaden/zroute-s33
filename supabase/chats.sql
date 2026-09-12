@@ -1002,3 +1002,88 @@ begin
   return new;
 end;
 $$;
+
+-- ── Комментарии к летописи ──────────────────────────────────────────────
+
+create table if not exists public.forum_event_comments (
+  id             uuid primary key default gen_random_uuid(),
+  event_id       text not null,
+  author_id      uuid references public.forum_users (id) on delete set null,
+  author_nick    text not null default '',
+  body           text not null,
+  deleted        boolean not null default false,
+  deleted_reason text not null default '',
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists forum_event_comments_event_idx
+  on public.forum_event_comments (event_id, created_at);
+
+alter table public.forum_event_comments enable row level security;
+
+drop policy if exists forum_event_comments_read on public.forum_event_comments;
+create policy forum_event_comments_read on public.forum_event_comments
+  for select using (true);
+
+drop policy if exists forum_event_comments_insert on public.forum_event_comments;
+create policy forum_event_comments_insert on public.forum_event_comments
+  for insert with check (author_id = auth.uid() and public.forum_can_write());
+
+drop policy if exists forum_event_comments_update on public.forum_event_comments;
+create policy forum_event_comments_update on public.forum_event_comments
+  for update using (author_id = auth.uid() or public.forum_is_staff())
+  with check (author_id = auth.uid() or public.forum_is_staff());
+
+drop policy if exists forum_event_comments_delete on public.forum_event_comments;
+create policy forum_event_comments_delete on public.forum_event_comments
+  for delete using (author_id = auth.uid() or public.forum_is_staff());
+
+create or replace function public.forum_event_comment_author()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is not null then
+    new.author_id := auth.uid();
+    select nick into new.author_nick from public.forum_users where id = auth.uid();
+  end if;
+  new.body := left(new.body, 2000);
+  if char_length(btrim(new.body)) = 0 then
+    raise exception 'Пустой комментарий';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_event_comment_author on public.forum_event_comments;
+create trigger forum_event_comment_author
+  before insert on public.forum_event_comments
+  for each row execute function public.forum_event_comment_author();
+
+grant select, insert, update, delete on public.forum_event_comments to authenticated;
+
+-- ── Web Push уведомления ────────────────────────────────────────────────
+
+create table if not exists public.push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.forum_users (id) on delete cascade,
+  endpoint   text not null unique,
+  keys       jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists push_subscriptions_read on public.push_subscriptions;
+create policy push_subscriptions_read on public.push_subscriptions
+  for select using (user_id = auth.uid() or public.forum_is_staff());
+
+drop policy if exists push_subscriptions_insert on public.push_subscriptions;
+create policy push_subscriptions_insert on public.push_subscriptions
+  for insert with check (user_id = auth.uid());
+
+drop policy if exists push_subscriptions_delete on public.push_subscriptions;
+create policy push_subscriptions_delete on public.push_subscriptions
+  for delete using (user_id = auth.uid() or public.forum_is_staff());
+
+grant select, insert, delete on public.push_subscriptions to authenticated;

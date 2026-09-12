@@ -1037,6 +1037,8 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   font-size: 12px;
 }
 .quart-hero__bottom b { color: var(--quart-acid); font-size: 16px; }
+.quart-hero__countdown { color: #c9d6be; }
+.quart-hero__countdown b { color: var(--quart-acid); font-size: 16px; }
 .quart-hero__legend { display: flex; gap: 5px; }
 .quart-led { width: 24px; height: 5px; border-radius: 99px; background: #394735; }
 .quart-led--on { background: var(--quart-acid); box-shadow: 0 0 9px rgba(211,166,255,.55); }
@@ -1877,6 +1879,97 @@ summary.tl__row { cursor: pointer; }
   .tl__details-body { animation: none; }
   .tl__chev { transition: none; }
 }
+
+/* ── Комментарии к событиям летописи ──────────────────────────────────── */
+
+.tl__comments-box {
+  margin: 8px 0 0;
+  padding: 0;
+}
+.tl__comments-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.tl__comments-toggle:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.tl__comments-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.tl__comment {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12.5px;
+}
+.tl__comment-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--raised-2);
+  color: var(--dim);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  flex: none;
+  overflow: hidden;
+}
+.tl__comment-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.tl__comment-body { flex: 1; min-width: 0; }
+.tl__comment-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
+.tl__comment-nick { font-weight: 700; font-size: 12px; color: var(--text); }
+.tl__comment-time { color: var(--mute); font-size: 10.5px; }
+.tl__comment-text { color: var(--dim); line-height: 1.5; }
+.tl__comment-del {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 4px;
+}
+.tl__comment-del:hover { color: #ffb3ba; }
+.tl__comment-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.tl__comment-form input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.02);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.tl__comment-form input:focus { outline: none; border-color: var(--accent); }
+.tl__comment-form button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #14100c;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tl__comment-form button:disabled { opacity: .5; }
+
 /* ── Плашки вердиктов: список режем до нескольких свежих ───────────────────── */
 .wks__more {
   display: inline-flex;
