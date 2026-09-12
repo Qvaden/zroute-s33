@@ -95,6 +95,8 @@ create table if not exists public.forum_chats (
   max_members    int  not null default 200 check (max_members between 2 and 200),
   closed         boolean not null default false,
   closed_reason  text not null default '',
+  avatar_url     text not null default '',
+  pinned_message_id uuid references public.forum_chat_messages (id) on delete set null,
   created_at     timestamptz not null default now()
 );
 
@@ -104,6 +106,8 @@ create table if not exists public.forum_chat_members (
   role         text not null default 'member' check (role in ('owner', 'admin', 'member')),
   joined_at    timestamptz not null default now(),
   last_read_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  typing_at    timestamptz,
   primary key (chat_id, user_id)
 );
 
@@ -571,3 +575,402 @@ grant select on public.forum_chat_member_list to authenticated;
 grant select, insert, update, delete on public.forum_chats to authenticated;
 grant select, insert, update, delete on public.forum_chat_members to authenticated;
 grant select, insert, update on public.forum_chat_messages to authenticated;
+
+-- ── Миграции для существующих баз ────────────────────────────────────────
+-- Если база создана до этой версии, колонки уже есть в create table.
+-- Если после — эти alter добавят недостающие.
+
+alter table public.forum_chats add column if not exists avatar_url text not null default '';
+alter table public.forum_chats add column if not exists pinned_message_id uuid references public.forum_chat_messages (id) on delete set null;
+alter table public.forum_chat_members add column if not exists last_seen_at timestamptz not null default now();
+alter table public.forum_chat_members add column if not exists typing_at timestamptz;
+
+-- ── Закреплённое сообщение ───────────────────────────────────────────────
+
+create or replace function public.forum_chat_pin(target_chat uuid, target_msg uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Сначала войдите';
+  end if;
+  if not exists (
+    select 1 from public.forum_chat_members
+    where chat_id = target_chat and user_id = auth.uid() and role in ('owner', 'admin')
+  ) and not public.forum_is_staff() then
+    raise exception 'Закрепить сообщение может владелец или помощник';
+  end if;
+  if not exists (
+    select 1 from public.forum_chat_messages
+    where id = target_msg and chat_id = target_chat and deleted = false
+  ) then
+    raise exception 'Сообщение не найдено в этом чате';
+  end if;
+  update public.forum_chats set pinned_message_id = target_msg where id = target_chat;
+end;
+$$;
+
+revoke all on function public.forum_chat_pin(uuid, uuid) from public, anon;
+grant execute on function public.forum_chat_pin(uuid, uuid) to authenticated;
+
+create or replace function public.forum_chat_unpin(target_chat uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Сначала войдите';
+  end if;
+  if not exists (
+    select 1 from public.forum_chat_members
+    where chat_id = target_chat and user_id = auth.uid() and role in ('owner', 'admin')
+  ) and not public.forum_is_staff() then
+    raise exception 'Открепить может владелец или помощник';
+  end if;
+  update public.forum_chats set pinned_message_id = null where id = target_chat;
+end;
+$$;
+
+revoke all on function public.forum_chat_unpin(uuid) from public, anon;
+grant execute on function public.forum_chat_unpin(uuid) to authenticated;
+
+-- ── Обновление last_seen_at при markChatRead ─────────────────────────────
+
+-- В supabase adapter markChatRead обновляет last_read_at.
+-- Триггер синхронизирует last_seen_at.
+create or replace function public.forum_chat_member_seen()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  new.last_seen_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_chat_member_seen on public.forum_chat_members;
+create trigger forum_chat_member_seen
+  before update of last_read_at on public.forum_chat_members
+  for each row execute function public.forum_chat_member_seen();
+
+-- ── Индикатор «печатает…» ────────────────────────────────────────────────
+
+create or replace function public.forum_chat_set_typing(target_chat uuid)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then return; end if;
+  update public.forum_chat_members
+  set typing_at = now()
+  where chat_id = target_chat and user_id = auth.uid();
+end;
+$$;
+
+revoke all on function public.forum_chat_set_typing(uuid) from public, anon;
+grant execute on function public.forum_chat_set_typing(uuid) to authenticated;
+
+-- ── Обновлённые представления ─────────────────────────────────────────────
+
+drop view if exists public.forum_chat_list;
+create view public.forum_chat_list
+with (security_invoker = on) as
+select
+  c.*,
+  (select count(*) from public.forum_chat_members m where m.chat_id = c.id) as member_count,
+  (select count(*) from public.forum_chat_members m
+     where m.chat_id = c.id and m.last_seen_at > now() - interval '5 minutes') as online_count,
+  (select m.role from public.forum_chat_members m
+     where m.chat_id = c.id and m.user_id = auth.uid()) as my_role,
+  (select m.last_read_at from public.forum_chat_members m
+     where m.chat_id = c.id and m.user_id = auth.uid()) as my_last_read_at,
+  (select count(*) from public.forum_chat_messages x
+     where x.chat_id = c.id and x.deleted = false
+       and x.created_at > coalesce(
+         (select m.last_read_at from public.forum_chat_members m
+            where m.chat_id = c.id and m.user_id = auth.uid()), 'epoch'::timestamptz)
+       and x.author_id is distinct from auth.uid()) as unread_count,
+  (select coalesce(
+      nullif(x.body, ''),
+      case
+        when x.poll is not null then '📊 Опрос'
+        when x.attachments is not null and x.attachments <> '[]'::jsonb then '📎 Вложение'
+        else ''
+      end
+    ) from public.forum_chat_messages x
+     where x.chat_id = c.id and x.deleted = false
+     order by x.created_at desc limit 1) as last_body,
+  (select x.author_nick from public.forum_chat_messages x
+     where x.chat_id = c.id and x.deleted = false
+     order by x.created_at desc limit 1) as last_nick,
+  (select x.created_at from public.forum_chat_messages x
+     where x.chat_id = c.id and x.deleted = false
+     order by x.created_at desc limit 1) as last_at,
+  -- Закреплённое сообщение: первые 80 символов тела.
+  (select left(coalesce(nullif(pm.body, ''), '📎'), 80)
+     from public.forum_chat_messages pm
+     where pm.id = c.pinned_message_id and pm.deleted = false) as pinned_body,
+  (select pm.author_nick from public.forum_chat_messages pm
+     where pm.id = c.pinned_message_id and pm.deleted = false) as pinned_nick
+from public.forum_chats c;
+
+grant select on public.forum_chat_list to authenticated;
+
+drop view if exists public.forum_chat_message_list;
+create view public.forum_chat_message_list
+with (security_invoker = on) as
+select
+  x.*,
+  prof.avatar_url as author_avatar,
+  prof.alliance_tag as author_alliance,
+  prof.role as author_role,
+  prof.is_leader as author_is_leader
+from public.forum_chat_messages x
+left join public.forum_profiles prof on prof.id = x.author_id;
+
+grant select on public.forum_chat_message_list to authenticated;
+
+drop view if exists public.forum_chat_member_list;
+create view public.forum_chat_member_list
+with (security_invoker = on) as
+select
+  m.*,
+  prof.nick,
+  prof.avatar_url,
+  prof.alliance_tag,
+  prof.is_leader
+from public.forum_chat_members m
+join public.forum_profiles prof on prof.id = m.user_id;
+
+grant select on public.forum_chat_member_list to authenticated;
+
+-- ── Достижения за чаты ───────────────────────────────────────────────────
+
+create table if not exists public.forum_chat_achievements (
+  user_id     uuid not null references public.forum_users (id) on delete cascade,
+  kind        text not null check (kind in (
+    'first_message',   -- первое сообщение в чате
+    'chatter_100',     -- 100 сообщений в чатах
+    'chatter_1000',    -- 1000 сообщений в чатах
+    'created_chat',    -- создал чат
+    'seven_day_streak' -- 7 дней подряд писал в чат
+  )),
+  unlocked_at timestamptz not null default now(),
+  primary key (user_id, kind)
+);
+
+alter table public.forum_chat_achievements enable row level security;
+
+drop policy if exists forum_chat_achievements_read on public.forum_chat_achievements;
+create policy forum_chat_achievements_read on public.forum_chat_achievements
+  for select using (user_id = auth.uid() or public.forum_is_staff());
+
+drop policy if exists forum_chat_achievements_insert on public.forum_chat_achievements;
+create policy forum_chat_achievements_insert on public.forum_chat_achievements
+  for insert with check (user_id = auth.uid());
+
+grant select, insert on public.forum_chat_achievements to authenticated;
+
+-- Триггер: при первом сообщении в чате выдать достижение.
+create or replace function public.forum_chat_achievement_check()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare
+  msg_count int;
+  streak_count int;
+  chat_count int;
+begin
+  if new.author_id is null then return new; end if;
+
+  -- first_message
+  insert into public.forum_chat_achievements (user_id, kind)
+  values (new.author_id, 'first_message')
+  on conflict do nothing;
+
+  -- chatter_100 / chatter_1000
+  select count(*) into msg_count
+  from public.forum_chat_messages
+  where author_id = new.author_id and deleted = false;
+
+  if msg_count >= 100 then
+    insert into public.forum_chat_achievements (user_id, kind)
+    values (new.author_id, 'chatter_100') on conflict do nothing;
+  end if;
+  if msg_count >= 1000 then
+    insert into public.forum_chat_achievements (user_id, kind)
+    values (new.author_id, 'chatter_1000') on conflict do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_chat_achievement_check on public.forum_chat_messages;
+create trigger forum_chat_achievement_check
+  after insert on public.forum_chat_messages
+  for each row execute function public.forum_chat_achievement_check();
+
+-- Достижение «создал чат» выдаётся в триггере forum_chat_after_create.
+-- seven_day_streak — считается по дням, выдаётся при проверке из JS.
+
+-- ── Личные сообщения (ЛС) ────────────────────────────────────────────────
+
+-- ЛС — это обычный чат с kind = 'dm'. Отдельный вид не нужен:
+-- при создании ЛС проверяем, что между двумя пользователями нет
+-- уже существующего dm-чата, и переиспользуем его.
+
+create or replace function public.forum_chat_create_dm(other_user uuid)
+returns uuid
+language plpgsql security definer set search_path = public
+as $$
+declare
+  existing_id uuid;
+  new_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Сначала войдите';
+  end if;
+  if other_user = auth.uid() then
+    raise exception 'Нельзя написать самому себе';
+  end if;
+  if not public.forum_can_write() then
+    raise exception 'Вам запрещено писать';
+  end if;
+
+  -- Ищем существующий ЛС между двумя пользователями.
+  select m1.chat_id into existing_id
+  from public.forum_chat_members m1
+  join public.forum_chats c on c.id = m1.chat_id and c.kind = 'dm'
+  join public.forum_chat_members m2 on m2.chat_id = m1.chat_id and m2.user_id = other_user
+  where m1.user_id = auth.uid()
+  limit 1;
+
+  if existing_id is not null then
+    return existing_id;
+  end if;
+
+  -- Создаём новый ЛС-чат.
+  insert into public.forum_chats (title, kind, owner_id, owner_nick)
+  values (
+    (select nick from public.forum_users where id = other_user),
+    'dm',
+    auth.uid(),
+    (select nick from public.forum_users where id = auth.uid())
+  ) returning id into new_id;
+
+  -- Участники добавляются триггером forum_chat_after_create (владелец)
+  -- и здесь — второй участник.
+  insert into public.forum_chat_members (chat_id, user_id, role)
+  values (new_id, other_user, 'member');
+
+  return new_id;
+end;
+$$;
+
+revoke all on function public.forum_chat_create_dm(uuid) from public, anon;
+grant execute on function public.forum_chat_create_dm(uuid) to authenticated;
+
+-- Обновляем constraint kind, чтобы включить 'dm'.
+alter table public.forum_chats drop constraint if exists forum_chats_kind_check;
+alter table public.forum_chats add constraint forum_chats_kind_check
+  check (kind in ('alliance', 'inter', 'dm'));
+
+-- ── Лидерборд чатов (представление) ──────────────────────────────────────
+
+drop view if exists public.forum_chat_leaderboard;
+create view public.forum_chat_leaderboard
+with (security_invoker = on) as
+select
+  m.author_id as user_id,
+  m.author_nick as nick,
+  prof.avatar_url,
+  prof.alliance_tag,
+  count(*) as message_count
+from public.forum_chat_messages m
+left join public.forum_profiles prof on prof.id = m.author_id
+where m.deleted = false
+  and m.created_at >= date_trunc('week', now())
+group by m.author_id, m.author_nick, prof.avatar_url, prof.alliance_tag
+order by message_count desc
+limit 20;
+
+grant select on public.forum_chat_leaderboard to authenticated;
+
+-- ── Уведомления в чатах (уведомление через forum_notifications) ──────────
+
+-- Упоминание @Ник в чате: триггер на вставке сообщения парсит @Ник и
+-- отправляет уведомление через существующую систему forum_notifications.
+
+create or replace function public.forum_chat_message_notify()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare
+  nick text;
+  user_rec record;
+  chat_title text;
+  nick_pos int;
+begin
+  if new.author_id is null then return new; end if;
+
+  select title into chat_title from public.forum_chats where id = new.chat_id;
+
+  -- Парсим @Ник из тела сообщения.
+  for nick in
+    select m[1] from regexp_matches(new.body, '@([A-Za-zА-Яа-яЁё0-9_]{2,40})', 'g') as m
+  loop
+    select id, nick into user_rec from public.forum_users where lower(nick) = lower(nick) limit 1;
+    if user_rec.id is not null and user_rec.id <> new.author_id then
+      -- Проверяем, что получатель — участник чата.
+      if exists (select 1 from public.forum_chat_members where chat_id = new.chat_id and user_id = user_rec.id) then
+        insert into public.forum_notifications (user_id, actor_id, actor_nick, kind, preview)
+        values (
+          user_rec.id,
+          new.author_id,
+          new.author_nick,
+          'mention',
+          left('В чате «' || coalesce(chat_title, '') || '»: ' || coalesce(nullif(new.body, ''), '📎'), 200)
+        );
+      end if;
+    end if;
+  end loop;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_chat_message_notify on public.forum_chat_messages;
+create trigger forum_chat_message_notify
+  after insert on public.forum_chat_messages
+  for each row execute function public.forum_chat_message_notify();
+
+-- ── Реакции-стикеры (расширенный набор эмодзи) ──────────────────────────
+
+-- Реакции хранятся в JSON-колонке reactions сообщений. Набор эмодзи
+-- определяется клиентом (src/pages/chats.js). База не ограничивает
+-- какие эмодзи можно использовать — это данные, а не структура.
+-- Поэтому отдельной таблицы не нужно.
+
+-- ── Правка kind в forum_chat_guard ────────────────────────────────────────
+
+create or replace function public.forum_chat_guard()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then return new; end if;
+  new.owner_id := old.owner_id;
+  new.owner_nick := old.owner_nick;
+  new.created_at := old.created_at;
+  new.kind := old.kind;
+  new.title := left(btrim(new.title), 60);
+  if new.closed and not old.closed and not public.forum_is_staff()
+     and not exists (select 1 from public.forum_chat_members
+                     where chat_id = old.id and user_id = auth.uid() and role = 'owner') then
+    raise exception 'Закрыть чат может владелец чата или модерация';
+  end if;
+  return new;
+end;
+$$;

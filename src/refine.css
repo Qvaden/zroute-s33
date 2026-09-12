@@ -1306,6 +1306,143 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .chat-empty .forum-btn { margin-top: 14px; }
 
+/* ── Закреплённое сообщение ──────────────────────────────────────────────── */
+
+.chat-pinned {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(255,201,60,.04);
+  font-size: 12px;
+}
+.chat-pinned__badge { font-size: 14px; }
+.chat-pinned__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-pinned__unpin {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+  font-size: 14px;
+}
+.chat-pinned__unpin:hover { color: #ffb3ba; }
+
+/* ── Онлайн в шапке ─────────────────────────────────────────────────────── */
+
+.chat-room__online { color: #31c5b5; }
+
+/* ── Лидерборд чатов ─────────────────────────────────────────────────────── */
+
+.chat-leaderboard {
+  flex: none;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(255,255,255,.02);
+}
+.chat-leaderboard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.chat-leaderboard__close {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+  font-size: 14px;
+}
+.chat-leaderboard__close:hover { color: #ffb3ba; }
+.chat-leaderboard__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.chat-leaderboard__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.chat-leaderboard__place {
+  width: 20px;
+  text-align: center;
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 700;
+}
+.chat-leaderboard__nick {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.chat-leaderboard__nick a { color: var(--text); text-decoration: none; }
+.chat-leaderboard__nick a:hover { color: var(--accent); }
+.chat-leaderboard__nick small { display: block; font-size: 10px; }
+.chat-leaderboard__count {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Личные сообщения (форма) ─────────────────────────────────────────────── */
+
+.chat-dm {
+  flex: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.chat-dm__acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ── Кнопки в шапке списка ───────────────────────────────────────────────── */
+
+.chat-list__head-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ── Кнопки в сообщении (закреп) ──────────────────────────────────────────── */
+
+.chat-msg__pin-btn {
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--mute);
+  font-size: 11px;
+  cursor: pointer;
+}
+.chat-msg__pin-btn:hover { color: var(--gold); }
+
+/* ── Индикатор «печатает…» ───────────────────────────────────────────────── */
+
+.chat-typing {
+  padding: 4px 10px 0;
+  color: var(--mute);
+  font-size: 11px;
+  font-style: italic;
+}
+
 /* ── Телефон: плотнее ────────────────────────────────────────────────────── */
 
 /*

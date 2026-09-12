@@ -102,13 +102,21 @@ export function renderChatListHead(s) {
         <span class="eyebrow">Закрытые чаты</span>
         <h2 class="chat-list__title">Чаты</h2>
       </div>
-      ${canCreate
-        ? `<button type="button" class="forum-btn forum-btn--primary chat-list__new" data-chat-create-toggle
-                   aria-expanded="${s.createOpen ? 'true' : 'false'}">
-             <span aria-hidden="true">+</span> Новый
-           </button>`
-        : ''}
-    </header>`;
+      <div class="chat-list__head-actions">
+        ${canCreate
+          ? `<button type="button" class="forum-btn forum-btn--primary chat-list__new" data-chat-create-toggle
+                     aria-expanded="${s.createOpen ? 'true' : 'false'}">
+               <span aria-hidden="true">+</span> Новый
+             </button>`
+          : ''}
+        <button type="button" class="forum-btn forum-btn--ghost chat-list__new"
+                data-chat-leaderboard-toggle title="Лидерборд активности">
+          🏆
+        </button>
+      </div>
+    </header>
+    ${s.leaderboardOpen ? renderLeaderboard(s) : ''}
+    ${s.dmOpen ? renderDMForm(s) : ''}`;
 }
 
 export function renderJoin() {
@@ -117,6 +125,7 @@ export function renderJoin() {
       <input class="chat-join__input" name="code" inputmode="text" autocomplete="off"
              spellcheck="false" placeholder="Код приглашения" aria-label="Код приглашения" maxlength="16">
       <button type="submit" class="forum-btn forum-btn--ghost">Войти</button>
+      <button type="button" class="forum-btn forum-btn--ghost" data-chat-dm-toggle title="Личное сообщение">✉</button>
     </form>`;
 }
 
@@ -149,6 +158,45 @@ export function renderCreateForm(s) {
         <button type="button" class="forum-btn forum-btn--ghost" data-chat-create-toggle>Отмена</button>
       </div>
       <p class="forum-error" data-chat-create-error hidden></p>
+    </form>`;
+}
+
+export function renderLeaderboard(s) {
+  const rows = s.leaderboard || [];
+  return `
+    <div class="chat-leaderboard">
+      <div class="chat-leaderboard__head">
+        <span class="eyebrow">🏆 Активность за неделю</span>
+        <button type="button" class="chat-leaderboard__close" data-chat-leaderboard-toggle>✕</button>
+      </div>
+      ${rows.length ? `<ol class="chat-leaderboard__list">
+        ${rows.map((r, i) => `
+          <li class="chat-leaderboard__row">
+            <span class="chat-leaderboard__place">${i + 1}</span>
+            ${avatar(r.nick, r.avatarUrl)}
+            <span class="chat-leaderboard__nick">
+              <a href="#/user/${encodeURIComponent(r.nick)}">${esc(r.nick)}</a>
+              ${r.allianceTag ? `<small class="muted">${esc(r.allianceTag)}</small>` : ''}
+            </span>
+            <span class="chat-leaderboard__count">${r.messageCount}</span>
+          </li>
+        `).join('')}
+      </ol>` : `<p class="muted">Нет данных за эту неделю.</p>`}
+    </div>`;
+}
+
+export function renderDMForm(s) {
+  return `
+    <form class="chat-dm" data-chat-dm>
+      <label class="forum-field">
+        <span>Ник игрока</span>
+        <input name="nick" maxlength="40" required placeholder="Кому написать…">
+      </label>
+      <div class="chat-dm__acts">
+        <button type="submit" class="forum-btn forum-btn--primary">Открыть ЛС</button>
+        <button type="button" class="forum-btn forum-btn--ghost" data-chat-dm-toggle>Отмена</button>
+      </div>
+      <p class="forum-error" data-chat-dm-error hidden></p>
     </form>`;
 }
 
@@ -265,6 +313,7 @@ function renderRoom(s) {
         <b class="chat-room__title">${esc(c.title)}</b>
         <small class="chat-room__sub muted">
           ${esc(kindWord)}${c.allianceTag ? ` · ${esc(c.allianceTag)}` : ''} · ${esc(membersWord)}
+          ${c.onlineCount > 1 ? ` · <span class="chat-room__online">${c.onlineCount} онлайн</span>` : ''}
           ${c.closed ? ' · <span class="chat-room__closed">закрыт</span>' : ''}
         </small>
       </div>
@@ -281,6 +330,13 @@ function renderRoom(s) {
 
     ${s.membersOpen ? renderMembers(s, isMgr) : ''}
     ${s.inviteOpen ? renderInvite(c) : ''}
+
+    ${c.pinnedBody ? `
+      <div class="chat-pinned">
+        <span class="chat-pinned__badge">📌</span>
+        <span class="chat-pinned__text"><b>${esc(c.pinnedNick || '')}:</b> ${esc(c.pinnedBody)}</span>
+        ${isMgr ? `<button type="button" class="chat-pinned__unpin" data-chat-unpin title="Открепить">✕</button>` : ''}
+      </div>` : ''}
 
     ${s.searchOpen ? `
       <div class="chat-search">
@@ -409,11 +465,13 @@ export function renderMessage(m, s, isMgr, grouped) {
         ${m.poll ? renderPoll(m.id, m.poll, s.me?.id) : ''}
         ${renderReactionsBar(m.id, m.reactions, s.me?.id)}
 
-        <div class="chat-msg__meta">
+          <div class="chat-msg__meta">
           <time title="${esc(fullTime(m.createdAt))}">${esc(clock(m.createdAt))}</time>
           <button type="button" class="chat-msg__reply-btn" data-chat-msg-reply="${esc(m.id)}"
                   data-nick="${esc(m.authorNick)}" data-excerpt="${esc(plainExcerpt(m.body || 'Вложение', 50))}"
                   title="Ответить" aria-label="Ответить">↩</button>
+          ${isMgr ? `<button type="button" class="chat-msg__pin-btn" data-chat-pin="${esc(m.id)}"
+                    title="Закрепить сообщение" aria-label="Закрепить">📌</button>` : ''}
           <div class="chat-msg__react-trigger" data-chat-react-picker="${esc(m.id)}">
             <button type="button" class="chat-msg__react-btn" title="Поставить реакцию">😊</button>
             <div class="chat-msg__reactions-pop">
@@ -525,8 +583,15 @@ export function renderComposer(s, c) {
     return `<p class="chat-compose__locked muted">Вам запрещено писать.</p>`;
   }
 
+  // Typing indicator: other members who typed in the last 5 seconds.
+  const now = Date.now();
+  const typists = (s.members || [])
+    .filter((m) => m.userId !== s.me?.id && m.typingAt && (now - new Date(m.typingAt).getTime()) < 5000)
+    .map((m) => m.nick);
+
   return `
     <div class="chat-compose-wrap">
+      ${typists.length ? `<div class="chat-typing">${esc(typists.join(', '))} ${typists.length === 1 ? 'печатает' : 'печатают'}…</div>` : ''}
       ${s.replyingTo ? renderReplyBanner(s.replyingTo) : ''}
       ${s.pollDraft ? `
         <div class="chat-pending-poll">

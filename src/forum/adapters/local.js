@@ -955,11 +955,18 @@ function chatView(s, c, meId) {
     ...c,
     createdAt: new Date(c.createdAt),
     memberCount: members.length,
+    onlineCount: members.filter((m) => {
+      const seen = m.lastSeenAt ? new Date(m.lastSeenAt).getTime() : 0;
+      return seen > Date.now() - 5 * 60 * 1000;
+    }).length,
     myRole: mine?.role ?? null,
     unread: msgs.filter((x) => new Date(x.createdAt).getTime() > since && x.authorId !== meId).length,
     lastBody: lastText,
     lastNick: last?.authorNick ?? '',
     lastAt: last ? new Date(last.createdAt) : null,
+    avatarUrl: c.avatarUrl || '',
+    pinnedBody: null,
+    pinnedNick: null,
   };
 }
 
@@ -1233,4 +1240,80 @@ export async function adminDeleteChat(chatId) {
   s.chatMembers = s.chatMembers.filter((m) => m.chatId !== chatId);
   s.chatMessages = s.chatMessages.filter((m) => m.chatId !== chatId);
   write(s);
+}
+
+export async function pinChatMessage(chatId, messageId) {
+  const s = read();
+  const me = meOrThrow(s);
+  const c = s.chats.find((x) => x.id === chatId);
+  if (!c) throw new Error('Чат не найден');
+  const m = memberOf(s, chatId, me.id);
+  if (!m || !['owner', 'admin'].includes(m.role)) throw new Error('Недостаточно прав');
+  c.pinnedMessageId = messageId;
+  write(s);
+}
+
+export async function unpinChatMessage(chatId) {
+  const s = read();
+  const me = meOrThrow(s);
+  const c = s.chats.find((x) => x.id === chatId);
+  if (!c) throw new Error('Чат не найден');
+  const m = memberOf(s, chatId, me.id);
+  if (!m || !['owner', 'admin'].includes(m.role)) throw new Error('Недостаточно прав');
+  c.pinnedMessageId = null;
+  write(s);
+}
+
+export async function setTyping(chatId) {
+  /* Локальный режим: nobody else is reading, typing indicator is meaningless. */
+}
+
+export async function createDM(otherUserId) {
+  const s = read();
+  const me = meOrThrow(s);
+  const other = s.users.find((u) => u.id === otherUserId);
+  if (!other) throw new Error('Игрок не найден');
+  const existing = s.chats.find((c) =>
+    c.kind === 'dm' &&
+    s.chatMembers.some((m) => m.chatId === c.id && m.userId === me.id) &&
+    s.chatMembers.some((m) => m.chatId === c.id && m.userId === otherUserId)
+  );
+  if (existing) return existing.id;
+  const c = {
+    id: newId('c'),
+    title: other.nick,
+    kind: 'dm',
+    allianceTag: '',
+    ownerId: me.id,
+    ownerNick: me.nick,
+    inviteCode: '',
+    maxMembers: 2,
+    closed: false,
+    closedReason: '',
+    avatarUrl: '',
+    pinnedMessageId: null,
+    createdAt: new Date().toISOString(),
+  };
+  s.chats.push(c);
+  const now = new Date().toISOString();
+  s.chatMembers.push({ chatId: c.id, userId: me.id, role: 'owner', joinedAt: now, lastReadAt: now, lastSeenAt: now, typingAt: null });
+  s.chatMembers.push({ chatId: c.id, userId: otherUserId, role: 'member', joinedAt: now, lastReadAt: now, lastSeenAt: now, typingAt: null });
+  write(s);
+  return c.id;
+}
+
+export async function chatLeaderboard() {
+  const s = read();
+  const counts = {};
+  for (const m of s.chatMessages) {
+    if (m.deleted || !m.authorId) continue;
+    counts[m.authorId] = (counts[m.authorId] || 0) + 1;
+  }
+  return Object.entries(counts)
+    .map(([uid, count]) => {
+      const u = s.users.find((x) => x.id === uid);
+      return { userId: uid, nick: u?.nick ?? '—', avatarUrl: u?.avatarUrl ?? '', allianceTag: u?.allianceTag ?? '', messageCount: count };
+    })
+    .sort((a, b) => b.messageCount - a.messageCount)
+    .slice(0, 20);
 }

@@ -190,13 +190,18 @@
  * @property {(chatId: string) => Promise<void>} adminDeleteChat
  * @property {(messageId: string, optionIndex: number) => Promise<void>} [voteChatPoll]
  * @property {(messageId: string, reaction: string) => Promise<void>} [reactChatMessage]
+ * @property {(chatId: string, messageId: string) => Promise<void>} [pinChatMessage]
+ * @property {(chatId: string) => Promise<void>} [unpinChatMessage]
+ * @property {(chatId: string) => Promise<void>} [setTyping]
+ * @property {(otherUserId: string) => Promise<string>} [createDM]
+ * @property {() => Promise<{userId: string, nick: string, avatarUrl: string, allianceTag: string, messageCount: number}[]>} [chatLeaderboard]
  */
 
 /**
  * @typedef {Object} ForumChat
  * @property {string} id
  * @property {string} title
- * @property {'alliance'|'inter'} kind
+ * @property {'alliance'|'inter'|'dm'} kind
  * @property {string} allianceTag
  * @property {string|null} ownerId
  * @property {string} ownerNick
@@ -204,13 +209,17 @@
  * @property {number} maxMembers
  * @property {boolean} closed
  * @property {string} closedReason
+ * @property {string} avatarUrl
  * @property {Date} createdAt
  * @property {number} memberCount
+ * @property {number} onlineCount
  * @property {'owner'|'admin'|'member'|null} myRole
  * @property {number} unread
  * @property {string} lastBody
  * @property {string} lastNick
  * @property {Date|null} lastAt
+ * @property {string|null} pinnedBody
+ * @property {string|null} pinnedNick
  */
 
 /**
@@ -223,6 +232,7 @@
  * @property {boolean} isLeader
  * @property {'owner'|'admin'|'member'} role
  * @property {Date} joinedAt
+ * @property {Date|null} lastSeenAt
  */
 
 /**

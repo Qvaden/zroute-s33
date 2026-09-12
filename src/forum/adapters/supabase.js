@@ -730,13 +730,17 @@ function chatOut(row) {
     maxMembers: Number(row.max_members || 200),
     closed: Boolean(row.closed),
     closedReason: row.closed_reason || '',
+    avatarUrl: row.avatar_url || '',
     createdAt: toDate(row.created_at) ?? new Date(),
     memberCount: Number(row.member_count || 0),
+    onlineCount: Number(row.online_count || 0),
     myRole: row.my_role || null,
     unread: Number(row.unread_count || 0),
     lastBody: row.last_body || '',
     lastNick: row.last_nick || '',
     lastAt: toDate(row.last_at),
+    pinnedBody: row.pinned_body || null,
+    pinnedNick: row.pinned_nick || null,
   };
 }
 
@@ -771,6 +775,8 @@ function chatMemberOut(row) {
     isLeader: Boolean(row.is_leader),
     role: row.role || 'member',
     joinedAt: toDate(row.joined_at) ?? new Date(),
+    lastSeenAt: toDate(row.last_seen_at),
+    typingAt: toDate(row.typing_at),
   };
 }
 
@@ -963,4 +969,32 @@ export async function rotateChatCode(chatId) {
 /** Модерация: удалить чат целиком со всеми сообщениями. */
 export async function adminDeleteChat(chatId) {
   await rest(`/forum_chats?id=eq.${encodeURIComponent(chatId)}`, { method: 'DELETE' });
+}
+
+export async function pinChatMessage(chatId, messageId) {
+  await rest('/rpc/forum_chat_pin', { method: 'POST', body: { target_chat: chatId, target_msg: messageId } });
+}
+
+export async function unpinChatMessage(chatId) {
+  await rest('/rpc/forum_chat_unpin', { method: 'POST', body: { target_chat: chatId } });
+}
+
+export async function setTyping(chatId) {
+  await rest('/rpc/forum_chat_set_typing', { method: 'POST', body: { target_chat: chatId } }).catch(() => {});
+}
+
+export async function createDM(otherUserId) {
+  const id = await rest('/rpc/forum_chat_create_dm', { method: 'POST', body: { other_user: otherUserId } });
+  return String(id).replace(/"/g, '');
+}
+
+export async function chatLeaderboard() {
+  const rows = await rest('/forum_chat_leaderboard?select=*');
+  return (Array.isArray(rows) ? rows : []).map((r) => ({
+    userId: r.user_id,
+    nick: r.nick || '',
+    avatarUrl: r.avatar_url || '',
+    allianceTag: r.alliance_tag || '',
+    messageCount: Number(r.message_count || 0),
+  }));
 }

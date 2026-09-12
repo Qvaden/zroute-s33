@@ -47,6 +47,9 @@ const state = {
   lightbox: null,
   searchOpen: false,
   searchQuery: '',
+  leaderboardOpen: false,
+  leaderboard: null,
+  dmOpen: false,
 };
 
 let host = null;
@@ -347,6 +350,8 @@ async function openChat(id) {
   state.replyingTo = null;
   state.pollDraft = null;
   state.lightbox = null;
+  state.searchOpen = false;
+  state.searchQuery = '';
   state.hasMore = false;
   state.loading = true;
   paintFull({ stick: true });
@@ -672,8 +677,25 @@ function wire() {
         state.createOpen = false;
         await loadList();
         location.hash = `#/chats/${chat.id}`;
+});
+    }
+
+    if (form.matches('[data-chat-dm]')) {
+      e.preventDefault();
+      const err = form.querySelector('[data-chat-dm-error]');
+      const nick = String(form.elements.nick?.value ?? '').trim();
+      if (!nick) return;
+      const btn = form.querySelector('button[type="submit"]');
+      await withBusy(btn, '…', async () => {
+        const id = await forum.createDM?.(nick);
+        if (!id) { if (err) { err.textContent = 'Не удалось открыть ЛС'; err.hidden = false; } return; }
+        state.dmOpen = false;
+        await loadList();
+        location.hash = `#/chats/${id}`;
+        notice('ЛС открыт');
       });
     }
+    return;
   });
 
   document.addEventListener('click', async (e) => {
@@ -1086,6 +1108,52 @@ function wire() {
       notice(state.open.pinnedId ? 'Сообщение закреплено' : 'Откреплено');
       return;
     }
+
+    /* Открепить сообщение (из баннера). */
+    const unpinBtn = t.closest('[data-chat-unpin]');
+    if (unpinBtn && state.openId) {
+      state.menuOpen = false;
+      await withBusy(unpinBtn, '…', async () => {
+        await forum.unpinChatMessage?.(state.openId);
+        await loadList();
+        await openChat(state.openId);
+        notice('Откреплено');
+      });
+      return;
+    }
+
+    /* Закрепить сообщение (из меню сообщения). */
+    const pinMsg = t.closest('[data-chat-pin]');
+    if (pinMsg && state.openId) {
+      const msgId = pinMsg.dataset.chatPin;
+      await withBusy(pinMsg, '…', async () => {
+        await forum.pinChatMessage?.(state.openId, msgId);
+        await loadList();
+        await openChat(state.openId);
+        notice('Сообщение закреплено');
+      });
+      return;
+    }
+
+    /* Лидерборд: показать/скрыть. */
+    const lbToggle = t.closest('[data-chat-leaderboard-toggle]');
+    if (lbToggle) {
+      state.leaderboardOpen = !state.leaderboardOpen;
+      if (state.leaderboardOpen && !state.leaderboard?.length) {
+        try { state.leaderboard = await forum.chatLeaderboard?.() ?? []; } catch { state.leaderboard = []; }
+      }
+      paintFull();
+      return;
+    }
+
+    /* Личные сообщения: показать/скрыть форму. */
+    const dmToggle = t.closest('[data-chat-dm-toggle]');
+    if (dmToggle) {
+      state.dmOpen = !state.dmOpen;
+      paintFull();
+      if (state.dmOpen) host.querySelector('[data-chat-dm] input[name="nick"]')?.focus({ preventScroll: true });
+      return;
+    }
   });
 
   /* Выбор файлов через скрепку. */
@@ -1114,7 +1182,14 @@ function wire() {
 
   document.addEventListener('input', (e) => {
     if (!host || !host.contains(e.target)) return;
-    if (e.target.matches?.('[data-chat-input]')) autosize(e.target);
+    if (e.target.matches?.('[data-chat-input]')) {
+      autosize(e.target);
+      // Typing indicator: send debounced.
+      if (state.openId) {
+        clearTimeout(state._typingTimer);
+        state._typingTimer = setTimeout(() => { forum.setTyping?.(state.openId); }, 800);
+      }
+    }
     if (e.target.matches?.('[data-chat-search-input]')) {
       state.searchQuery = e.target.value;
       paintMessages();
