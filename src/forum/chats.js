@@ -39,11 +39,14 @@ const state = {
   createOpen: false,
   pollOpen: false,
   hasMore: false,
+  newMessages: 0,
   sending: false,
   pendingFiles: [],
   replyingTo: null,
   pollDraft: null,
   lightbox: null,
+  searchOpen: false,
+  searchQuery: '',
 };
 
 let host = null;
@@ -166,8 +169,17 @@ function paintMessages({ stick = false } = {}) {
 
   scroll.innerHTML = renderScrollArea(state);
 
-  if (stick || atBottom) scroll.scrollTop = scroll.scrollHeight;
-  else scroll.scrollTop = prevTop + (scroll.scrollHeight - prevHeight);
+  if (stick || atBottom) {
+    scroll.scrollTop = scroll.scrollHeight;
+    state.newMessages = 0;
+  } else {
+    scroll.scrollTop = prevTop + (scroll.scrollHeight - prevHeight);
+  }
+  paintGoBottom();
+
+  /* Наблюдаем сентинел для бесконечной прокрутки. */
+  const sentinel = scroll.querySelector('[data-chat-sentinel]');
+  if (sentinel && state._scrollObserver) state._scrollObserver.observe(sentinel);
 }
 
 /** Точечная перерисовка списка чатов (счётчики непрочитанного). */
@@ -175,6 +187,22 @@ function paintList() {
   if (!host) return;
   const area = host.querySelector('[data-chat-list-area]');
   if (area) area.innerHTML = renderChatList(state);
+}
+
+/**
+ * Обновить кнопку «вниз» и счётчик новых сообщений.
+ *
+ * Кнопка живёт как сиблинг .chat-room__scroll и позиционируется
+ * абсолютно над лентой — не зависит от перерисовки ленты.
+ */
+function paintGoBottom() {
+  if (!host) return;
+  const btn = host.querySelector('[data-chat-go-bottom]');
+  if (!btn) return;
+  const has = state.newMessages > 0;
+  btn.classList.toggle('is-visible', has);
+  const count = btn.querySelector('[data-chat-go-count]');
+  if (count) count.textContent = state.newMessages > 99 ? '99+' : String(state.newMessages);
 }
 
 function autosize(el) {
@@ -189,6 +217,12 @@ function notice(text) {
   t.textContent = text;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2600);
+}
+
+/** Текст без HTML-тегов, обрезанный. */
+function plainExcerpt(src, max = 80) {
+  const t = String(src).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
 /* ── Вложения ───────────────────────────────────────────────────────────── */
@@ -393,8 +427,22 @@ async function tick() {
       return m;
     });
     if (added.length) {
+      const scroll = host?.querySelector('[data-chat-scroll]');
+      const atBottom = scroll ? scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80 : true;
       state.messages = [...state.messages, ...added].sort((a, b) => a.createdAt - b.createdAt);
-      if (added.some((m) => m.authorId !== state.me?.id)) forum.markChatRead(id).catch(() => {});
+      const newFromOthers = added.filter((m) => m.authorId !== state.me?.id);
+      if (newFromOthers.length) forum.markChatRead(id).catch(() => {});
+      if (!atBottom) state.newMessages += newFromOthers.length;
+
+      /* Звук и уведомление: только для чужих сообщений, только когда видим. */
+      if (newFromOthers.length && !document.hidden) {
+        playNewMessageSound();
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          const sender = newFromOthers[newFromOthers.length - 1].authorNick;
+          const preview = plainExcerpt(newFromOthers[newFromOthers.length - 1].body || 'Вложение', 60);
+          new Notification(`${sender}: ${preview}`, { silent: true });
+        }
+      }
     }
     if (changed) paintMessages();
   } catch {
@@ -946,6 +994,97 @@ function wire() {
         state.hasMore = older.length >= 60;
         paintMessages();
       });
+      return;
+    }
+
+    /* Бесконечный скролл: IntersectionObserver следит за сентинелем
+       в верху ленты и подгружает порцию, когда он появляется в зоне
+       видимости. Срабатывает один раз на сентинел, потом сентинел
+       удаляется (paintMessages перерисовывает ленту, и если hasMore —
+       сентинел появляется снова). */
+    const sentinel = t.closest('[data-chat-sentinel]');
+    if (sentinel && state.openId && !state._loadingMore) {
+      state._loadingMore = true;
+      try {
+        const oldest = state.messages[0]?.createdAt;
+        const older = await forum.listChatMessages(state.openId, { limit: 60, before: oldest });
+        state.messages = [...older, ...state.messages];
+        state.hasMore = older.length >= 60;
+        paintMessages();
+      } finally {
+        state._loadingMore = false;
+      }
+      return;
+    }
+
+    /* Кнопка «вниз» — прокрутка к последнему сообщению. */
+    const goBottom = t.closest('[data-chat-go-bottom]');
+    if (goBottom) {
+      const scroll = host?.querySelector('[data-chat-scroll]');
+      if (scroll) scroll.scrollTo({ top: scroll.scrollHeight, behavior: 'smooth' });
+      state.newMessages = 0;
+      paintGoBottom();
+      return;
+    }
+
+    /* Переименовать чат. */
+    const rename = t.closest('[data-chat-rename]');
+    if (rename && state.openId && state.open) {
+      state.menuOpen = false;
+      host.querySelector('.chat-menu__pop')?.remove();
+      const title = prompt('Новое название чата:', state.open.title) ?? null;
+      if (title === null || !title.trim() || title.trim() === state.open.title) return;
+      await withBusy(rename, '…', async () => {
+        await forum.updateChat(state.openId, { title: title.trim() });
+        await loadList();
+        await openChat(state.openId);
+      });
+      return;
+    }
+
+    /* Экспорт истории чата в JSON. */
+    const exportBtn = t.closest('[data-chat-export]');
+    if (exportBtn && state.openId) {
+      state.menuOpen = false;
+      host.querySelector('.chat-menu__pop')?.remove();
+      const msgs = state.messages.map((m) => ({
+        author: m.authorNick,
+        date: m.createdAt?.toISOString?.() ?? m.createdAt,
+        body: m.body,
+        attachments: m.attachments,
+        reactions: m.reactions,
+        poll: m.poll,
+      }));
+      const blob = new Blob([JSON.stringify({ title: state.open?.title, messages: msgs }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `chat-${state.open?.title || state.openId}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      notice('История экспортирована');
+      return;
+    }
+
+    /* Поиск по сообщениям: открыть/закрыть. */
+    const searchToggle = t.closest('[data-chat-search-toggle]');
+    if (searchToggle) {
+      state.searchOpen = !state.searchOpen;
+      state.searchQuery = '';
+      paintFull();
+      if (state.searchOpen) {
+        host.querySelector('[data-chat-search-input]')?.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    /* Закрепить сообщение (для будущего). */
+    const pinBtn = t.closest('[data-chat-pin]');
+    if (pinBtn && state.openId) {
+      const msgId = pinBtn.dataset.chatPin;
+      state.open.pinnedId = state.open.pinnedId === msgId ? null : msgId;
+      paintFull({ stick: true });
+      notice(state.open.pinnedId ? 'Сообщение закреплено' : 'Откреплено');
+      return;
     }
   });
 
@@ -974,7 +1113,12 @@ function wire() {
   });
 
   document.addEventListener('input', (e) => {
-    if (host && e.target.matches?.('[data-chat-input]')) autosize(e.target);
+    if (!host || !host.contains(e.target)) return;
+    if (e.target.matches?.('[data-chat-input]')) autosize(e.target);
+    if (e.target.matches?.('[data-chat-search-input]')) {
+      state.searchQuery = e.target.value;
+      paintMessages();
+    }
   });
 
   document.addEventListener('keydown', (e) => {
@@ -1002,6 +1146,64 @@ function wire() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && host) tick();
   });
+
+  /* Слушатель скролла: сбрасываем newMessages, когда пользователь докрутился до низа. */
+  host?.addEventListener('scroll', (e) => {
+    const target = e.target.closest('[data-chat-scroll]');
+    if (!target) return;
+    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
+    if (atBottom) {
+      state.newMessages = 0;
+      paintGoBottom();
+    }
+  }, { passive: true });
+
+  /* Бесконечный скролл: IntersectionObserver следит за сентинелем
+     в верху ленты и подгружает порцию, когда он появляется в зоне
+     видимости. */
+  const scrollObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting && state.openId && !state._loadingMore && state.hasMore) {
+        state._loadingMore = true;
+        const oldest = state.messages[0]?.createdAt;
+        forum.listChatMessages(state.openId, { limit: 60, before: oldest }).then((older) => {
+          if (state.openId) {
+            state.messages = [...older, ...state.messages];
+            state.hasMore = older.length >= 60;
+            paintMessages();
+          }
+        }).finally(() => { state._loadingMore = false; });
+      }
+    }
+  }, { root: null, threshold: 0.1 });
+  state._scrollObserver = scrollObserver;
+
+  /* Уведомления о новых сообщениях: звук + системное уведомление. */
+  async function playNewMessageSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.value = 0.08;
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {
+      /* игнорируем ошибки звука */
+    }
+  }
+
+  /* Запросить разрешение на уведомления. */
+  async function requestNotificationPermission() {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      await Notification.requestPermission().catch(() => {});
+    }
+  }
 }
 
 /* ── Входы ──────────────────────────────────────────────────────────────── */
@@ -1069,6 +1271,7 @@ export function unmountChats() {
   headWatch = null;
   vvWatch?.();
   vvWatch = null;
+  if (state._scrollObserver) { state._scrollObserver.disconnect(); state._scrollObserver = null; }
   state.openId = null;
   state.open = null;
   state.messages = [];
@@ -1081,6 +1284,10 @@ export function unmountChats() {
   state.replyingTo = null;
   state.pollDraft = null;
   state.lightbox = null;
+  state.searchOpen = false;
+  state.searchQuery = '';
+  state.newMessages = 0;
+  state._loadingMore = false;
   clearPendingFiles();
   renderedChatId = undefined;
 }

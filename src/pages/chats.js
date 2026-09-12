@@ -13,6 +13,24 @@ import { postBody, timeAgo, fullTime, nickColor, nickInitial } from '../forum/fo
 import { roleBadge } from '../forum/roles.js';
 
 /**
+ * Рендер тела сообщения с @упоминаниями.
+ *
+ * postBody() санитизирует HTML и превращает ссылки. После этого
+ * находим @Ник и оборачиваем в ссылку на профиль участника.
+ * Парсинг идёт ПОСЛЕ sanitizeHtml, поэтому теги уже чистые.
+ */
+function renderBody(raw) {
+  let html = postBody(raw);
+  // @Ник — любой набор непробельных символов после @.
+  // Не трогаем email-адреса (user@host).
+  html = html.replace(/(^|[\s>])@([^\s<@]{2,40})/g, (m, pre, nick) => {
+    // Не парсим, если уже внутри ссылки.
+    return `${pre}<a href="#/user/${encodeURIComponent(nick)}">@${esc(nick)}</a>`;
+  });
+  return html;
+}
+
+/**
  * @typedef {Object} ChatsState
  * @property {boolean} ready
  * @property {boolean} loading
@@ -192,7 +210,10 @@ export function renderScrollArea(s) {
     c.myRole === 'owner' || c.myRole === 'admin' ||
     c.ownerId === s.me?.id || s.me?.role === 'admin' || s.me?.role === 'moderator'
   );
-  return `${c && s.hasMore ? `<button type="button" class="chat-room__more forum-act" data-chat-more>Показать раньше</button>` : ''}${renderMessages(s, isMgr)}`;
+  const msgs = s.searchOpen && s.searchQuery.trim()
+    ? s.messages.filter((m) => m.body?.toLowerCase().includes(s.searchQuery.toLowerCase()))
+    : s.messages;
+  return `${c && s.hasMore ? `<div class="chat-sentinel" data-chat-sentinel></div>` : ''}${renderMessages({ ...s, messages: msgs }, isMgr)}`;
 }
 
 function renderRoom(s) {
@@ -216,6 +237,9 @@ function renderRoom(s) {
       👥 Участники<span class="chat-menu__count">${esc(c.memberCount)}</span>
     </button>`,
     isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-invite>🔗 Пригласить по коду</button>` : '',
+    isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-rename>✏️ Переименовать</button>` : '',
+    `<button type="button" class="chat-menu__item" role="menuitem" data-chat-search-toggle>🔍 ${s.searchOpen ? 'Скрыть поиск' : 'Поиск по сообщениям'}</button>`,
+    `<button type="button" class="chat-menu__item" role="menuitem" data-chat-export>📥 Экспорт истории</button>`,
     c.myRole && c.myRole !== 'owner'
       ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-leave>🚪 Выйти из чата</button>`
       : '',
@@ -258,9 +282,25 @@ function renderRoom(s) {
     ${s.membersOpen ? renderMembers(s, isMgr) : ''}
     ${s.inviteOpen ? renderInvite(c) : ''}
 
+    ${s.searchOpen ? `
+      <div class="chat-search">
+        <input class="chat-search__input" name="search" autocomplete="off" spellcheck="false"
+               placeholder="Поиск по сообщениям…" aria-label="Поиск"
+               data-chat-search-input value="${esc(s.searchQuery || '')}">
+      </div>` : ''}
+
     <div class="chat-room__scroll" data-chat-scroll>
       ${renderScrollArea(s)}
     </div>
+
+    <button type="button" class="chat-go-bottom${s.newMessages > 0 ? ' is-visible' : ''}"
+            data-chat-go-bottom aria-label="К последнему сообщению">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+      <span data-chat-go-count>${s.newMessages > 99 ? '99+' : s.newMessages}</span>
+    </button>
 
     ${renderComposer(s, c)}`;
 }
@@ -293,6 +333,7 @@ export function renderMembers(s, isMgr) {
 
 export function renderInvite(c) {
   const link = `${location.origin}${location.pathname}#/chats/join/${esc(c.inviteCode)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(link)}`;
   return `
     <div class="chat-invite" data-chat-invite-panel>
       <div class="chat-invite__code">
@@ -302,6 +343,10 @@ export function renderInvite(c) {
       <div class="chat-invite__acts">
         <button type="button" class="forum-btn forum-btn--ghost" data-chat-copy="${esc(link)}">Скопировать ссылку</button>
         <button type="button" class="forum-act" data-chat-rotate>Сменить код</button>
+      </div>
+      <div class="chat-invite__qr">
+        <img src="${esc(qrUrl)}" alt="QR-код приглашения" width="140" height="140" loading="lazy">
+        <p class="muted">Наведите камеру телефона</p>
       </div>
       <p class="muted chat-invite__note">Кто знает код, тот войдёт. Утёк — смените, старый перестанет работать.</p>
     </div>`;
@@ -359,7 +404,7 @@ export function renderMessage(m, s, isMgr, grouped) {
           </div>`}
 
         ${m.replyTo ? renderReplyQuote(m.replyTo) : ''}
-        ${m.body ? `<div class="chat-msg__body">${postBody(m.body)}</div>` : ''}
+        ${m.body ? `<div class="chat-msg__body">${renderBody(m.body)}</div>` : ''}
         ${m.attachments?.length ? renderAttachments(m.attachments) : ''}
         ${m.poll ? renderPoll(m.id, m.poll, s.me?.id) : ''}
         ${renderReactionsBar(m.id, m.reactions, s.me?.id)}

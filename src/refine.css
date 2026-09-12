@@ -595,6 +595,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   в выпадающее меню: строка кнопок «Пригласить · Выйти · Закрыть»
   переносилась на телефоне и толкала название в две строки.
 */
+.chat-room {
+  position: relative;
+}
 .chat-room__head {
   display: flex;
   align-items: center;
@@ -1219,6 +1222,79 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .chat-reaction-chip b { color: var(--mute); font-size: 10.5px; }
 .chat-reaction-chip.is-mine b { color: var(--accent); }
+
+/* ── Кнопка «вниз» ──────────────────────────────────────────────────────── */
+
+.chat-go-bottom {
+  position: absolute;
+  bottom: 72px;
+  right: 14px;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised-2);
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px -6px rgba(0,0,0,.6);
+  z-index: 6;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-go-bottom:hover { color: var(--text); border-color: var(--accent); }
+.chat-go-bottom.is-visible { display: inline-flex; }
+.chat-go-bottom span { min-width: 18px; text-align: center; }
+
+/* ── Поиск по сообщениям ────────────────────────────────────────────────── */
+
+.chat-search {
+  flex: none;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.chat-search__input {
+  width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.025);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.chat-search__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+}
+
+/* ── QR-код в приглашении ────────────────────────────────────────────────── */
+
+.chat-invite__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.chat-invite__qr img {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+/* ── Упоминания @ник в сообщениях ────────────────────────────────────────── */
+
+.chat-msg__body a[href^="#/user/"] {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.chat-msg__body a[href^="#/user/"]:hover {
+  text-decoration: underline;
+}
 
 /* ── Чаты без базы и без входа ───────────────────────────────────────────── */
 
