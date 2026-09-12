@@ -50,6 +50,7 @@ const state = {
   leaderboardOpen: false,
   leaderboard: null,
   dmOpen: false,
+  pushSubscribed: false,
 };
 
 let host = null;
@@ -1181,7 +1182,7 @@ function wire() {
       return;
     }
 
-    /* Web Push подписка. */
+    /* Web Push подписка: переключатель. */
     const pushBtn = t.closest('[data-chat-push]');
     if (pushBtn) {
       state.menuOpen = false;
@@ -1191,24 +1192,43 @@ function wire() {
         if (!('Notification' in window)) { notice('Браузер не поддерживает уведомления'); return; }
         if (!('serviceWorker' in navigator)) { notice('Service Worker не поддерживается'); return; }
 
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+
+        if (existing) {
+          // Уже подписан — отключаем.
+          await existing.unsubscribe();
+          await forum.removePushSubscription?.(existing.endpoint).catch(() => {});
+          state.pushSubscribed = false;
+          notice('🔕 Push-уведомления отключены');
+          paintFull();
+          return;
+        }
+
+        // Не подписан — подписываемся.
         const perm = await Notification.requestPermission();
         if (perm !== 'granted') { notice('Разрешение на уведомления не выдано'); return; }
 
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          // VAPID-ключ: после генерации вписать свой публичный сюда
-          // и приватный в секреты Edge Function.
-          // Генерация: npx web-push generate-vapid-keys
-          const vapidPublicKey = (document.querySelector('meta[name="vapid-public-key"]')?.content) || '';
-          const vapidBytes = vapidPublicKey ? urlBase64ToUint8Array(vapidPublicKey) : null;
-          if (!vapidBytes) { notice('Push-ключ не настроен. Установите мету vapid-public-key.'); return; }
-          try {
-            sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes });
-          } catch {
-            notice('Не удалось подписаться на push. Попробуйте позже.');
-            return;
-          }
+        const vapidPublicKey = (document.querySelector('meta[name="vapid-public-key"]')?.content) || '';
+        const vapidBytes = vapidPublicKey ? urlBase64ToUint8Array(vapidPublicKey) : null;
+        if (!vapidBytes) { notice('Push-ключ не настроен. Установите мету vapid-public-key.'); return; }
+        let sub;
+        try {
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes });
+        } catch {
+          notice('Не удалось подписаться на push. Попробуйте позже.');
+          return;
+        }
+        const keys = sub.keys || {};
+        await forum.savePushSubscription?.(sub.endpoint, keys);
+        state.pushSubscribed = true;
+        notice('🔔 Push-уведомления включены');
+        paintFull();
+      } catch (err) {
+        notice(String(err?.message ?? err));
+      }
+      return;
+    }
         }
         const keys = sub.keys || {};
         await forum.savePushSubscription?.(sub.endpoint, keys);
@@ -1371,6 +1391,15 @@ export async function mountChats(container, param = null) {
     state.me = null;
   }
   if (!state.me) { state.loading = false; paintFull(); return; }
+
+  // Проверить, подписан ли пользователь на push.
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      state.pushSubscribed = Boolean(sub);
+    }
+  } catch { /* ignore */ }
 
   if (param && param.startsWith('join/')) {
     const code = param.slice(5);
