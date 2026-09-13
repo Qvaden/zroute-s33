@@ -25,6 +25,7 @@ import './ui/ladder-controls.js?v=34';
 import './ui/timeline-controls.js?v=34';
 import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=34';
 import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=34';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=34';
 
 /*
   РАЗДЕЛЫ.
@@ -51,6 +52,7 @@ const ROUTES = [
   */
   { id: 'forum', label: 'Форум', live: true, primary: true },
   { id: 'chats', label: 'Чаты', live: true, primary: true },
+  { id: 'tournaments', label: 'Турниры', live: true, primary: true },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -354,13 +356,21 @@ function render() {
 
     if (route.id === 'chats') {
       unmountForum();
+      unmountTournaments();
       app.innerHTML = '';
       // Второй сегмент — id чата; ссылка-приглашение: #/chats/join/<код>.
       const rest = location.hash.replace(/^#\/?chats\/?/, '');
       mountChats(app, rest ? decodeURIComponent(rest) : null);
       path = rest ? '/chats/room' : '/chats';
+    } else if (route.id === 'tournaments') {
+      unmountForum();
+      unmountChats();
+      app.innerHTML = '';
+      mountTournaments(app, view.alliances);
+      path = '/tournaments';
     } else if (route.live) {
       unmountChats();
+      unmountTournaments();
       /*
         Живому разделу нельзя просто подставить строку: он сам решает, что
         показать, потому что ждёт ответа хранилища. Второй сегмент адреса —

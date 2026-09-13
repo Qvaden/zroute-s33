@@ -1394,3 +1394,46 @@ export async function toggleProfileLike(userId) {
   write(s);
   return { liked: true };
 }
+
+/* ── Турниры ────────────────────────────────────────────────────────────── */
+
+export async function listTournaments() {
+  const s = read();
+  return (s.tournaments || []).map((t) => ({ ...t, createdAt: new Date(t.createdAt) }));
+}
+
+export async function createTournament(allyA, allyB, title = '') {
+  const s = read();
+  if (allyA === allyB) throw new Error('Нужны два разных альянса');
+  const t = {
+    id: newId('tr'),
+    title: String(title),
+    allyA,
+    allyB,
+    winsA: 0,
+    winsB: 0,
+    draws: 0,
+    status: 'active',
+    winner: null,
+    createdAt: new Date().toISOString(),
+  };
+  if (!s.tournaments) s.tournaments = [];
+  s.tournaments.push(t);
+  write(s);
+  return { ...t, createdAt: new Date(t.createdAt) };
+}
+
+export async function addTournamentRound(tournamentId, winnerId = null, notes = '') {
+  const s = read();
+  const t = (s.tournaments || []).find((x) => x.id === tournamentId);
+  if (!t) throw new Error('Турнир не найден');
+  if (t.status === 'finished') throw new Error('Турнир завершён');
+  if (winnerId === t.allyA) t.winsA += 1;
+  else if (winnerId === t.allyB) t.winsB += 1;
+  else t.draws += 1;
+  // Победа: разрыв больше, чем оставшихся раундов до ничьей 10 (потолок).
+  const remaining = Math.max(0, 10 - (t.winsA + t.winsB + t.draws));
+  if (t.winsA > t.winsB + remaining) { t.winner = t.allyA; t.status = 'finished'; }
+  else if (t.winsB > t.winsA + remaining) { t.winner = t.allyB; t.status = 'finished'; }
+  write(s);
+}

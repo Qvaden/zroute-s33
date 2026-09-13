@@ -201,6 +201,23 @@
  * @property {(id: string, reason?: string) => Promise<void>} [deleteEventComment]
  * @property {(endpoint: string, keys: Record<string,string>) => Promise<void>} [savePushSubscription]
  * @property {(endpoint: string) => Promise<void>} [removePushSubscription]
+ * @property {() => Promise<ForumTournament[]>} [listTournaments]
+ * @property {(allyA: string, allyB: string, title?: string) => Promise<ForumTournament>} [createTournament]
+ * @property {(tournamentId: string, winnerId: string|null, notes?: string) => Promise<void>} [addTournamentRound]
+ */
+
+/**
+ * @typedef {Object} ForumTournament
+ * @property {string} id
+ * @property {string} title
+ * @property {string} allyA
+ * @property {string} allyB
+ * @property {number} winsA
+ * @property {number} winsB
+ * @property {number} draws
+ * @property {'active'|'finished'} status
+ * @property {string|null} winner
+ * @property {Date} createdAt
  */
 
 /**

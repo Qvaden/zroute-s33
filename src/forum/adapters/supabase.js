@@ -1070,3 +1070,43 @@ export async function toggleProfileLike(userId) {
   await rest('/forum_profile_likes', { method: 'POST', body: { from_user: me, to_user: userId } });
   return { liked: true };
 }
+
+/* ── Турниры (VS-матчапы) ─────────────────────────────────────────────────── */
+
+function tournamentOut(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    allyA: row.ally_a,
+    allyB: row.ally_b,
+    winsA: Number(row.wins_a || 0),
+    winsB: Number(row.wins_b || 0),
+    draws: Number(row.draws || 0),
+    status: row.status || 'active',
+    winner: row.winner || null,
+    createdAt: toDate(row.created_at) ?? new Date(),
+  };
+}
+
+export async function listTournaments() {
+  const rows = await rest('/vs_tournaments?select=*&order=created_at.desc');
+  return (Array.isArray(rows) ? rows : []).map(tournamentOut);
+}
+
+export async function createTournament(allyA, allyB, title = '') {
+  if (allyA === allyB) throw new Error('Нужны два разных альянса');
+  const rows = await rest('/vs_tournaments', {
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { ally_a: allyA, ally_b: allyB, title: String(title) },
+  });
+  const created = Array.isArray(rows) ? rows[0] : rows;
+  return tournamentOut(created);
+}
+
+export async function addTournamentRound(tournamentId, winnerId = null, notes = '') {
+  await rest('/vs_tournament_rounds', {
+    method: 'POST',
+    body: { tournament_id: tournamentId, winner: winnerId, notes: String(notes) },
+  });
+}

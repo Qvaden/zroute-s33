@@ -1541,3 +1541,64 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-kv { gap: 7px; }
 .adm-chip { min-height: 32px; font-size: 12.5px; }
 }
+
+/* ── Турниры ─────────────────────────────────────────────────────────────── */
+
+.tour-page { padding: 18px; }
+.tour-gen { display: grid; gap: 8px; margin: 4px 0 18px; }
+.tour-gen__row { display: flex; align-items: center; gap: 8px; }
+.tour-gen select {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.tour-gen input {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.025);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.tour-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.tour-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+}
+.tour-card.is-finished { opacity: .8; }
+.tour-card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.tour-card__head b { font-size: 14px; }
+.tour-card__status { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.tour-score { display: flex; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+.tour-side { display: grid; justify-items: center; gap: 3px; min-width: 90px; }
+.tour-side b { font-family: Unbounded, sans-serif; font-size: 26px; line-height: 1; }
+.tour-side small { color: var(--dim); font-size: 11px; }
+.tour-side.is-win b { color: var(--win); }
+.tour-vs { font-size: 20px; font-weight: 700; color: var(--mute); }
+.tour-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--ava, var(--raised-2));
+  color: #10131a;
+  font-family: Unbounded, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+.tour-rounds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.forum-btn--sm { min-height: 32px; padding: 5px 10px; font-size: 12px; }
+@media (max-width: 759px) {
+  .tour-gen select, .tour-gen input { font-size: 16px; }
+  .tour-side { min-width: 64px; }
+}
