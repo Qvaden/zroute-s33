@@ -82,13 +82,6 @@ function initTheme() {
 }
 initTheme();
 
-/* ── Индикатор онлайн ────────────────────────────────────────────────── */
-function isOnline(lastSeen) {
-  if (!lastSeen) return false;
-  const d = lastSeen instanceof Date ? lastSeen : new Date(lastSeen);
-  return Date.now() - d.getTime() < 5 * 60 * 1000;
-}
-
 /* ── Таймер Кварта ───────────────────────────────────────────────────── */
 let quarterTimer = null;
 function startQuarterTimer() {
