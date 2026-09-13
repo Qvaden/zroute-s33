@@ -55,6 +55,10 @@ function profileFrom(row) {
     /* Сколько просмотров собрали все записи блога. Считает база в forum_profiles. */
     blogViews: Number(row.blog_views || 0),
     blogPostCount: Number(row.blog_post_count || 0),
+    /* Онлайн и репутация из форума. forum_profiles считает их сам. */
+    lastSeenAt: toDate(row.last_seen_at),
+    profileLikes: Number(row.profile_likes || 0),
+    iLiked: Boolean(row.i_liked),
   };
 }
 

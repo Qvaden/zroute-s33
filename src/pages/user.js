@@ -98,8 +98,8 @@ function renderCard(p, isMe, editing) {
           isMe
             ? `<button type="button" class="forum-btn forum-btn--ghost forum-profile__edit"
                        data-profile-edit>${editing ? 'Свернуть' : 'Изменить профиль'}</button>`
-            : `<button type="button" class="forum-btn forum-btn--ghost" data-profile-like data-user-id="${esc(p.id)}" title="Репутация">
-                 <span class="forum-like-icon">♡</span> <span class="forum-like-count">${p.profileLikes ?? 0}</span>
+            : `<button type="button" class="forum-btn forum-btn--ghost${p.iLiked ? ' is-liked' : ''}" data-profile-like data-user-id="${esc(p.id)}" title="Репутация">
+                 <span class="forum-like-icon">${p.iLiked ? '♥' : '♡'}</span> <span class="forum-like-count">${p.profileLikes ?? 0}</span>
                </button>`
         }
       </div>
