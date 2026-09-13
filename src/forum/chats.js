@@ -1229,15 +1229,6 @@ function wire() {
       }
       return;
     }
-        }
-        const keys = sub.keys || {};
-        await forum.savePushSubscription?.(sub.endpoint, keys);
-        notice('✅ Push-уведомления включены');
-      } catch (err) {
-        notice(String(err?.message ?? err));
-      }
-      return;
-    }
   });
 
   /* Выбор файлов через скрепку. */
