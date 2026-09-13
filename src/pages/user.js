@@ -15,6 +15,12 @@
 import { esc } from '../ui/helpers.js';
 import { excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { roleBadge, roleLabel } from '../forum/roles.js';
+
+function isOnline(lastSeen) {
+  if (!lastSeen) return false;
+  const d = lastSeen instanceof Date ? lastSeen : new Date(lastSeen);
+  return Date.now() - d.getTime() < 5 * 60 * 1000;
+}
 import { levelOf, progressOf, achievementsOf, doneCount } from '../forum/rank.js';
 
 /**
@@ -78,7 +84,7 @@ function renderCard(p, isMe, editing) {
         ${renderAvatar(p, 'lg')}
 
         <div class="forum-profile__ident">
-          <h1 class="forum-profile__nick">${esc(p.nick)}</h1>
+          <h1 class="forum-profile__nick">${esc(p.nick)}${isOnline(p.lastSeenAt) ? '<span class="online-dot" title="В сети"></span>' : ''}</h1>
           <div class="forum-profile__meta">
             ${roleBadge(p) || `<span class="forum-profile__role">${esc(roleLabel(p))}</span>`}
             ${p.isBlogger ? '<span class="forum-profile__role forum-profile__role--blogger" title="Ведёт свой блог">✍️ Блогер</span>' : ''}
@@ -92,7 +98,9 @@ function renderCard(p, isMe, editing) {
           isMe
             ? `<button type="button" class="forum-btn forum-btn--ghost forum-profile__edit"
                        data-profile-edit>${editing ? 'Свернуть' : 'Изменить профиль'}</button>`
-            : ''
+            : `<button type="button" class="forum-btn forum-btn--ghost" data-profile-like data-user-id="${esc(p.id)}" title="Репутация">
+                 <span class="forum-like-icon">♡</span> <span class="forum-like-count">${p.profileLikes ?? 0}</span>
+               </button>`
         }
       </div>
     </section>`;
@@ -233,6 +241,7 @@ function renderStats(p) {
     { value: p.postCount, label: pluralWord(p.postCount, 'пост', 'поста', 'постов') },
     { value: p.commentCount, label: pluralWord(p.commentCount, 'ответ', 'ответа', 'ответов') },
     { value: p.likesReceived, label: pluralWord(p.likesReceived, 'согласие', 'согласия', 'согласий') },
+    { value: p.profileLikes ?? 0, label: '♡ репутация' },
   ];
 
   return `

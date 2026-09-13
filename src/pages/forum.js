@@ -97,6 +97,8 @@ export function renderForum(view, state = {}) {
       <aside class="forum-side" aria-label="Сводка и правила">
         ${renderChronicleBand(view?.events ?? [])}
         ${renderWeekTheme(view)}
+        ${renderArticleOfWeek(s)}
+        ${renderServerActivity(view)}
         ${renderHotTopics(s)}
         ${renderLeaderboard(s)}
         ${renderRules()}
@@ -271,6 +273,66 @@ function renderWeekTheme(view) {
           ? `<p class="forum-theme__body">${esc(body.length > 240 ? `${body.slice(0, 237)}…` : body)}</p>`
           : ''
       }
+    </section>`;
+}
+
+/* ── Статья недели ───────────────────────────────────────────────────────── */
+
+/**
+ * «Статья недели» — пост с наибольшей активностью за последние 7 дней.
+ *
+ * Считается из уже загруженной ленты:heat = согласия + ответы. Взятое и
+ * удалённое не участвует. Нет ни одного поста с реакцией — блок не показываем,
+ * иначе в пустом форуме висела бы карточка-заглушка.
+ */
+function renderArticleOfWeek(s) {
+  if (!s.ready || s.loading) return '';
+  const weekAgo = Date.now() - 7 * 86400000;
+  const week = (s.posts || []).filter((p) =>
+    !p.deleted
+    && !p.pinned
+    && p.createdAt instanceof Date
+    && p.createdAt.getTime() >= weekAgo,
+  );
+  if (!week.length) return '';
+  const heat = (p) => Number(p.score || 0) + Number(p.commentCount || 0) + Number((p.reactions?.like) || 0);
+  const best = week.reduce((a, b) => (heat(b) > heat(a) ? b : a), week[0]);
+  if (heat(best) <= 0) return '';
+  return `
+    <section class="panel post-weekly" aria-label="Статья недели">
+      <span class="eyebrow">✨ Статья недели</span>
+      <h2 class="forum-post__title"><a href="#/forum/${esc(best.id)}">${esc(best.title)}</a></h2>
+      <div class="forum-post__by muted">
+        ${nickLink(best.authorNick)}
+        <time>${esc(timeAgo(best.createdAt))}</time>
+      </div>
+      <p class="forum-post__excerpt">${esc(excerpt(best.body, 160))}</p>
+      <a class="forum-btn forum-btn--ghost forum-btn--sm" href="#/forum/${esc(best.id)}">Читать</a>
+    </section>`;
+}
+
+/* ── Активность сервера ───────────────────────────────────────────────────── */
+
+/**
+ * Мини-дашборд «что происходит на сервере»: активные альянсы, всего событий,
+ * событий за неделю, тем на форуме. Считается из данных сайта, которые уже
+ * есть на странице, — отдельных запросов не делает.
+ */
+function renderServerActivity(view) {
+  const alliances = Array.isArray(view?.alliances) ? view.alliances : [];
+  const events = Array.isArray(view?.events) ? view.events : [];
+  if (!alliances.length && !events.length) return '';
+  const active = alliances.filter((a) => a?.active).length;
+  const weekAgo = Date.now() - 7 * 86400000;
+  const thisWeek = events.filter((e) => e?.date instanceof Date && e.date.getTime() >= weekAgo).length;
+  return `
+    <section class="panel server-stats" aria-label="Активность сервера">
+      <span class="eyebrow">Активность сервера</span>
+      <div class="server-stats__grid">
+        <div class="server-stat"><b class="num">${active}</b><span>${esc(plural(active, 'активный альянс', 'активных альянса', 'активных альянсов'))}</span></div>
+        <div class="server-stat"><b class="num">${thisWeek}</b><span>${esc(plural(thisWeek, 'событие', 'события', 'событий'))} за неделю</span></div>
+        <div class="server-stat"><b class="num">${events.length}</b><span>${esc(plural(events.length, 'запись', 'записи', 'записей'))} в летописи</span></div>
+      </div>
     </section>`;
 }
 

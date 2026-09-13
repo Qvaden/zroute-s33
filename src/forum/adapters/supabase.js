@@ -1054,3 +1054,19 @@ export async function removePushSubscription(endpoint) {
     method: 'DELETE',
   });
 }
+
+/* ── Лайки на профили (репутация) ──────────────────────────────────────── */
+
+export async function toggleProfileLike(userId) {
+  const me = currentUserId();
+  if (!me) throw new Error('Сначала войдите');
+  if (me === userId) throw new Error('Нельзя лайкнуть самого себя');
+  // Проверяем, есть ли уже лайк
+  const existing = await rest(`/forum_profile_likes?from_user=eq.${me}&to_user=eq.${encodeURIComponent(userId)}`);
+  if (Array.isArray(existing) && existing.length > 0) {
+    await rest(`/forum_profile_likes?id=eq.${existing[0].id}`, { method: 'DELETE' });
+    return { liked: false };
+  }
+  await rest('/forum_profile_likes', { method: 'POST', body: { from_user: me, to_user: userId } });
+  return { liked: true };
+}

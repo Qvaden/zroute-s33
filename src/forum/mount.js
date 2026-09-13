@@ -960,6 +960,21 @@ function wire() {
       paint();
       return;
     }
+    const likeBtn = t.closest('[data-profile-like]');
+    if (likeBtn && forum.toggleProfileLike) {
+      try {
+        const userId = likeBtn.dataset.userId;
+        const res = await forum.toggleProfileLike(userId);
+        const countEl = likeBtn.querySelector('.forum-like-count');
+        const iconEl = likeBtn.querySelector('.forum-like-icon');
+        if (countEl) countEl.textContent = Number(countEl.textContent) + (res.liked ? 1 : -1);
+        if (iconEl) iconEl.textContent = res.liked ? '♥' : '♡';
+        if (res.liked) { likeBtn.classList.add('is-liked'); } else { likeBtn.classList.remove('is-liked'); }
+      } catch (err) {
+        notice(String(err?.message ?? err));
+      }
+      return;
+    }
     if (t.closest('[data-profile-cancel]')) {
       profileState.editing = false;
       paint();

@@ -195,6 +195,7 @@
  * @property {(chatId: string) => Promise<void>} [setTyping]
  * @property {(otherUserNick: string) => Promise<string>} [createDM]  Возвращает id чата.
  * @property {() => Promise<{userId: string, nick: string, avatarUrl: string, allianceTag: string, messageCount: number}[]>} [chatLeaderboard]
+ * @property {(userId: string) => Promise<{liked: boolean}>} [toggleProfileLike]
  * @property {(eventId: string) => Promise<ForumEventComment[]>} [listEventComments]
  * @property {(eventId: string, body: string) => Promise<ForumEventComment>} [addEventComment]
  * @property {(id: string, reason?: string) => Promise<void>} [deleteEventComment]

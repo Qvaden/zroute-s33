@@ -9,7 +9,7 @@
   Сначала телефон: аудитория играет и заходит с телефона.
 */
 
-/* ── Токены ─────────────────────────────────────────────────────────────── */
+/* ── Токены: тёмная тема (по умолчанию) ─────────────────────────────────── */
 :root {
   --bg:        #0a0b0d;
   --surface:   #111318;
@@ -37,6 +37,162 @@
 
   --ease: cubic-bezier(.22,.68,.34,1);
 }
+
+/* ── Токены: светлая тема ──────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg:        #f5f5f2;
+  --surface:   #ffffff;
+  --raised:    #f0efe9;
+  --raised-2:  #e5e4de;
+  --line:      #cfcfc8;
+  --line-soft: #dbdbd5;
+
+  --text:      #1a1814;
+  --dim:       #5f5c57;
+  --mute:      #8a8782;
+
+  --accent:    #e85b1c;
+  --accent-dk: #c94814;
+  --gold:      #b58b00;
+  --win:       #1d8f1d;
+  --loss:      #d13030;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 28px -12px rgba(0,0,0,.12);
+}
+
+[data-theme="light"] .site-head {
+  background: linear-gradient(180deg, rgba(0,0,0,.04), transparent);
+  border-color: var(--line);
+}
+[data-theme="light"] body { background: var(--bg); color: var(--text); }
+[data-theme="light"] .site-foot { color: var(--mute); }
+[data-theme="light"] .hero--forum { background: none; box-shadow: none; }
+
+/* ── Переключатель темы ──────────────────────────────────────────────────── */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  font-size: 17px;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--line-soft); background: rgba(255,255,255,.04); }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+/* ── Онлайн индикатор ─────────────────────────────────────────────────── */
+.online-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--win);
+  box-shadow: 0 0 6px var(--win);
+  flex-shrink: 0;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.is-online .online-dot { display: inline-block; }
+.forum-nick .online-dot { margin-left: 3px; vertical-align: -1px; }
+
+/* ── Статистика сервера и турниры ──────────────────────────────────────── */
+.server-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+.server-stat {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  text-align: center;
+}
+.server-stat b { display: block; font-size: 17px; font-weight: 700; }
+.server-stat span { display: block; margin-top: 2px; color: var(--dim); font-size: 10.5px; }
+
+/* ── Генератор турниров ──────────────────────────────────────────────────── */
+.tourney-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+}
+.tourney-card b { font-size: 14px; }
+.tourney-card .num { font-size: 17px; }
+
+.vs-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  text-align: center;
+}
+.vs-grid .vs-label { font-size: 24px; font-weight: 800; color: var(--text); }
+.vs-grid .vs-score { font-size: 17px; color: var(--dim); }
+
+/* ── Countdown / Timer ────────────────────────────────────────────────── */
+.quart-timer {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  background: var(--raised);
+  font-size: 13px;
+}
+.quart-timer .num {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ── Статья недели ─────────────────────────────────────────────────────── */
+.post-weekly {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-dk);
+  border-radius: var(--r);
+  background: linear-gradient(135deg, var(--raised), var(--raised-2));
+}
+.post-weekly::before {
+  content: '✨';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 17px;
+}
+.post-weekly .forum-post__title { font-size: 15px; font-weight: 800; }
+.post-weekly .forum-post__by { font-size: 12px; }
+
+/* ── Гиды: markdown-секция ─────────────────────────────────────────────── */
+.guide-content {
+  line-height: 1.6;
+}
+.guide-content h2 { margin: 18px 0 8px; font-size: 16px; font-weight: 700; }
+.guide-content h3 { margin: 14px 0 6px; font-size: 14px; font-weight: 700; }
+.guide-content ul { padding-left: 18px; }
+.guide-content li { margin-bottom: 4px; }
 
 * { box-sizing: border-box; }
 ::selection { background: var(--accent); color: #0a0b0d; }

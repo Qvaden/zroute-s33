@@ -1105,3 +1105,371 @@ drop trigger if exists push_subscription_author on public.push_subscriptions;
 create trigger push_subscription_author
   before insert on public.push_subscriptions
   for each row execute function public.push_subscription_author();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- РАСШИРЕННЫЕ ФИЧИ: репутация, онлайн, push, генератор турниров
+-- Запускать ПОСЛЕ предыдущих блоков chats.sql. Повторный запуск безопасен.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ── 1. Репутация участников ─────────────────────────────────────────────
+
+-- Лайк на профиль: один пользователь — один лайк на один профиль.
+create table if not exists public.forum_user_likes (
+  from_user uuid not null references public.forum_users (id) on delete cascade,
+  to_user   uuid not null references public.forum_users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (from_user, to_user)
+);
+
+alter table public.forum_user_likes enable row level security;
+
+drop policy if exists forum_user_likes_read on public.forum_user_likes;
+create policy forum_user_likes_read on public.forum_user_likes
+  for select using (true);
+
+drop policy if exists forum_user_likes_insert on public.forum_user_likes;
+create policy forum_user_likes_insert on public.forum_user_likes
+  for insert with check (from_user = auth.uid() and from_user <> to_user);
+
+drop policy if exists forum_user_likes_delete on public.forum_user_likes;
+create policy forum_user_likes_delete on public.forum_user_likes
+  for delete using (from_user = auth.uid());
+
+grant select, insert, delete on public.forum_user_likes to authenticated;
+
+-- ── 2. Обновлённый view profiles: добавляем likes_received и online ─────
+
+create or replace view public.forum_profiles
+with (security_invoker = off) as
+select
+  u.id,
+  u.nick,
+  u.avatar_url,
+  u.about,
+  u.alliance_tag,
+  u.role,
+  u.is_blogger,
+  u.is_leader,
+  u.created_at,
+  (select count(*) from public.forum_posts p
+     where p.author_id = u.id and p.deleted = false) as post_count,
+  (select count(*) from public.forum_comments c
+     where c.author_id = u.id and c.deleted = false) as comment_count,
+  coalesce((
+    select count(*) from public.forum_reactions r
+    join public.forum_posts p on p.id = r.target_id
+     where r.target_type = 'post' and p.author_id = u.id and r.reaction = 'like'
+  ), 0) as likes_received,
+  -- Новые: лайки на профиль
+  coalesce((
+    select count(*) from public.forum_user_likes ul
+    where ul.to_user = u.id
+  ), 0) as profile_likes,
+  -- Новые: онлайн (последнее обновление)
+  u.last_seen_at,
+  coalesce((
+    select sum(p.views)
+    from public.forum_posts p
+    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+  ), 0) as blog_views,
+  coalesce((
+    select count(*)
+    from public.forum_posts p
+    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+  ), 0) as blog_post_count
+from public.forum_users u;
+
+grant select on public.forum_profiles to anon, authenticated;
+
+-- ── 3. last_seen_at на forum_users (для онлайн) ─────────────────────────
+
+alter table public.forum_users add column if not exists last_seen_at timestamptz;
+
+-- Триггер: при любом обновлении читать/писать в базе обновляем last_seen_at.
+-- Если триггер уже есть от forum_chat_members — пропускаем (IF NOT EXISTS).
+-- Делаем отдельный триггер на forum_users.
+create or replace function public.forum_user_seen()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  new.last_seen_at := now();
+  return new;
+end;
+$$;
+
+-- Обновляем last_seen_at при каждом изменении forum_users.
+-- Поскольку triggers не имеют IF NOT EXISTS — используем drop + create.
+drop trigger if exists forum_user_seen on public.forum_users;
+create trigger forum_user_seen
+  before update on public.forum_users
+  for each row execute function public.forum_user_seen();
+
+-- ── 4. Расширенный Web Push: триггер на новые посты форума ──────────────
+
+-- Триггер: новый пост → push всем subscribed (кроме автора).
+-- Триггер: новый комментарий → push автору поста (если subscribed).
+-- Вызывается Edge Function через Database Webhook.
+-- Webhook на forum_posts INSERT и forum_comments INSERT → send-push.
+-- В edge function проверяем record type и отправляем push.
+
+-- Добавляем в push_subscriptions флаг is_active для отключения без удаления.
+alter table public.push_subscriptions add column if not exists is_active boolean not null default true;
+
+-- Обновлённая view: только активные подписки для отправки.
+-- (Edge Function уже фильтрует по user_id, is_active проверим там.)
+-- Обновляем push-триггер для чатов: проверяем is_active = true.
+-- Поскольку chat_push_trigger уже создан, пересоздадим его.
+create or replace function public.chat_push_trigger()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_url text;
+  v_key text;
+begin
+  v_url := coalesce(
+    current_setting('app.settings.supabase_url', true),
+    'https://ebumybzkrhhyinpjpeuk.supabase.co'
+  );
+  v_key := current_setting('app.settings.supabase_anon_key', true);
+
+  perform net.http_post(
+    url    := v_url || '/functions/v1/send-push',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer ' || coalesce(v_key, '')
+    ),
+    body   := jsonb_build_object(
+      'record', jsonb_build_object(
+        'chat_id',     NEW.chat_id,
+        'author_id',   NEW.author_id,
+        'author_nick', NEW.author_nick,
+        'body',        NEW.body,
+        'source',      'chat'
+      )
+    )
+  );
+
+  return NEW;
+end;
+$$;
+
+-- ── 5. Активность сервера — view: посты/сообщения за день ───────────────
+
+create or replace view public.server_activity
+with (security_invoker = on) as
+select
+  date(created_at) as day,
+  count(*) filter (where author_id is not null) as new_posts,
+  count(*) as new_messages
+from public.forum_chat_messages
+where deleted = false
+group by date(created_at);
+
+grant select on public.server_activity to authenticated;
+
+-- ── 6. Личная статистика ────────────────────────────────────────────────
+
+-- View: статистика по каждому пользователю.
+create or replace view public.user_activity_stats
+with (security_invoker = on) as
+select
+  u.id as user_id,
+  u.nick,
+  coalesce(p.cnt, 0) as forum_posts,
+  coalesce(cm.cnt, 0) as forum_comments,
+  coalesce(ch.cnt, 0) as chat_messages,
+  coalesce(ch.chats_joined, 0) as chats_joined,
+  coalesce(ul.cnt, 0) as profile_likes
+from public.forum_users u
+left join (select author_id, count(*) cnt from public.forum_posts where deleted = false group by author_id) p on p.author_id = u.id
+left join (select author_id, count(*) cnt from public.forum_comments where deleted = false group by author_id) cm on cm.author_id = u.id
+left join (select author_id, count(*) cnt from public.forum_chat_messages where deleted = false group by author_id) ch on ch.author_id = u.id
+left join (select user_id, count(*) chats_joined from public.forum_chat_members group by user_id) cj on cj.user_id = u.id
+left join (select to_user, count(*) cnt from public.forum_user_likes group by to_user) ul on ul.to_user = u.id;
+
+grant select on public.user_activity_stats to authenticated;
+
+-- ── 7. Турниры (VS matchup tracker) ─────────────────────────────────────
+
+create table if not exists public.vs_tournaments (
+  id           uuid primary key default gen_random_uuid(),
+  title        text not null default '',
+  ally_a       uuid not null references public.site_alliances (id) on delete cascade,
+  ally_b       uuid not null references public.site_alliances (id) on delete cascade,
+  wins_a       int  not null default 0,
+  wins_b       int  not null default 0,
+  draws        int  not null default 0,
+  status       text not null default 'active' check (status in ('active', 'finished')),
+  winner       uuid references public.site_alliances (id) on delete set null,
+  created_by   uuid references public.forum_users (id) on delete set null,
+  created_at   timestamptz not null default now(),
+  finished_at  timestamptz
+);
+
+alter table public.vs_tournaments enable row level security;
+
+drop policy if exists vs_tournaments_read on public.vs_tournaments;
+create policy vs_tournaments_read on public.vs_tournaments
+  for select using (true);
+
+drop policy if exists vs_tournaments_insert on public.vs_tournaments;
+create policy vs_tournaments_insert on public.vs_tournaments
+  for insert with check (public.forum_is_leader() and public.forum_can_write());
+
+drop policy if exists vs_tournaments_update on public.vs_tournaments;
+create policy vs_tournaments_update on public.vs_tournaments
+  for update using (created_by = auth.uid() or public.forum_is_staff());
+
+grant select, insert, update on public.vs_tournaments to authenticated;
+
+-- Отдельные результаты раундов турнира.
+create table if not exists public.vs_tournament_rounds (
+  id            uuid primary key default gen_random_uuid(),
+  tournament_id uuid not null references public.vs_tournaments (id) on delete cascade,
+  round_number  int  not null default 1,
+  winner        uuid references public.site_alliances (id) on delete set null,
+  notes         text not null default '',
+  created_at    timestamptz not null default now()
+);
+
+alter table public.vs_tournament_rounds enable row level security;
+
+drop policy if exists vs_tournament_rounds_read on public.vs_tournament_rounds;
+create policy vs_tournament_rounds_read on public.vs_tournament_rounds
+  for select using (true);
+
+drop policy if exists vs_tournament_rounds_insert on public.vs_tournament_rounds;
+create policy vs_tournament_rounds_insert on public.vs_tournament_rounds
+  for insert with check (public.forum_is_leader() and public.forum_can_write());
+
+drop policy if exists vs_tournament_rounds_update on public.vs_tournament_rounds;
+create policy vs_tournament_rounds_update on public.vs_tournament_rounds
+  for update using (public.forum_is_leader() or public.forum_is_staff());
+
+grant select, insert, update on public.vs_tournament_rounds to authenticated;
+
+-- Триггер: после вставки раунда обновляем wins_a/wins_b/draws и winner в турнире.
+create or replace function public.vs_tournament_round_update()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_ally_a uuid;
+  v_ally_b uuid;
+  v_wins_a int;
+  v_wins_b int;
+  v_draws  int;
+  v_winner uuid;
+  v_count  int;
+begin
+  select ally_a, ally_b into v_ally_a, v_ally_b
+    from public.vs_tournaments where id = NEW.tournament_id;
+
+  select count(*) filter (where winner = v_ally_a),
+         count(*) filter (where winner = v_ally_b),
+         count(*) filter (where winner is null)
+  into v_wins_a, v_wins_b, v_draws
+  from public.vs_tournament_rounds
+  where tournament_id = NEW.tournament_id;
+
+  -- Если разница > 0 и больше невозможно догнать → победитель.
+  v_winner := null;
+  select count(*) into v_count from public.vs_tournament_rounds where tournament_id = NEW.tournament_id;
+  if v_wins_a > v_wins_b + (v_count - v_wins_a - v_wins_b - v_draws) then
+    v_winner := v_ally_a;
+  elsif v_wins_b > v_wins_a + (v_count - v_wins_a - v_wins_b - v_draws) then
+    v_winner := v_ally_b;
+  end if;
+
+  update public.vs_tournaments
+  set wins_a = v_wins_a,
+      wins_b = v_wins_b,
+      draws  = v_draws,
+      winner = v_winner,
+      status = case when v_winner is not null then 'finished' else status end,
+      finished_at = case when v_winner is not null then now() else finished_at end
+  where id = NEW.tournament_id;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists vs_tournament_round_update on public.vs_tournament_rounds;
+create trigger vs_tournament_round_update
+  after insert on public.vs_tournament_rounds
+  for each row execute function public.vs_tournament_round_update();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- РАСШИРЕННЫЕ ФИЧИ 2: лайки на профили, онлайн, статья недели
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ── Лайки на профили (репутация) ────────────────────────────────────────
+
+create table if not exists public.forum_profile_likes (
+  id         uuid primary key default gen_random_uuid(),
+  from_user  uuid not null references public.forum_users (id) on delete cascade,
+  to_user    uuid not null references public.forum_users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (from_user, to_user)
+);
+
+alter table public.forum_profile_likes enable row level security;
+
+drop policy if exists forum_profile_likes_read on public.forum_profile_likes;
+create policy forum_profile_likes_read on public.forum_profile_likes
+  for select using (true);
+
+drop policy if exists forum_profile_likes_insert on public.forum_profile_likes;
+create policy forum_profile_likes_insert on public.forum_profile_likes
+  for insert with check (from_user = auth.uid() and from_user <> to_user);
+
+drop policy if exists forum_profile_likes_delete on public.forum_profile_likes;
+create policy forum_profile_likes_delete on public.forum_profile_likes
+  for delete using (from_user = auth.uid());
+
+grant select, insert, delete on public.forum_profile_likes to authenticated;
+
+-- ── Обновлённый view forum_profiles с лайками и онлайном ──────────────────
+
+drop view if exists public.forum_profiles;
+create view public.forum_profiles
+with (security_invoker = off) as
+select
+  u.id,
+  u.nick,
+  u.avatar_url,
+  u.about,
+  u.alliance_tag,
+  u.role,
+  u.is_blogger,
+  u.created_at,
+  u.last_seen_at,
+  (select count(*) from public.forum_posts p
+     where p.author_id = u.id and p.deleted = false) as post_count,
+  (select count(*) from public.forum_comments c
+     where c.author_id = u.id and c.deleted = false) as comment_count,
+  coalesce((
+    select count(*) from public.forum_reactions r
+    join public.forum_posts p on p.id = r.target_id
+     where r.target_type = 'post' and p.author_id = u.id and r.reaction = 'like'
+  ), 0) as likes_received,
+  coalesce((select count(*) from public.forum_profile_likes fl
+            where fl.to_user = u.id), 0) as profile_likes,
+  coalesce((select 1 from public.forum_profile_likes fl
+            where fl.to_user = u.id and fl.from_user = auth.uid() limit 1), 0) as i_liked,
+  coalesce((
+    select sum(p.views)
+    from public.forum_posts p
+    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+  ), 0) as blog_views,
+  coalesce((
+    select count(*)
+    from public.forum_posts p
+    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+  ), 0) as blog_post_count,
+  u.is_leader
+from public.forum_users u;
+
+grant select on public.forum_profiles to anon, authenticated;

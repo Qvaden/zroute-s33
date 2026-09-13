@@ -69,6 +69,48 @@ const sideVeil = document.getElementById('side-veil');
 const isFirstVisit = !document.documentElement.classList.contains('s33-loader-seen');
 const bootStartedAt = performance.now();
 
+/* ── Тема (светлая / тёмная) ──────────────────────────────────────────── */
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('s33-theme', theme); } catch (_) {}
+}
+function initTheme() {
+  try {
+    const saved = localStorage.getItem('s33-theme');
+    if (saved) applyTheme(saved);
+  } catch (_) {}
+}
+initTheme();
+
+/* ── Индикатор онлайн ────────────────────────────────────────────────── */
+function isOnline(lastSeen) {
+  if (!lastSeen) return false;
+  const d = lastSeen instanceof Date ? lastSeen : new Date(lastSeen);
+  return Date.now() - d.getTime() < 5 * 60 * 1000;
+}
+
+/* ── Таймер Кварта ───────────────────────────────────────────────────── */
+let quarterTimer = null;
+function startQuarterTimer() {
+  if (quarterTimer) { clearInterval(quarterTimer); quarterTimer = null; }
+  const el = document.querySelector('[data-quarter-end]');
+  if (!el) return;
+  const endMs = Number(el.dataset.quarterEnd);
+  if (!endMs || isNaN(endMs)) return;
+  const num = el.querySelector('.quart-countdown-num');
+  if (!num) return;
+  function update() {
+    const ms = Math.max(0, endMs - Date.now());
+    const days = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    num.textContent = `${days}д ${hours}ч ${mins}м`;
+    if (ms === 0 && quarterTimer) { clearInterval(quarterTimer); quarterTimer = null; }
+  }
+  update();
+  quarterTimer = setInterval(update, 30000);
+}
+
 function finishBootLoader() {
   if (!bootLoader || !isFirstVisit) return;
   const wait = Math.max(0, 180 - (performance.now() - bootStartedAt));
@@ -181,6 +223,13 @@ document.addEventListener('keydown', (e) => {
 */
 window.matchMedia('(min-width: 1040px)').addEventListener('change', (e) => {
   if (e.matches) setSideOpen(false);
+});
+
+/* ── Переключатель темы ─────────────────────────────────────────────── */
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  applyTheme(next);
 });
 
 function renderPresidentBoard(texts = []) {
@@ -345,6 +394,8 @@ function render() {
       for (const fn of [window.__ladderApply, window.__timelineApply]) {
         if (typeof fn === 'function') fn();
       }
+      // Запуск таймера Кварта, если открыта страница Кварта.
+      if (route.id === 'quarter') startQuarterTimer();
       path = `/${route.id}`;
     }
   }

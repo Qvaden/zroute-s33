@@ -1376,3 +1376,21 @@ export async function deleteEventComment(id, reason = '') {
 
 export async function savePushSubscription() {}
 export async function removePushSubscription() {}
+
+/* ── Лайки на профили ─────────────────────────────────────────────────── */
+
+export async function toggleProfileLike(userId) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (me.id === userId) throw new Error('Нельзя лайкнуть самого себя');
+  if (!s.profileLikes) s.profileLikes = [];
+  const idx = s.profileLikes.findIndex((l) => l.from === me.id && l.to === userId);
+  if (idx >= 0) {
+    s.profileLikes.splice(idx, 1);
+    write(s);
+    return { liked: false };
+  }
+  s.profileLikes.push({ from: me.id, to: userId, createdAt: new Date().toISOString() });
+  write(s);
+  return { liked: true };
+}

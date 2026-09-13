@@ -63,7 +63,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         </div>
         <div class="quart-hero__bottom">
           <span><b>${progress}</b> из 4 недель периода</span>
-          ${daysLeft != null ? `<span class="quart-hero__countdown">До конца Кварта: <b>${daysLeft}</b> ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
+          ${daysLeft != null ? `<span class="quart-hero__countdown" data-quarter-end="${endDate ? endDate.getTime() : ''}">До конца Кварта: <span class="quart-countdown-num">${daysLeft}</span> ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
           <span class="quart-hero__legend"><i class="quart-led quart-led--on"></i><i class="quart-led"></i><i class="quart-led"></i><i class="quart-led"></i></span>
         </div>
       </header>
