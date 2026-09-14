@@ -46,34 +46,36 @@
 }
 
 /* ── Токены: светлая тема ──────────────────────────────────────────────── */
-/* Тёплая «бумажная» палитра: крем вместо чистого белого, чернильный текст
-   вместо чёрного, приглушённый терракот вместо яркого оранжевого. */
+/* «Стальной рассвет»: прохладная сланцевая дымка вместо крема, графитовые
+   чернила вместо тёплой сепии и приглушённая медь вместо терракота.
+   Медь — семейная черта бренда: тот же тёплый акцент, что и сигнальный
+   оранжевый тёмной темы, но без яркости, режущей глаз на светлом. */
 [data-theme="light"] {
-  --bg:        #ece9e1;
-  --surface:   #f7f4ec;
-  --raised:    #efebe2;
-  --raised-2:  #e6e1d5;
-  --line:      #d4cec0;
-  --line-soft: #dfd9cc;
+  --bg:        #e2e5e9;
+  --surface:   #f0f2f5;
+  --raised:    #eaecef;
+  --raised-2:  #e3e6ea;
+  --line:      #c9ced4;
+  --line-soft: #d5dae0;
 
-  --text:      #2b2822;
-  --dim:       #6b6457;
-  --mute:      #948d7e;
+  --text:      #2c3038;
+  --dim:       #5d646e;
+  --mute:      #8f959e;
 
-  --accent:    #c05a24;
-  --accent-dk: #9f4a1c;
-  --gold:      #977912;
-  --win:       #2f7d37;
-  --loss:      #b23a3a;
+  --accent:    #b06a45;
+  --accent-dk: #8e5232;
+  --gold:      #8a7318;
+  --win:       #2f7a52;
+  --loss:      #b24850;
 
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 32px -14px rgba(80,60,35,.18);
+  --shadow: 0 1px 2px rgba(22,32,44,.07), 0 10px 32px -14px rgba(22,32,44,.2);
 
-  /* Тот же смысл, что в тёмной, но читаемо на белом: пастель темнеет. */
+  /* Тот же смысл, что в тёмной, но читаемо на светлом: пастель темнеет. */
   color-scheme: light;
-  --link:      #33639c;
-  --soft-ok:   #2f7d37;
-  --soft-bad:  #b23a3a;
-  --soft-warn: #8a6a12;
+  --link:      #35618e;
+  --soft-ok:   #2f7a52;
+  --soft-bad:  #b24850;
+  --soft-warn: #8a7318;
 }
 
 [data-theme="light"] .site-foot { color: var(--mute); }
@@ -1583,7 +1585,7 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 
 /* ── WOW redesign: тактический командный центр Server 33 ────────────────── */
 :root { --electric: #a7a3c2; --violet: #9c7cff; --hud-line: color-mix(in srgb, var(--electric) 20%, transparent); }
-:root[data-theme="light"] { --electric: #6d6962; --violet: #7a5d78; --hud-line: color-mix(in srgb, var(--electric) 30%, transparent); }
+:root[data-theme="light"] { --electric: #64707e; --violet: #6e6887; --hud-line: color-mix(in srgb, var(--electric) 30%, transparent); }
 body {
   background:
     radial-gradient(900px 600px at 50% -18%, rgba(255,106,43,.12), transparent 62%),
