@@ -1267,13 +1267,13 @@ grant select on public.user_activity_stats to authenticated;
 create table if not exists public.vs_tournaments (
   id           uuid primary key default gen_random_uuid(),
   title        text not null default '',
-  ally_a       uuid not null references public.site_alliances (id) on delete cascade,
-  ally_b       uuid not null references public.site_alliances (id) on delete cascade,
+  ally_a       text not null references public.site_alliances (id) on delete cascade,
+  ally_b       text not null references public.site_alliances (id) on delete cascade,
   wins_a       int  not null default 0,
   wins_b       int  not null default 0,
   draws        int  not null default 0,
   status       text not null default 'active' check (status in ('active', 'finished')),
-  winner       uuid references public.site_alliances (id) on delete set null,
+  winner       text references public.site_alliances (id) on delete set null,
   created_by   uuid references public.forum_users (id) on delete set null,
   created_at   timestamptz not null default now(),
   finished_at  timestamptz
@@ -1300,7 +1300,7 @@ create table if not exists public.vs_tournament_rounds (
   id            uuid primary key default gen_random_uuid(),
   tournament_id uuid not null references public.vs_tournaments (id) on delete cascade,
   round_number  int  not null default 1,
-  winner        uuid references public.site_alliances (id) on delete set null,
+  winner        text references public.site_alliances (id) on delete set null,
   notes         text not null default '',
   created_at    timestamptz not null default now()
 );
@@ -1327,12 +1327,12 @@ returns trigger
 language plpgsql security definer set search_path = public
 as $$
 declare
-  v_ally_a uuid;
-  v_ally_b uuid;
+  v_ally_a text;
+  v_ally_b text;
   v_wins_a int;
   v_wins_b int;
   v_draws  int;
-  v_winner uuid;
+  v_winner text;
   v_count  int;
 begin
   select ally_a, ally_b into v_ally_a, v_ally_b
