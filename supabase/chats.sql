@@ -1251,7 +1251,7 @@ select
   coalesce(p.cnt, 0) as forum_posts,
   coalesce(cm.cnt, 0) as forum_comments,
   coalesce(ch.cnt, 0) as chat_messages,
-  coalesce(ch.chats_joined, 0) as chats_joined,
+  coalesce(cj.chats_joined, 0) as chats_joined,
   coalesce(ul.cnt, 0) as profile_likes
 from public.forum_users u
 left join (select author_id, count(*) cnt from public.forum_posts where deleted = false group by author_id) p on p.author_id = u.id
