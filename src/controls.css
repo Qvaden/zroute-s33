@@ -47,7 +47,7 @@
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.025);
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font-family: inherit;
   /*
@@ -73,7 +73,7 @@
 .forum-field select:hover,
 .adm-field input:hover,
 .adm-field textarea:hover,
-.adm-field select:hover { border-color: rgba(255, 255, 255, 0.2); }
+.adm-field select:hover { border-color: color-mix(in srgb, var(--text) 20%, transparent); }
 
 .forum-field input:focus,
 .forum-field textarea:focus,
@@ -84,7 +84,7 @@
 .adm-field select:focus {
   outline: none;
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.14);
 }
 
@@ -99,7 +99,7 @@
 .adm-field select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  background: rgba(255, 255, 255, 0.012);
+  background: color-mix(in srgb, var(--text) 1.2%, transparent);
 }
 
 .forum-field textarea,

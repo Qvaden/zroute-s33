@@ -201,6 +201,6 @@
     и подсветка отвечает на вопрос «в какой я сейчас», когда курсор ушёл
     к кнопке отметки.
   */
-  .adm-cell:hover { border-color: rgba(255,255,255,.18); }
-  .adm-ally:hover { background: rgba(255,255,255,.02); }
+  .adm-cell:hover { border-color: color-mix(in srgb, var(--text) 18%, transparent); }
+  .adm-ally:hover { background: color-mix(in srgb, var(--text) 2%, transparent); }
 }

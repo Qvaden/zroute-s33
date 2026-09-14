@@ -25,6 +25,7 @@ import { renderUserPage } from '../pages/user.js';
 import { validateNick, validatePassword, validatePost, validateComment, deletionReason } from './rules.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
+import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { esc } from '../ui/helpers.js';
 import { leaderboardOf } from './leaderboard.js';
 import { CONFIG } from '../../config.js';
@@ -326,11 +327,6 @@ function appendPollOption(container) {
     <input type="text" name="poll_option_${idx}" maxlength="120" placeholder="Вариант ответа">`;
   container.appendChild(label);
   return label;
-}
-
-/** Редактор пуст, когда в нём не осталось видимого текста. */
-function syncEditorEmpty(editor) {
-  editor.classList.toggle('is-empty', textOf(editor.innerHTML).length === 0);
 }
 
 /** Текст формы: HTML из редактора, если он есть, иначе значение поля. */
@@ -709,90 +705,7 @@ function clearAllShots() {
   for (const scope of [...pendingShots.keys()]) clearShots(scope);
 }
 
-/*
- * ФОРМАТИРОВАНИЕ РЕДАКТОРА.
- *
- * Кнопки панели дергают document.execCommand — стандартный механизм жирного
- * курсива и цветов в contenteditable. Он же возвращает состояние: кнопка
- * «Жирный» держится нажатой, пока курсор внутри жирного текста. Это и есть
- * «сразу видно»: здесь нет маркеров, которые надо ждать, пока отрисуются.
- */
-
-/** Редактор, в котором сейчас курсор. */
-function activeEditor() {
-  const a = document.activeElement;
-  return a && a.matches?.('[contenteditable]') ? a : null;
-}
-
-/** Редактор той формы, где стоит кнопка. */
-function editorFor(btn) {
-  return btn.closest('form')?.querySelector('[data-editor]') ?? null;
-}
-
-/**
- * Применить команду форматирования.
- *
- * Сначала фокус в редактируемый блок: без него браузер применит команду
- * неизвестно куда или не применит совсем. Кнопки панели не забирают фокус
- * (mousedown на них гасится), поэтому выделение к моменту клика на месте.
- *
- * @param {HTMLElement} editor
- * @param {string} cmd имя команды без 'execCommand'
- * @param {string} [value]
- */
-function applyFormat(editor, cmd, value) {
-  if (!editor || typeof document.execCommand !== 'function') return;
-  editor.focus({ preventScroll: true });
-
-  if (cmd === 'color') {
-    // Сброс через 'inherit': санитайзер такую обёртку выбросит на сохранении.
-    document.execCommand('foreColor', false, value || 'inherit');
-    return;
-  }
-  if (cmd === 'code') {
-    wrapInline(editor, 'code');
-    return;
-  }
-  if (cmd === 'formatBlock') {
-    // Некоторые браузеры принимают тег только в угловых скобках.
-    const name = value || 'h3';
-    document.execCommand('formatBlock', false, name.startsWith('<') ? name : `<${name}>`);
-    return;
-  }
-  document.execCommand(cmd, false, null);
-}
-
-/**
- * Обернуть выделение в инлайн-тег (code), а если выделения нет — вставить
- * образец и поставить курсор внутрь. Текст подставляется текстовым узлом:
- * символы '<' из выделения не могут стать разметкой.
- */
-function wrapInline(editor, tag) {
-  const sel = window.getSelection?.();
-  if (!sel || sel.rangeCount === 0 || !sel.anchorNode || !editor.contains(sel.anchorNode)) {
-    if (typeof document.execCommand === 'function') {
-      document.execCommand('insertHTML', false, textSample(tag));
-    }
-    return;
-  }
-
-  const range = sel.getRangeAt(0);
-  const text = range.toString() || 'текст';
-  range.deleteContents();
-
-  const node = range.startContainer.ownerDocument.createElement(tag);
-  node.textContent = text;
-  range.insertNode(node);
-
-  range.setStartAfter(node);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-function textSample(tag) {
-  return `<${tag}>текст</${tag}>`;
-}
+/* Форматирование редактора — в editor.js: тот же механизм нужен и гайдам. */
 
 /**
  * Загрузить выбранные картинки к уже созданной записи.
@@ -1298,12 +1211,6 @@ function wire() {
   document.addEventListener('input', (e) => {
     if (!host || !host.contains(e.target)) return;
 
-    const editor = e.target.closest?.('[data-editor]');
-    if (editor) {
-      syncEditorEmpty(editor);
-      return;
-    }
-
     const search = e.target.closest('[data-forum-search]');
     if (!search) return;
 
@@ -1315,68 +1222,7 @@ function wire() {
     }, 300);
   });
 
-  /*
-    Лимит редактора держим сами: у contenteditable нет maxlength. Печатать
-    дальше предела не даём (beforeinput успевает перехватить), а вставка
-    идёт только текстом без формата — иначе человек случайно притащит
-    в пост чужую вёрстку с картинками.
-  */
-  document.addEventListener('beforeinput', (e) => {
-    if (!host || !host.contains(e.target)) return;
-    const editor = e.target.closest?.('[data-editor]');
-    if (!editor || (e.inputType !== 'insertText' && e.inputType !== 'insertCompositionText')) return;
-
-    const limit = Number(editor.dataset.limit);
-    if (!limit) return;
-    const extra = (e.data ?? '').length;
-    if (!extra) return;
-    if (textOf(editor.innerHTML).length + extra > limit) e.preventDefault();
-  });
-
-  document.addEventListener('paste', (e) => {
-    const editor = e.target.closest?.('[data-editor]');
-    if (!editor || !host?.contains(editor) || !e.clipboardData) return;
-    e.preventDefault();
-
-    const text = e.clipboardData.getData('text/plain') ?? '';
-    if (!text) return;
-
-    const limit = Number(editor.dataset.limit) || Infinity;
-    const room = Math.max(0, limit - textOf(editor.innerHTML).length);
-    const part = room ? text.slice(0, room) : '';
-    if (part && typeof document.execCommand === 'function') {
-      document.execCommand('insertText', false, part);
-    }
-    syncEditorEmpty(editor);
-  });
-
-  /*
-    Кнопки панели не должны забирать фокус из редактора: иначе выделение
-    исчезнет и команда применится впустую. focus() на самом element, но
-    предупреждённого mousedown этого шага не требует — selection просто
-    остаётся на месте.
-  */
-  document.addEventListener('mousedown', (e) => {
-    if (!host || !host.contains(e.target)) return;
-    if (e.target.closest?.('[data-editor-cmd], [data-editor-color]')) e.preventDefault();
-  });
-
-  /*
-    Кнопки «Жирный» и прочие держатся нажатыми, пока стиль действует: человек
-    видит состояние без переключения.
-  */
-  document.addEventListener('selectionchange', () => {
-    if (!host || typeof document.queryCommandState !== 'function') return;
-    const editor = activeEditor();
-    if (!editor || !host.contains(editor)) return;
-    for (const btn of host.querySelectorAll('[data-editor-cmd]')) {
-      if (!host.contains(btn)) continue;
-      if (!['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript'].includes(btn.dataset.editorCmd)) continue;
-      let state2 = false;
-      try { state2 = document.queryCommandState(btn.dataset.editorCmd); } catch { /* старый браузер */ }
-      btn.setAttribute('aria-pressed', state2 ? 'true' : 'false');
-    }
-  });
+  wireRichEditor(() => host);
 
   document.addEventListener('change', async (e) => {
     if (!host || !host.contains(e.target)) return;

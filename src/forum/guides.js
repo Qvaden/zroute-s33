@@ -6,6 +6,8 @@
  */
 import { forum } from './index.js';
 import { renderGuides } from '../pages/guides.js';
+import { sanitizeHtml, textOf } from './format.js';
+import { editorFor, applyFormat, wireRichEditor } from './editor.js';
 
 const state = {
   me: null,
@@ -53,9 +55,25 @@ function wire() {
   if (wired) return;
   wired = true;
 
+  wireRichEditor(() => host);
+
   document.addEventListener('click', async (e) => {
     if (!host || !host.contains(e.target)) return;
     const t = e.target;
+
+    /* Панель форматирования гайда — тот же механизм, что у форума. */
+    const cmdBtn = t.closest('[data-editor-cmd]');
+    if (cmdBtn) {
+      const editor = editorFor(cmdBtn);
+      if (editor) applyFormat(editor, cmdBtn.dataset.editorCmd, cmdBtn.dataset.editorValue);
+      return;
+    }
+    const colorBtn = t.closest('[data-editor-color]');
+    if (colorBtn) {
+      const editor = editorFor(colorBtn);
+      if (editor) applyFormat(editor, 'color', colorBtn.dataset.editorColor || 'inherit');
+      return;
+    }
 
     const chip = t.closest('[data-guide-cat]');
     if (chip) {
@@ -107,6 +125,17 @@ function wire() {
       if (err) { err.textContent = 'Заголовок слишком короткий'; err.hidden = false; }
       return;
     }
+    /*
+      Тело — HTML из редактора, как в форуме: на хранение уходит разметка,
+      а показывает её postBody через тот же белый список. Пустой редактор
+      браузер оставляет с служебными тегами, поэтому проверяем видимый текст.
+    */
+    const editor = form.querySelector('[data-editor]');
+    const body = sanitizeHtml(editor?.innerHTML ?? '');
+    if (textOf(body).length < 10) {
+      if (err) { err.textContent = 'Текст гайда слишком короткий'; err.hidden = false; }
+      return;
+    }
     const btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
     try {
@@ -114,7 +143,7 @@ function wire() {
         slug,
         title,
         category: String(form.elements.category?.value ?? 'strategy'),
-        body: form.elements.body.value,
+        body,
       });
       state.composing = false;
       state.guides = await forum.listGuides();

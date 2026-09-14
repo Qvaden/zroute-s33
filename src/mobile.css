@@ -217,7 +217,7 @@ html {
     остаётся подсвеченной, и человек думает, что она выбрана.
   */
   .lad__row:hover { background: none; border-left-color: transparent; }
-  .lad__row:active { background: rgba(255,255,255,.05); }
+  .lad__row:active { background: color-mix(in srgb, var(--text) 5%, transparent); }
 }
 
 /* ── Хронология: месяцы-папки и компактные записи ─────────────────────────── */
@@ -391,7 +391,7 @@ html {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255,255,255,.02);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
   text-align: center;
 }
 .forum-profile__stat b {
@@ -672,8 +672,8 @@ html {
       Строке справочного назначения движение не нужно вовсе.
     */
     animation: none;
-    box-shadow: inset 0 1px rgba(255,255,255,.06);
-    background: linear-gradient(110deg, rgba(167,163,194,.1), rgba(255,255,255,.03));
+    box-shadow: inset 0 1px color-mix(in srgb, var(--text) 6%, transparent);
+    background: linear-gradient(110deg, rgba(167,163,194,.1), color-mix(in srgb, var(--text) 3%, transparent));
   }
   .president-board::before,
   .president-board::after { display: none; }
@@ -906,7 +906,7 @@ html {
 .role-badge--owner {
   border-color: rgba(255,201,60,.4);
   background: linear-gradient(135deg, rgba(255,201,60,.16), rgba(255,201,60,.06));
-  box-shadow: 0 0 9px -5px rgba(255,201,60,.5), inset 0 1px rgba(255,255,255,.08);
+  box-shadow: 0 0 9px -5px rgba(255,201,60,.5), inset 0 1px color-mix(in srgb, var(--text) 8%, transparent);
 }
 .role-badge--owner i { filter: drop-shadow(0 0 3px rgba(255,201,60,.45)); }
 
@@ -1119,7 +1119,7 @@ html {
   -webkit-tap-highlight-color: transparent;
   transition: border-color .16s var(--ease), background .16s var(--ease);
 }
-.pick__btn:hover { border-color: rgba(255,255,255,.24); }
+.pick__btn:hover { border-color: color-mix(in srgb, var(--text) 24%, transparent); }
 .pick__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pick.is-open .pick__btn {
   border-color: color-mix(in srgb, var(--accent) 60%, transparent);
@@ -1213,7 +1213,7 @@ html {
   -webkit-tap-highlight-color: transparent;
   transition: color .15s var(--ease), background .15s var(--ease);
 }
-.pick__opt:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.pick__opt:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4%, transparent); }
 .pick__opt[aria-selected="true"] {
   color: #14100c;
   background: linear-gradient(135deg, #ff9a4a, var(--accent));

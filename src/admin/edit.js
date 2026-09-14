@@ -231,6 +231,52 @@ export function nextEventId(raw, list) {
 }
 
 /**
+ * Следующая неделя — по календарю, а не с клавиатуры.
+ *
+ * Раньше недели заводились руками в базе, и сезон в какой-то момент
+ * заканчивался: вносить результаты было некуда, а как заводить новые —
+ * помнил только тот, кто придумывал нумерацию. Правила здесь ровно те же,
+ * по которым недели заводили в первый раз: понедельник — воскресенье,
+ * номер продолжается, id — «W» + номер.
+ *
+ * Если недель нет вовсе, отсчёт от понедельника текущей недели (UTC):
+ * первый клик заводит неделю, которая идёт прямо сейчас.
+ *
+ * @param {any} raw Сырой набор данных (сырые недели).
+ * @returns {{id: string, number: number, startDate: string, endDate: string, note: null}}
+ */
+export function nextWeek(raw) {
+  const DAY = 86400000;
+  const weeks = (raw?.weeks ?? []).filter((w) => w && w.id != null);
+
+  let start;
+  let number;
+  if (weeks.length) {
+    const last = weeks.reduce((a, b) => (new Date(a.endDate) >= new Date(b.endDate) ? a : b));
+    start = new Date(new Date(String(last.endDate)).getTime() + DAY);
+    number = weeks.reduce((m, w) => Math.max(m, Number(w.number) || 0), 0) + 1;
+  } else {
+    const now = new Date();
+    const sinceMonday = (now.getUTCDay() + 6) % 7;
+    start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - sinceMonday));
+    number = 1;
+  }
+
+  // Номер внутри года может повториться через високосные 53-и — id не должен.
+  const taken = new Set(weeks.map((w) => String(w.id)));
+  while (taken.has(`W${number}`)) number += 1;
+
+  const end = new Date(start.getTime() + 6 * DAY);
+  return {
+    id: `W${number}`,
+    number,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+    note: null,
+  };
+}
+
+/**
  * Человеческие проверки до публикации.
  *
  * Валидатор сайта поймает пустой заголовок и битую дату и сам, но скажет это

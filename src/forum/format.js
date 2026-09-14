@@ -19,19 +19,21 @@
  * их как обычный текст, а пустые строки снова превращаются в абзацы.
  */
 import { esc } from '../ui/helpers.js';
-import { sanitizeHtml, textOf, linkify } from './sanitize.js';
+import { sanitizeHtml, textOf, linkify, decodeEntities } from './sanitize.js';
 
 export { textOf, sanitizeHtml };
 
 /**
  * Абзацы из плоского текста (старые записи): пустая строка — новый абзац,
- * одиночный перенос — <br>.
+ * одиночный перенос — <br>. Сущности сначала декодируются: редактор
+ * оставляет в тексте &nbsp;, а esc вернул бы из них «&amp;nbsp;» — буквы
+ * были бы видны читателю.
  * @param {string} text
  */
 function paragraphs(text) {
   return text
     .split(/\n{2,}/)
-    .map((para) => `<p>${esc(para).replace(/\n/g, '<br>')}</p>`)
+    .map((para) => `<p>${esc(decodeEntities(para)).replace(/\n/g, '<br>')}</p>`)
     .join('');
 }
 

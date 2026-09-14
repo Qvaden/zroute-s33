@@ -703,7 +703,7 @@ const MD_COLORS = [
   '#6fa8ff', '#b78cff', '#9aa4b2', '#ffffff',
 ];
 
-function renderMdBar() {
+export function renderMdBar() {
   const line = (list) =>
     list
       .map(

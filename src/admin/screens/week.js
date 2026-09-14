@@ -1,5 +1,5 @@
 import { esc, fmtDate, plural } from '../../ui/helpers.js';
-import { diffMarks, countMarks, marksFromRaw } from '../edit.js';
+import { diffMarks, countMarks, marksFromRaw, nextWeek } from '../edit.js';
 import { byWeekStartDesc, findCurrentWeek } from '../../data/week-order.js';
 
 /**
@@ -29,7 +29,11 @@ export function renderWeek(view, param) {
 
   if (!weeks.length) {
     return `<section class="panel"><h2>Недели не заведены</h2>
-      <p class="muted">Пока в данных нет ни одной недели, вносить результаты некуда.</p></section>`;
+      <p class="muted">Пока в данных нет ни одной недели, вносить результаты некуда.</p>
+      ${canPush ? `
+        <p><button type="button" class="adm-btn adm-btn--primary" data-week-add>＋ Завести первую неделю</button></p>
+        <div class="adm-result" data-publish-result hidden></div>` : ''}
+      </section>`;
   }
 
   /*
@@ -88,7 +92,13 @@ export function renderWeek(view, param) {
         <span class="adm-dot">·</span>
         ${plural(wins, 'победа', 'победы', 'побед')}, ${plural(losses, 'поражение', 'поражения', 'поражений')}
       </p>
-      <div class="adm-weeks">${picker}</div>
+      <div class="adm-weeks">${picker}
+        ${canPush ? `
+          <button type="button" class="adm-btn adm-week-add" data-week-add
+                  title="Даты и номер подставятся сами по календарю">
+            ＋ Неделя ${nextWeek(raw).number}
+          </button>` : ''}
+      </div>
     </section>
 
     <section class="panel" data-week-form data-week-id="${esc(selected.id)}">

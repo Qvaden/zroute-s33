@@ -75,6 +75,7 @@ import {
   eventProblems,
   blankEvent,
   nextEventId,
+  nextWeek,
   alliancesFromRaw,
   alliancesDiff,
   allianceProblems,
@@ -623,6 +624,29 @@ async function publish() {
     // Опубликовано — черновик больше не нужен, иначе он навсегда останется
     // «незаконченным вводом» и будет пугать значком в шапке.
     onDone: () => dropDraft(week.id),
+  });
+}
+
+/**
+ * Завести следующую неделю.
+ *
+ * Момент, когда сезон кончился, а вносить результаты некуда, раньше лечился
+ * правкой базы руками. Теперь кнопка сама берёт календарь: дата начала —
+ * день после конца последней недели, дальше понедельник-воскресенье, номер
+ * продолжается. Публикация идёт общим путём, поэтому проверка данных и отчёт
+ * те же, что у отметок.
+ */
+async function addWeek(button) {
+  if (!view.canPush) return;
+  const week = nextWeek(view.raw);
+  const candidate = { ...view.raw, weeks: [...(view.raw.weeks ?? []), week] };
+
+  await publishDataset({
+    candidate,
+    resultBox: '[data-publish-result]',
+    button,
+    // Открыть панель на только что заведённой неделе: править хотят её.
+    onDone: () => { view.weekId = week.id; },
   });
 }
 
@@ -1709,6 +1733,11 @@ document.addEventListener('click', async (e) => {
 
   if (e.target.closest('[data-publish]')) {
     publish();
+    return;
+  }
+
+  if (e.target.closest('[data-week-add]')) {
+    addWeek(e.target.closest('[data-week-add]'));
     return;
   }
 

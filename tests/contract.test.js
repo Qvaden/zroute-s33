@@ -2480,6 +2480,7 @@ console.log('\nQ. Форум');
     Number.isInteger(forumConfig) && forumConfig > 4 && forumConfig <= 20);
 
   const mountSource = await readFile('src/forum/mount.js', 'utf8');
+  const editorSource = await readFile('src/forum/editor.js', 'utf8');
   check('браузер берёт предел из конфига, а не из зашитой четвёрки',
     /const MAX_SHOTS = CONFIG\.forum\.limits\.attachmentsMax/.test(mountSource) && !/\bMAX_SHOTS = 4\b/.test(mountSource));
   check('у правки поста есть форма, а у формы — комнаты',
@@ -2504,15 +2505,17 @@ console.log('\nQ. Форум');
   /*
     Панель форматирования: кнопки дёргают document.execCommand — жирный, цвет
     и прочее видно в редакторе сразу, разметка при показе не собирается.
+    Сами команды переехали в общий модуль редактора (forum/editor.js),
+    mount.js только подвязывает его к своей форме.
   */
   check('панель форматирования работает командами редактора',
-    mountSource.includes('data-editor-cmd') && mountSource.includes('document.execCommand'));
+    editorSource.includes('data-editor-cmd') && editorSource.includes('document.execCommand'));
   check('цвета применяются кнопками палитры',
-    mountSource.includes('data-editor-color') && mountSource.includes('foreColor'));
+    editorSource.includes('data-editor-color') && editorSource.includes('foreColor'));
   check('предел длины держит сам редактор',
-    mountSource.includes('beforeinput') && mountSource.includes('paste'));
+    editorSource.includes('beforeinput') && editorSource.includes('paste'));
   check('кнопка стиля держится, пока стиль действует',
-    mountSource.includes('queryCommandState'));
+    editorSource.includes('queryCommandState'));
 
   /* ── Схема базы: где живёт настоящая защита ── */
 
@@ -2952,7 +2955,7 @@ console.log('\nQ. Форум');
       const val = await res;
       check(`${path.split('/').pop()}: isReady() резолвится в boolean`, typeof val === 'boolean');
     }
-    const mountSource = await readFile('src/forum/mount.js', 'utf8');
+const mountSource = await readFile('src/forum/mount.js', 'utf8');
     check('mount.js не зовёт .catch на isReady() (крах страницы профиля)',
       !mountSource.includes('.isReady().catch'));
     const supabaseSource2 = await readFile('src/forum/adapters/supabase.js', 'utf8');

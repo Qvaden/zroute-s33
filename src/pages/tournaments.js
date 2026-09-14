@@ -58,12 +58,13 @@ export function renderTournaments(s) {
   const genForm = s.me && alliances.length >= 2
     ? `
       <form class="tour-gen" data-tour-create>
-        <span class="eyebrow">Новый матч</span>
+        <span class="eyebrow">Новый матч · жребий</span>
         <div class="tour-gen__row">
-          <select name="allyA" aria-label="Первый альянс">${opts}</select>
-          <button type="button" class="forum-btn forum-btn--sm" data-tour-random title="Случайный жребий">🎲</button>
-          <select name="allyB" aria-label="Второй альянс">${opts}</select>
+          <select name="allyA" aria-label="Первый альянс" disabled>${opts}</select>
+          <button type="button" class="forum-btn forum-btn--sm" data-tour-random title="Перебросить пару">🎲</button>
+          <select name="allyB" aria-label="Второй альянс" disabled>${opts}</select>
         </div>
+        <p class="muted tour-gen__hint">Пара выпадает сама и закрепляется: selectable поля закрыты. Киньте 🎲 ещё раз, если жребий не нравится.</p>
         <input name="title" maxlength="60" placeholder="Название (необязательно)" autocomplete="off">
         <button type="submit" class="forum-btn forum-btn--primary">Создать турнир</button>
         <p class="forum-error" data-tour-error hidden></p>

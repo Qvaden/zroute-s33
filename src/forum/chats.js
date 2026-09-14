@@ -16,6 +16,7 @@ import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
 import { renderChats, renderScrollArea, renderChatList, renderMessage } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
+import { decodeEntities } from './sanitize.js';
 import { uploadFile, currentUserId } from '../db/client.js';
 
 const POLL_MS = 4000;
@@ -241,9 +242,13 @@ function notice(text) {
   setTimeout(() => t.remove(), 2600);
 }
 
-/** Текст без HTML-тегов, обрезанный. */
+/** Текст без HTML-тегов, обрезанный. Сущности декодируем: иначе &nbsp;
+ *  из редактора показывался бы буквами «&nbsp;» в превью и в уведомлении. */
 function plainExcerpt(src, max = 80) {
-  const t = String(src).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const t = decodeEntities(String(src))
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
@@ -585,7 +590,7 @@ function paintComposerMeta() {
       <div class="chat-reply-banner">
         <div class="chat-reply-banner__info">
           <span class="chat-reply-banner__label">Ответ для <b>${esc(state.replyingTo.authorNick)}</b></span>
-          <span class="chat-reply-banner__text muted">${esc(state.replyingTo.body)}</span>
+          <span class="chat-reply-banner__text muted">${esc(plainExcerpt(state.replyingTo.body, 90))}</span>
         </div>
         <button type="button" class="chat-reply-banner__cancel" data-chat-reply-cancel title="Отменить ответ">✕</button>
       </div>`);

@@ -5,6 +5,8 @@
  */
 import { esc } from '../ui/helpers.js';
 import { postBody } from '../forum/format.js';
+import { renderMdBar } from './forum.js';
+import { CONFIG } from '../../config.js';
 
 const CATEGORIES = [
   { id: 'strategy', label: 'Стратегия' },
@@ -62,6 +64,7 @@ function renderList(s) {
 
 function composeForm(s) {
   const opts = CATEGORIES.map((c) => `<option value="${c.id}">${esc(c.label)}</option>`).join('');
+  const bodyMax = CONFIG.forum.limits.bodyMax;
   return `
     <form class="guide-composer" data-guide-form>
       <label class="forum-field">
@@ -80,8 +83,11 @@ function composeForm(s) {
       </label>
       <label class="forum-field">
         <span>Текст гайда</span>
-        <textarea name="body" rows="8" required placeholder="Опишите стратегию шаг за шагом…"></textarea>
+        <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+             name="body" data-editor data-limit="${bodyMax}"
+             data-placeholder="Опишите стратегию шаг за шагом. Жирный, списки, цитаты и цвет — как в посте форума."></div>
       </label>
+      ${renderMdBar()}
       <div class="forum-composer__actions">
         <button type="submit" class="forum-btn forum-btn--primary">Опубликовать</button>
         <button type="button" class="forum-btn forum-btn--ghost" data-guide-cancel>Отмена</button>

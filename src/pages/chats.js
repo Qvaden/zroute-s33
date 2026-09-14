@@ -10,6 +10,7 @@
  */
 import { esc, plural } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { decodeEntities } from '../forum/sanitize.js';
 import { roleBadge } from '../forum/roles.js';
 
 /**
@@ -340,7 +341,7 @@ function renderRoom(s) {
     ${c.pinnedBody ? `
       <div class="chat-pinned">
         <span class="chat-pinned__badge">📌</span>
-        <span class="chat-pinned__text"><b>${esc(c.pinnedNick || '')}:</b> ${esc(c.pinnedBody)}</span>
+        <span class="chat-pinned__text"><b>${esc(c.pinnedNick || '')}:</b> ${esc(plainExcerpt(c.pinnedBody, 160))}</span>
         ${isMgr ? `<button type="button" class="chat-pinned__unpin" data-chat-unpin title="Открепить">✕</button>` : ''}
       </div>` : ''}
 
@@ -695,7 +696,10 @@ function avatar(nick, url) {
 }
 
 function plainExcerpt(src, max) {
-  const t = String(src).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const t = decodeEntities(String(src))
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 

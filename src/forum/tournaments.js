@@ -12,6 +12,7 @@ const state = {
   alliances: [],
   tournaments: [],
   loading: true,
+  drawn: null,
 };
 
 let host = null;
@@ -20,6 +21,29 @@ let wired = false;
 function paint() {
   if (!host) return;
   host.innerHTML = renderTournaments(state);
+  syncDraw();
+}
+
+/*
+  ЖРЕБИЙ. Пара выпадает сама и закрепляется: селекты закрыты, меняет её
+  только 🎲. Выпавшее живёт в state.drawn — перерисовка после засчёта раунда
+  не должна тайком подсовывать новую пару там, где лидер собирался создать
+  турнир тем же составом.
+*/
+function syncDraw() {
+  const form = host?.querySelector('[data-tour-create]');
+  if (!form) return;
+  const opts = [...form.querySelectorAll('select[name="allyA"] option')];
+  if (opts.length < 2) return;
+  const alive = (id) => opts.some((o) => o.value === id);
+  if (!state.drawn || !alive(state.drawn.a) || !alive(state.drawn.b) || state.drawn.a === state.drawn.b) {
+    const i = Math.floor(Math.random() * opts.length);
+    let j = Math.floor(Math.random() * (opts.length - 1));
+    if (j >= i) j += 1;
+    state.drawn = { a: opts[i].value, b: opts[j].value };
+  }
+  form.elements.allyA.value = state.drawn.a;
+  form.elements.allyB.value = state.drawn.b;
 }
 
 async function load() {
@@ -43,14 +67,8 @@ function wire() {
 
     const rand = t.closest('[data-tour-random]');
     if (rand) {
-      const form = rand.closest('[data-tour-create]');
-      const opts = [...form.querySelectorAll('select[name="allyA"] option')];
-      if (opts.length < 2) return;
-      const i = Math.floor(Math.random() * opts.length);
-      let j = Math.floor(Math.random() * (opts.length - 1));
-      if (j >= i) j += 1;
-      form.elements.allyA.value = opts[i].value;
-      form.elements.allyB.value = opts[j].value;
+      state.drawn = null;
+      syncDraw();
       return;
     }
 
@@ -74,16 +92,20 @@ function wire() {
     e.preventDefault();
     const err = form.querySelector('[data-tour-error]');
     if (err) err.hidden = true;
-    const a = form.elements.allyA.value;
-    const b = form.elements.allyB.value;
+    syncDraw();
+    const a = state.drawn?.a;
+    const b = state.drawn?.b;
     if (!a || !b || a === b) {
-      if (err) { err.textContent = 'Выберите два разных альянса'; err.hidden = false; }
+      if (err) { err.textContent = 'Жребий не задался — перебросьте 🎲'; err.hidden = false; }
       return;
     }
     const btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
     try {
       await forum.createTournament(a, b, String(form.elements.title?.value ?? '').trim());
+      // Созданный турнир уходит в ленту, а форма остаётся — под него нужен
+      // новый жребий, а не прежняя пара.
+      state.drawn = null;
       state.tournaments = await forum.listTournaments();
       paint();
     } catch (ex) {
