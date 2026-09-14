@@ -35,6 +35,8 @@ const toDate = (v) => (v ? new Date(v) : null);
  * @property {number} postCount
  * @property {number} commentCount
  * @property {number} likesReceived
+ * @property {boolean} [isVerified]  Ник подтверждён лидером/модерацией.
+ * @property {Date|null} [verifiedAt]
  */
 
 /** @param {any} row */
@@ -59,6 +61,8 @@ function profileFrom(row) {
     lastSeenAt: toDate(row.last_seen_at),
     profileLikes: Number(row.profile_likes || 0),
     iLiked: Boolean(row.i_liked),
+    isVerified: Boolean(row.is_verified),
+    verifiedAt: toDate(row.verified_at),
   };
 }
 
@@ -102,10 +106,10 @@ export async function getUserPosts(userId, limit = 10) {
 /**
  * Правка своего профиля.
  *
- * Ник здесь не меняется, и это не забывчивость: на ник ссылаются копии
- * в постах (author_nick), и смена оставила бы старые записи подписанными
- * прежним именем. Переименование — отдельная задача, требующая обновления
- * этих копий; пока его нет, лучше честно не давать, чем дать наполовину.
+ * Ник здесь не меняется, и это не забывчивость: смена ника — отдельная
+ * функция базы (forum_rename_nick), потому что кроме профиля она обновляет
+ * копии ника в постах, комментариях, чатах и уведомлениях и пишет строку в
+ * журнал переименований. Форму профиль вызывает её сам, до сохранения.
  *
  * @param {{about?: string, allianceTag?: string}} patch
  */

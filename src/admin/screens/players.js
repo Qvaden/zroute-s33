@@ -1,6 +1,6 @@
 ﻿import { esc } from '../../ui/helpers.js';
 import { RULES } from '../../forum/rules.js';
-import { roleBadge, roleLabel } from '../../forum/roles.js';
+import { roleBadge, roleLabel, verifiedBadge } from '../../forum/roles.js';
 
 /**
  * ЭКРАН «ИГРОКИ» — учётные записи форума.
@@ -93,6 +93,7 @@ export function renderPlayers(view) {
 
   const rows = forum.users.map((u) => renderRow(u, forum.me)).join('');
   const leaders = renderLeaders(forum.users);
+  const reserved = renderReservedBlock(forum.reservedNicks ?? []);
 
   return `
     <section class="panel">
@@ -101,7 +102,7 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь назначают модераторов, отмечают блогеров, сбрасывают забытый
+          Здесь назначают модераторов, подтверждают ники, сбрасывают забытый
           пароль, закрывают возможность писать и удаляют чужие аккаунты.
         </p>
       </header>
@@ -111,6 +112,8 @@ export function renderPlayers(view) {
       ${leaders}
 
       <div class="adm-players">${rows}</div>
+
+      ${reserved}
 
       <div class="adm-players__notes">
         <p class="muted">
@@ -135,6 +138,19 @@ export function renderPlayers(view) {
           межальянсовые, до 200 человек). Не роль и не право на сайт: доверие
           своему альянсу. Чаты и их участников видно на вкладке «Чаты».
           Назначение нового лидера снимает предыдущего того же альянса.
+          Назначив лидера, вы автоматически подтверждаете его ник.
+        </p>
+        <p class="muted">
+          <b>Проверенный игрок</b> — ник подтверждён (самим фактом назначения
+          лидером, или вручную здесь). Отметка видна у его ника в ленте и
+          чатах, и только она открывает право создавать чаты. Непроверенный
+          никогда не выдаст себя за того, чьё имя вы уже заняли. Снять отметку
+          нельзя себе самому — это защита от прикола «под чужим ником».
+        </p>
+        <p class="muted">
+          <b>Стоп-лист</b> выше — ники, которые нельзя занять никому, включая
+          похожие написания («Кремль», «Крeмль»). Удобно, чтобы защитить имена
+          старых игроков от перехвата новичками.
         </p>
         <p class="muted">
           Пароль показывается один раз и только вам — передайте его человеку сами.
@@ -145,6 +161,7 @@ export function renderPlayers(view) {
     </section>
 
     ${renderLeaderModal()}
+    ${renderRenameModal()}
     ${renderResetModal()}
     ${renderRestrictModal()}
     ${renderDeleteModal()}`;
@@ -200,7 +217,7 @@ function renderRow(user, me) {
   return `
     <div class="adm-player" data-player="${esc(user.id)}">
       <div class="adm-player__who">
-        <b>${esc(user.nick)}${roleBadge(user, { short: true })}${user.isLeader ? ` <span class="adm-badge adm-badge--leader">лидер ${esc((user.leaderOf || '').toUpperCase())}</span>` : ''}</b>
+        <b>${esc(user.nick)}${roleBadge(user, { short: true })}${verifiedBadge(user.isVerified)}${user.isLeader ? ` <span class="adm-badge adm-badge--leader">лидер ${esc((user.leaderOf || '').toUpperCase())}</span>` : ''}</b>
         <small>с ${esc(shortDate(user.createdAt))}</small>
       </div>
 
@@ -255,6 +272,16 @@ function renderRow(user, me) {
                     : `Сделать лидером${(user.allianceTag || '') ? ` (${esc(user.allianceTag.toUpperCase())})` : ''}`}
                 </button>
                 <button type="button" class="adm-btn"
+                        data-player-verify="${esc(user.id)}"
+                        data-player-nick="${esc(user.nick)}"
+                        data-player-ver="${user.isVerified ? '1' : ''}">
+                  ${user.isVerified ? 'Снять проверку' : 'Проверить ник'}
+                </button>
+                <button type="button" class="adm-btn"
+                        data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                  Переименовать
+                </button>
+                <button type="button" class="adm-btn"
                         data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"
                         data-player-banned="${user.banned ? '1' : ''}">
                   ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
@@ -297,6 +324,77 @@ function renderLeaderModal() {
           </div>
           <div class="adm-result" data-leader-error hidden></div>
         </form>
+      </div>
+    </div>`;
+}
+
+/**
+ * Стоп-лист ников: ники, которые нельзя занять никому — вместе с похожими
+ * написаниями (база сравнивает по нормализованному ключу). Ведёт владелец:
+ * список, добавить, убрать. SPDX защищает имена старых игроков от перехвата.
+ */
+function renderReservedBlock(reserved) {
+  const items = (reserved || []).map((r) => `
+    <li class="adm-reserved__item">
+      <code>${esc(r.nick)}</code>
+      <span class="muted">с ${esc(shortDate(r.createdAt))}</span>
+      <button type="button" class="adm-btn" data-reserved-remove="${esc(r.nick)}">Убрать</button>
+    </li>`).join('');
+
+  return `
+    <div class="adm-reserved">
+      <h2 class="adm-leaders__title">Стоп-лист ников</h2>
+      <p class="muted">
+        Эти ники не сможет занять никто — ни точно так, ни похожим написанием
+        («Крeмль» вместо «Кремль»). Вписывается как есть, регистр не важен.
+      </p>
+      <form data-reserved-form class="adm-reserved__add">
+        <input type="text" name="nick" maxlength="40"
+               placeholder="Например: Кремль" autocomplete="off">
+        <button type="submit" class="adm-btn adm-btn--primary">Бронировать</button>
+      </form>
+      <div class="adm-result" data-reserved-error hidden></div>
+      <ul class="adm-reserved__list">${items || '<li class="muted">Список пуст.</li>'}</ul>
+    </div>`;
+}
+
+/**
+ * Окно переименования игрока.
+ *
+ * Переименовывает владелец — например, когда тролль занял чужой ник или
+ * переименовался в него. Причина обязательна и остаётся в журнале; рядом
+ * показана вся история смен этого игрока. После смены можно подтвердить
+ * или снять проверку ника той же панелью.
+ */
+function renderRenameModal() {
+  return `
+    <div class="adm-modal" data-rename-modal hidden>
+      <div class="adm-modal__box" role="dialog" aria-modal="true" aria-label="Переименовать игрока">
+        <h3>Переименовать <b data-rename-nick></b></h3>
+        <p class="muted">
+          Старые посты, комментарии и сообщения переподпишутся новым ником,
+          а смена останется в журнале внизу.
+        </p>
+        <form data-rename-form>
+          <label class="adm-field">
+            <span>Новый ник</span>
+            <input type="text" name="newNick" maxlength="40" required autocomplete="off">
+          </label>
+          <label class="adm-field">
+            <span>Причина (останется в журнале)</span>
+            <input type="text" name="reason" maxlength="500" required autocomplete="off"
+                   placeholder="Например: вернулся к старому нику">
+          </label>
+          <div class="adm-actions">
+            <button type="submit" class="adm-btn adm-btn--primary">Переименовать</button>
+            <button type="button" class="adm-btn" data-rename-cancel>Отмена</button>
+          </div>
+          <div class="adm-result" data-rename-error hidden></div>
+        </form>
+        <div class="adm-rename-history">
+          <h4 class="muted">История переименований</h4>
+          <div data-nick-history class="adm-reserved__list"><span class="muted">Загружаем…</span></div>
+        </div>
       </div>
     </div>`;
 }

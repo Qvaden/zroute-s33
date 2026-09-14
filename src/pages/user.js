@@ -14,7 +14,7 @@
  */
 import { esc } from '../ui/helpers.js';
 import { excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
-import { roleBadge, roleLabel } from '../forum/roles.js';
+import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 
 function isOnline(lastSeen) {
   if (!lastSeen) return false;
@@ -33,10 +33,11 @@ import { levelOf, progressOf, achievementsOf, doneCount } from '../forum/rank.js
  *   loading?: boolean,
  *   error?: string,
  *   nick?: string,
+ *   history?: {createdAt: Date, oldNick: string, newNick: string, changedBy: string|null, reason: string}|null,
  * }} state
  */
 export function renderUserPage(state = {}) {
-  const { profile, posts = [], activity = null, me, editing = false, loading = false, error = '', nick = '' } = state;
+  const { profile, posts = [], activity = null, me, editing = false, loading = false, error = '', nick = '', history = null } = state;
 
   if (loading) return '<div class="loading">Открываем профиль…</div>';
 
@@ -69,6 +70,8 @@ export function renderUserPage(state = {}) {
 
   return `
     ${renderCard(profile, isMe, editing)}
+    ${renderVerify(profile, me)}
+    ${renderNickLog(profile, me, history, isMe)}
     ${editing && isMe ? renderEditForm(profile) : ''}
     ${renderStats(profile)}
     ${renderActivity(activity, isMe)}
@@ -89,6 +92,7 @@ function renderCard(p, isMe, editing) {
           <h1 class="forum-profile__nick">${esc(p.nick)}${isOnline(p.lastSeenAt) ? '<span class="online-dot" title="В сети"></span>' : ''}</h1>
           <div class="forum-profile__meta">
             ${roleBadge(p) || `<span class="forum-profile__role">${esc(roleLabel(p))}</span>`}
+            ${verifiedBadge(p.isVerified)}
             ${p.isBlogger ? '<span class="forum-profile__role forum-profile__role--blogger" title="Ведёт свой блог">✍️ Блогер</span>' : ''}
             ${p.allianceTag ? `<span class="forum-profile__ally">${esc(p.allianceTag)}</span>` : ''}
             <span class="muted">с ${esc(joinDate(p.createdAt))}</span>
@@ -105,6 +109,86 @@ function renderCard(p, isMe, editing) {
                </button>`
         }
       </div>
+    </section>`;
+}
+
+/* ── Подтверждение ника ────────────────────────────────────────────────────── */
+
+function isStaffMe(me) {
+  return Boolean(me && (me.role === 'admin' || me.role === 'moderator'));
+}
+
+/*
+  Кто может подтвердить ник здесь — ровно те же, кого пускает forum_set_verified
+  в базе: модерация (любому) или лидер альянса (участнику своего альянса).
+  Себе подтвердить нельзя — проверка вниз идёт сквозь, от разметки до базы.
+*/
+function canVerify(me, p) {
+  if (!me || !p || me.id === p.id) return false;
+  if (isStaffMe(me)) return true;
+  return Boolean(me.leaderOf && p.allianceTag && me.leaderOf === p.allianceTag);
+}
+
+function renderVerify(p, me) {
+  if (!canVerify(me, p)) return '';
+  const verified = Boolean(p.isVerified);
+
+  return `
+    <section class="panel forum-verify">
+      <div class="forum-verify__text">
+        <b>Подтверждение ника</b>
+        <p class="muted">
+          ${
+            verified
+              ? 'Ник подтверждён: у имени стоит знак ✓, и игрок может открывать чаты.'
+              : 'Ник не подтверждён: серая метка «!» и право открывать чаты закрыто.'
+          }
+          ${
+            isStaffMe(me)
+              ? ' Подтверждение снимается тем же нажатием.'
+              : ' Вы лидер его альянса — подтвердите, что это свой человек.'
+          }
+        </p>
+      </div>
+      <button type="button" class="forum-btn${verified ? ' forum-btn--ghost' : ''}"
+              data-profile-verify="${esc(p.id)}" data-profile-ver="${verified ? '1' : ''}">
+        ${verified ? 'Снять подтверждение' : 'Подтвердить ник'}
+      </button>
+    </section>`;
+}
+
+/* ── Журнал переименований ────────────────────────────────────────────────── */
+
+/*
+  Виден самому игроку и модерации — тем, кому его отдаёт forum_nick_history_list.
+  Лидер альянса журнал не видит: подтверждать — да, разбирать историю имён —
+  задача модерации.
+*/
+function renderNickLog(p, me, history, isMe) {
+  if (!isMe && !isStaffMe(me)) return '';
+  if (!Array.isArray(history)) return '';
+
+  return `
+    <section class="panel forum-nicklog">
+      <header class="panel__head">
+        <span class="eyebrow">Журнал имён</span>
+        <h2>История переименований</h2>
+      </header>
+      ${
+        history.length
+          ? `<ul class="forum-nicklog__list">
+        ${history
+          .map((h) => {
+            const d = h.createdAt instanceof Date ? h.createdAt : new Date(h.createdAt);
+            return `<li class="forum-nicklog__item">
+              <code>${esc(h.oldNick)} → ${esc(h.newNick)}</code>
+              <span class="muted">${esc(fullTime(d))} · ${h.changedBy ? 'владелец' : 'сам игрок'}${h.reason ? ` · ${esc(h.reason)}` : ''}</span>
+            </li>`;
+          })
+          .join('')}
+      </ul>`
+          : '<p class="muted">Ник не менялся.</p>'
+      }
     </section>`;
 }
 
@@ -204,13 +288,11 @@ function renderEditForm(p) {
 
         <label class="forum-field">
           <span>Ник</span>
-          <input type="text" value="${esc(p.nick)}" disabled>
-          <!--
-            Ник не меняется, и об этом сказано прямо. Причина не в лени:
-            на ник ссылаются копии в постах, и смена оставила бы старые записи
-            подписанными прежним именем. Честнее не давать, чем дать наполовину.
-          -->
-          <small class="muted">Ник изменить нельзя: им подписаны все ваши посты.</small>
+          <input type="text" name="nick" maxlength="40" value="${esc(p.nick)}" autocomplete="off">
+          <small class="muted">
+            Смена ника разрешена: старые записи переподписываются новым именем,
+            а история переименований остаётся в журнале владельца.
+          </small>
         </label>
 
         <label class="forum-field">

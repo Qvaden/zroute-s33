@@ -31,6 +31,9 @@
  * @property {string} [banReason]
  * @property {boolean} [isLeader]   Признак лидера альянса (производный от leaderOf).
  * @property {string} [leaderOf]    Тег альянса, лидером которого он является; пусто — не лидер.
+ * @property {boolean} [isVerified] Ник подтверждён лидером/модерацией; непроверенный не может создавать чаты.
+ * @property {string|null} [verifiedBy] Кто подтвердил ник.
+ * @property {Date|null} [verifiedAt]
  */
 
 /**
@@ -46,6 +49,7 @@
  * @property {string}  authorId
  * @property {string}  authorNick     Копией, чтобы лента не ходила за автором.
  * @property {boolean} [authorIsBlogger]  Автор ведёт блог: метка и ссылка на него.
+ * @property {boolean} [authorIsVerified] Ник автора подтверждён; непроверенный виден с меткой.
  * @property {string}  category       Из CATEGORIES в rules.js.
  * @property {string}  title
  * @property {string}  body
@@ -72,6 +76,7 @@
  * @property {string}  id
  * @property {string}  postId
  * @property {string}  authorId
+ * @property {boolean} [authorIsVerified] Ник автора подтверждён.
  * @property {string}  authorNick
  * @property {string}  body
  * @property {Date}    createdAt
@@ -164,6 +169,16 @@
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
+ *
+ * Защита ников и верификация (см. supabase/nicks-verified.sql).
+ * @property {(nick: string) => Promise<{status: 'free'|'taken'|'reserved'}>} checkNick  Свободен ли ник (живая проверка формы).
+ * @property {(userId: string, verified: boolean) => Promise<void>} setVerified  Подтвердить/снять ник: лидер своего альянса, модератор или владелец.
+ * @property {(newNick: string, reason?: string) => Promise<void>} renameNick  Игрок меняет свой ник; пишется в журнал.
+ * @property {(userId: string, newNick: string, reason: string) => Promise<void>} renameNickAs  Владелец переименовывает игрока (тролля); причина обязательна.
+ * @property {() => Promise<{nick: string, createdAt: Date}[]>} listReservedNicks  Стоп-лист запрещённых ников (владелец).
+ * @property {(nick: string) => Promise<void>} addReservedNick
+ * @property {(nick: string) => Promise<void>} removeReservedNick
+ * @property {(userId: string) => Promise<{createdAt: Date, oldNick: string, newNick: string, changedBy: string|null, reason: string}[]>} nickHistory
  * @property {(pollId: string, optionId: string) => Promise<void>} votePoll
  * @property {(pollId: string, optionId: string) => Promise<void>} unvotePoll
  * @property {(pollId: string) => Promise<void>} closePoll
@@ -307,6 +322,7 @@
  * @property {string} authorAlliance
  * @property {string} authorRole
  * @property {boolean} authorIsLeader
+ * @property {boolean} authorIsVerified
  * @property {string} body
  * @property {any[]} [attachments]
  * @property {any|null} [poll]

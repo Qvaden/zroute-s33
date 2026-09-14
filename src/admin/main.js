@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=17';
-import { esc } from '../ui/helpers.js?v=17';
-import { mapDataset } from '../data/adapters/_map.js?v=17';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=17';
-import { validateDataset } from '../data/contract.js?v=17';
+import { CONFIG } from '../../config.js?v=18';
+import { esc } from '../ui/helpers.js?v=18';
+import { mapDataset } from '../data/adapters/_map.js?v=18';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=18';
+import { validateDataset } from '../data/contract.js?v=18';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=17';
-import { renderHome } from '../pages/home.js?v=17';
+} from '../logic/standings.js?v=18';
+import { renderHome } from '../pages/home.js?v=18';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=17';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=17';
+} from '../db/account.js?v=18';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=17';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=17';
-import { roleLabel } from '../forum/roles.js?v=17';
-import { prepareImage, uploadPath } from './image.js?v=17';
+} from './store.js?v=18';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=18';
+import { roleLabel } from '../forum/roles.js?v=18';
+import { prepareImage, uploadPath } from './image.js?v=18';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=17';
+} from './edit.js?v=18';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=17';
-import { renderShell } from './shell.js?v=17';
-import { renderLogin } from './login.js?v=17';
-import { renderOverview } from './screens/overview.js?v=17';
-import { renderWeek, describe } from './screens/week.js?v=17';
-import { renderAlliances } from './screens/alliances.js?v=17';
-import { renderEvents } from './screens/events.js?v=17';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=17';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=17';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=17';
-import { renderQuarter } from './screens/quarter.js?v=17';
-import { renderPresident } from './screens/president.js?v=17';
-import { renderPlayers } from './screens/players.js?v=17';
-import { renderModeration } from './screens/moderation.js?v=17';
-import { renderChatsAdmin } from './screens/chats.js?v=17';
-import { forum } from '../forum/index.js?v=17';
-import { deletionReason } from '../forum/rules.js?v=17';
+} from './draft.js?v=18';
+import { renderShell } from './shell.js?v=18';
+import { renderLogin } from './login.js?v=18';
+import { renderOverview } from './screens/overview.js?v=18';
+import { renderWeek, describe } from './screens/week.js?v=18';
+import { renderAlliances } from './screens/alliances.js?v=18';
+import { renderEvents } from './screens/events.js?v=18';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=18';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=18';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=18';
+import { renderQuarter } from './screens/quarter.js?v=18';
+import { renderPresident } from './screens/president.js?v=18';
+import { renderPlayers } from './screens/players.js?v=18';
+import { renderModeration } from './screens/moderation.js?v=18';
+import { renderChatsAdmin } from './screens/chats.js?v=18';
+import { forum } from '../forum/index.js?v=18';
+import { deletionReason } from '../forum/rules.js?v=18';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1220,7 +1220,18 @@ async function loadForumScreen(screenId) {
     if (screenId === 'players') {
       // Игроки — вкладка владельца: только он управляет людьми. Модератору
       // тащить весь список бессмысленно — ему он всё равно не покажется.
-      if (canManagePeople(account)) view.forum.users = await forum.listUsers();
+      if (canManagePeople(account)) {
+        view.forum.users = await forum.listUsers();
+        // Стоп-лист ников — необязательная миграция: если база ещё не прогнала
+        // новый SQL, экран не рушится, просто блок остаётся пустым.
+        if (typeof forum.listReservedNicks === 'function') {
+          try {
+            view.forum.reservedNicks = await forum.listReservedNicks();
+          } catch {
+            view.forum.reservedNicks = null;
+          }
+        }
+      }
     } else if (screenId === 'chats') {
       // Модерации база отдаёт все чаты; обычному участнику — только свои.
       if (canModerate(account)) view.forum.chats = await forum.listChats();
@@ -1248,7 +1259,7 @@ function openPlayerModal(selector, nick, targetId, extra = {}) {
   if (!modal) return;
 
   modal.dataset.playerId = targetId;
-  const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick], [data-delete-nick]');
+  const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick], [data-delete-nick], [data-rename-nick]');
   if (nickBox) nickBox.textContent = nick;
 
   for (const [key, value] of Object.entries(extra)) modal.dataset[key] = value;
@@ -1414,6 +1425,63 @@ document.addEventListener('submit', async (e) => {
       );
     } catch (err) {
       showForumResult('[data-delete-error]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  /* ── Форум: переименование ── */
+  const renameForm = e.target.closest('[data-rename-form]');
+  if (renameForm) {
+    e.preventDefault();
+    const modal = renameForm.closest('[data-rename-modal]');
+    const nick = modal.querySelector('[data-rename-nick]')?.textContent ?? '';
+    const newNick = String(renameForm.elements.newNick?.value ?? '').trim();
+    const reason = String(renameForm.elements.reason?.value ?? '').trim();
+
+    if (newNick.length < 2 || newNick.length > 40) {
+      showForumResult('[data-rename-error]', 'Ник должен быть от 2 до 40 символов', 'err');
+      return;
+    }
+    if (!reason) {
+      showForumResult('[data-rename-error]', 'Укажите причину: она останется в журнале', 'err');
+      return;
+    }
+
+    try {
+      await forum.renameNickAs(modal.dataset.playerId, newNick, reason);
+      closePlayerModal('[data-rename-modal]');
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        `<b>${esc(nick)}</b> переименован в <b>${esc(newNick)}</b>. Старые записи переподписаны, смена записана в журнал.`,
+        'ok'
+      );
+    } catch (err) {
+      showForumResult('[data-rename-error]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  /* ── Форум: стоп-лист ── */
+  const reservedForm = e.target.closest('[data-reserved-form]');
+  if (reservedForm) {
+    e.preventDefault();
+    const nick = String(reservedForm.elements.nick?.value ?? '').trim();
+    if (!nick) return;
+
+    try {
+      await forum.addReservedNick(nick);
+      reservedForm.elements.nick.value = '';
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        `Ник <code>${esc(nick)}</code> зарезервирован: никому больше его не занять, включая похожие написания.`,
+        'ok'
+      );
+    } catch (err) {
+      showForumResult('[data-reserved-error]', esc(String(err?.message ?? err)), 'err');
     }
     return;
   }
@@ -1584,7 +1652,7 @@ document.addEventListener('click', async (e) => {
         '[data-players-result]',
         isLeader
           ? `<b>${esc(nick)} больше не лидер.</b> Созданные им чаты остались — закрыть их можно на вкладке «Чаты».`
-          : `<b>${esc(nick)} теперь лидер альянса.</b> Он может создавать закрытые чаты и давать код приглашения.`,
+          : `<b>${esc(nick)} теперь лидер альянса.</b> Он может создавать закрытые чаты и давать код приглашения; ник автоматически подтверждён.`,
         'ok'
       );
     } catch (err) {
@@ -1592,6 +1660,96 @@ document.addEventListener('click', async (e) => {
         leadBtn.disabled = false;
         leadBtn.textContent = isLeader ? 'Снять лидера' : 'Сделать лидером';
       }
+      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  /*
+    Проверка ника — без окна, как отметка блогера: действие обратимо тем же
+    нажатием. «Проверен» = ник подтверждён владельцем; непроверенный не может
+    создавать чаты и носит серую метку у ника.
+  */
+  const verBtn = e.target.closest('[data-player-verify]');
+  if (verBtn) {
+    const nick = verBtn.dataset.playerNick;
+    const isVerified = verBtn.dataset.playerVer === '1';
+    verBtn.disabled = true;
+    verBtn.textContent = isVerified ? 'Снимаем…' : 'Проверяем…';
+    try {
+      await forum.setVerified(verBtn.dataset.playerVerify, !isVerified);
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        isVerified
+          ? `<b>${esc(nick)} больше не проверен.</b> Право создавать чаты закрыто до новой проверки.`
+          : `<b>${esc(nick)} теперь проверенный игрок.</b> У ника появилась метка, и он может открыть чат.`,
+        'ok'
+      );
+    } catch (err) {
+      if (verBtn.isConnected) {
+        verBtn.disabled = false;
+        verBtn.textContent = isVerified ? 'Снять проверку' : 'Проверить ник';
+      }
+      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
+  /* Переименование игрока вместе с его историей. */
+  const renameBtn = e.target.closest('[data-player-rename]');
+  if (renameBtn) {
+    const userId = renameBtn.dataset.playerRename;
+    openPlayerModal('[data-rename-modal]', renameBtn.dataset.playerNick, userId);
+    const box = root.querySelector('[data-nick-history]');
+    if (box) {
+      box.textContent = 'Загружаем…';
+      try {
+        if (typeof forum.nickHistory !== 'function') {
+          box.innerHTML = '<li class="muted">История переименований недоступна.</li>';
+        } else {
+          const rows = await forum.nickHistory(userId);
+          box.innerHTML = rows.length
+            ? rows.map((h) => {
+                const when = h.createdAt instanceof Date ? h.createdAt : new Date(h.createdAt);
+                const pad = (n) => String(n).padStart(2, '0');
+                const stamp = `${pad(when.getDate())}.${pad(when.getMonth() + 1)} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
+                const who = h.changedBy ? 'владелец' : 'сам игрок';
+                return `<li class="adm-reserved__item">
+                  <span class="muted">${esc(stamp)}</span>
+                  <code>${esc(h.oldNick)} → ${esc(h.newNick)}</code>
+                  <span class="muted">${esc(who)}${h.reason ? ` · ${esc(h.reason)}` : ''}</span>
+                </li>`;
+              }).join('')
+            : '<li class="muted">Переименований ещё не было.</li>';
+        }
+      } catch (err) {
+        box.innerHTML = `<li class="muted">${esc(String(err?.message ?? err))}</li>`;
+      }
+    }
+    return;
+  }
+  if (e.target.closest('[data-rename-cancel]')) {
+    closePlayerModal('[data-rename-modal]');
+    return;
+  }
+
+  const resRem = e.target.closest('[data-reserved-remove]');
+  if (resRem) {
+    const nick = resRem.dataset.reservedRemove;
+    resRem.disabled = true;
+    try {
+      await forum.removeReservedNick(nick);
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        `Ник <code>${esc(nick)}</code> убран из стоп-листа — его уже можно занимать.`,
+        'ok'
+      );
+    } catch (err) {
+      resRem.disabled = false;
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }
     return;

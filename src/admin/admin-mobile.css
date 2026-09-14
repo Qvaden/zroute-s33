@@ -159,6 +159,10 @@
     border-radius: 18px 18px 12px 12px;
   }
   .adm-modal__box .adm-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, #0b111a 40%); }
+  .adm-reserved__add { max-width: none; }
+  .adm-reserved__add input { height: 44px; }
+  .adm-reserved__add .adm-btn { height: 44px; min-height: 44px; }
+  .adm-reserved__item .adm-btn { margin-left: 0; }
 }
 
 /* ── Безопасные края ──────────────────────────────────────────────────────── */

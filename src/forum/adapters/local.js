@@ -62,6 +62,8 @@ function emptyState() {
     chats: [],
     chatMembers: [],
     chatMessages: [],
+    reservedNicks: [],
+    nickHistory: [],
   };
 }
 
@@ -82,6 +84,24 @@ function newId(prefix) {
 }
 
 const toDate = (v) => (v ? new Date(v) : null);
+
+/**
+ * Нормализованный ключ ника, как в базе (supabase/nicks-verified.sql):
+ * нижний регистр + подмена кириллических «двойников» латинских букв.
+ * «Кремль» и «Крeмль» находят друг друга и считаются одним ником.
+ */
+function nickKey(v) {
+  const map = { а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x' };
+  return String(v || '')
+    .toLowerCase()
+    .split('')
+    .map((ch) => map[ch] || ch)
+    .join('');
+}
+
+/* Форма ника — то же правило, что в validateNick при регистрации и в
+   forum_rename_nick базы: буквы/цифры, внутри ещё пробел, _ и -. */
+const NICK_SHAPE = /^[\p{L}\p{N}][\p{L}\p{N} _-]*[\p{L}\p{N}]$/u;
 
 export async function isReady() {
   return true;
@@ -112,6 +132,9 @@ function userOut(u) {
     mutedUntil: toDate(u.mutedUntil),
     banned: Boolean(u.banned),
     banReason: u.banReason || '',
+    isVerified: Boolean(u.isVerified),
+    verifiedBy: u.verifiedBy || null,
+    verifiedAt: toDate(u.verifiedAt),
   };
 }
 
@@ -127,9 +150,14 @@ export async function currentUser() {
  */
 export async function signUp(nick) {
   const s = read();
-  const key = String(nick).trim().toLowerCase();
+  const nb = String(nick).trim();
+  const key = nickKey(nb);
 
-  if (s.users.some((u) => u.nick.toLowerCase() === key)) {
+  if (s.reservedNicks.some((r) => nickKey(r.nick) === key)) {
+    throw new Error('Этот ник зарезервирован');
+  }
+
+  if (s.users.some((u) => nickKey(u.nick) === key)) {
     throw new Error('Такой ник уже занят');
   }
 
@@ -198,6 +226,7 @@ function postOut(state, p) {
     authorAlliance: author?.allianceTag || '',
     authorRole: author?.role || 'member',
     authorIsBlogger: Boolean(author?.isBlogger),
+    authorIsVerified: Boolean(author?.isVerified),
     category: p.category,
     title: p.title,
     body: p.body,
@@ -442,6 +471,7 @@ function commentOut(state, c) {
     authorAvatar: author?.avatarUrl || '',
     authorRole: author?.role || 'member',
     authorIsBlogger: Boolean(author?.isBlogger),
+    authorIsVerified: Boolean(author?.isVerified),
     body: c.body,
     createdAt: toDate(c.createdAt) ?? new Date(),
     deleted: Boolean(c.deleted),
@@ -825,6 +855,125 @@ export async function adminDeleteUser(userId) {
   write(s);
 }
 
+/* ── Ники и верификация (паритет с рабочей базой, см. nicks-verified.sql) ── */
+
+export async function checkNick(nick) {
+  const s = read();
+  const key = nickKey(nick);
+  if (s.reservedNicks.some((r) => nickKey(r.nick) === key)) {
+    return { status: 'reserved' };
+  }
+  const mine = s.me;
+  if (s.users.some((u) => nickKey(u.nick) === key && u.id !== mine)) {
+    return { status: 'taken' };
+  }
+  return { status: 'free' };
+}
+
+export async function setVerified(userId, verified) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+  const target = s.users.find((u) => u.id === userId);
+  if (!target) throw new Error('Игрок не найден');
+  if (target.id === me.id) throw new Error('Проверить самого себя нельзя: это сделает лидер вашего альянса, модератор или владелец');
+  const ownAlliance = target.allianceTag && target.allianceTag === me.leaderOf;
+  if (!isStaff(me) && !ownAlliance) throw new Error('Подтверждать игроков может владелец, модератор или лидер альянса игрока');
+  target.isVerified = Boolean(verified);
+  target.verifiedBy = verified ? me.id : null;
+  target.verifiedAt = verified ? new Date().toISOString() : null;
+  write(s);
+}
+
+export async function renameNick(newNick, reason = '') {
+  const s = read();
+  const me = meOrThrow(s);
+  const v = String(newNick).trim();
+  if (v.length < 2 || v.length > 40) throw new Error('Ник должен быть от 2 до 40 символов');
+  if (!NICK_SHAPE.test(v)) throw new Error('В нике допустимы только буквы, цифры, пробел, _ и -');
+  if (me.nick === v) return;
+  const key = nickKey(v);
+  if (s.reservedNicks.some((r) => nickKey(r.nick) === key)) throw new Error('Этот ник зарезервирован');
+  if (s.users.some((u) => nickKey(u.nick) === key && u.id !== me.id)) throw new Error('Этот ник уже занят');
+  const old = me.nick;
+  me.nick = v;
+  for (const p of s.posts) if (p.authorId === me.id) p.authorNick = v;
+  for (const c of s.comments) if (c.authorId === me.id) c.authorNick = v;
+  for (const ch of s.chats) if (ch.ownerId === me.id) ch.ownerNick = v;
+  for (const m of s.chatMessages) if (m.authorId === me.id) m.authorNick = v;
+  for (const n of s.notifications) if (n.actorId === me.id) n.actorNick = v;
+  s.nickHistory.push({ userId: me.id, oldNick: old, newNick: v, changedBy: null, reason: String(reason), createdAt: new Date().toISOString() });
+  write(s);
+}
+
+export async function renameNickAs(userId, newNick, reason) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (me.role !== 'admin') throw new Error('Переименовывать игроков может только владелец');
+  const target = s.users.find((u) => u.id === userId);
+  if (!target) throw new Error('Игрок не найден');
+  const v = String(newNick).trim();
+  if (v.length < 2 || v.length > 40) throw new Error('Ник должен быть от 2 до 40 символов');
+  if (!NICK_SHAPE.test(v)) throw new Error('В нике допустимы только буквы, цифры, пробел, _ и -');
+  if (target.nick === v) return;
+  const key = nickKey(v);
+  if (s.reservedNicks.some((r) => nickKey(r.nick) === key)) throw new Error('Этот ник зарезервирован');
+  if (s.users.some((u) => nickKey(u.nick) === key && u.id !== target.id)) throw new Error('Этот ник уже занят');
+  const old = target.nick;
+  target.nick = v;
+  for (const p of s.posts) if (p.authorId === target.id) p.authorNick = v;
+  for (const c of s.comments) if (c.authorId === target.id) c.authorNick = v;
+  for (const ch of s.chats) if (ch.ownerId === target.id) ch.ownerNick = v;
+  for (const m of s.chatMessages) if (m.authorId === target.id) m.authorNick = v;
+  for (const n of s.notifications) if (n.actorId === target.id) n.actorNick = v;
+  s.nickHistory.push({ userId: target.id, oldNick: old, newNick: v, changedBy: me.id, reason: String(reason || ''), createdAt: new Date().toISOString() });
+  write(s);
+}
+
+export async function listReservedNicks() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me || me.role !== 'admin') throw new Error('Стоп-лист ников ведёт владелец');
+  return s.reservedNicks.map((r) => ({ nick: r.nick, createdAt: new Date(r.createdAt) }));
+}
+
+export async function addReservedNick(nick) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me || me.role !== 'admin') throw new Error('Стоп-лист ников ведёт владелец');
+  const key = nickKey(nick);
+  if (!key) throw new Error('Пустой ник нельзя добавить в стоп-лист');
+  if (!s.reservedNicks.some((r) => r.nick === key)) {
+    s.reservedNicks.push({ nick: key, createdAt: new Date().toISOString() });
+    write(s);
+  }
+}
+
+export async function removeReservedNick(nick) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me || me.role !== 'admin') throw new Error('Стоп-лист ников ведёт владелец');
+  const key = nickKey(nick);
+  s.reservedNicks = s.reservedNicks.filter((r) => r.nick !== key);
+  write(s);
+}
+
+export async function nickHistory(userId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  const staff = me && (me.role === 'admin' || me.role === 'moderator');
+  if (!me || (userId !== me.id && !staff)) throw new Error('Историю смены ника смотрит модерация или сам игрок');
+  return s.nickHistory
+    .filter((h) => h.userId === userId)
+    .map((h) => ({
+      createdAt: new Date(h.createdAt),
+      oldNick: h.oldNick,
+      newNick: h.newNick,
+      changedBy: h.changedBy || null,
+      reason: h.reason || '',
+    }));
+}
+
 export async function votePoll(pollId, optionId) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me);
@@ -988,6 +1137,12 @@ export async function setLeader(userId, allianceTag) {
   }
   user.leaderOf = tag;
   user.isLeader = tag !== '';
+  // Назначение лидера — доверие владельца: ник игрока тем самым подтверждается.
+  if (tag) {
+    user.isVerified = true;
+    user.verifiedBy = me.id;
+    user.verifiedAt = user.verifiedAt || new Date().toISOString();
+  }
   write(s);
 }
 
@@ -1014,6 +1169,7 @@ export async function createChat({ title, kind = 'alliance', allianceTag = '' })
   const s = read();
   const me = meOrThrow(s);
   if (!me.isLeader && !isStaff(me)) throw new Error('Чаты создают лидеры альянсов');
+  if (!me.isVerified && !isStaff(me)) throw new Error('Непроверенные не создают чаты');
   const clean = String(title).trim().slice(0, 60);
   if (clean.length < 2) throw new Error('Название чата короче двух символов');
   const c = {
@@ -1095,6 +1251,7 @@ export async function listChatMessages(chatId, { limit = 60, before = null } = {
       authorAlliance: u?.allianceTag ?? '',
       authorRole: u?.role ?? 'member',
       authorIsLeader: Boolean(u?.isLeader),
+      authorIsVerified: Boolean(u?.isVerified),
       attachments: Array.isArray(x.attachments) ? x.attachments : [],
       poll: x.poll || null,
       replyTo: x.replyTo || null,

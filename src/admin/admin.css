@@ -1295,3 +1295,31 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-chat__msg-del:hover { color: var(--loss); }
 .adm-chat__msg-body { display: block; color: var(--dim); line-height: 1.45; overflow-wrap: anywhere; }
 .adm-btn--sm { min-height: 28px; padding: 3px 9px; font-size: 12px; }
+/* В панели метка проверки крупнее: там она несёт смысл, а не прячется.
+   Родной кегль 6.5px заточён под строку ника в ленте форума. */
+.adm-players .role-badge { margin-left: 6px; padding: 1px 6px; font-size: 9px; }
+.adm-players .role-badge i { font-size: 10px; }
+
+/* ── Стоп-лист ников и журнал переименований ─────────────────────────────── */
+.adm-reserved { margin-top: 26px; display: grid; gap: 10px; }
+.adm-reserved__title { font-size: 16px; font-weight: 800; letter-spacing: .04em; }
+.adm-reserved__add { display: flex; gap: 8px; max-width: 480px; }
+.adm-reserved__add input {
+  flex: 1; min-width: 0; height: 38px; padding: 0 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm);
+}
+.adm-reserved__add input:focus { outline: none; border-color: var(--accent); }
+.adm-reserved__add .adm-btn { height: 38px; min-height: 38px; }
+.adm-reserved__list { display: grid; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.adm-reserved__item {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 10px; border: 1px solid var(--line-soft); border-radius: 10px;
+  font-size: 13px;
+}
+.adm-reserved__item code { color: var(--accent); font-size: 13px; overflow-wrap: anywhere; }
+.adm-reserved__item .adm-btn { margin-left: auto; min-height: 26px; }
+.adm-rename-history { margin-top: 18px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.adm-rename-history h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.adm-rename-history .adm-reserved__item code { color: var(--dim); }

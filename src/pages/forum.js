@@ -23,7 +23,7 @@ import { esc, plural, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
-import { roleBadge, roleLabel } from '../forum/roles.js';
+import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
@@ -1226,6 +1226,8 @@ export function renderPostCard(p, s) {
           }${
             roleBadge({ role: p.authorRole }, { short: true })
           }${
+            verifiedBadge(p.authorIsVerified)
+          }${
             p.authorAlliance ? ` <span class="forum-post__ally">${esc(p.authorAlliance)}</span>` : ''
           }</b>
           <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
@@ -1440,6 +1442,8 @@ function renderComments(post, s) {
                     : ''
                 }${
                   roleBadge({ role: c.authorRole }, { short: true })
+                }${
+                  verifiedBadge(c.authorIsVerified)
                 }</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>
               </div>

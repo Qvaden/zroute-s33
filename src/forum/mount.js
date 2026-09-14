@@ -76,6 +76,11 @@ const profileState = {
   posts: [],
   /** Личная статистика: GitHub-график и число чатов; null — источник не умеет. */
   activity: null,
+  /**
+   * История переименований показанного игрока. null — смотреть нельзя
+   * (посторонний) или источник не умеет; [] — можно, но смен не было.
+   */
+  history: null,
   editing: false,
   loading: false,
   error: '',
@@ -649,6 +654,23 @@ async function handleAuth(form, mode, submitter) {
   if (!password.ok) return showError('[data-forum-auth-error]', password.error);
 
   /*
+    При регистрации спрашиваем базу, свободен ли ник вообще — до того, как
+    отправить запрос. База сравнивает по нормализованному ключу («Крeмль»
+    и «Кремль» — одно имя), и человек узнаёт заранее, а не по отказу.
+    Если проверка не ответила (база ещё без миграции, сеть), молча идём
+    дальше: окончательное слово всё равно за регистрацией.
+  */
+  if (mode === 'signup' && typeof forum.checkNick === 'function') {
+    try {
+      const st = await forum.checkNick(nick.value);
+      if (st?.status === 'taken') return showError('[data-forum-auth-error]', 'Этот ник уже занят');
+      if (st?.status === 'reserved') return showError('[data-forum-auth-error]', 'Этот ник зарезервирован и не может быть занят');
+    } catch {
+      /* проверка — услуга, а не условие */
+    }
+  }
+
+  /*
     Пока запрос идёт, гасим ОБЕ кнопки формы. Выключенной становится только
     нажатая — вторая остаётся живой, и при неспешной сети человек жмёт
     «Зарегистрироваться» следом за «Войти». Это два аккаунта, которые потом
@@ -815,6 +837,22 @@ async function loadProfile(nick) {
         profileState.activity = null;
       }
     }
+
+    /*
+      Журнал переименований — себе и модерации; источник может не уметь
+      (старая база без миграции), тогда блок просто не рисуется.
+    */
+    profileState.history = null;
+    const v = state.me;
+    const staffView = v && (v.role === 'admin' || v.role === 'moderator');
+    if (profileState.profile && v && typeof forum.nickHistory === 'function'
+        && (staffView || v.id === profileState.profile.id)) {
+      try {
+        profileState.history = await forum.nickHistory(profileState.profile.id);
+      } catch {
+        profileState.history = null;
+      }
+    }
   } catch (err) {
     profileState.error = String(err?.message ?? err);
   } finally {
@@ -956,6 +994,30 @@ function wire() {
     if (t.closest('[data-profile-cancel]')) {
       profileState.editing = false;
       paint();
+      return;
+    }
+    /*
+      Подтверждение ника — для лидера альянса игрока и модерации; кнопку
+      показывает только им (pages/user.js), права всё равно проверяет база.
+      После нажатия перезагружаем страницу целиком: метка ✓, дата и кнопка
+      меняются разом, без точечной правки DOM.
+    */
+    const verifyBtn = t.closest('[data-profile-verify]');
+    if (verifyBtn) {
+      const was = verifyBtn.dataset.profileVer === '1';
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = was ? 'Снимаем…' : 'Подтверждаем…';
+      try {
+        await forum.setVerified(verifyBtn.dataset.profileVerify, !was);
+        notice(was ? 'Подтверждение снято.' : 'Ник подтверждён.');
+        await loadProfile(profileState.nick);
+      } catch (err) {
+        notice(String(err?.message ?? err));
+        if (verifyBtn.isConnected) {
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = was ? 'Снять подтверждение' : 'Подтвердить ник';
+        }
+      }
       return;
     }
     if (t.closest('[data-avatar-clear]')) {
@@ -1516,14 +1578,32 @@ function wire() {
       e.preventDefault();
       clearError('[data-profile-error]');
 
+      const newNick = form.nick.value.trim();
+
+      // Ник проверяем тем же правилом, что при регистрации: иначе база
+      // откажет уже после отправки своим текстом, а не подсказкой в поле.
+      if (newNick && newNick !== (state.me?.nick ?? '')) {
+        const v = validateNick(newNick);
+        if (!v.ok) return showError('[data-profile-error]', v.error);
+      }
+
       await withBusy(submitter, 'Сохраняем…', async () => {
         try {
+          if (state.me && newNick !== state.me.nick) {
+            // Смена ника — отдельная функция базы: она проверит формат,
+            // занятость и стоп-лист и переподпишет посты. Журнал ведёт сама.
+            await forum.renameNick(newNick);
+            // Шапка и меню живут со state.me — обновляем, иначе до
+            // перезагрузки страницы ник там останется прежним.
+            state.me = await forum.currentUser();
+          }
           await saveProfile({
             about: form.about.value,
             allianceTag: form.allianceTag.value,
           });
           profileState.editing = false;
-          await loadProfile(profileState.nick);
+          // После смены ника страница живёт уже под новым именем.
+          await loadProfile(newNick || profileState.nick);
         } catch (err) {
           showError('[data-profile-error]', String(err?.message ?? err));
         }
@@ -1869,6 +1949,7 @@ export function unmountForum() {
 
   profileState.profile = null;
   profileState.posts = [];
+  profileState.history = null;
   profileState.editing = false;
 
   /*

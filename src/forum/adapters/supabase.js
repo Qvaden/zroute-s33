@@ -105,6 +105,9 @@ function userOut(row) {
     mutedUntil: toDate(row.muted_until),
     banned: Boolean(row.banned),
     banReason: row.ban_reason || '',
+    isVerified: Boolean(row.is_verified),
+    verifiedBy: row.verified_by || null,
+    verifiedAt: toDate(row.verified_at),
   };
 }
 
@@ -249,6 +252,7 @@ function postOut(row) {
     */
     authorRole: row.author_role || 'member',
     authorIsBlogger: Boolean(row.author_is_blogger),
+    authorIsVerified: Boolean(row.author_is_verified),
     category: row.category,
     title: row.title,
     body: row.body,
@@ -481,6 +485,7 @@ function commentOut(row) {
     authorAvatar: row.author_avatar || '',
     authorRole: row.author_role || 'member',
     authorIsBlogger: Boolean(row.author_is_blogger),
+    authorIsVerified: Boolean(row.author_is_verified),
     body: row.body,
     createdAt: toDate(row.created_at) ?? new Date(),
     deleted: Boolean(row.deleted),
@@ -667,6 +672,91 @@ export async function adminDeleteUser(userId) {
   });
 }
 
+/* ── Ники и верификация ────────────────────────────────────────────────────── */
+
+/*
+  Защита ников и статус «проверенного игрока» живут функциями в базе
+  (см. supabase/nicks-verified.sql): и право, и правила проверяются там,
+  а этот код лишь пересказывает результат в понятном виде. Так владелец
+  не даёт панели больше прав, чем есть у функции.
+*/
+
+/**
+ * Живая проверка ника для формы: свободен / занят / зарезервирован.
+ * База сравнивает по нормализованному ключу («Кремль» и «Крeмль» — одно).
+ */
+export async function checkNick(nick) {
+  const res = await rest('/rpc/forum_check_nick', {
+    method: 'POST',
+    body: { nick: String(nick || '') },
+  });
+  return { status: res?.status || 'free' };
+}
+
+/** Подтвердить ник игрока; снять — повторным вызовом с false. */
+export async function setVerified(userId, verified) {
+  await rest('/rpc/forum_set_verified', {
+    method: 'POST',
+    body: { target_user: userId, verified: Boolean(verified) },
+  });
+}
+
+/** Игрок меняет свой ник. База сама проверит формат, занятость и стоп-лист. */
+export async function renameNick(newNick, reason = '') {
+  await rest('/rpc/forum_rename_nick', {
+    method: 'POST',
+    body: { new_nick: String(newNick), reason: String(reason) },
+  });
+}
+
+/** Владелец переименовывает игрока (например, тролля). Причина обязательна. */
+export async function renameNickAs(userId, newNick, reason) {
+  await rest('/rpc/forum_rename_nick_as', {
+    method: 'POST',
+    body: { target_user: userId, new_nick: String(newNick), reason: String(reason) },
+  });
+}
+
+export async function listReservedNicks() {
+  const rows = await rest('/rpc/forum_reserved_list', { method: 'POST', body: {} });
+  return (Array.isArray(rows) ? rows : []).map((r) => ({
+    nick: r.nick,
+    createdAt: toDate(r.created_at),
+  }));
+}
+
+export async function addReservedNick(nick) {
+  await rest('/rpc/forum_reserved_add', {
+    method: 'POST',
+    body: { nick: String(nick) },
+  });
+}
+
+export async function removeReservedNick(nick) {
+  await rest('/rpc/forum_reserved_remove', {
+    method: 'POST',
+    body: { nick: String(nick) },
+  });
+}
+
+/**
+ * История переименований игрока: старая/новая, кто (null — сам игрок),
+ * причина и дата. Смотрит сам игрок и владелец.
+ */
+export async function nickHistory(userId) {
+  const rows = await rest('/rpc/forum_nick_history_list', {
+    method: 'POST',
+    body: { target_user: userId },
+  });
+  return (Array.isArray(rows) ? rows : []).map((h) => ({
+    createdAt: toDate(h.created_at),
+    oldNick: h.old_nick,
+    newNick: h.new_nick,
+    changedBy: h.changed_by || null,
+    reason: h.reason || '',
+  }));
+}
+
 /* ── Уведомления ───────────────────────────────────────────────────────────── */
 
 /*
@@ -757,6 +847,7 @@ function chatMessageOut(row) {
     authorAlliance: row.author_alliance || '',
     authorRole: row.author_role || 'member',
     authorIsLeader: Boolean(row.author_is_leader),
+    authorIsVerified: Boolean(row.author_is_verified),
     body: row.body,
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     poll: row.poll || null,

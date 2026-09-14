@@ -2361,6 +2361,8 @@ console.log('\nQ. Форум');
     'listUsers', 'resetPassword', 'setRestriction',
     'votePoll', 'unvotePoll', 'closePoll',
     'listNotifications', 'markNotificationsRead', 'markAllNotificationsRead',
+    'checkNick', 'setVerified', 'renameNick', 'renameNickAs',
+    'listReservedNicks', 'addReservedNick', 'removeReservedNick', 'nickHistory',
   ];
   const missingLocal = required.filter((m) => typeof localAdapter[m] !== 'function');
   const missingSupabase = required.filter((m) => typeof supabaseAdapter[m] !== 'function');
@@ -2438,6 +2440,54 @@ console.log('\nQ. Форум');
     (await loc.listPosts({ q: 'РАЗБОР' })).posts.length, 1);
   equal('поиск без совпадений возвращает пусто',
     (await loc.listPosts({ q: 'небывальщина' })).posts.length, 0);
+
+  /* ── Ники и верификация: локальный адаптер ── */
+
+  await loc.addReservedNick('Рогоз');
+  let reservedRefused = false;
+  try {
+    await loc.signUp('рогоз');
+  } catch {
+    reservedRefused = true;
+  }
+  check('стоп-лист отказывает занявшему похожее написание', reservedRefused);
+  await loc.removeReservedNick('рогоз');
+  const free = await loc.checkNick('свободный_ник');
+  check('checkNick отвечает «свободно» на незанятый ник', free.status === 'free');
+  const wannabe = await loc.signUp('гек_к_проверке');
+  const meAgain = await loc.signIn('писатель_для_тестов');
+  check('в локальном режиме первый игрок — владелец', meAgain.role === 'admin');
+  check('checkNick отвечает «занято» на существующий ник',
+    (await loc.checkNick('гек_к_проверке')).status === 'taken');
+
+  await loc.setVerified(wannabe.id, true);
+  const checkOk = await loc.signIn('гек_к_проверке');
+  check('проверка отразилась в профиле', checkOk.isVerified === true && typeof checkOk.verifiedBy === 'string');
+  let selfRefused = false;
+  try {
+    await loc.setVerified(checkOk.id, false);
+  } catch {
+    selfRefused = true;
+  }
+  check('самому себе снять проверку нельзя', selfRefused);
+  await loc.signIn('писатель_для_тестов');
+  await loc.setVerified(wannabe.id, false);
+
+  const renamed = await loc.renameNick('Писатель');
+  check('смена ника прошла без ошибок', renamed === undefined);
+  check('посты переподписываются новым ником',
+    (await loc.listPosts({ q: 'полочкам' })).posts[0].authorNick === 'Писатель');
+  const history = await loc.nickHistory(meAgain.id);
+  check('смена записана в журнал переименований',
+    history.length >= 1 && /писатель_для_тестов → Писатель/.test(`${history[history.length - 1].oldNick} → ${history[history.length - 1].newNick}`));
+  await loc.renameNick('писатель_для_тестов');
+  let shapeRefused = false;
+  try {
+    await loc.renameNick('!!');
+  } catch {
+    shapeRefused = true;
+  }
+  check('смена ника держит формат букв и цифр, как база', shapeRefused);
 
   /*
     Раздел проверяется и в браузере (validatePost), и в адаптерах: база свою
@@ -3107,6 +3157,39 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     !renderPlayers({
       forum: { configured: true, me, users: [me, { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null }] },
     }).includes('Лидеры альянсов'));
+
+  /* ── Ники: проверка, переименование, стоп-лист ── */
+
+  check('администратору доступна проверка ника',
+    playersHtml.includes('data-player-verify="u2"') && playersHtml.includes('data-player-ver=""'));
+  check('непроверенный игрок помечен серой меткой',
+    /role-badge--unverified/.test(playersHtml) && /не проверен/.test(playersHtml));
+
+  const verifiedHtml = renderPlayers({
+    forum: {
+      configured: true,
+      me,
+      users: [
+        me,
+        { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null, isVerified: true, verifiedBy: 'u1', verifiedAt: new Date() },
+      ],
+    },
+  });
+  check('проверенный игрок носит зелёную метку и кнопку «снять»',
+    /role-badge--verified/.test(verifiedHtml) && /проверен/.test(verifiedHtml) && /data-player-ver="1"/.test(verifiedHtml) && /Снять проверку/.test(verifiedHtml));
+
+  check('переименование открывается окном с причиной и журналом',
+    /data-player-rename="u2"/.test(playersHtml) && /data-rename-form/.test(playersHtml) && /data-nick-history/.test(playersHtml) && /Причина/.test(playersHtml));
+
+  check('стоп-лист рисуется с формой добавления',
+    /Стоп-лист ников/.test(playersHtml) && /data-reserved-form/.test(playersHtml));
+  const reservedHtml = renderPlayers({
+    forum: { configured: true, me, users: [me], reservedNicks: [{ nick: 'Кремль', createdAt: new Date() }] },
+  });
+  check('зарезервированный ник виден в стоп-листе с кнопкой «убрать»',
+    /data-reserved-remove="Кремль"/.test(reservedHtml));
+  check('легенда объясняет проверку и стоп-лист',
+    /Проверенный игрок/.test(playersHtml) && /Стоп-лист/.test(playersHtml));
 
   const reportsHtml = renderModeration({
     forum: {
@@ -3899,6 +3982,10 @@ console.log('\nS. Чистые функции');
 
   const guestPlain = renderPostCard({ ...base, myReaction: 'like' }, seat);
   check('след: гость не получает подсветку', !/forum-post--trail/.test(guestPlain));
+
+  const verifiedPost = renderPostCard({ ...base, authorIsVerified: true }, member);
+  check('проверенный автор носит зелёную метку', /role-badge--verified/.test(verifiedPost));
+  check('без флага проверки метка серая', /role-badge--unverified/.test(plain));
 }
 
 /* ── Еженедельная тема ── */
@@ -3932,6 +4019,58 @@ console.log('\nS. Чистые функции');
   const pagesSource = await readFile('src/pages/forum.js', 'utf8');
   check('тема недели: ключ один на форум и панель',
     KNOWN_TEXT_KEYS.includes('forum-theme') && /FORUM_THEME_KEY = 'forum-theme'/.test(pagesSource));
+}
+
+/* ── Подтверждение ника и журнал имён на странице участника ── */
+{
+  const { renderUserPage } = await import('../src/pages/user.js');
+  const { readFile } = await import('node:fs/promises');
+
+  const profile = {
+    id: 'u2', nick: 'Игрок', role: 'member', allianceTag: 'KR33',
+    createdAt: new Date(), isVerified: false,
+    postCount: 0, commentCount: 0, likesReceived: 0, profileLikes: 0,
+  };
+  const base = { profile, posts: [] };
+  const leader = { id: 'u1', nick: 'Лидер', role: 'member', leaderOf: 'KR33', isLeader: true };
+  const moderator = { id: 'u9', nick: 'Мод', role: 'moderator' };
+  const stranger = { id: 'u3', nick: 'Прохожий', role: 'member' };
+  const self = { id: 'u2', nick: 'Игрок', role: 'member' };
+
+  check('лидер альянса видит кнопку подтверждения ника',
+    /data-profile-verify/.test(renderUserPage({ ...base, me: leader })));
+  check('модератор видит кнопку подтверждения ника',
+    /data-profile-verify/.test(renderUserPage({ ...base, me: moderator })));
+  check('постороннему игроку кнопка не показывается',
+    !/data-profile-verify/.test(renderUserPage({ ...base, me: stranger })));
+  check('сам себе подтвердить нельзя — кнопки нет',
+    !/data-profile-verify/.test(renderUserPage({ ...base, me: self })));
+  check('лидер чужого альянса подтвердить не может',
+    !/data-profile-verify/.test(renderUserPage({ ...base, me: { ...leader, leaderOf: 'FFA' } })));
+  check('подтверждённому игроку кнопка предлагает снять',
+    /data-profile-ver="1"/.test(renderUserPage({ ...base, me: moderator, profile: { ...profile, isVerified: true } }))
+      && /Снять подтверждение/.test(renderUserPage({ ...base, me: moderator, profile: { ...profile, isVerified: true } })));
+
+  const entry = { createdAt: new Date('2026-09-01T12:00:00Z'), oldNick: 'Старый', newNick: 'Игрок', changedBy: 'u1', reason: 'троллил чужим ником' };
+  check('модератору виден журнал переименований с причиной',
+    /История переименований/.test(renderUserPage({ ...base, me: moderator, history: [entry] }))
+      && /Старый → Игрок/.test(renderUserPage({ ...base, me: moderator, history: [entry] }))
+      && /троллил чужим ником/.test(renderUserPage({ ...base, me: moderator, history: [entry] })));
+  check('сам игрок видит свой журнал',
+    /История переименований/.test(renderUserPage({ ...base, me: self, history: [entry] })));
+  check('постороннему журнал не показывается',
+    !/История переименований/.test(renderUserPage({ ...base, me: stranger, history: [entry] })));
+  check('пустой журнал честно говорит «не менялся»',
+    /Ник не менялся/.test(renderUserPage({ ...base, me: moderator, history: [] })));
+
+  const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
+  check('журнал переименований в базе открыт модерации, а не только владельцу',
+    /forum_nick_history_list\(target_user uuid\)[\s\S]*?not public\.forum_is_staff\(\)/.test(nicksSql));
+  check('подтверждение ника в базе разрешает лидеру своего альянса',
+    /leader_of into v_my_leader_of[\s\S]*?alliance_tag into v_victim_tag[\s\S]*?v_victim_tag <> v_my_leader_of/.test(nicksSql));
+  check('mount обновляет state.me после смены ника — шапка не врёт',
+    /renameNick\(newNick\)[\s\S]{0,300}state\.me = await forum\.currentUser\(\)/.test(
+      await readFile('src/forum/mount.js', 'utf8')));
 }
 
 console.log(`\n${'─'.repeat(52)}`);

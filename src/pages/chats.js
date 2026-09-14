@@ -11,7 +11,7 @@
 import { esc, plural } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
 import { decodeEntities } from '../forum/sanitize.js';
-import { roleBadge } from '../forum/roles.js';
+import { roleBadge, verifiedBadge } from '../forum/roles.js';
 
 /**
  * Рендер тела сообщения с @упоминаниями.
@@ -462,6 +462,7 @@ export function renderMessage(m, s, isMgr, grouped) {
           <div class="chat-msg__head">
             <a class="forum-nick" href="#/user/${encodeURIComponent(m.authorNick)}">${esc(m.authorNick)}</a>
             ${roleBadge({ role: m.authorRole }, { short: true })}
+            ${verifiedBadge(m.authorIsVerified)}
             ${m.authorIsLeader ? leaderBadge() : ''}
             ${m.authorAlliance ? `<small class="chat-msg__tag">${esc(m.authorAlliance)}</small>` : ''}
           </div>`}
