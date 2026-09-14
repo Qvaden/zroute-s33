@@ -697,7 +697,8 @@ from public.forum_users u;
 grant select on public.forum_profiles to anon, authenticated;
 
 -- Лента и комментарии: метка «проверен» автора едет рядом с ролью, как
--- author_is_blogger. created as create or replace — колонка добавлена в конец.
+-- author_is_blogger. Порядок колонок повторяет действующие представления
+-- дословно (create or replace сверяет их по позициям), новая — строго в конец.
 create or replace view public.forum_post_list
 with (security_invoker = on) as
 select
@@ -740,6 +741,34 @@ select
       from public.forum_attachments a
      where a.target_type = 'post' and a.target_id = p.id
   ), '[]'::jsonb) as attachments,
+  /*
+    Опрос в ленте — как в rich-forum.sql, откуда представление и выросло.
+    Колонки при create or replace совпадают ПО ПОЗИЦИЯМ, поэтому порядок
+    повторяет действующий дословно; новая колонка верификации добавлена
+    строго в конец.
+  */
+  (
+    select jsonb_build_object(
+      'id', pl.id,
+      'question', pl.question,
+      'multiple', pl.multiple,
+      'closed', pl.closed,
+      'total', (select count(distinct user_id) from public.forum_poll_votes v where v.poll_id = pl.id),
+      'options', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', o.id,
+          'text', o.text,
+          'votes', (select count(*) from public.forum_poll_votes v where v.option_id = o.id),
+          'mine', exists (
+            select 1 from public.forum_poll_votes v
+             where v.option_id = o.id and v.user_id = auth.uid()
+          )
+        ) order by o.position, o.id)
+          from public.forum_poll_options o where o.poll_id = pl.id
+      ), '[]'::jsonb)
+    )
+      from public.forum_polls pl where pl.post_id = p.id
+  ) as poll,
   prof.is_verified as author_is_verified
 from public.forum_posts p
 left join public.forum_profiles prof on prof.id = p.author_id;
