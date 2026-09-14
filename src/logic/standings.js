@@ -139,7 +139,7 @@ function tallyUpTo(alliances, weeks, index, scoring, upToIndex) {
  * @param {import('../data/types.js').Week[]} weeks
  * @param {import('../data/types.js').Result[]} results
  * @param {number} periodLength
- * @returns {{weeks: import('../data/types.js').Week[], number: number, startNumber: number|null, endNumber: number|null}}
+ * @returns {{weeks: import('../data/types.js').Week[], number: number, startNumber: number|null, endNumber: number|null, endDate: Date|null}}
  */
 export function computeQuarterWindow(weeks, results, periodLength = 4) {
   const ordered = [...weeks].sort(byWeekStart);
@@ -147,7 +147,7 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
   const last = [...ordered].reverse().find((week) => filled.has(week.id));
 
   if (!last) {
-    return { weeks: [], number: 0, startNumber: null, endNumber: null };
+    return { weeks: [], number: 0, startNumber: null, endNumber: null, endDate: null };
   }
 
   const number = Math.floor((last.number - 1) / periodLength) + 1;
@@ -157,7 +157,27 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
     (week) => week.number >= startNumber && week.number <= endNumber
   );
 
-  return { weeks: currentWeeks, number, startNumber, endNumber };
+  /*
+    Конец Кварта — это конец недели endNumber, а не последней недели, что
+    уже есть в данных. Недели заводятся по мере игры: в середине периода
+    неделя endNumber ещё не существует, и брать конец от последней созданной
+    значило бы показывать уже прошедшую дату. Недели идут подряд по календарю
+    (следующая начинается через день после конца предыдущей — см. editor),
+    поэтому недостающие дни досчитываем от последней недели окна с датой.
+  */
+  let endDate = null;
+  for (let i = currentWeeks.length - 1; i >= 0; i--) {
+    const week = currentWeeks[i];
+    const t = week?.endDate instanceof Date && !Number.isNaN(week.endDate.getTime())
+      ? week.endDate.getTime()
+      : null;
+    if (t === null) continue;
+    const missing = Math.max(0, endNumber - (Number(week.number) || 0));
+    endDate = new Date(t + missing * 7 * 24 * 60 * 60 * 1000);
+    break;
+  }
+
+  return { weeks: currentWeeks, number, startNumber, endNumber, endDate };
 }
 
 /**

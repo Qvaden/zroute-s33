@@ -36,9 +36,7 @@ export function renderQuarter({ standings, quarter } = {}) {
 
   // Расчёт даты конца текущего Кварта и дней до следующего.
   const now = new Date();
-  const weeks = period.weeks ?? [];
-  const lastWeek = weeks[weeks.length - 1];
-  const endDate = lastWeek?.endDate ? new Date(lastWeek.endDate) : null;
+  const endDate = period.endDate instanceof Date ? period.endDate : null;
   const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - now) / 86400000)) : null;
   const nextQuarterStart = endDate ? new Date(endDate.getTime() + 86400000) : null;
   const nextQuarterLabel = nextQuarterStart

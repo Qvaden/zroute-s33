@@ -430,9 +430,7 @@ function renderHotTopics(s) {
  * интервалом управляет ui/quarter-timer.js по атрибуту data-quarter-end.
  */
 function renderQuarterCountdown(view) {
-  const weeks = Array.isArray(view?.quarter?.weeks) ? view.quarter.weeks : [];
-  const lastWeek = weeks[weeks.length - 1];
-  const endDate = lastWeek?.endDate ? new Date(lastWeek.endDate) : null;
+  const endDate = view?.quarter?.endDate instanceof Date ? view.quarter.endDate : null;
   if (!endDate || Number.isNaN(endDate.getTime())) return '';
   const left = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
   return `

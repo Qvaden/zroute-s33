@@ -244,6 +244,37 @@ console.log('\nB3. Четырёхнедельный рейтинг');
   equal('очки нового Кватра считаются с нуля', secondStandings[0].points, -1);
 }
 
+// ── B3a. Конец Кватра — календарный конец недели endNumber ────────────────
+{
+  // Кварт 2 идёт (результаты за W5, W6 есть), но недели W7, W8 ещё не заведены:
+  // конец Кватра обязан досчитаться до конца недели №8, а не встать на W6.
+  const weeks = Array.from({ length: 6 }, (_, i) => ({
+    id: `W${i + 1}`,
+    number: i + 1,
+    startDate: new Date(2026, 0, i * 7 + 5),
+    endDate: new Date(2026, 0, i * 7 + 11),
+  }));
+  const results = [
+    { weekId: 'W1', allianceId: 'x', outcome: 'win' },
+    { weekId: 'W2', allianceId: 'x', outcome: 'win' },
+    { weekId: 'W3', allianceId: 'x', outcome: 'loss' },
+    { weekId: 'W4', allianceId: 'x', outcome: 'win' },
+    { weekId: 'W5', allianceId: 'x', outcome: 'loss' },
+    { weekId: 'W6', allianceId: 'x', outcome: 'win' },
+  ];
+
+  const growth = computeQuarterWindow(weeks, results);
+  equal('Кварт 2 с неполными неделями — окно W5–W8', growth.number, 2);
+  const fullEnd = new Date(2026, 0, 7 * 7 + 11);
+  equal(
+    'конец Кватра — конец недели 8, а не последней созданной W6',
+    growth.endDate?.getTime(),
+    fullEnd.getTime()
+  );
+  equal('кварт без недель не даёт даты конца',
+    computeQuarterWindow([], []).endDate, null);
+}
+
 // ── B4. Форма Кварта всегда состоит из четырёх недель ───────────────────────
 console.log('\nB4. Четыре кубика формы');
 {
