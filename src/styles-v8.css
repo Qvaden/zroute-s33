@@ -46,32 +46,34 @@
 }
 
 /* ── Токены: светлая тема ──────────────────────────────────────────────── */
+/* Тёплая «бумажная» палитра: крем вместо чистого белого, чернильный текст
+   вместо чёрного, приглушённый терракот вместо яркого оранжевого. */
 [data-theme="light"] {
-  --bg:        #f5f5f2;
-  --surface:   #ffffff;
-  --raised:    #f0efe9;
-  --raised-2:  #e5e4de;
-  --line:      #cfcfc8;
-  --line-soft: #dbdbd5;
+  --bg:        #ece9e1;
+  --surface:   #f7f4ec;
+  --raised:    #efebe2;
+  --raised-2:  #e6e1d5;
+  --line:      #d4cec0;
+  --line-soft: #dfd9cc;
 
-  --text:      #1a1814;
-  --dim:       #5f5c57;
-  --mute:      #8a8782;
+  --text:      #2b2822;
+  --dim:       #6b6457;
+  --mute:      #948d7e;
 
-  --accent:    #e85b1c;
-  --accent-dk: #c94814;
-  --gold:      #b58b00;
-  --win:       #1d8f1d;
-  --loss:      #d13030;
+  --accent:    #c05a24;
+  --accent-dk: #9f4a1c;
+  --gold:      #977912;
+  --win:       #2f7d37;
+  --loss:      #b23a3a;
 
-  --shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 28px -12px rgba(0,0,0,.12);
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 32px -14px rgba(80,60,35,.18);
 
   /* Тот же смысл, что в тёмной, но читаемо на белом: пастель темнеет. */
   color-scheme: light;
-  --link:      #2b6cb8;
-  --soft-ok:   #0f7a3d;
-  --soft-bad:  #b3212f;
-  --soft-warn: #8a5b00;
+  --link:      #33639c;
+  --soft-ok:   #2f7d37;
+  --soft-bad:  #b23a3a;
+  --soft-warn: #8a6a12;
 }
 
 [data-theme="light"] .site-foot { color: var(--mute); }
@@ -1567,7 +1569,7 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 
 /* ── WOW redesign: тактический командный центр Server 33 ────────────────── */
 :root { --electric: #a7a3c2; --violet: #9c7cff; --hud-line: color-mix(in srgb, var(--electric) 20%, transparent); }
-:root[data-theme="light"] { --electric: #6d6985; --violet: #7a5dd8; --hud-line: color-mix(in srgb, var(--electric) 34%, transparent); }
+:root[data-theme="light"] { --electric: #6d6962; --violet: #7a5d78; --hud-line: color-mix(in srgb, var(--electric) 30%, transparent); }
 body {
   background:
     radial-gradient(900px 600px at 50% -18%, rgba(255,106,43,.12), transparent 62%),
