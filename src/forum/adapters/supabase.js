@@ -1110,3 +1110,91 @@ export async function addTournamentRound(tournamentId, winnerId = null, notes = 
     body: { tournament_id: tournamentId, winner: winnerId, notes: String(notes) },
   });
 }
+
+/* ── Гайды (wiki) ─────────────────────────────────────────────────────────── */
+
+function guideOut(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    category: row.category || 'strategy',
+    body: row.body,
+    authorId: row.author_id,
+    authorNick: row.author_nick || '',
+    status: row.status || 'published',
+    createdAt: toDate(row.created_at) ?? new Date(),
+    updatedAt: toDate(row.updated_at) ?? new Date(),
+  };
+}
+
+export async function listGuides() {
+  const rows = await rest('/forum_guides?select=*&status=eq.published&order=published_at.desc');
+  return (Array.isArray(rows) ? rows : []).map(guideOut);
+}
+
+export async function getGuide(slug) {
+  const rows = await rest(`/forum_guides?select=*&slug=eq.${encodeURIComponent(slug)}&limit=1`);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  return row ? guideOut(row) : null;
+}
+
+export async function createGuide(draft) {
+  const rows = await rest('/forum_guides', {
+    method: 'POST',
+    prefer: 'return=representation',
+    body: {
+      slug: String(draft.slug),
+      title: String(draft.title),
+      category: String(draft.category || 'strategy'),
+      body: String(draft.body),
+    },
+  });
+  const created = Array.isArray(rows) ? rows[0] : rows;
+  return guideOut(created);
+}
+
+export async function updateGuide(id, patch) {
+  const body = {};
+  if (patch.title != null) body.title = String(patch.title);
+  if (patch.category != null) body.category = String(patch.category);
+  if (patch.body != null) body.body = String(patch.body);
+  if (patch.status != null) body.status = String(patch.status);
+  const rows = await rest(`/forum_guides?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    prefer: 'return=representation',
+    body,
+  });
+  const updated = Array.isArray(rows) ? rows[0] : rows;
+  return guideOut(updated);
+}
+
+export async function deleteGuide(id) {
+  await rest(`/forum_guides?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/* ── Push-настройки (посты форума) ────────────────────────────────────────── */
+
+export async function getPushPrefs() {
+  const me = currentUserId();
+  if (!me) return { newForumPost: false, newForumReply: false };
+  const rows = await rest(`/forum_push_prefs?user_id=eq.${encodeURIComponent(me)}&limit=1`);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  return {
+    newForumPost: Boolean(row?.new_forum_post),
+    newForumReply: Boolean(row?.new_forum_reply),
+  };
+}
+
+export async function setPushPrefs(prefs) {
+  const me = currentUserId();
+  if (!me) throw new Error('Сначала войдите');
+  const body = { user_id: me };
+  if (prefs.newForumPost != null) body.new_forum_post = Boolean(prefs.newForumPost);
+  if (prefs.newForumReply != null) body.new_forum_reply = Boolean(prefs.newForumReply);
+  await rest('/forum_push_prefs', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates',
+    body,
+  });
+}

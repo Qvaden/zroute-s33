@@ -1718,3 +1718,97 @@
 }
 .forum-lead__score .num { font-size: 13px; color: var(--text); }
 .forum-lead__empty { margin: 10px 0 2px; font-size: 13px; }
+
+
+/* -- Гайды (wiki) ----------------------------------------------------------- */
+
+.guides-page .panel__head { margin-bottom: 12px; }
+.guides-page .panel__head h1 { font-size: clamp(20px, 3vw, 26px); margin: 4px 0 0; }
+
+.guide-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.guide-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mute);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.guide-chip:hover { color: var(--text); border-color: var(--accent); }
+.guide-chip.is-on {
+  color: #14100c;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.guide-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.guide-card { }
+.guide-card a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color .15s, transform .15s;
+}
+.guide-card a:hover { border-color: var(--accent); transform: translateY(-1px); }
+.guide-card__cat {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.guide-card__title { font-size: 15px; line-height: 1.35; }
+.guide-card__by { font-size: 11.5px; }
+.guide-list-wrap { margin-top: 14px; }
+
+.guide-composer {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  margin: 12px 0;
+  border-radius: 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+}
+.guide-composer .forum-composer__actions { display: flex; gap: 8px; }
+.guide-composer textarea { min-height: 180px; resize: vertical; }
+.guide-composer .forum-error { display: block; }
+
+.guide-detail .back { display: inline-block; margin-bottom: 10px; }
+.guide-detail h1 { font-size: clamp(20px, 3vw, 27px); margin: 6px 0 2px; }
+.guide-detail .guide-card__cat { display: inline-block; margin-top: 10px; }
+.guide-content { margin-top: 16px; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.guide-content p { margin: 0 0 10px; }
+.guide-content blockquote {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--raised);
+  border-radius: 6px;
+  font-size: 14px;
+}
+.guide-content pre {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.guide-content code { font-family: var(--mono, monospace); font-size: 13px; }
+.guide-detail__acts { margin-top: 20px; }

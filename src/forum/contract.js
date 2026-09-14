@@ -204,6 +204,27 @@
  * @property {() => Promise<ForumTournament[]>} [listTournaments]
  * @property {(allyA: string, allyB: string, title?: string) => Promise<ForumTournament>} [createTournament]
  * @property {(tournamentId: string, winnerId: string|null, notes?: string) => Promise<void>} [addTournamentRound]
+ * @property {() => Promise<ForumGuide[]>} [listGuides]
+ * @property {(slug: string) => Promise<ForumGuide|null>} [getGuide]
+ * @property {(draft: {slug: string, title: string, category?: string, body: string}) => Promise<ForumGuide>} [createGuide]
+ * @property {(id: string, patch: {title?: string, category?: string, body?: string, status?: string}) => Promise<ForumGuide>} [updateGuide]
+ * @property {(id: string) => Promise<void>} [deleteGuide]
+ * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean}>} [getPushPrefs]
+ * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
+ */
+
+/**
+ * @typedef {Object} ForumGuide
+ * @property {string} id
+ * @property {string} slug
+ * @property {string} title
+ * @property {string} category
+ * @property {string} body
+ * @property {string|null} authorId
+ * @property {string} authorNick
+ * @property {'draft'|'published'|'archived'} status
+ * @property {Date} createdAt
+ * @property {Date} updatedAt
  */
 
 /**

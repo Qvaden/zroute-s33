@@ -30,41 +30,63 @@ serve(async (req) => {
   try {
     const payload = await req.json();
     const record = payload?.record;
-    if (!record?.chat_id || !record?.author_id) {
+    if (!record || !record.author_id) {
       return new Response("no record", { status: 200 });
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const source = record.source || "chat";
 
-    // Найти участников чата (кроме автора сообщения).
-    const { data: members } = await admin
-      .from("forum_chat_members")
-      .select("user_id")
-      .eq("chat_id", record.chat_id)
-      .neq("user_id", record.author_id);
+    // Кто должен получить push и какой текст — зависит от источника события.
+    let recipientIds: string[] = [];
+    let notif = { title: "", body: "", tag: "server-33" };
 
-    if (!members?.length) {
+    if (source === "forum_post") {
+      // Подписанные на новые посты форума (кроме автора).
+      const { data: prefs } = await admin
+        .from("forum_push_prefs")
+        .select("user_id")
+        .eq("new_forum_post", true);
+      recipientIds = (prefs || [])
+        .map((p: { user_id: string }) => p.user_id)
+        .filter((id: string) => id !== record.author_id);
+      notif = {
+        title: "Новый пост на форуме",
+        body: `${record.author_nick || "Участник"}: ${record.title || ""}`.slice(0, 120),
+        tag: `post-${record.post_id}`,
+      };
+    } else {
+      // Обычный чат: участники комнаты, кроме автора.
+      if (!record.chat_id) return new Response("no chat", { status: 200 });
+      const { data: members } = await admin
+        .from("forum_chat_members")
+        .select("user_id")
+        .eq("chat_id", record.chat_id)
+        .neq("user_id", record.author_id);
+      recipientIds = (members || []).map((m: { user_id: string }) => m.user_id);
+      const body = record.body || "📎 Вложение";
+      notif = {
+        title: `${record.author_nick || "Участник"}: сообщение`,
+        body: body.length > 100 ? body.slice(0, 97) + "…" : body,
+        tag: `chat-${record.chat_id}`,
+      };
+    }
+
+    if (!recipientIds.length) {
       return new Response("no members", { status: 200 });
     }
 
     // Найти push-подписки для этих участников.
-    const memberIds = members.map((m: { user_id: string }) => m.user_id);
     const { data: subs } = await admin
       .from("push_subscriptions")
       .select("endpoint, keys")
-      .in("user_id", memberIds);
+      .in("user_id", recipientIds);
 
     if (!subs?.length) {
       return new Response("no subscriptions", { status: 200 });
     }
 
-    const body = record.body || "📎 Вложение";
-    const preview = body.length > 100 ? body.slice(0, 97) + "…" : body;
-    const notification = JSON.stringify({
-      title: `${record.author_nick || "Участник"}: сообщение`,
-      body: preview,
-      tag: `chat-${record.chat_id}`,
-    });
+    const notification = JSON.stringify(notif);
 
     const results = await Promise.allSettled(
       subs.map(async (sub: { endpoint: string; keys: Record<string, string> }) => {

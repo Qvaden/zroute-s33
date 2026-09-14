@@ -1437,3 +1437,96 @@ export async function addTournamentRound(tournamentId, winnerId = null, notes = 
   else if (t.winsB > t.winsA + remaining) { t.winner = t.allyB; t.status = 'finished'; }
   write(s);
 }
+
+/* ── Гайды (wiki) в локальном режиме ─────────────────────────────────────── */
+
+function guideOut(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    category: row.category || 'strategy',
+    body: row.body,
+    authorId: row.authorId,
+    authorNick: row.authorNick || '',
+    status: row.status || 'published',
+    createdAt: new Date(row.createdAt),
+    updatedAt: new Date(row.updatedAt),
+  };
+}
+
+export async function listGuides() {
+  const s = read();
+  return (s.guides || []).filter((g) => g.status === 'published').map(guideOut);
+}
+
+export async function getGuide(slug) {
+  const s = read();
+  const g = (s.guides || []).find((x) => x.slug === slug);
+  return g ? guideOut(g) : null;
+}
+
+export async function createGuide(draft) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!me.isLeader && !isStaff(me)) throw new Error('Гайды пишут лидеры альянсов');
+  const slug = String(draft.slug || '').toLowerCase().trim();
+  if (!/^[a-z0-9а-яё-]{2,80}$/.test(slug)) throw new Error('Slug: только буквы, цифры и дефис');
+  if ((s.guides || []).some((g) => g.slug === slug)) throw new Error('Такой slug уже занят');
+  const title = String(draft.title).trim();
+  if (title.length < 2) throw new Error('Заголовок слишком короткий');
+  const now = new Date().toISOString();
+  const g = {
+    id: newId('g'), slug, title,
+    category: String(draft.category || 'strategy'),
+    body: String(draft.body),
+    authorId: me.id, authorNick: me.nick,
+    status: 'published',
+    createdAt: now, updatedAt: now,
+  };
+  if (!s.guides) s.guides = [];
+  s.guides.push(g);
+  write(s);
+  return guideOut(g);
+}
+
+export async function updateGuide(id, patch) {
+  const s = read();
+  const me = meOrThrow(s);
+  const g = (s.guides || []).find((x) => x.id === id);
+  if (!g) throw new Error('Гайд не найден');
+  if (g.authorId !== me.id && !isStaff(me)) throw new Error('Недостаточно прав');
+  if (patch.title != null) g.title = String(patch.title).trim();
+  if (patch.category != null) g.category = String(patch.category);
+  if (patch.body != null) g.body = String(patch.body);
+  if (patch.status != null) g.status = String(patch.status);
+  g.updatedAt = new Date().toISOString();
+  write(s);
+  return guideOut(g);
+}
+
+export async function deleteGuide(id) {
+  const s = read();
+  const me = meOrThrow(s);
+  const g = (s.guides || []).find((x) => x.id === id);
+  if (!g) return;
+  if (g.authorId !== me.id && !isStaff(me)) throw new Error('Недостаточно прав');
+  s.guides = s.guides.filter((x) => x.id !== id);
+  write(s);
+}
+
+/* ── Push-настройки (посты форума) в локальном режиме ─────────────────────── */
+
+export async function getPushPrefs() {
+  const s = read();
+  const p = s.pushPrefs || {};
+  return { newForumPost: Boolean(p.newForumPost), newForumReply: Boolean(p.newForumReply) };
+}
+
+export async function setPushPrefs(prefs) {
+  const s = read();
+  s.pushPrefs = { ...(s.pushPrefs || {}) };
+  if (prefs.newForumPost != null) s.pushPrefs.newForumPost = Boolean(prefs.newForumPost);
+  if (prefs.newForumReply != null) s.pushPrefs.newForumReply = Boolean(prefs.newForumReply);
+  write(s);
+}

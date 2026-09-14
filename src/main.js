@@ -26,6 +26,7 @@ import './ui/timeline-controls.js?v=34';
 import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=34';
 import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=34';
 import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=34';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=34';
 
 /*
   РАЗДЕЛЫ.
@@ -53,6 +54,7 @@ const ROUTES = [
   { id: 'forum', label: 'Форум', live: true, primary: true },
   { id: 'chats', label: 'Чаты', live: true, primary: true },
   { id: 'tournaments', label: 'Турниры', live: true, primary: true },
+  { id: 'guides', label: 'Гайды', live: true, primary: true },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -357,6 +359,7 @@ function render() {
     if (route.id === 'chats') {
       unmountForum();
       unmountTournaments();
+      unmountGuides();
       app.innerHTML = '';
       // Второй сегмент — id чата; ссылка-приглашение: #/chats/join/<код>.
       const rest = location.hash.replace(/^#\/?chats\/?/, '');
@@ -365,12 +368,23 @@ function render() {
     } else if (route.id === 'tournaments') {
       unmountForum();
       unmountChats();
+      unmountGuides();
       app.innerHTML = '';
       mountTournaments(app, view.alliances);
       path = '/tournaments';
+    } else if (route.id === 'guides') {
+      unmountForum();
+      unmountChats();
+      unmountTournaments();
+      app.innerHTML = '';
+      // Второй сегмент — slug гайда: #/guides/na-sklad.
+      const rest = location.hash.replace(/^#\/?guides\/?/, '');
+      mountGuides(app, rest ? decodeURIComponent(rest) : null);
+      path = rest ? '/guides/slug' : '/guides';
     } else if (route.live) {
       unmountChats();
       unmountTournaments();
+      unmountGuides();
       /*
         Живому разделу нельзя просто подставить строку: он сам решает, что
         показать, потому что ждёт ответа хранилища. Второй сегмент адреса —

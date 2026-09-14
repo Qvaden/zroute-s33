@@ -1473,3 +1473,147 @@ select
 from public.forum_users u;
 
 grant select on public.forum_profiles to anon, authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ГАЙДЫ (wiki) и push на новые посты форума. Повторный запуск безопасен.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ── Гайды игроков ───────────────────────────────────────────────────────
+
+create table if not exists public.forum_guides (
+  id           uuid primary key default gen_random_uuid(),
+  slug         text not null unique,
+  title        text not null,
+  category     text not null default 'strategy',
+  body         text not null,
+  author_id    uuid references public.forum_users (id) on delete set null,
+  author_nick  text not null default '',
+  status       text not null default 'published' check (status in ('draft','published','archived')),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  published_at timestamptz
+);
+
+create index if not exists forum_guides_cat_idx on public.forum_guides (category, published_at desc);
+
+alter table public.forum_guides enable row level security;
+
+-- Опубликованное видят все; черновик — только автор и модерация.
+drop policy if exists forum_guides_read on public.forum_guides;
+create policy forum_guides_read on public.forum_guides
+  for select using (status = 'published' or author_id = auth.uid() or public.forum_is_staff());
+
+drop policy if exists forum_guides_insert on public.forum_guides;
+create policy forum_guides_insert on public.forum_guides
+  for insert with check (public.forum_is_leader() and public.forum_can_write());
+
+drop policy if exists forum_guides_update on public.forum_guides;
+create policy forum_guides_update on public.forum_guides
+  for update using (author_id = auth.uid() or public.forum_is_staff());
+
+drop policy if exists forum_guides_delete on public.forum_guides;
+create policy forum_guides_delete on public.forum_guides
+  for delete using (author_id = auth.uid() or public.forum_is_staff());
+
+-- Автора подставляет база; slug не даёт дублей, published_at проставляется сам.
+create or replace function public.forum_guide_before()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is not null then
+    new.author_id := auth.uid();
+    select nick into new.author_nick from public.forum_users where id = auth.uid();
+  end if;
+  new.title := left(btrim(new.title), 120);
+  if char_length(new.title) < 2 then
+    raise exception 'Заголовок гайда короче двух символов';
+  end if;
+  new.slug := lower(btrim(new.slug));
+  if new.slug !~ '^[a-z0-9а-яё-]{2,80}$' then
+    raise exception 'Slug: только буквы, цифры и дефис';
+  end if;
+  new.slug := left(new.slug, 80);
+  new.updated_at := now();
+  if new.status = 'published' and new.published_at is null then
+    new.published_at := now();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_guide_before on public.forum_guides;
+create trigger forum_guide_before
+  before insert or update on public.forum_guides
+  for each row execute function public.forum_guide_before();
+
+grant select, insert, update, delete on public.forum_guides to authenticated;
+
+-- ── Настройки push по типам событий ─────────────────────────────────────
+
+-- Кто на что подписан сверх чатов: новые посты форума, комментарии.
+create table if not exists public.forum_push_prefs (
+  user_id          uuid primary key references public.forum_users (id) on delete cascade,
+  new_forum_post   boolean not null default false,
+  new_forum_reply  boolean not null default false,
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.forum_push_prefs enable row level security;
+
+drop policy if exists forum_push_prefs_read on public.forum_push_prefs;
+create policy forum_push_prefs_read on public.forum_push_prefs
+  for select using (user_id = auth.uid() or public.forum_is_staff());
+
+drop policy if exists forum_push_prefs_write on public.forum_push_prefs;
+create policy forum_push_prefs_write on public.forum_push_prefs
+  for insert with check (user_id = auth.uid());
+
+drop policy if exists forum_push_prefs_update on public.forum_push_prefs;
+create policy forum_push_prefs_update on public.forum_push_prefs
+  for update using (user_id = auth.uid());
+
+grant select, insert, update on public.forum_push_prefs to authenticated;
+
+-- ── Push на новый пост форума: webhook на Edge Function ─────────────────
+
+-- При вставке поста уведомляем подписчиков. Автору — не шлём.
+create or replace function public.forum_post_push_trigger()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_url text;
+  v_key text;
+begin
+  if new.deleted then return new; end if;
+  v_url := coalesce(
+    current_setting('app.settings.supabase_url', true),
+    'https://ebumybzkrhhyinpjpeuk.supabase.co'
+  );
+  v_key := current_setting('app.settings.supabase_anon_key', true);
+  perform net.http_post(
+    url     := v_url || '/functions/v1/send-push',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer ' || coalesce(v_key, '')
+    ),
+    body := jsonb_build_object(
+      'record', jsonb_build_object(
+        'source',      'forum_post',
+        'post_id',     new.id,
+        'author_id',   new.author_id,
+        'author_nick', new.author_nick,
+        'title',       new.title,
+        'category',    new.category
+      )
+    )
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_post_push on public.forum_posts;
+create trigger forum_post_push
+  after insert on public.forum_posts
+  for each row execute function public.forum_post_push_trigger();
