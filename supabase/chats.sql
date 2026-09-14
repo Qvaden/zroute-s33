@@ -1138,6 +1138,10 @@ create policy forum_user_likes_delete on public.forum_user_likes
 grant select, insert, delete on public.forum_user_likes to authenticated;
 
 -- ── 2. Обновлённый view profiles: добавляем likes_received и online ─────
+-- Колонка last_seen_at нужна представлению, поэтому добавляем её ДО
+-- пересоздания представления, а не после (как было).
+
+alter table public.forum_users add column if not exists last_seen_at timestamptz;
 
 create or replace view public.forum_profiles
 with (security_invoker = off) as
@@ -1182,8 +1186,7 @@ from public.forum_users u;
 grant select on public.forum_profiles to anon, authenticated;
 
 -- ── 3. last_seen_at на forum_users (для онлайн) ─────────────────────────
-
-alter table public.forum_users add column if not exists last_seen_at timestamptz;
+-- Сама колонка уже добавлена выше, перед пересозданием forum_profiles.
 
 -- Триггер: при любом обновлении читать/писать в базе обновляем last_seen_at.
 -- Если триггер уже есть от forum_chat_members — пропускаем (IF NOT EXISTS).
