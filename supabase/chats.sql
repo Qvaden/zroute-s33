@@ -27,6 +27,36 @@
 alter table public.forum_users
   add column if not exists is_leader boolean not null default false;
 
+-- forum_profiles ниже говорит про last_seen_at, поэтому колонка нужна ДО вида.
+alter table public.forum_users
+  add column if not exists last_seen_at timestamptz;
+
+-- Лайки на профиль — до представления forum_profiles, которое их считает.
+-- Один пользователь — один лайк на один профиль (unique).
+create table if not exists public.forum_profile_likes (
+  id         uuid primary key default gen_random_uuid(),
+  from_user  uuid not null references public.forum_users (id) on delete cascade,
+  to_user    uuid not null references public.forum_users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (from_user, to_user)
+);
+
+alter table public.forum_profile_likes enable row level security;
+
+drop policy if exists forum_profile_likes_read on public.forum_profile_likes;
+create policy forum_profile_likes_read on public.forum_profile_likes
+  for select using (true);
+
+drop policy if exists forum_profile_likes_insert on public.forum_profile_likes;
+create policy forum_profile_likes_insert on public.forum_profile_likes
+  for insert with check (from_user = auth.uid() and from_user <> to_user);
+
+drop policy if exists forum_profile_likes_delete on public.forum_profile_likes;
+create policy forum_profile_likes_delete on public.forum_profile_likes
+  for delete using (from_user = auth.uid());
+
+grant select, insert, delete on public.forum_profile_likes to authenticated;
+
 -- Публичный профиль показывает отметку лидера: у имени в чате и на странице.
 --
 -- ВАЖНО: без drop. Postgres позволяет create or replace view, только если
@@ -68,14 +98,26 @@ select
       from public.forum_posts p
      where p.author_id = u.id and p.category = 'blog' and p.deleted = false
   ), 0) as blog_views,
-  coalesce((
+coalesce((
     select count(*)
-      from public.forum_posts p
-     where p.author_id = u.id and p.category = 'blog' and p.deleted = false
+    from public.forum_posts p
+    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
   ), 0) as blog_post_count,
   -- Лидер альянса: новая колонка В КОНЦЕ, поэтому create or replace
   -- проходит без drop — зависимые лента и комментарии остаются целы.
-  u.is_leader
+  u.is_leader,
+  -- Онлайн: последняя активность (обновляет триггер forum_user_seen).
+  u.last_seen_at,
+  -- Репутация: сколько людей поставили лайк на профиль.
+  coalesce((
+    select count(*) from public.forum_profile_likes fl
+    where fl.to_user = u.id
+  ), 0) as profile_likes,
+  -- Мету «я лайкнул» считает сама база: гость получает false, вошедший — честно.
+  coalesce((
+    select 1 from public.forum_profile_likes fl
+    where fl.to_user = u.id and fl.from_user = auth.uid() limit 1
+  ), 0) as i_liked
 from public.forum_users u;
 
 grant select on public.forum_profiles to anon, authenticated;
@@ -1111,82 +1153,8 @@ create trigger push_subscription_author
 -- Запускать ПОСЛЕ предыдущих блоков chats.sql. Повторный запуск безопасен.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ── 1. Репутация участников ─────────────────────────────────────────────
-
--- Лайк на профиль: один пользователь — один лайк на один профиль.
-create table if not exists public.forum_user_likes (
-  from_user uuid not null references public.forum_users (id) on delete cascade,
-  to_user   uuid not null references public.forum_users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (from_user, to_user)
-);
-
-alter table public.forum_user_likes enable row level security;
-
-drop policy if exists forum_user_likes_read on public.forum_user_likes;
-create policy forum_user_likes_read on public.forum_user_likes
-  for select using (true);
-
-drop policy if exists forum_user_likes_insert on public.forum_user_likes;
-create policy forum_user_likes_insert on public.forum_user_likes
-  for insert with check (from_user = auth.uid() and from_user <> to_user);
-
-drop policy if exists forum_user_likes_delete on public.forum_user_likes;
-create policy forum_user_likes_delete on public.forum_user_likes
-  for delete using (from_user = auth.uid());
-
-grant select, insert, delete on public.forum_user_likes to authenticated;
-
--- ── 2. Обновлённый view profiles: добавляем likes_received и online ─────
--- Колонка last_seen_at нужна представлению, поэтому добавляем её ДО
--- пересоздания представления, а не после (как было).
-
-alter table public.forum_users add column if not exists last_seen_at timestamptz;
-
-create or replace view public.forum_profiles
-with (security_invoker = off) as
-select
-  u.id,
-  u.nick,
-  u.avatar_url,
-  u.about,
-  u.alliance_tag,
-  u.role,
-  u.is_blogger,
-  u.is_leader,
-  u.created_at,
-  (select count(*) from public.forum_posts p
-     where p.author_id = u.id and p.deleted = false) as post_count,
-  (select count(*) from public.forum_comments c
-     where c.author_id = u.id and c.deleted = false) as comment_count,
-  coalesce((
-    select count(*) from public.forum_reactions r
-    join public.forum_posts p on p.id = r.target_id
-     where r.target_type = 'post' and p.author_id = u.id and r.reaction = 'like'
-  ), 0) as likes_received,
-  -- Новые: лайки на профиль
-  coalesce((
-    select count(*) from public.forum_user_likes ul
-    where ul.to_user = u.id
-  ), 0) as profile_likes,
-  -- Новые: онлайн (последнее обновление)
-  u.last_seen_at,
-  coalesce((
-    select sum(p.views)
-    from public.forum_posts p
-    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
-  ), 0) as blog_views,
-  coalesce((
-    select count(*)
-    from public.forum_posts p
-    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
-  ), 0) as blog_post_count
-from public.forum_users u;
-
-grant select on public.forum_profiles to anon, authenticated;
-
--- ── 3. last_seen_at на forum_users (для онлайн) ─────────────────────────
--- Сама колонка уже добавлена выше, перед пересозданием forum_profiles.
+-- ── Онлайн: last_seen_at на forum_users ─────────────────────────────────
+-- Колонка добавлена в начале файла, перед каноническим forum_profiles.
 
 -- Триггер: при любом обновлении читать/писать в базе обновляем last_seen_at.
 -- Если триггер уже есть от forum_chat_members — пропускаем (IF NOT EXISTS).
@@ -1290,7 +1258,7 @@ left join (select author_id, count(*) cnt from public.forum_posts where deleted 
 left join (select author_id, count(*) cnt from public.forum_comments where deleted = false group by author_id) cm on cm.author_id = u.id
 left join (select author_id, count(*) cnt from public.forum_chat_messages where deleted = false group by author_id) ch on ch.author_id = u.id
 left join (select user_id, count(*) chats_joined from public.forum_chat_members group by user_id) cj on cj.user_id = u.id
-left join (select to_user, count(*) cnt from public.forum_user_likes group by to_user) ul on ul.to_user = u.id;
+left join (select to_user, count(*) cnt from public.forum_profile_likes group by to_user) ul on ul.to_user = u.id;
 
 grant select on public.user_activity_stats to authenticated;
 
@@ -1403,79 +1371,6 @@ drop trigger if exists vs_tournament_round_update on public.vs_tournament_rounds
 create trigger vs_tournament_round_update
   after insert on public.vs_tournament_rounds
   for each row execute function public.vs_tournament_round_update();
-
--- ═══════════════════════════════════════════════════════════════════════════
--- РАСШИРЕННЫЕ ФИЧИ 2: лайки на профили, онлайн, статья недели
--- ═══════════════════════════════════════════════════════════════════════════
-
--- ── Лайки на профили (репутация) ────────────────────────────────────────
-
-create table if not exists public.forum_profile_likes (
-  id         uuid primary key default gen_random_uuid(),
-  from_user  uuid not null references public.forum_users (id) on delete cascade,
-  to_user    uuid not null references public.forum_users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  unique (from_user, to_user)
-);
-
-alter table public.forum_profile_likes enable row level security;
-
-drop policy if exists forum_profile_likes_read on public.forum_profile_likes;
-create policy forum_profile_likes_read on public.forum_profile_likes
-  for select using (true);
-
-drop policy if exists forum_profile_likes_insert on public.forum_profile_likes;
-create policy forum_profile_likes_insert on public.forum_profile_likes
-  for insert with check (from_user = auth.uid() and from_user <> to_user);
-
-drop policy if exists forum_profile_likes_delete on public.forum_profile_likes;
-create policy forum_profile_likes_delete on public.forum_profile_likes
-  for delete using (from_user = auth.uid());
-
-grant select, insert, delete on public.forum_profile_likes to authenticated;
-
--- ── Обновлённый view forum_profiles с лайками и онлайном ──────────────────
-
-drop view if exists public.forum_profiles;
-create view public.forum_profiles
-with (security_invoker = off) as
-select
-  u.id,
-  u.nick,
-  u.avatar_url,
-  u.about,
-  u.alliance_tag,
-  u.role,
-  u.is_blogger,
-  u.created_at,
-  u.last_seen_at,
-  (select count(*) from public.forum_posts p
-     where p.author_id = u.id and p.deleted = false) as post_count,
-  (select count(*) from public.forum_comments c
-     where c.author_id = u.id and c.deleted = false) as comment_count,
-  coalesce((
-    select count(*) from public.forum_reactions r
-    join public.forum_posts p on p.id = r.target_id
-     where r.target_type = 'post' and p.author_id = u.id and r.reaction = 'like'
-  ), 0) as likes_received,
-  coalesce((select count(*) from public.forum_profile_likes fl
-            where fl.to_user = u.id), 0) as profile_likes,
-  coalesce((select 1 from public.forum_profile_likes fl
-            where fl.to_user = u.id and fl.from_user = auth.uid() limit 1), 0) as i_liked,
-  coalesce((
-    select sum(p.views)
-    from public.forum_posts p
-    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
-  ), 0) as blog_views,
-  coalesce((
-    select count(*)
-    from public.forum_posts p
-    where p.author_id = u.id and p.category = 'blog' and p.deleted = false
-  ), 0) as blog_post_count,
-  u.is_leader
-from public.forum_users u;
-
-grant select on public.forum_profiles to anon, authenticated;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ГАЙДЫ (wiki) и push на новые посты форума. Повторный запуск безопасен.
