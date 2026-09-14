@@ -105,7 +105,8 @@ function userOut(u) {
     about: u.about || '',
     allianceTag: u.allianceTag || '',
     isBlogger: Boolean(u.isBlogger),
-    isLeader: Boolean(u.isLeader),
+    isLeader: Boolean(u.isLeader || (u.leaderOf ?? '') !== ''),
+    leaderOf: u.leaderOf || '',
     canEditSite: Boolean(u.canEditSite) || u.role === 'admin',
     createdAt: toDate(u.createdAt) ?? new Date(),
     mutedUntil: toDate(u.mutedUntil),
@@ -973,12 +974,20 @@ function chatView(s, c, meId) {
   };
 }
 
-export async function setLeader(userId, isLeader) {
+export async function setLeader(userId, allianceTag) {
   const s = read();
   if (!isStaff(meOrThrow(s))) throw new Error('Недостаточно прав');
   const user = s.users.find((u) => u.id === userId);
   if (!user) throw new Error('Игрок не найден');
-  user.isLeader = Boolean(isLeader);
+  const tag = String(allianceTag || '').trim().toUpperCase().slice(0, 12);
+  if (tag) {
+    // Один лидер на альянс: предыдущего держателя тега снимаем.
+    for (const u of s.users) {
+      if (u.id !== userId && (u.leaderOf || '') === tag) u.leaderOf = '';
+    }
+  }
+  user.leaderOf = tag;
+  user.isLeader = tag !== '';
   write(s);
 }
 

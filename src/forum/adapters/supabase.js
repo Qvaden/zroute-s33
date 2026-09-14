@@ -99,6 +99,7 @@ function userOut(row) {
     allianceTag: row.alliance_tag || '',
     isBlogger: Boolean(row.is_blogger),
     isLeader: Boolean(row.is_leader),
+    leaderOf: row.leader_of || '',
     canEditSite: Boolean(row.can_edit_site) || row.role === 'admin',
     createdAt: toDate(row.created_at) ?? new Date(),
     mutedUntil: toDate(row.muted_until),
@@ -639,13 +640,15 @@ export async function setBlogger(userId, isBlogger) {
 }
 
 /**
- * Отметка лидера альянса: право создавать закрытые чаты. Не роль сайта —
- * доверие своему альянсу. Выдаёт модерация, снимается тем же нажатием.
+ * Лидерство привязано к альянсу: у лидера заполнен leader_of (тег альянса),
+ * и на один альянс — один лидер. Назначает и снимает функция в базе
+ * (forum_set_leader): она по-хозяйски снимает предыдущего лидера того же тега
+ * и держит is_leader синхронным. Пустой тег = снятие.
  */
-export async function setLeader(userId, isLeader) {
-  await rest(`/forum_users?id=eq.${encodeURIComponent(userId)}`, {
-    method: 'PATCH',
-    body: { is_leader: Boolean(isLeader) },
+export async function setLeader(userId, allianceTag) {
+  await rest('/rpc/forum_set_leader', {
+    method: 'POST',
+    body: { target_user: userId, leader_of: String(allianceTag || '') },
   });
 }
 

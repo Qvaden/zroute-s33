@@ -29,6 +29,8 @@
  * @property {Date|null} [mutedUntil]  До этого времени писать нельзя.
  * @property {boolean} [banned]     Запрет без срока.
  * @property {string} [banReason]
+ * @property {boolean} [isLeader]   Признак лидера альянса (производный от leaderOf).
+ * @property {string} [leaderOf]    Тег альянса, лидером которого он является; пусто — не лидер.
  */
 
 /**
@@ -171,7 +173,7 @@
  *
  * Закрытые чаты (см. supabase/chats.sql). Создаёт лидер альянса
  * (ForumUser.isLeader) или модерация; читают только участники и модерация.
- * @property {(userId: string, isLeader: boolean) => Promise<void>} setLeader
+ * @property {(userId: string, allianceTag: string) => Promise<void>} setLeader  Назначить лидера тега allianceTag; пустой тег — снять.
  * @property {() => Promise<ForumChat[]>} listChats
  * @property {(id: string) => Promise<ForumChat|null>} getChat
  * @property {(draft: {title: string, kind?: 'alliance'|'inter', allianceTag?: string}) => Promise<ForumChat>} createChat

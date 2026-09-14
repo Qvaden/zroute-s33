@@ -3071,6 +3071,43 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('панель предупреждает, что пароль покажется один раз',
     /один раз/.test(playersHtml));
 
+  /*
+    Лидерство привязано к альянсу: лидер ведёт конкретный тег, инспекция в
+    списке показывает этот тег, а отдельный блок собирает всех лидеров, чтобы
+    назначение конкурента не потерялось в перечислении игроков.
+  */
+  const leaderHtml = renderPlayers({
+    forum: {
+      configured: true,
+      me,
+      users: [
+        me,
+        { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null },
+        { id: 'u3', nick: 'Рэд', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null, isLeader: true, leaderOf: 'kr33', allianceTag: 'kr33' },
+        { id: 'u4', nick: 'Бэн', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null, isLeader: true, leaderOf: 'FFA' },
+        { id: 'u5', nick: 'Гек', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null, allianceTag: 'bmp' },
+      ],
+    },
+  });
+  check('лидеры собраны в отдельный блок',
+    /Лидеры альянсов/.test(leaderHtml) && /adm-leaders__grid/.test(leaderHtml));
+  check('в блоке лидеров виден тег альянса', /kr33/.test(leaderHtml) && /adm-leader__tag/.test(leaderHtml));
+  check('лидер без альянса попал в блок', /FFA/.test(leaderHtml) && /Снять лидера/.test(leaderHtml));
+  check('лидер в списке помечен своим тегом',
+    /лидер KR33/.test(leaderHtml));
+  check('кнопка лидера подсказывает альянс — своего, если лидер',
+    /Снять лидера \(KR33\)/.test(leaderHtml) && /data-player-lead="1"/.test(leaderHtml));
+  check('не-лидеру кнопка подсказывает его альянс из профиля',
+    /Сделать лидером \(BMP\)/.test(leaderHtml) && /data-player-alliance="bmp"/.test(leaderHtml));
+  check('легенда объясняет привязку лидера к альянсу',
+    /привязано\s*к тегу/.test(leaderHtml));
+  check('назначение идёт через окно с полем тега',
+    /data-leader-form/.test(leaderHtml) && /data-leader-warning/.test(leaderHtml));
+  check('без лидеров блок не рисуется',
+    !renderPlayers({
+      forum: { configured: true, me, users: [me, { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null }] },
+    }).includes('Лидеры альянсов'));
+
   const reportsHtml = renderModeration({
     forum: {
       configured: true,

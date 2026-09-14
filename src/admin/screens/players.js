@@ -92,6 +92,7 @@ export function renderPlayers(view) {
   }
 
   const rows = forum.users.map((u) => renderRow(u, forum.me)).join('');
+  const leaders = renderLeaders(forum.users);
 
   return `
     <section class="panel">
@@ -106,6 +107,8 @@ export function renderPlayers(view) {
       </header>
 
       <div class="adm-result" data-players-result hidden></div>
+
+      ${leaders}
 
       <div class="adm-players">${rows}</div>
 
@@ -127,10 +130,11 @@ export function renderPlayers(view) {
           не ограничивает: это только метка у постов и блок блога на странице.
         </p>
         <p class="muted">
-          <b>Лидер альянса</b> — тот, кто может создавать закрытые чаты
-          (альянсовые и межальянсовые, до 200 человек). Не роль и не право
-          на сайт: доверие своему альянсу. Чаты и их участников видно на
-          вкладке «Чаты».
+          <b>Лидер альянса</b> — один на один альянс, и лидерство привязано
+          к тегу его альянса. Он может создавать закрытые чаты (альянсовые и
+          межальянсовые, до 200 человек). Не роль и не право на сайт: доверие
+          своему альянсу. Чаты и их участников видно на вкладке «Чаты».
+          Назначение нового лидера снимает предыдущего того же альянса.
         </p>
         <p class="muted">
           Пароль показывается один раз и только вам — передайте его человеку сами.
@@ -140,9 +144,44 @@ export function renderPlayers(view) {
       </div>
     </section>
 
+    ${renderLeaderModal()}
     ${renderResetModal()}
     ${renderRestrictModal()}
     ${renderDeleteModal()}`;
+}
+
+/**
+ * Блок «Лидеры альянсов» — отдельная секция над списком, чтобы лидерство
+ * одного альянса не тонуло в общем перечне игроков. Здесь сразу видно,
+ * кто ведёт какой альянс, и назначение нового лидера конкурирует с этим.
+ */
+function renderLeaders(users) {
+  const leaders = users
+    .filter((u) => u.isLeader || (u.leaderOf ?? ''))
+    .sort((a, b) => (a.leaderOf || '').localeCompare(b.leaderOf || '', 'ru'));
+  if (!leaders.length) return '';
+
+  const cards = leaders
+    .map((u) => `
+      <div class="adm-leader" data-player="${esc(u.id)}">
+        <span class="adm-leader__tag">${esc((u.leaderOf || '').toUpperCase())}</span>
+        <b class="adm-leader__nick">${esc(u.nick)}</b>
+        <span class="adm-leader__meta muted">с ${esc(shortDate(u.createdAt))}</span>
+        <div class="adm-leader__acts">
+          <button type="button" class="adm-btn" data-player-leader="${esc(u.id)}"
+                  data-player-nick="${esc(u.nick)}"
+                  data-player-lead="1">
+            Снять лидера
+          </button>
+        </div>
+      </div>`)
+    .join('');
+
+  return `
+    <div class="adm-leaders">
+      <h2 class="adm-leaders__title">Лидеры альянсов</h2>
+      <div class="adm-leaders__grid">${cards}</div>
+    </div>`;
 }
 
 /** Одна строка списка. */
@@ -161,7 +200,7 @@ function renderRow(user, me) {
   return `
     <div class="adm-player" data-player="${esc(user.id)}">
       <div class="adm-player__who">
-        <b>${esc(user.nick)}${roleBadge(user, { short: true })}${user.isLeader ? ' <span class="adm-badge adm-badge--leader">лидер</span>' : ''}</b>
+        <b>${esc(user.nick)}${roleBadge(user, { short: true })}${user.isLeader ? ` <span class="adm-badge adm-badge--leader">лидер ${esc((user.leaderOf || '').toUpperCase())}</span>` : ''}</b>
         <small>с ${esc(shortDate(user.createdAt))}</small>
       </div>
 
@@ -209,8 +248,11 @@ function renderRow(user, me) {
                 <button type="button" class="adm-btn"
                         data-player-leader="${esc(user.id)}"
                         data-player-nick="${esc(user.nick)}"
+                        data-player-alliance="${esc(user.allianceTag || '')}"
                         data-player-lead="${user.isLeader ? '1' : ''}">
-                  ${user.isLeader ? 'Снять лидера' : 'Сделать лидером'}
+                  ${user.isLeader
+                    ? `Снять лидера${(user.leaderOf || '') ? ` (${esc((user.leaderOf || '').toUpperCase())})` : ''}`
+                    : `Сделать лидером${(user.allianceTag || '') ? ` (${esc(user.allianceTag.toUpperCase())})` : ''}`}
                 </button>
                 <button type="button" class="adm-btn"
                         data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"
@@ -222,6 +264,39 @@ function renderRow(user, me) {
                   Удалить навсегда
                 </button>`
         }
+      </div>
+    </div>`;
+}
+
+/**
+ * Окно назначения лидера.
+ *
+ * Лидерство привязано к альянсу: лидер ведёт конкретный тег. Альянс по
+ * умолчанию подставляется из alliance_tag игрока (его же видно в списке),
+ * но здесь его можно поправить, а для игрока без альянса — указать впервые.
+ *
+ * Если тег уже ведёт другой игрок, база снимает его при назначении —
+ * об этом предупреждаем заранее, чтобы назначение не выглядело сюрпризом.
+ */
+function renderLeaderModal() {
+  return `
+    <div class="adm-modal" data-leader-modal hidden>
+      <div class="adm-modal__box" role="dialog" aria-modal="true" aria-label="Назначить лидера">
+        <h3>Сделать лидером <b data-leader-nick></b></h3>
+        <p class="muted" data-leader-warning hidden></p>
+        <form data-leader-form>
+          <label class="adm-field">
+            <span>Альянс (тег) — лидером какого альянса назначаем</span>
+            <input type="text" name="leaderOf" maxlength="12" required
+                   placeholder="Например: KR33"
+                   autocomplete="off">
+          </label>
+          <div class="adm-actions">
+            <button type="submit" class="adm-btn adm-btn--primary">Назначить</button>
+            <button type="button" class="adm-btn" data-leader-cancel>Отмена</button>
+          </div>
+          <div class="adm-result" data-leader-error hidden></div>
+        </form>
       </div>
     </div>`;
 }
