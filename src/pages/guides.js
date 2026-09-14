@@ -17,6 +17,19 @@ const CATEGORIES = [
 
 const catLabel = (id) => (CATEGORIES.find((c) => c.id === id) || {}).label || 'Гайд';
 
+/**
+ * Поиск по гайдам: слово из запроса ищется в заголовке, тексте и авторе.
+ * Порядок без учёта регистра; пустой запрос пропускает всё.
+ */
+function matchQuery(query) {
+  const q = String(query ?? '').trim().toLowerCase();
+  if (!q) return () => true;
+  return (g) =>
+    String(g.title ?? '').toLowerCase().includes(q)
+    || String(g.body ?? '').toLowerCase().includes(q)
+    || String(g.authorNick ?? '').toLowerCase().includes(q);
+}
+
 export function renderGuides(s) {
   if (s.selected) return renderDetail(s, s.selected);
   return renderList(s);
@@ -24,7 +37,8 @@ export function renderGuides(s) {
 
 function renderList(s) {
   const all = Array.isArray(s.guides) ? s.guides : [];
-  const guides = s.category === 'all' ? all : all.filter((g) => g.category === s.category);
+  const guides = (s.category === 'all' ? all : all.filter((g) => g.category === s.category))
+    .filter(matchQuery(s.query ?? ''));
   const cats = [{ id: 'all', label: 'Все' }, ...CATEGORIES];
   const canWrite = s.me && (s.me.isLeader || s.me.role === 'admin' || s.me.role === 'moderator');
 
@@ -44,7 +58,7 @@ function renderList(s) {
             </a>
           </li>`)
         .join('')}</ul>`
-    : '<p class="muted">Гайдов пока нет. Лидер альянса может добавить первый.</p>';
+    : `<p class="muted">${s.query ? 'По запросу ничего не найдено.' : 'Гайдов пока нет. Лидер альянса может добавить первый.'}</p>`;
 
   return `
     <section class="panel guides-page">
@@ -54,6 +68,13 @@ function renderList(s) {
         <p class="muted">Стратегии, советы для новичков и разбор боёв — пишут участники.</p>
       </header>
       <div class="guide-cats" role="tablist">${chips}</div>
+      <label class="guide-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+        </svg>
+        <input type="search" placeholder="Поиск по гайдам…" autocomplete="off" spellcheck="false"
+               data-guide-search value="${esc(s.query ?? '')}">
+      </label>
       ${canWrite && !s.composing
         ? '<button type="button" class="forum-btn forum-btn--primary" data-guide-new>Написать гайд</button>'
         : ''}

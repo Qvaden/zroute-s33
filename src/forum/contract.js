@@ -211,6 +211,8 @@
  * @property {(id: string) => Promise<void>} [deleteGuide]
  * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean}>} [getPushPrefs]
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
+ * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
+ * @property {(userId: string) => Promise<ForumUserActivity|null>} [getUserActivity]  Личный GitHub-график: активность по дням.
  */
 
 /**
@@ -225,6 +227,20 @@
  * @property {'draft'|'published'|'archived'} status
  * @property {Date} createdAt
  * @property {Date} updatedAt
+ */
+
+/**
+ * @typedef {Object} ForumActivityDay
+ * @property {Date} day             День, по местному времени.
+ * @property {number} forumPosts    Тем на форуме за этот день.
+ * @property {number} forumComments Ответов на форуме за этот день.
+ * @property {number} chatMessages  Сообщений в чатах за этот день.
+ */
+
+/**
+ * @typedef {Object} ForumUserActivity
+ * @property {ForumActivityDay[]} days  Активность по дням, старые сверху.
+ * @property {number|null} chatsJoined  Сколько чатов у человека; null — чужая статистика скрыта.
  */
 
 /**

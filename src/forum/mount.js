@@ -20,7 +20,7 @@
  * от document этой проблемы не знает — тот же приём, что в ui/*-controls.js.
  */
 import { forum } from './index.js';
-import { renderForum, renderReportDialog, renderDeleteDialog } from '../pages/forum.js';
+import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY } from '../pages/forum.js';
 import { renderUserPage } from '../pages/user.js';
 import { validateNick, validatePassword, validatePost, validateComment, deletionReason } from './rules.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
@@ -29,6 +29,7 @@ import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './edito
 import { esc } from '../ui/helpers.js';
 import { leaderboardOf } from './leaderboard.js';
 import { CONFIG } from '../../config.js';
+import { startQuarterTimer, stopQuarterTimer } from '../ui/quarter-timer.js';
 
 /** Состояние страницы. Живёт между перерисовками, сбрасывается при уходе. */
 const state = {
@@ -58,6 +59,8 @@ const state = {
   notifyOpen: false,
   notifyList: [],
   notifyUnread: 0,
+  /** Активность сервера: посты и сообщения по дням за неделю; null — нет данных. */
+  activity: null,
 };
 
 /**
@@ -71,6 +74,8 @@ const profileState = {
   nick: '',
   profile: null,
   posts: [],
+  /** Личная статистика: GitHub-график и число чатов; null — источник не умеет. */
+  activity: null,
   editing: false,
   loading: false,
   error: '',
@@ -362,6 +367,14 @@ function paint() {
     ? renderUserPage({ ...profileState, me: state.me })
     : renderForum(siteView, state) + renderReportDialog() + renderDeleteDialog();
 
+  /*
+    Таймер Кварта в боковой колонке форума — свой интервал. При каждой
+    перерисовке элемент [data-quarter-end] создаётся заново, поэтому таймер
+    перезапускаем после полной отрисовки: функцию startQuarterTimer можно
+    звать хоть каждый раз — без элемента она сама ничего не делает.
+  */
+  startQuarterTimer();
+
   restoreInput(snapshot);
   paintPendingShots();
 }
@@ -587,6 +600,43 @@ async function loadNotifications() {
   paint();
 }
 
+async function loadPushPrefs() {
+  /*
+    Push-настройки — только для вошедшего и только когда источник умеет их
+    хранить (настройка getPushPrefs есть не у каждого адаптера). Провал
+    просто оставляет тумблеры скрытыми: уведомления — удобство, а не часть
+    договора страницы.
+  */
+  if (!state.me || typeof forum.getPushPrefs !== 'function') {
+    state.pushPrefs = null;
+    return;
+  }
+  try {
+    state.pushPrefs = await forum.getPushPrefs();
+  } catch {
+    state.pushPrefs = null;
+  }
+}
+
+/**
+ * Активность сервера: посты, комментарии и сообщения в чатах по дням недели.
+ *
+ * Источник — опциональный метод адаптера; если его нет или база ещё не
+ * прогнала миграцию, виджет просто не рисуется (activity остаётся null).
+ * Ошибка не роняет страницу — это статистика, а не договор.
+ */
+async function loadActivity() {
+  if (typeof forum.getServerActivity !== 'function') return;
+  const token = mountToken;
+  try {
+    state.activity = await forum.getServerActivity();
+    if (token !== mountToken) return;
+    if (state.activity) paint();
+  } catch {
+    state.activity = null;
+  }
+}
+
 /* ── Вход ─────────────────────────────────────────────────────────────────── */
 
 async function handleAuth(form, mode, submitter) {
@@ -614,6 +664,7 @@ async function handleAuth(form, mode, submitter) {
       ? await forum.signUp(nick.value, password.value)
       : await forum.signIn(nick.value, password.value);
     await loadNotifications();
+    await loadPushPrefs();
     await loadFeed();
   } catch (err) {
     showError('[data-forum-auth-error]', String(err?.message ?? err));
@@ -750,6 +801,20 @@ async function loadProfile(nick) {
     profileState.posts = profileState.profile
       ? await getUserPosts(profileState.profile.id, 10)
       : [];
+
+    /*
+      Личную статистику тянем только у того, кто умеет её отдавать (опциональный
+      метод адаптера). Ошибка не роняет страницу — график это картинка, а не
+      договор, и без него профиль остаётся прежним.
+    */
+    profileState.activity = null;
+    if (profileState.profile && typeof forum.getUserActivity === 'function') {
+      try {
+        profileState.activity = await forum.getUserActivity(profileState.profile.id);
+      } catch {
+        profileState.activity = null;
+      }
+    }
   } catch (err) {
     profileState.error = String(err?.message ?? err);
   } finally {
@@ -1014,7 +1079,36 @@ function wire() {
       state.notifyOpen = false;
       state.notifyList = [];
       state.notifyUnread = 0;
+      state.pushPrefs = null;
       await loadFeed();
+      return;
+    }
+
+    // Push-настройки: клик по тумблеру. Меняем сразу, ошибку показывать нечем
+    // и не нужно — галка вернётся сама, если сохранение не удалось.
+    const pushPref = t.closest('[data-forum-push-pref]');
+    if (pushPref && host.contains(pushPref)) {
+      const key = pushPref.getAttribute('data-forum-push-pref');
+      if (!state.pushPrefs || !(key in state.pushPrefs)) return;
+      const next = { ...state.pushPrefs, [key]: Boolean(pushPref.checked) };
+      try {
+        await forum.setPushPrefs?.(next);
+        state.pushPrefs = next;
+      } catch {
+        state.pushPrefs = { ...state.pushPrefs };
+      }
+      paint();
+      return;
+    }
+
+    // Баннер «Новый Кварт начался»: «Понятно» запоминает период и скрывает.
+    const dismissQuarter = t.closest('[data-quart-banner-dismiss]');
+    if (dismissQuarter && host.contains(dismissQuarter)) {
+      const number = Number(dismissQuarter.closest('[data-quart-banner]')?.dataset.quartBanner);
+      if (number > 0) {
+        try { localStorage.setItem(QUARTER_SEEN_KEY, String(number)); } catch {}
+      }
+      paint();
       return;
     }
 
@@ -1674,6 +1768,8 @@ export async function mountForum(container, view, postId = null) {
 
   if (state.me) await loadNotifications();
 
+  await loadPushPrefs();
+
   /*
     Просмотр регистрируем при ОТКРЫТИИ темы, а не в loadThread: тот зовётся
     ещё и после правки, удаления или комментария, и каждая такая перерисовка
@@ -1690,6 +1786,12 @@ export async function mountForum(container, view, postId = null) {
     await loadThread(postId);
   } else {
     state.openPostId = null;
+    /*
+      Ленту и активность грузим вместе: это два независимых источника, и ждать
+      их друг за другом нет смысла. Активность не обновляет сразу страницу —
+      она дописывается в state до/вместе с общим paint в loadFeed.
+    */
+    loadActivity();
     await loadFeed();
   }
 }
@@ -1745,6 +1847,7 @@ export async function mountUser(container, nick) {
 
 /** Ушли на другую вкладку: держать чужую разметку в руках незачем. */
 export function unmountForum() {
+  stopQuarterTimer();
   host = null;
   mode = 'feed';
   state.openPostId = null;

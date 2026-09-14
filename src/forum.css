@@ -550,6 +550,45 @@
 }
 
 /*
+  Push-настройки форума под учётной строкой. Своя карточка внутри панели:
+  выключатели отделены от действий профиля, чтобы «Выйти» не путалось
+  с тумблером уведомлений.
+*/
+.forum-push {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-soft);
+}
+.forum-push__head { display: block; }
+.forum-push__head b { display: block; font-size: 12.5px; }
+.forum-push__head small { font-size: 10.5px; }
+.forum-push__grid {
+  display: grid;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+@media (min-width: 560px) {
+  .forum-push__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.forum-push__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  cursor: pointer;
+  font-size: 12.5px;
+  -webkit-tap-highlight-color: transparent;
+}
+.forum-push__row input {
+  accent-color: var(--accent);
+  width: 17px;
+  height: 17px;
+  flex: none;
+  cursor: pointer;
+}
+.forum-push__hint { margin: 5px 0 0; font-size: 10.5px; line-height: 1.45; }
+
+/*
   Колокольчик уведомлений. Счётчик — маленький кружок на кнопке, как у мессенджера:
   число должно читаться, не отвлекая от остальной строки «профиль · выйти».
 */
@@ -1503,6 +1542,49 @@
 }
 .forum-rank__sum { margin: 10px 0 0; font-size: 12px; }
 
+/* ── Личная статистика: GitHub-график ───────────────────────────────────── */
+
+.forum-ghlog { margin-top: 14px; }
+.forum-ghlog .panel__head { align-items: baseline; }
+.forum-ghlog__chats { margin-left: auto; font-size: 12px; color: var(--dim); }
+.forum-ghlog__wrap {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.forum-ghlog__labels {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  font-size: 9px;
+  color: var(--dim);
+  text-align: right;
+  line-height: 12px;
+}
+.forum-ghlog__grid {
+  display: flex;
+  gap: 3px;
+}
+.forum-ghlog__column {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+}
+.gh-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+}
+.gh-cell--0 { opacity: .55; }
+.gh-cell--1 { background: color-mix(in srgb, var(--accent) 30%, var(--raised)); border-color: transparent; }
+.gh-cell--2 { background: color-mix(in srgb, var(--accent) 55%, var(--raised)); border-color: transparent; }
+.gh-cell--3 { background: color-mix(in srgb, var(--accent) 78%, var(--raised)); border-color: transparent; }
+.gh-cell--4 { background: var(--accent); border-color: transparent; }
+
 /* ── Опросы ─────────────────────────────────────────────────────────────── */
 
 .forum-poll {
@@ -1747,6 +1829,69 @@
   color: #14100c;
   background: var(--accent);
   border-color: transparent;
+}
+
+.guide-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  transition: border-color .15s;
+}
+.guide-search:focus-within { border-color: var(--accent); }
+.guide-search svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: var(--mute);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.guide-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.guide-search input::placeholder { color: var(--mute); }
+.guide-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+/* ── Кварт в боковой колонке форума ───────────────────────────────────────── */
+.quart-next { display: grid; gap: 8px; }
+.quart-next .quart-timer { justify-content: space-between; margin-top: 0; }
+.quart-next__more {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.quart-next__more b { font-size: 13px; }
+.quart-next__more:hover { text-decoration: underline; }
+
+.quart-banner {
+  display: grid;
+  gap: 7px;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    var(--raised);
+}
+.quart-banner__title { font-size: 15px; line-height: 1.3; }
+.quart-banner p { margin: 0; font-size: 12px; line-height: 1.5; }
+.quart-banner__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .guide-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

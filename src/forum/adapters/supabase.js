@@ -1198,3 +1198,50 @@ export async function setPushPrefs(prefs) {
     body,
   });
 }
+
+/* ── Активность сервера: посты и сообщения по дням ────────────────────────── */
+
+/**
+ * Последняя неделя активности сервера через RPC get_server_activity.
+ * Возвращает null, если функция в базе ещё не создана (миграция не прогнана) —
+ * виджет просто не рисуется, форум от этого не падает.
+ */
+export async function getServerActivity() {
+  const rows = await rest('/rpc/get_server_activity', {
+    method: 'POST',
+    body: { p_days: 7 },
+  });
+  if (!Array.isArray(rows)) return null;
+  return rows.map((r) => ({
+    day: r.day ? new Date(`${r.day}T00:00:00`) : new Date(),
+    forumPosts: Number(r.forum_posts ?? 0),
+    forumComments: Number(r.forum_comments ?? 0),
+    chatMessages: Number(r.chat_messages ?? 0),
+  }));
+}
+
+/* ── Личная статистика: GitHub-график на странице участника ───────────────── */
+
+/**
+ * Активность конкретного пользователя по дням (для тепловой карты на его
+ * странице) плюс число его чатов. chatsJoined приходит только себе, чужим —
+ * null: личные чаты — не публичная статистика (см. миграцию
+ * user-activity-daily.sql).
+ */
+export async function getUserActivity(userId) {
+  const rows = await rest('/rpc/get_user_activity', {
+    method: 'POST',
+    body: { p_user_id: userId, p_days: 140 },
+  });
+  if (!Array.isArray(rows)) return null;
+  const anyChats = rows.find((r) => r.chats_joined != null)?.chats_joined;
+  return {
+    days: rows.map((r) => ({
+      day: r.day ? new Date(`${r.day}T00:00:00`) : new Date(),
+      forumPosts: Number(r.posts ?? 0),
+      forumComments: Number(r.comments ?? 0),
+      chatMessages: Number(r.chat_messages ?? 0),
+    })),
+    chatsJoined: anyChats != null ? Number(anyChats) : null,
+  };
+}

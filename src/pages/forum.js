@@ -19,7 +19,7 @@
  * поведение — в src/forum/mount.js. Разделение то же, что у остальных
  * страниц, и по той же причине: чистую разметку можно проверить без браузера.
  */
-import { esc, plural } from '../ui/helpers.js';
+import { esc, plural, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
@@ -35,6 +35,13 @@ const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн',
  * в форме. Расхождение между двумя списками ловит тест.
  */
 export const FORUM_THEME_KEY = 'forum-theme';
+
+/**
+ * Ключ: какой номер Кварта человек уже видел на этом устройстве.
+ * Используется баннером «Новый Кварт начался» и его обработчиком в mount.js —
+ * одна строка на оба файла, чтобы не разойтись.
+ */
+export const QUARTER_SEEN_KEY = 's33-quarter-seen';
 
 /**
  * @typedef {Object} ForumViewState
@@ -75,6 +82,10 @@ export function renderForum(view, state = {}) {
     hot: [],
     lead: [],
     leadPeriod: 'week',
+    /** Push-настройки форума: приходит ли уведомление о новом посте и об ответе. */
+    pushPrefs: null,
+    /** Активность сервера: посты и сообщения по дням за неделю; null — нет данных. */
+    activity: null,
     /** Уведомления: открыта ли панель и что в ней. */
     notifyOpen: false,
     notifyList: [],
@@ -97,8 +108,10 @@ export function renderForum(view, state = {}) {
       <aside class="forum-side" aria-label="Сводка и правила">
         ${renderChronicleBand(view?.events ?? [])}
         ${renderWeekTheme(view)}
+        ${renderQuarterBanner(view)}
         ${renderArticleOfWeek(s)}
-        ${renderServerActivity(view)}
+        ${renderServerActivity(view, s)}
+        ${renderQuarterCountdown(view)}
         ${renderHotTopics(s)}
         ${renderLeaderboard(s)}
         ${renderRules()}
@@ -313,26 +326,62 @@ function renderArticleOfWeek(s) {
 
 /* ── Активность сервера ───────────────────────────────────────────────────── */
 
+const DAY_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
 /**
- * Мини-дашборд «что происходит на сервере»: активные альянсы, всего событий,
- * событий за неделю, тем на форуме. Считается из данных сайта, которые уже
- * есть на странице, — отдельных запросов не делает.
+ * Мини-дашборд «что происходит на сервере»: посты и сообщения за сегодня,
+ * активные альянсы, события за неделю, мини-график за 7 дней.
+ *
+ * Числа за день берутся из опционального источника forum.getServerActivity(),
+ * а статистика сайта — из view (уже загруженного).
  */
-function renderServerActivity(view) {
+function renderServerActivity(view, s) {
   const alliances = Array.isArray(view?.alliances) ? view.alliances : [];
   const events = Array.isArray(view?.events) ? view.events : [];
-  if (!alliances.length && !events.length) return '';
-  const active = alliances.filter((a) => a?.active).length;
+  const act = Array.isArray(s?.activity) ? s.activity : [];
+  const today = act.length ? act[act.length - 1] : null;
+
+  if (!alliances.length && !events.length && !act.length) return '';
+
   const weekAgo = Date.now() - 7 * 86400000;
+  const active = alliances.filter((a) => a?.active).length;
   const thisWeek = events.filter((e) => e?.date instanceof Date && e.date.getTime() >= weekAgo).length;
+
+  /*
+    График за 7 дней: суммарная активность (посты + комментарии + сообщения).
+    Три точки и менее sparkline не рисует, поэтому для пустой/короткой недели
+    просто опускаем блок.
+  */
+  const totalByDay = act.map((d) => d.forumPosts + d.forumComments + d.chatMessages);
+  const sparkColor = 'var(--accent)';
+  const chart = totalByDay.some((n) => n > 0) ? sparkline(totalByDay, sparkColor, 180, 28) : '';
+
   return `
     <section class="panel server-stats" aria-label="Активность сервера">
       <span class="eyebrow">Активность сервера</span>
       <div class="server-stats__grid">
-        <div class="server-stat"><b class="num">${active}</b><span>${esc(plural(active, 'активный альянс', 'активных альянса', 'активных альянсов'))}</span></div>
+        ${today ? `
+        <div class="server-stat">
+          <b class="num">${today.forumPosts}</b>
+          <span>${esc(plural(today.forumPosts, 'пост', 'поста', 'постов'))} сегодня</span>
+        </div>
+        <div class="server-stat">
+          <b class="num">${today.chatMessages}</b>
+          <span>${esc(plural(today.chatMessages, 'сообщение', 'сообщения', 'сообщений'))} в чатах</span>
+        </div>` : ''}
+        ${alliances.length ? `
+        <div class="server-stat"><b class="num">${active}</b><span>${esc(plural(active, 'активный альянс', 'активных альянса', 'активных альянсов'))}</span></div>` : ''}
+        ${events.length ? `
         <div class="server-stat"><b class="num">${thisWeek}</b><span>${esc(plural(thisWeek, 'событие', 'события', 'событий'))} за неделю</span></div>
-        <div class="server-stat"><b class="num">${events.length}</b><span>${esc(plural(events.length, 'запись', 'записи', 'записей'))} в летописи</span></div>
+        <div class="server-stat"><b class="num">${events.length}</b><span>${esc(plural(events.length, 'запись', 'записи', 'записей'))} в летописи</span></div>` : ''}
       </div>
+      ${chart ? `
+      <div class="server-stats__chart">
+        ${chart}
+        <div class="server-stats__labels">
+          ${act.map((d) => `<span>${DAY_SHORT[d.day.getDay()]}</span>`).join('')}
+        </div>
+      </div>` : ''}
     </section>`;
 }
 
@@ -367,6 +416,61 @@ function renderHotTopics(s) {
           )
           .join('')}
       </ul>
+    </section>`;
+}
+
+/* ── Кварт: таймер до конца периода ───────────────────────────────────────── */
+
+/**
+ * Сколько осталось до конца Кварта — в боковой колонке форума.
+ *
+ * Дата конца берётся из тех же данных, что и страница Кварта: последняя
+ * неделя окна. Пока период начат и есть конец — показываем счётчик
+ * короткой строкой, с ссылкой на страницу Кварта. Число живёт само:
+ * интервалом управляет ui/quarter-timer.js по атрибуту data-quarter-end.
+ */
+function renderQuarterCountdown(view) {
+  const weeks = Array.isArray(view?.quarter?.weeks) ? view.quarter.weeks : [];
+  const lastWeek = weeks[weeks.length - 1];
+  const endDate = lastWeek?.endDate ? new Date(lastWeek.endDate) : null;
+  if (!endDate || Number.isNaN(endDate.getTime())) return '';
+  const left = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
+  return `
+    <section class="panel quart-next" aria-label="До конца Кварта">
+      <span class="eyebrow">Кварт</span>
+      <div class="quart-timer" data-quarter-end="${endDate.getTime()}">
+        <span>До конца Кварта</span>
+        <b class="num quart-countdown-num">${left}</b>
+      </div>
+      <a class="quart-next__more" href="#/quarter">Кто лидирует? <b>→</b></a>
+    </section>`;
+}
+
+/**
+ * Баннер «Новый Кварт начался».
+ *
+ * Рисуется, только если номер Кварта вырос с прошлого захода: запоминаем
+ * последний увиденный номер в localStorage. Скрытие — той же кнопкой,
+ * обработчик в mount.js сохраняет номер и перерисовывает страницу.
+ */
+function renderQuarterBanner(view) {
+  const number = Number(view?.quarter?.number ?? 0);
+  if (number < 1) return '';
+  let seen = 0;
+  try {
+    seen = Number(localStorage.getItem(QUARTER_SEEN_KEY) ?? 0);
+  } catch { /* localStorage может быть недоступен — тогда баннер не показываем. */ }
+  if (number <= seen) return '';
+  return `
+    <section class="panel quart-banner" data-quart-banner="${number}" role="status">
+      <span class="eyebrow">🎉 Новый Кварт</span>
+      <b class="quart-banner__title">Кварт ${number} начался</b>
+      <p class="muted">Новые четыре недели — и новый шанс для каждого альянса подняться.</p>
+      <div class="quart-banner__acts">
+        <a class="forum-btn forum-btn--sm" href="#/quarter">Открыть Кварт</a>
+        <button type="button" class="forum-btn forum-btn--ghost forum-btn--sm"
+                data-quart-banner-dismiss>Понятно</button>
+      </div>
     </section>`;
 }
 
@@ -628,7 +732,8 @@ function renderWhoAmI(s) {
         muted
           ? `<p class="forum-blocked">Писать можно снова с ${esc(fullTime(s.me.mutedUntil))}</p>`
           : ''
-      }`;
+      }
+${renderPushPrefs(s)}`;
   }
 
   const L = CONFIG.forum.limits;
@@ -661,6 +766,36 @@ function renderWhoAmI(s) {
       </p>
       <p class="forum-error" data-forum-auth-error hidden></p>
     </form>`;
+}
+
+/**
+ * Push-настройки форума под учётной строкой.
+ *
+ * Два тумблера: уведомлять ли о новых постах и об ответах на ваши записи.
+ * Состояние хранится в базе (forum_push_prefs) и подгружается адаптером.
+ * Показываются, только когда человек вошёл и настройки уже прочитались —
+ * иначе пустые тумблеры путали бы, какое значение действительно сохранено.
+ */
+function renderPushPrefs(s) {
+  if (!s.me || !s.pushPrefs) return '';
+  const toggle = (key, label) => `
+    <label class="forum-push__row">
+      <input type="checkbox" data-forum-push-pref="${key}"
+             ${s.pushPrefs[key] ? 'checked' : ''}>
+      <span>${esc(label)}</span>
+    </label>`;
+  return `
+    <div class="forum-push">
+      <span class="forum-push__head">
+        <b>Push-уведомления</b>
+        <small class="muted">Когда форум закрыт</small>
+      </span>
+      <div class="forum-push__grid">
+        ${toggle('newForumPost', 'Новые посты')}
+        ${toggle('newForumReply', 'Ответы на мои посты')}
+      </div>
+      <p class="forum-push__hint muted">Включите и разрешите уведомления — в чатах есть отдельная кнопка включения</p>
+    </div>`;
 }
 
 /* ── Написать пост ────────────────────────────────────────────────────────── */

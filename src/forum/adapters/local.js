@@ -1530,3 +1530,53 @@ export async function setPushPrefs(prefs) {
   if (prefs.newForumReply != null) s.pushPrefs.newForumReply = Boolean(prefs.newForumReply);
   write(s);
 }
+
+/* ── Активность сервера: посты и сообщения по дням, из локальных данных ──── */
+
+export async function getServerActivity() {
+  const s = read();
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const at = new Date();
+    at.setHours(0, 0, 0, 0);
+    at.setDate(at.getDate() - (6 - i));
+    const day = at.toISOString();
+    const key = (d) => toDate(d) && new Date(d).toISOString().slice(0, 10);
+    const stamp = (iso) => iso?.slice(0, 10);
+    days.push({
+      day: at,
+      forumPosts: s.posts.filter((p) => !p.deleted && stamp(key(p.createdAt)) === day.slice(0, 10)).length,
+      forumComments: s.comments.filter((c) => !c.deleted && stamp(key(c.createdAt)) === day.slice(0, 10)).length,
+      chatMessages: s.chatMessages.filter((m) => !m.deleted && stamp(key(m.createdAt)) === day.slice(0, 10)).length,
+    });
+  }
+  return days;
+}
+
+/* ── Личная статистика: GitHub-график на странице участника ───────────────── */
+
+/**
+ * Активность по дням конкретного участника за последние 20 недель. Число чатов
+ * отдаём только себе, чужим — null, как в рабочем адаптере: локальный режим
+ * весь в одном браузере, но приватность должна вести себя одинаково в обоих.
+ */
+export async function getUserActivity(userId) {
+  const s = read();
+  const hours = new Date().getHours();
+  const days = [];
+  for (let i = 0; i < 140; i++) {
+    const at = new Date();
+    at.setHours(hours, 0, 0, 0);
+    const shift = (140 - 1 - i) * 86400000;
+    at = new Date(at.getTime() - shift);
+    const target = at.toDateString();
+    days.push({
+      day: at,
+      forumPosts: s.posts.filter((p) => !p.deleted && p.authorId === userId && new Date(p.createdAt).toDateString() === target).length,
+      forumComments: s.comments.filter((c) => !c.deleted && c.authorId === userId && new Date(c.createdAt).toDateString() === target).length,
+      chatMessages: s.chatMessages.filter((m) => !m.deleted && m.authorId === userId && new Date(m.createdAt).toDateString() === target).length,
+    });
+  }
+  const chatsJoined = userId === s.me ? s.chatMembers.filter((cm) => cm.userId === userId).length : null;
+  return { days, chatsJoined };
+}

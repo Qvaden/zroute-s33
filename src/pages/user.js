@@ -27,6 +27,7 @@ import { levelOf, progressOf, achievementsOf, doneCount } from '../forum/rank.js
  * @param {{
  *   profile: import('../forum/profile.js').Profile|null,
  *   posts?: any[],
+ *   activity?: import('../forum/contract.js').ForumUserActivity|null,
  *   me?: any,
  *   editing?: boolean,
  *   loading?: boolean,
@@ -35,7 +36,7 @@ import { levelOf, progressOf, achievementsOf, doneCount } from '../forum/rank.js
  * }} state
  */
 export function renderUserPage(state = {}) {
-  const { profile, posts = [], me, editing = false, loading = false, error = '', nick = '' } = state;
+  const { profile, posts = [], activity = null, me, editing = false, loading = false, error = '', nick = '' } = state;
 
   if (loading) return '<div class="loading">Открываем профиль…</div>';
 
@@ -70,6 +71,7 @@ export function renderUserPage(state = {}) {
     ${renderCard(profile, isMe, editing)}
     ${editing && isMe ? renderEditForm(profile) : ''}
     ${renderStats(profile)}
+    ${renderActivity(activity, isMe)}
     ${profile.isBlogger ? renderBlog(profile, posts) : ''}
     ${renderRank(profile)}
     ${renderPosts(profile, posts)}`;
@@ -254,6 +256,61 @@ function renderStats(p) {
         )
         .join('')}
     </div>`;
+}
+
+/* ── Личная статистика: GitHub-график ─────────────────────────────────────── */
+
+const WEEKDAY = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/**
+ * Тепловая карта активности за полгода — строками дни недели, колонками недели,
+ * как в GitHub. Каждая клетка — один день, интенсивность — сколько записей
+ * (посты + комментарии + сообщения) человек оставил. Рядом — число его чатов,
+ * но только своё: чужая статистика площадей скрыта (см. контракт).
+ */
+function renderActivity(activity, isMe) {
+  if (!activity || !Array.isArray(activity.days) || !activity.days.length) return '';
+
+  const days = activity.days;
+  const daily = days.map((d) => d.forumPosts + d.forumComments + d.chatMessages);
+  const max = Math.max(...daily);
+
+  // Режем массив дней по неделям с начала массива.
+  const columns = [];
+  for (let i = 0; i < days.length; i += 7) columns.push(days.slice(i, i + 7));
+
+  const cell = (d, v) => {
+    const level = v === 0 ? 0 : 1 + Math.min(3, Math.round((v / Math.max(1, max)) * 3));
+    const title = v ? `${v} ${pluralWord(v, 'запись', 'записи', 'записей')}` : 'нет записей';
+    return `<span class="gh-cell gh-cell--${level}" title="${title}"></span>`;
+  };
+
+  return `
+    <section class="panel forum-ghlog" aria-label="Активность">
+      <header class="panel__head">
+        <span class="eyebrow">За последние 20 недель</span>
+        <h2>Активность</h2>
+        <span class="forum-ghlog__chats">${isMe && activity.chatsJoined != null
+          ? `💬 в ${activity.chatsJoined} ${pluralWord(activity.chatsJoined, 'чате', 'чатах', 'чатах')}`
+          : ''}</span>
+      </header>
+      <div class="forum-ghlog__wrap">
+        <div class="forum-ghlog__labels">
+          ${WEEKDAY.map((w, i) => (days.some((d) => (d.day.getDay() + 6) % 7 === i) ? `<span>${w}</span>` : '<span></span>')).join('')}
+        </div>
+        <div class="forum-ghlog__grid">
+          ${columns.map((week) => {
+            const dayCells = Array.from({ length: 7 });
+            for (const d of week) {
+              const i = (d.day.getDay() + 6) % 7;
+              const dailyV = d.forumPosts + d.forumComments + d.chatMessages;
+              dayCells[i] = cell(d, dailyV);
+            }
+            return `<div class="forum-ghlog__column">${dayCells.map((c) => c ?? '<span class="gh-cell gh-cell--0"></span>').join('')}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    </section>`;
 }
 
 /* ── Уровень и достижения ────────────────────────────────────────────────── */

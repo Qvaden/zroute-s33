@@ -13,6 +13,7 @@ const state = {
   me: null,
   guides: [],
   category: 'all',
+  query: '',
   selected: null,
   composing: false,
   loading: true,
@@ -23,7 +24,19 @@ let wired = false;
 
 function paint() {
   if (!host) return;
+  /*
+    Поиск не должен пропадать при перерисовке (выбор раздела и т.п.):
+    иначе набранное стирается на каждом клике, и человеку кажется,
+    что сайт не реагирует на ввод.
+  */
+  const prev = host.querySelector('[data-guide-search]')?.value ?? '';
   host.innerHTML = renderGuides(state);
+  const input = host.querySelector('[data-guide-search]');
+  if (input && prev) {
+    input.value = prev;
+    input.focus({ preventScroll: true });
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+  }
 }
 
 async function load() {
@@ -56,6 +69,13 @@ function wire() {
   wired = true;
 
   wireRichEditor(() => host);
+
+  document.addEventListener('input', (e) => {
+    const input = e.target.closest?.('[data-guide-search]');
+    if (!input || !host?.contains(input)) return;
+    state.query = input.value;
+    paint();
+  });
 
   document.addEventListener('click', async (e) => {
     if (!host || !host.contains(e.target)) return;
@@ -176,4 +196,5 @@ export function unmountGuides() {
   state.guides = [];
   state.selected = null;
   state.composing = false;
+  state.query = '';
 }
