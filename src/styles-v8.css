@@ -114,11 +114,12 @@
 .forum-nick .online-dot { margin-left: 3px; vertical-align: -1px; }
 
 /* ── Статистика сервера и турниры ──────────────────────────────────────── */
-.server-stats {
+.server-stats { margin: 10px 0; }
+.server-stats__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
-  margin: 10px 0;
+  margin-top: 9px;
 }
 .server-stat {
   padding: 10px;

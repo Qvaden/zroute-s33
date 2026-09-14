@@ -476,7 +476,7 @@ export function renderMessage(m, s, isMgr, grouped) {
           <time title="${esc(fullTime(m.createdAt))}">${esc(clock(m.createdAt))}</time>
           <button type="button" class="chat-msg__reply-btn" data-chat-msg-reply="${esc(m.id)}"
                   data-nick="${esc(m.authorNick)}" data-excerpt="${esc(plainExcerpt(m.body || 'Вложение', 50))}"
-                  title="Ответить" aria-label="Ответить">↩</button>
+                  title="Ответить" aria-label="Ответить"><span class="chat-msg__reply-ico" aria-hidden="true">↩</span><span class="chat-msg__reply-label">Ответить</span></button>
           ${isMgr ? `<button type="button" class="chat-msg__pin-btn" data-chat-pin="${esc(m.id)}"
                     title="Закрепить сообщение" aria-label="Закрепить">📌</button>` : ''}
           <div class="chat-msg__react-trigger" data-chat-react-picker="${esc(m.id)}">
