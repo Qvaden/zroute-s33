@@ -906,6 +906,14 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-size: 14px;
   line-height: 1.45;
   resize: none;
+  /*
+    contenteditable по умолчанию не переносит неразрывное: длинная ссылка
+    или случайный набор символов без пробелов растягивала поле за границы
+    compose-панели. Перенос «где угодно» держит слово внутри рамки.
+  */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .chat-compose__input:focus {
   outline: none;
@@ -1651,109 +1659,136 @@ body:has(.chat-layout) .site-foot { display: none; }
   .tour-side { min-width: 64px; }
 }
 
-/* ══ Светлая тема: «стальной рассвет» — сланцевая дымка, медный акцент ════ */
-:root[data-theme="light"] {
-  --shadow: 0 1px 2px rgba(22,32,44,.06), 0 10px 32px -14px rgba(22,32,44,.18);
-}
+/* ══ Светлая тема: «ночь и пергамент» — ночная синева, молочные панели, золото ══ */
 
 /*
-  Фон — рассвет над стальным городом: сверху прохладное небо (электрик),
-  у горизонта справа — слабый медный отсвет. Обратный порядок тёмной теме,
-  где оранжевое пятно висит над всем сайтом: здесь тепло лишь касается
-  края, а главная тема — холодная дымка. Сеть тоньше, чем в тёмной:
-  на светлом фоне каждый штрих читается сильнее.
+  Фон — ночное небо над столом с лампой: холодная луна сверху, тёплое
+  золотое свечение снизу справа. Сетка — тонкие светлые линии: на тёмном
+  фоне каждая линия читается сильнее, чем на светлом, поэтому альфа ещё
+  меньше, чем в тёмной теме.
 */
 :root[data-theme="light"] body {
   background:
-    radial-gradient(900px 600px at 50% -18%, color-mix(in srgb, var(--electric) 7%, transparent), transparent 62%),
-    radial-gradient(700px 520px at 110% 42%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 60%),
-    linear-gradient(color-mix(in srgb, var(--text) 1.1%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--text) 1.1%, transparent) 1px, transparent 1px),
+    radial-gradient(900px 600px at 50% -18%, rgba(158,180,220,.09), transparent 62%),
+    radial-gradient(700px 520px at 108% 46%, rgba(217,171,78,.08), transparent 60%),
+    linear-gradient(rgba(243,239,228,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(243,239,228,.035) 1px, transparent 1px),
     var(--bg);
   background-size: auto, auto, 46px 46px, 46px 46px, auto;
 }
-:root[data-theme="light"] body::before { background: radial-gradient(560px 260px at 48% 5%, color-mix(in srgb, var(--electric) 6%, transparent), transparent 70%), radial-gradient(420px 500px at 4% 55%, color-mix(in srgb, var(--accent) 3%, transparent), transparent 72%); }
+:root[data-theme="light"] body::before { background: radial-gradient(560px 260px at 48% 5%, rgba(158,180,220,.08), transparent 70%), radial-gradient(420px 500px at 4% 55%, rgba(217,171,78,.06), transparent 72%); }
 
-/* Выделение текста: медная плашка с белым — чёрный цвет тёмной темы
-   терялся бы на приглушённой меди. */
-:root[data-theme="light"] ::selection { color: #fff; }
-
-/* Брендинг и шапка */
 /*
-  Плитка «33»: в тёмной теме — яркий сигнальный градиент, здесь он резал
-  бы глаз, поэтому приглушённая медь с белой цифрой. Узнаваемость та же,
-  крик — нет.
+  ШАПКА, ФУТЕР И БОКОВОЕ МЕНЮ красятся от фона, а фон здесь ночной.
+  Общий --text чернильный и служит светлым панелям, поэтому этим трём
+  зонам раздаём собственные «ночные» токены каскадом: все дети внутри
+  перекрашиваются разом, без точечной правки каждого правила.
+*/
+:root[data-theme="light"] .site-head,
+:root[data-theme="light"] .site-foot,
+:root[data-theme="light"] .side {
+  --text: #f3efe4;
+  --dim: #b7b0a0;
+  --mute: #828898;
+  --electric: #d9ab4e;
+  --line: color-mix(in srgb, #f3efe4 14%, transparent);
+}
+:root[data-theme="light"] .site-head {
+  border-bottom-color: color-mix(in srgb, #d9ab4e 24%, transparent);
+  box-shadow: 0 14px 40px -30px rgba(4,8,18,.9);
+}
+:root[data-theme="light"] .site-head:hover { box-shadow: 0 14px 34px -24px rgba(4,8,18,.95); }
+:root[data-theme="light"] .site-foot { color: var(--mute); }
+/* Меню — сплошная ночь: градиент surface→bg из forum.css делил бы панель
+   на светлую и тёмную половины с чернильным текстом на тёмной. */
+:root[data-theme="light"] .side {
+  background: var(--bg);
+  box-shadow: 6px 0 50px -28px rgba(4,8,18,.9);
+}
+@media (max-width: 1039px) { :root[data-theme="light"] .side { box-shadow: -8px 0 50px -30px rgba(4,8,18,.95); } }
+
+/*
+  Плитка «33» — латунная табличка на ночной шапке: тёплое золото
+  с чернильной цифрой. Родной сигнальный градиент тёмной темы здесь
+  слишком кричащий.
 */
 :root[data-theme="light"] .brand__num {
   animation: none;
-  color: #fff;
-  background: linear-gradient(145deg, #c5825a, var(--accent-dk));
-  box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--accent) 32%, transparent);
+  color: #241d0b;
+  background: linear-gradient(145deg, #e3b95e, #8f6a14);
+  box-shadow: 0 4px 16px -6px rgba(217,171,78,.45);
 }
-:root[data-theme="light"] .site-head { box-shadow: 0 12px 40px -32px rgba(22,32,44,.2); border-bottom-color: color-mix(in srgb, var(--accent) 22%, transparent); }
-:root[data-theme="light"] .site-head:hover { box-shadow: 0 12px 34px -24px rgba(22,32,44,.22); }
 :root[data-theme="light"] .nav__link.is-active {
-  color: #fff;
-  border-color: color-mix(in srgb, var(--accent-dk) 40%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
-  box-shadow: 0 2px 10px -3px color-mix(in srgb, var(--accent) 36%, transparent);
+  color: #241d0b;
+  border-color: color-mix(in srgb, #8f6a14 45%, transparent);
+  background: linear-gradient(135deg, #e3b95e, #b98a20);
+  box-shadow: 0 2px 10px -3px rgba(217,171,78,.4);
 }
 
 /*
-  Вау-герой: холодная сталь с медным отсветом снизу слева. Цифры —
-  «полированная сталь»: градиент от графита к серебру, а не чернильная
-  сепия, как на бумаге.
+  Вау-герой и панели: пергаментная карточка, парящая над ночью. Внутренняя
+  светлая кромка сверху + глубокая тень снизу — объём без обводки. Цифры —
+  «чернила и золото»: тёплый градиент в тон табличке бренда.
 */
 :root[data-theme="light"] .hero {
-  border-color: color-mix(in srgb, var(--electric) 30%, var(--line));
+  border-color: color-mix(in srgb, #d9ab4e 26%, var(--line));
   background:
-    radial-gradient(480px 220px at 88% 8%, color-mix(in srgb, var(--electric) 9%, transparent), transparent 66%),
-    radial-gradient(300px 260px at 2% 100%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 70%),
+    radial-gradient(480px 220px at 88% 8%, rgba(89,99,110,.07), transparent 66%),
+    radial-gradient(300px 260px at 2% 100%, rgba(217,171,78,.08), transparent 70%),
     linear-gradient(145deg, var(--raised-2) 0%, var(--raised) 58%, var(--surface) 100%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent), 0 22px 70px -38px rgba(22,32,44,.24), var(--shadow);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), 0 24px 70px -34px rgba(4,8,18,.65), var(--shadow);
 }
-:root[data-theme="light"] .hero::after { opacity: .28; }
+:root[data-theme="light"] .hero::after { opacity: .22; }
 :root[data-theme="light"] .hero__num {
-  background: linear-gradient(172deg, #363d47 18%, #8b95a1);
+  background: linear-gradient(172deg, #453a1d 18%, #a8935c);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   text-shadow: none;
 }
+:root[data-theme="light"] .panel {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 50%, transparent), 0 16px 40px -26px rgba(4,8,18,.6);
+}
 :root[data-theme="light"] .hero:hover,
-:root[data-theme="light"] .panel:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); box-shadow: 0 18px 42px -28px rgba(22,32,44,.24), var(--shadow); }
-:root[data-theme="light"] .panel { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 14px 34px -25px rgba(22,32,44,.2); }
-:root[data-theme="light"] .panel::before { opacity: .25; }
+:root[data-theme="light"] .panel:hover { border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), 0 20px 48px -30px rgba(4,8,18,.68), var(--shadow); }
+:root[data-theme="light"] .panel::before { opacity: .3; }
 :root[data-theme="light"] .panel__head h2 { text-shadow: none; }
-:root[data-theme="light"] .lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 14px 26px -24px rgba(22,32,44,.2); }
-:root[data-theme="light"] .tl__img:hover { box-shadow: 0 18px 34px -22px rgba(22,32,44,.26); }
+:root[data-theme="light"] .lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 14px 26px -22px rgba(4,8,18,.55); }
+:root[data-theme="light"] .tl__img:hover { box-shadow: 0 18px 34px -20px rgba(4,8,18,.6); }
 :root[data-theme="light"] .tl__year { text-shadow: none; }
-:root[data-theme="light"] .adm-publish--top { box-shadow: 0 12px 30px -24px rgba(22,32,44,.22); }
-:root[data-theme="light"] .adm-modal__box { box-shadow: 0 24px 80px -40px rgba(22,32,44,.26); }
+:root[data-theme="light"] .adm-publish--top { box-shadow: 0 12px 30px -22px rgba(4,8,18,.55); }
+:root[data-theme="light"] .adm-modal__box { box-shadow: 0 24px 80px -40px rgba(4,8,18,.7); }
 
-/* Лидер */
+/*
+  Поля и вставки, красящиеся от --bg (в тёмной теме он светлый и работает
+  как «утопленный» тон внутри панелей): в этой теме фон ночной, поэтому
+  утопленность делаем тёплым тоном пергамента, а не синевой ночи.
+*/
+:root[data-theme="light"] .forum-poll__opt { background: color-mix(in srgb, var(--text) 4%, transparent); }
+:root[data-theme="light"] .forum-poll__check { background: var(--surface); }
+
+/* Лидер: золотая кромка на пергаменте. */
 :root[data-theme="light"] .leader {
   border-color: color-mix(in srgb, var(--gold) 45%, var(--line));
   background: linear-gradient(100deg, color-mix(in srgb, var(--gold) 13%, transparent), color-mix(in srgb, var(--text) 3.5%, transparent) 58%, color-mix(in srgb, var(--electric) 5%, transparent));
-  box-shadow: inset 3px 0 0 var(--gold), 0 14px 34px -26px rgba(22,32,44,.18);
+  box-shadow: inset 3px 0 0 var(--gold), 0 14px 34px -24px rgba(4,8,18,.55);
 }
 :root[data-theme="light"] .leader__crown { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--gold) 30%, transparent)); }
 :root[data-theme="light"] .leader__pts { text-shadow: none; }
 
-/* Кварт-герой живёт внутри тёмного «острова» .quart-page, поэтому его
-   фиолетовая рамка остаётся островной: здесь правим только тень. */
+/* Кварт-герой живёт внутри тёмного «острова» .quart-page: на ночном фоне
+   остров и так на месте, здесь только тень. */
 :root[data-theme="light"] .quart-hero { box-shadow: 0 18px 50px -28px color-mix(in srgb, var(--electric) 22%, transparent), var(--shadow); }
 
-/* Поповеры, модалки, дровер, тосты: тяжёлый чёрный → прохладная тень сланца */
-@media (max-width: 1039px) { :root[data-theme="light"] .side { box-shadow: -8px 0 50px -30px rgba(22,32,44,.22); } }
-:root[data-theme="light"] .forum-emoji__pop { box-shadow: 0 16px 40px -20px rgba(22,32,44,.2); }
-:root[data-theme="light"] .forum-modal__box { box-shadow: 0 30px 80px -30px rgba(22,32,44,.26); }
-:root[data-theme="light"] .forum-toast { box-shadow: 0 18px 44px -22px rgba(22,32,44,.22); }
-:root[data-theme="light"] .chat-menu__pop { box-shadow: 0 18px 44px -18px rgba(22,32,44,.2), 0 4px 18px -10px rgba(22,32,44,.12); }
-:root[data-theme="light"] .chat-msg__reactions-pop { box-shadow: 0 8px 24px -12px rgba(22,32,44,.18); }
-:root[data-theme="light"] .chat-go-bottom { box-shadow: 0 4px 14px -6px rgba(22,32,44,.16); }
-:root[data-theme="light"] .pick__menu { box-shadow: 0 18px 44px -18px rgba(22,32,44,.2), 0 4px 18px -10px rgba(22,32,44,.12); }
+/* Поповеры, модалки, тосты: светлые карточки над ночью — тень глубокая. */
+:root[data-theme="light"] .forum-emoji__pop { box-shadow: 0 16px 40px -18px rgba(4,8,18,.6); }
+:root[data-theme="light"] .forum-modal__box { box-shadow: 0 30px 80px -30px rgba(4,8,18,.7); }
+:root[data-theme="light"] .forum-toast { box-shadow: 0 18px 44px -20px rgba(4,8,18,.6); }
+:root[data-theme="light"] .chat-menu__pop { box-shadow: 0 18px 44px -18px rgba(4,8,18,.6), 0 4px 18px -10px rgba(4,8,18,.4); }
+:root[data-theme="light"] .chat-msg__reactions-pop { box-shadow: 0 8px 24px -12px rgba(4,8,18,.5); }
+:root[data-theme="light"] .chat-go-bottom { box-shadow: 0 4px 14px -6px rgba(4,8,18,.5); }
+:root[data-theme="light"] .pick__menu { box-shadow: 0 18px 44px -18px rgba(4,8,18,.6), 0 4px 18px -10px rgba(4,8,18,.4); }
 
-/* Тёмные «острова» (бот, роли, кварт) остаются тёмными — возвращаем тёмные токены текста,
-   чтобы надписи читались на тёмном фоне и в светлой теме. */
+/* Тёмные «острова» (бот, роли, кварт) остаются тёмными — возвращаем тёмные
+   токены текста. На ночном фоне они читаются как глубины, а не чужие вставки. */
 :root[data-theme="light"] .bot-hero,
 :root[data-theme="light"] .bot-feature,
 :root[data-theme="light"] .roles-panel,
@@ -1768,6 +1803,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   --gold:  #ffc93c;
   --win:   #35d07f;
   --loss:  #ff4757;
+  --line: #23272f;
   color: #f4f6f9;
 }
 :root[data-theme="light"] .bot-cta,
@@ -1779,6 +1815,43 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .bot-cta:hover { color: #081011; background: #b9fff4; }
 :root[data-theme="light"] .roles-notice__mark { border-color: #d9b83a; background: linear-gradient(145deg, #ffd968, #f5c44a); color: #4a3a06; }
 :root[data-theme="light"] .quart-controls .search input { color: #e9f3e7; }
+
+/*
+  КНОПКИ: родной сигнальный градиент (#ff9a4a → accent) кричит на
+  пергаменте. Здесь он латунный — в тон табличке бренда, текст чернильный.
+*/
+:root[data-theme="light"] .forum-btn,
+:root[data-theme="light"] .chat-compose__send {
+  background: linear-gradient(135deg, #d9ab4e, var(--accent));
+  color: #241d0b;
+}
+:root[data-theme="light"] .forum-btn:hover:not(:disabled) { box-shadow: 0 8px 20px -12px rgba(161,115,13,.7); }
+
+/* Бургер: на ночной шапке оранжевый тон выглядел бы чужим — золотой. */
+:root[data-theme="light"] .burger {
+  background: linear-gradient(145deg, rgba(217,171,78,.16), rgba(217,171,78,.07));
+  box-shadow: inset 0 0 0 1px rgba(217,171,78,.22), 0 6px 18px -14px rgba(217,171,78,.5);
+}
+:root[data-theme="light"] .burger__lines i { background: #d9ab4e; }
+:root[data-theme="light"] .burger:hover,
+:root[data-theme="light"] .is-side-open .burger {
+  border-color: rgba(217,171,78,.5);
+  background: linear-gradient(145deg, rgba(217,171,78,.26), rgba(217,171,78,.14));
+}
+
+/* Мелочи, хардкодящие сигнальный оранжевый: стрелка селекта и кольцо
+   фокуса полей — золотые, иначе они единственные оранжевые точки
+   на пергаменте. */
+:root[data-theme="light"] .forum-field select,
+:root[data-theme="light"] .adm-field select,
+:root[data-theme="light"] .adm-form .adm-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%23a1730d' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] .forum-field input:focus,
+:root[data-theme="light"] .forum-field textarea:focus,
+:root[data-theme="light"] .adm-field input:focus,
+:root[data-theme="light"] .adm-field textarea:focus,
+:root[data-theme="light"] .adm-field select:focus { box-shadow: 0 0 0 3px rgba(161,115,13,.16); }
 
 /* ── Проверка ников ──────────────────────────────────────────────────────────
    Две соседних метки: «✓ проверен» (зелёная) и «! не проверен» (серая).

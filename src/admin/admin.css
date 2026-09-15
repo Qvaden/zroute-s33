@@ -1235,3 +1235,34 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-rename-history { margin-top: 18px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
 .adm-rename-history h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .adm-rename-history .adm-reserved__item code { color: var(--dim); }
+
+/* ── Светлая тема «ночь и пергамент» ──────────────────────────────────────
+   Страница — ночная синева, панели — молочный пергамент (токены в
+   styles-v8.css). Шапка, подвал, заголовки экранов и сводка здоровья лежат
+   прямо на фоне — им раздаём «ночные» токены каскадом: дети перекрасятся
+   разом, точечно ничего ловить не надо. */
+:root[data-theme="light"] .adm-top,
+:root[data-theme="light"] .adm-foot,
+:root[data-theme="light"] .adm-hero,
+:root[data-theme="light"] .adm-health {
+  --text: #f3efe4;
+  --dim: #b7b0a0;
+  --mute: #828898;
+  --line: color-mix(in srgb, #f3efe4 14%, transparent);
+  --line-soft: color-mix(in srgb, #f3efe4 9%, transparent);
+}
+:root[data-theme="light"] .adm-top { border-bottom-color: color-mix(in srgb, #f3efe4 14%, transparent); }
+:root[data-theme="light"] .adm-foot { border-top-color: color-mix(in srgb, #f3efe4 9%, transparent); }
+
+/* Поля, красящиеся от --bg: в тёмной теме фон светлый и работает как
+   «утопленный» тон; здесь фон ночной, поэтому утопленность остаётся
+   тёплым тоном пергамента, а не синевой ночи. */
+:root[data-theme="light"] .adm-form .adm-field input,
+:root[data-theme="light"] .adm-form .adm-field textarea,
+:root[data-theme="light"] .adm-form .adm-field select,
+:root[data-theme="light"] .adm-field input,
+:root[data-theme="light"] .adm-field textarea,
+:root[data-theme="light"] .adm-field select,
+:root[data-theme="light"] .adm-reserved__add input {
+  background: var(--raised-2);
+}
