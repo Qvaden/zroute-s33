@@ -46,38 +46,36 @@
 }
 
 /* ── Токены: светлая тема ──────────────────────────────────────────────── */
-/* «Ночь и пергамент»: страница — глубокая ночная синева, панели — молочный
-   пергамент, текст — чернила, акцент — старое золото. Противоположность
-   тёмной теме не «белым листом», а перевёрнутой глубиной: светлое живёт
-   карточками на тёмном, как лампы над ночным столом.
-   Шапка, футер и боковое меню красятся от фона и получают собственные
-   «ночные» токены в refine.css — общий --text здесь чернильный, для панелей. */
+/* «Arctic Command»: холодный командный центр премиальной AAA-игры. База —
+   светло-серый с голубым подтоном (не белый!), панели — белое стекло,
+   текст — графитово-синие чернила, сигнальный акцент — янтарь. Пропорция:
+   ~70% холодных нейтральных, ~20% графит, ~10% янтарь и статусы. */
 [data-theme="light"] {
-  --bg:        #182338;
-  --surface:   #f9f5ea;
-  --raised:    #f1ebdc;
-  --raised-2:  #e7dfcb;
-  --line:      #d6cdb4;
-  --line-soft: #e2dac4;
+  --bg:        #eef2f5;
+  --surface:   #ffffff;
+  --raised:    #e4eaf0;
+  --raised-2:  #f4f7fa;
+  --line:      #d2dae2;
+  --line-soft: #dde4ea;
 
-  --text:      #29261e;
-  --dim:       #5d5747;
-  --mute:      #8e8875;
+  --text:      #17212b;
+  --dim:       #657383;
+  --mute:      #93a0ad;
 
-  --accent:    #a1730d;
-  --accent-dk: #7d570a;
-  --gold:      #8a6d1a;
-  --win:       #2c7a4d;
-  --loss:      #b14a4a;
+  --accent:    #d9822b;
+  --accent-dk: #b06818;
+  --gold:      #c98a28;
+  --win:       #2f8f6b;
+  --loss:      #c85454;
 
-  --shadow: 0 1px 2px rgba(8,14,26,.18), 0 16px 44px -18px rgba(8,14,26,.5);
+  --shadow: 0 2px 5px rgba(31,48,64,.04), 0 12px 30px rgba(31,48,64,.08);
 
-  /* Тот же смысл, что в тёмной, но читаемо на пергаменте: пастель темнеет. */
+  /* Тот же смысл, что в тёмной, но читаемо на белом: пастель темнеет. */
   color-scheme: light;
-  --link:      #33587e;
-  --soft-ok:   #2c7a4d;
-  --soft-bad:  #b14a4a;
-  --soft-warn: #8a6d1a;
+  --link:      #3b6c9e;
+  --soft-ok:   #267b5b;
+  --soft-bad:  #c85454;
+  --soft-warn: #c98a28;
 }
 
 /* ── Переключатель темы ──────────────────────────────────────────────────── */
@@ -97,9 +95,12 @@
   font-size: 17px;
 }
 .theme-toggle:hover { color: var(--text); border-color: var(--line-soft); background: color-mix(in srgb, var(--text) 4%, transparent); }
+/* Иконки — inline-SVG внутри span: центрируем, чтобы не прыгали. */
+.theme-toggle .icon-sun,
+.theme-toggle .icon-moon { display: grid; place-items: center; }
 .theme-toggle .icon-sun { display: none; }
-.theme-toggle .icon-moon { display: block; }
-[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+.theme-toggle .icon-moon { display: grid; }
+[data-theme="light"] .theme-toggle .icon-sun { display: grid; }
 [data-theme="light"] .theme-toggle .icon-moon { display: none; }
 
 /* ── Онлайн индикатор ─────────────────────────────────────────────────── */
@@ -1495,7 +1496,7 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 
 /* ── WOW redesign: тактический командный центр Server 33 ────────────────── */
 :root { --electric: #a7a3c2; --violet: #9c7cff; --hud-line: color-mix(in srgb, var(--electric) 20%, transparent); }
-:root[data-theme="light"] { --electric: #59636e; --violet: #6d688b; --hud-line: color-mix(in srgb, var(--electric) 30%, transparent); }
+:root[data-theme="light"] { --electric: #51606e; --violet: #6c7a8c; --hud-line: color-mix(in srgb, var(--electric) 30%, transparent); }
 body {
   background:
     radial-gradient(900px 600px at 50% -18%, rgba(255,106,43,.12), transparent 62%),

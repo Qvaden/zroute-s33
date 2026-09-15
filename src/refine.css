@@ -1659,136 +1659,197 @@ body:has(.chat-layout) .site-foot { display: none; }
   .tour-side { min-width: 64px; }
 }
 
-/* ══ Светлая тема: «ночь и пергамент» — ночная синева, молочные панели, золото ══ */
+/* ══ Светлая тема: «Arctic Command» — холодный командный центр AAA ═══════ */
 
 /*
-  Фон — ночное небо над столом с лампой: холодная луна сверху, тёплое
-  золотое свечение снизу справа. Сетка — тонкие светлые линии: на тёмном
-  фоне каждая линия читается сильнее, чем на светлом, поэтому альфа ещё
-  меньше, чем в тёмной теме.
+  ФОН: светло-серый с голубым подтоном (не белый!), едва заметный янтарный
+  отсвет в правом верхнем углу и техническая сетка с альфой ~0.03. Сетка
+  создаёт ощущение приборной панели, но не спорит с текстом.
 */
 :root[data-theme="light"] body {
   background:
-    radial-gradient(900px 600px at 50% -18%, rgba(158,180,220,.09), transparent 62%),
-    radial-gradient(700px 520px at 108% 46%, rgba(217,171,78,.08), transparent 60%),
-    linear-gradient(rgba(243,239,228,.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(243,239,228,.035) 1px, transparent 1px),
+    radial-gradient(circle at 85% 0%, rgba(217,130,43,.08), transparent 28rem),
+    linear-gradient(rgba(23,33,43,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23,33,43,.03) 1px, transparent 1px),
     var(--bg);
-  background-size: auto, auto, 46px 46px, 46px 46px, auto;
+  background-size: auto, 46px 46px, 46px 46px, auto;
 }
-:root[data-theme="light"] body::before { background: radial-gradient(560px 260px at 48% 5%, rgba(158,180,220,.08), transparent 70%), radial-gradient(420px 500px at 4% 55%, rgba(217,171,78,.06), transparent 72%); }
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(760px 460px at 96% 2%, rgba(217,130,43,.05), transparent 58%),
+    radial-gradient(900px 520px at 8% -8%, rgba(122,152,182,.06), transparent 62%);
+}
 
 /*
-  ШАПКА, ФУТЕР И БОКОВОЕ МЕНЮ красятся от фона, а фон здесь ночной.
-  Общий --text чернильный и служит светлым панелям, поэтому этим трём
-  зонам раздаём собственные «ночные» токены каскадом: все дети внутри
-  перекрашиваются разом, без точечной правки каждого правила.
+  ТИПОГРАФИКА: в светлой теме заголовки и крупные числа набираются
+  Space Grotesk — техничный, плотный гротеск из AAA-интерфейсов. Тёмная
+  тема сохраняет фирменный Unbounded: у каждой темы свой характер.
 */
-:root[data-theme="light"] .site-head,
-:root[data-theme="light"] .site-foot,
-:root[data-theme="light"] .side {
-  --text: #f3efe4;
-  --dim: #b7b0a0;
-  --mute: #828898;
-  --electric: #d9ab4e;
-  --line: color-mix(in srgb, #f3efe4 14%, transparent);
+:root[data-theme="light"] h1,
+:root[data-theme="light"] h2,
+:root[data-theme="light"] h3,
+:root[data-theme="light"] h4,
+:root[data-theme="light"] .brand__num,
+:root[data-theme="light"] .brand__text b,
+:root[data-theme="light"] .hero__num,
+:root[data-theme="light"] .stat b,
+:root[data-theme="light"] .forum-chron__stat b,
+:root[data-theme="light"] .adm-stat b,
+:root[data-theme="light"] .wk__num,
+:root[data-theme="light"] .leader__pts,
+:root[data-theme="light"] .lad__place b,
+:root[data-theme="light"] .quart-dial b,
+:root[data-theme="light"] .tour-side b,
+:root[data-theme="light"] .tl__year span,
+:root[data-theme="light"] .president-board__name,
+:root[data-theme="light"] .president-board__alliance {
+  font-family: 'Space Grotesk', Inter, sans-serif;
 }
-:root[data-theme="light"] .site-head {
-  border-bottom-color: color-mix(in srgb, #d9ab4e 24%, transparent);
-  box-shadow: 0 14px 40px -30px rgba(4,8,18,.9);
-}
-:root[data-theme="light"] .site-head:hover { box-shadow: 0 14px 34px -24px rgba(4,8,18,.95); }
-:root[data-theme="light"] .site-foot { color: var(--mute); }
-/* Меню — сплошная ночь: градиент surface→bg из forum.css делил бы панель
-   на светлую и тёмную половины с чернильным текстом на тёмной. */
-:root[data-theme="light"] .side {
-  background: var(--bg);
-  box-shadow: 6px 0 50px -28px rgba(4,8,18,.9);
-}
-@media (max-width: 1039px) { :root[data-theme="light"] .side { box-shadow: -8px 0 50px -30px rgba(4,8,18,.95); } }
 
 /*
-  Плитка «33» — латунная табличка на ночной шапке: тёплое золото
-  с чернильной цифрой. Родной сигнальный градиент тёмной темы здесь
-  слишком кричащий.
+  ШАПКА: стеклянная командная панель. «LIVE // SERVER 33» превращается
+  в статусный бейдж ONLINE — капсула с зелёной точкой, без неона.
+*/
+:root[data-theme="light"] .site-head {
+  border-bottom-color: rgba(217,130,43,.35);
+  box-shadow: 0 10px 30px -24px rgba(31,48,64,.25);
+}
+:root[data-theme="light"] .site-head:hover { box-shadow: 0 10px 26px -20px rgba(31,48,64,.3); }
+:root[data-theme="light"] .site-head__inner::before {
+  content: '● ONLINE';
+  top: 5px; right: 12px;
+  padding: 3px 9px;
+  border: 1px solid #b9dfcc;
+  border-radius: 999px;
+  background: #e1f2ea;
+  color: #267b5b;
+  font: 700 8px/1 Inter, sans-serif;
+  letter-spacing: .14em;
+}
+:root[data-theme="light"] #app::before { color: #267b5b; }
+
+/*
+  ПЛИТКА «33» — янтарная сигнальная табличка с чернильной цифрой; активная
+  вкладка — та же янтарь, но плоская и строгая.
 */
 :root[data-theme="light"] .brand__num {
   animation: none;
-  color: #241d0b;
-  background: linear-gradient(145deg, #e3b95e, #8f6a14);
-  box-shadow: 0 4px 16px -6px rgba(217,171,78,.45);
+  color: #241a0e;
+  background: linear-gradient(145deg, #e89440, #c8751f);
+  box-shadow: 0 3px 10px -3px rgba(217,130,43,.4);
 }
 :root[data-theme="light"] .nav__link.is-active {
-  color: #241d0b;
-  border-color: color-mix(in srgb, #8f6a14 45%, transparent);
-  background: linear-gradient(135deg, #e3b95e, #b98a20);
-  box-shadow: 0 2px 10px -3px rgba(217,171,78,.4);
+  color: #241a0e;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent);
+  box-shadow: 0 3px 10px -4px rgba(217,130,43,.5);
 }
 
 /*
-  Вау-герой и панели: пергаментная карточка, парящая над ночью. Внутренняя
-  светлая кромка сверху + глубокая тень снизу — объём без обводки. Цифры —
-  «чернила и золото»: тёплый градиент в тон табличке бренда.
+  ПАНЕЛИ — белое стекло: полупрозрачный белый, blur, тонкая граница и
+  двухслойная мягкая тень. Наведение поднимает карточку на 2px и подсвечивает
+  границу янтарём. Верхняя линия .panel::before — короткий янтарный штрих
+  слева (сигнальный маркер, не полноширинная полоса).
+*/
+:root[data-theme="light"] .panel {
+  background: rgba(255,255,255,.86);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-color: var(--line);
+  box-shadow: 0 2px 5px rgba(31,48,64,.04), 0 12px 30px rgba(31,48,64,.08);
+  transition: transform .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+:root[data-theme="light"] .panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(217,130,43,.45);
+  box-shadow: 0 4px 8px rgba(31,48,64,.05), 0 18px 40px rgba(31,48,64,.12);
+}
+:root[data-theme="light"] .panel::before {
+  right: auto;
+  width: 56px;
+  background: var(--accent);
+  opacity: .85;
+}
+:root[data-theme="light"] .panel::after { opacity: 0; }
+:root[data-theme="light"] .panel__head h2 { text-shadow: none; }
+
+/* На телефоне стекло дорого: blur выключаем, карточки не поднимаем —
+   жестом листают список, а не наводят на карточки. */
+@media (hover: none) and (pointer: coarse) {
+  :root[data-theme="light"] .panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: #fff; }
+  :root[data-theme="light"] .panel:hover { transform: none; }
+}
+
+/*
+  ВАУ-ГЕРОЙ: та же белая стеклянная карточка, но крупнее и с HUD-уголком —
+  короткий янтарный уголок сверху справа, дозированный декор командного
+  центра. Диагональная штриховка тёмной темы здесь почти выключена.
 */
 :root[data-theme="light"] .hero {
-  border-color: color-mix(in srgb, #d9ab4e 26%, var(--line));
+  border-color: var(--line);
   background:
-    radial-gradient(480px 220px at 88% 8%, rgba(89,99,110,.07), transparent 66%),
-    radial-gradient(300px 260px at 2% 100%, rgba(217,171,78,.08), transparent 70%),
-    linear-gradient(145deg, var(--raised-2) 0%, var(--raised) 58%, var(--surface) 100%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), 0 24px 70px -34px rgba(4,8,18,.65), var(--shadow);
+    radial-gradient(480px 220px at 88% 8%, rgba(122,152,182,.07), transparent 66%),
+    radial-gradient(300px 260px at 2% 100%, rgba(217,130,43,.06), transparent 70%),
+    rgba(255,255,255,.9);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 5px rgba(31,48,64,.04), 0 16px 36px rgba(31,48,64,.1);
 }
-:root[data-theme="light"] .hero::after { opacity: .22; }
+:root[data-theme="light"] .hero::after { opacity: .1; }
 :root[data-theme="light"] .hero__num {
-  background: linear-gradient(172deg, #453a1d 18%, #a8935c);
+  background: linear-gradient(172deg, #25333f 18%, #6b7d8c);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   text-shadow: none;
 }
-:root[data-theme="light"] .panel {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 50%, transparent), 0 16px 40px -26px rgba(4,8,18,.6);
-}
-:root[data-theme="light"] .hero:hover,
-:root[data-theme="light"] .panel:hover { border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), 0 20px 48px -30px rgba(4,8,18,.68), var(--shadow); }
-:root[data-theme="light"] .panel::before { opacity: .3; }
-:root[data-theme="light"] .panel__head h2 { text-shadow: none; }
-:root[data-theme="light"] .lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 14px 26px -22px rgba(4,8,18,.55); }
-:root[data-theme="light"] .tl__img:hover { box-shadow: 0 18px 34px -20px rgba(4,8,18,.6); }
+:root[data-theme="light"] .hero__top::after { color: var(--dim); }
+
+:root[data-theme="light"] .lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 10px 22px -18px rgba(31,48,64,.4); }
+:root[data-theme="light"] .tl__img:hover { box-shadow: 0 14px 28px -18px rgba(31,48,64,.35); }
 :root[data-theme="light"] .tl__year { text-shadow: none; }
-:root[data-theme="light"] .adm-publish--top { box-shadow: 0 12px 30px -22px rgba(4,8,18,.55); }
-:root[data-theme="light"] .adm-modal__box { box-shadow: 0 24px 80px -40px rgba(4,8,18,.7); }
+:root[data-theme="light"] .adm-publish--top { box-shadow: 0 10px 26px -20px rgba(31,48,64,.35); }
+:root[data-theme="light"] .adm-modal__box { box-shadow: 0 24px 80px -40px rgba(31,48,64,.35); }
 
 /*
-  Поля и вставки, красящиеся от --bg (в тёмной теме он светлый и работает
-  как «утопленный» тон внутри панелей): в этой теме фон ночной, поэтому
-  утопленность делаем тёплым тоном пергамента, а не синевой ночи.
+  ПУСТЫЕ СОСТОЯНИЯ: вместо голой белой площади — пунктирная рамка и короткий
+  янтарный индикатор перед заголовком. «Данных нет» — тоже часть интерфейса.
+  Индикатор вешаем на .eyebrow: .forum-empty — это .panel, и его ::before
+  уже занят верхней сигнальной линией.
 */
-:root[data-theme="light"] .forum-poll__opt { background: color-mix(in srgb, var(--text) 4%, transparent); }
-:root[data-theme="light"] .forum-poll__check { background: var(--surface); }
+:root[data-theme="light"] .forum-empty { border-style: dashed; }
+:root[data-theme="light"] .forum-empty .eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 18px; height: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: 2px;
+  background: var(--accent);
+}
 
-/* Лидер: золотая кромка на пергаменте. */
+/* Лидер: тёплая кромка на белом стекле. */
 :root[data-theme="light"] .leader {
   border-color: color-mix(in srgb, var(--gold) 45%, var(--line));
-  background: linear-gradient(100deg, color-mix(in srgb, var(--gold) 13%, transparent), color-mix(in srgb, var(--text) 3.5%, transparent) 58%, color-mix(in srgb, var(--electric) 5%, transparent));
-  box-shadow: inset 3px 0 0 var(--gold), 0 14px 34px -24px rgba(4,8,18,.55);
+  background: linear-gradient(100deg, rgba(201,138,40,.1), rgba(23,33,43,.02) 58%, rgba(81,96,110,.05));
+  box-shadow: inset 3px 0 0 var(--gold), 0 10px 24px -18px rgba(31,48,64,.35);
 }
-:root[data-theme="light"] .leader__crown { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--gold) 30%, transparent)); }
+:root[data-theme="light"] .leader__crown { filter: none; }
 :root[data-theme="light"] .leader__pts { text-shadow: none; }
 
-/* Кварт-герой живёт внутри тёмного «острова» .quart-page: на ночном фоне
-   остров и так на месте, здесь только тень. */
-:root[data-theme="light"] .quart-hero { box-shadow: 0 18px 50px -28px color-mix(in srgb, var(--electric) 22%, transparent), var(--shadow); }
+/* Кварт-герой живёт внутри тёмного «острова» .quart-page — там правим
+   только тень, рамка островная. */
+:root[data-theme="light"] .quart-hero { box-shadow: 0 18px 50px -28px rgba(31,48,64,.5); }
 
-/* Поповеры, модалки, тосты: светлые карточки над ночью — тень глубокая. */
-:root[data-theme="light"] .forum-emoji__pop { box-shadow: 0 16px 40px -18px rgba(4,8,18,.6); }
-:root[data-theme="light"] .forum-modal__box { box-shadow: 0 30px 80px -30px rgba(4,8,18,.7); }
-:root[data-theme="light"] .forum-toast { box-shadow: 0 18px 44px -20px rgba(4,8,18,.6); }
-:root[data-theme="light"] .chat-menu__pop { box-shadow: 0 18px 44px -18px rgba(4,8,18,.6), 0 4px 18px -10px rgba(4,8,18,.4); }
-:root[data-theme="light"] .chat-msg__reactions-pop { box-shadow: 0 8px 24px -12px rgba(4,8,18,.5); }
-:root[data-theme="light"] .chat-go-bottom { box-shadow: 0 4px 14px -6px rgba(4,8,18,.5); }
-:root[data-theme="light"] .pick__menu { box-shadow: 0 18px 44px -18px rgba(4,8,18,.6), 0 4px 18px -10px rgba(4,8,18,.4); }
+/* Поповеры, модалки, тосты: белое стекло над холодным фоном. */
+:root[data-theme="light"] .forum-emoji__pop { box-shadow: 0 16px 40px -18px rgba(31,48,64,.3); }
+:root[data-theme="light"] .forum-modal__box { box-shadow: 0 30px 80px -30px rgba(31,48,64,.35); }
+:root[data-theme="light"] .forum-toast { box-shadow: 0 18px 44px -20px rgba(31,48,64,.3); }
+:root[data-theme="light"] .chat-menu__pop { box-shadow: 0 18px 44px -18px rgba(31,48,64,.3), 0 4px 18px -10px rgba(31,48,64,.18); }
+:root[data-theme="light"] .chat-msg__reactions-pop { box-shadow: 0 8px 24px -12px rgba(31,48,64,.28); }
+:root[data-theme="light"] .chat-go-bottom { box-shadow: 0 4px 14px -6px rgba(31,48,64,.3); }
+:root[data-theme="light"] .pick__menu { box-shadow: 0 18px 44px -18px rgba(31,48,64,.3), 0 4px 18px -10px rgba(31,48,64,.18); }
 
-/* Тёмные «острова» (бот, роли, кварт) остаются тёмными — возвращаем тёмные
-   токены текста. На ночном фоне они читаются как глубины, а не чужие вставки. */
+/* Тёмные «острова» (бот, роли, кварт) остаются тёмными: на холодном светлом
+   фоне они читаются как тактические экраны ночного режима. */
 :root[data-theme="light"] .bot-hero,
 :root[data-theme="light"] .bot-feature,
 :root[data-theme="light"] .roles-panel,
@@ -1817,41 +1878,56 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .quart-controls .search input { color: #e9f3e7; }
 
 /*
-  КНОПКИ: родной сигнальный градиент (#ff9a4a → accent) кричит на
-  пергаменте. Здесь он латунный — в тон табличке бренда, текст чернильный.
+  КНОПКИ: янтарные, тактильные — плоский янтарь с чернильным текстом,
+  hover осветляет и приподнимает. Никаких градиентных «конфет».
 */
 :root[data-theme="light"] .forum-btn,
 :root[data-theme="light"] .chat-compose__send {
-  background: linear-gradient(135deg, #d9ab4e, var(--accent));
-  color: #241d0b;
+  background: var(--accent);
+  color: #241a0e;
 }
-:root[data-theme="light"] .forum-btn:hover:not(:disabled) { box-shadow: 0 8px 20px -12px rgba(161,115,13,.7); }
+:root[data-theme="light"] .forum-btn:hover:not(:disabled) {
+  background: #e08e39;
+  box-shadow: 0 6px 16px -8px rgba(217,130,43,.55);
+}
 
-/* Бургер: на ночной шапке оранжевый тон выглядел бы чужим — золотой. */
-:root[data-theme="light"] .burger {
-  background: linear-gradient(145deg, rgba(217,171,78,.16), rgba(217,171,78,.07));
-  box-shadow: inset 0 0 0 1px rgba(217,171,78,.22), 0 6px 18px -14px rgba(217,171,78,.5);
+/* Переключатель темы: тёмно-графитовая кнопка, hover — янтарный. */
+:root[data-theme="light"] .theme-toggle {
+  background: #22303e;
+  border-color: #22303e;
+  color: #e8edf2;
 }
-:root[data-theme="light"] .burger__lines i { background: #d9ab4e; }
+:root[data-theme="light"] .theme-toggle:hover {
+  color: #f0b46a;
+  border-color: #2c3d4e;
+  background: #22303e;
+}
+
+/* Бургер: холодный тон шапки вместо оранжевых брызг. */
+:root[data-theme="light"] .burger {
+  background: color-mix(in srgb, #22303e 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #22303e 14%, transparent);
+}
+:root[data-theme="light"] .burger__lines i { background: var(--dim); }
 :root[data-theme="light"] .burger:hover,
 :root[data-theme="light"] .is-side-open .burger {
-  border-color: rgba(217,171,78,.5);
-  background: linear-gradient(145deg, rgba(217,171,78,.26), rgba(217,171,78,.14));
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
+:root[data-theme="light"] .is-side-open .burger__lines i { background: var(--accent); }
 
 /* Мелочи, хардкодящие сигнальный оранжевый: стрелка селекта и кольцо
-   фокуса полей — золотые, иначе они единственные оранжевые точки
-   на пергаменте. */
+   фокуса полей — янтарные, в тон акценту. */
 :root[data-theme="light"] .forum-field select,
 :root[data-theme="light"] .adm-field select,
 :root[data-theme="light"] .adm-form .adm-field select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%23a1730d' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%23b06818' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 :root[data-theme="light"] .forum-field input:focus,
 :root[data-theme="light"] .forum-field textarea:focus,
 :root[data-theme="light"] .adm-field input:focus,
 :root[data-theme="light"] .adm-field textarea:focus,
-:root[data-theme="light"] .adm-field select:focus { box-shadow: 0 0 0 3px rgba(161,115,13,.16); }
+:root[data-theme="light"] .adm-field select:focus { box-shadow: 0 0 0 3px rgba(217,130,43,.18); }
 
 /* ── Проверка ников ──────────────────────────────────────────────────────────
    Две соседних метки: «✓ проверен» (зелёная) и «! не проверен» (серая).
