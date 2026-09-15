@@ -248,56 +248,74 @@ function renderRow(user, me) {
                     Кнопки собраны в три смысловые группы — «Роль», «Аккаунт»,
                     «Меры» — иначе их восемь в один ряд, и на телефоне
                     карточка игрока превращалась в лестницу из кнопок.
+
+                    Группы живут не сами по себе, а одной панелью под шапкой
+                    игрока: подпись ряда слева, кнопки справа, опасные меры
+                    отделены линией. Восемь кнопок подряд карточку
+                    переполняли — ряд уезжал за край, — а панель держит
+                    ширину и читается сверху вниз: роль → аккаунт → меры.
                   */
                   ''
                 }
-                <div class="adm-player__act-group">
-                  <button type="button" class="adm-btn ${isModerator ? '' : 'adm-btn--primary'}"
-                          data-player-moderator="${esc(user.nick)}"
-                          data-player-allow="${isModerator ? '' : '1'}">
-                    ${isModerator ? 'Снять модератора' : 'Сделать модератором'}
-                  </button>
-                  <button type="button" class="adm-btn"
-                          data-player-blogger="${esc(user.id)}"
-                          data-player-nick="${esc(user.nick)}"
-                          data-player-blog="${user.isBlogger ? '1' : ''}">
-                    ${user.isBlogger ? 'Снять блогера' : 'Сделать блогером'}
-                  </button>
-                  <button type="button" class="adm-btn"
-                          data-player-leader="${esc(user.id)}"
-                          data-player-nick="${esc(user.nick)}"
-                          data-player-alliance="${esc(user.allianceTag || '')}"
-                          data-player-lead="${user.isLeader ? '1' : ''}">
-                    ${user.isLeader
-                      ? `Снять лидера${(user.leaderOf || '') ? ` (${esc((user.leaderOf || '').toUpperCase())})` : ''}`
-                      : `Сделать лидером${(user.allianceTag || '') ? ` (${esc(user.allianceTag.toUpperCase())})` : ''}`}
-                  </button>
-                  <button type="button" class="adm-btn"
-                          data-player-verify="${esc(user.id)}"
-                          data-player-nick="${esc(user.nick)}"
-                          data-player-ver="${user.isVerified ? '1' : ''}">
-                    ${user.isVerified ? 'Снять проверку' : 'Проверить ник'}
-                  </button>
-                </div>
-                <div class="adm-player__act-group">
-                  <button type="button" class="adm-btn"
-                          data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                    Сбросить пароль
-                  </button>
-                  <button type="button" class="adm-btn"
-                          data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                    Переименовать
-                  </button>
-                </div>
-                <div class="adm-player__act-group adm-player__act-group--danger">
-                  <button type="button" class="adm-btn"
-                          data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                    ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
-                  </button>
-                  <button type="button" class="adm-btn adm-btn--danger"
-                          data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                    Удалить навсегда
-                  </button>
+                <div class="adm-player__panel">
+                  <div class="adm-player__act-group" role="group" aria-label="Роль игрока">
+                    <span class="adm-player__act-label" aria-hidden="true">Роль</span>
+                    <div class="adm-player__act-buttons">
+                      <button type="button" class="adm-btn adm-toggle${isModerator ? ' is-on' : ' adm-btn--primary'}"
+                              data-player-moderator="${esc(user.nick)}"
+                              data-player-allow="${isModerator ? '' : '1'}">
+                        ${isModerator ? 'Снять модератора' : 'Сделать модератором'}
+                      </button>
+                      <button type="button" class="adm-btn adm-toggle${user.isBlogger ? ' is-on' : ''}"
+                              data-player-blogger="${esc(user.id)}"
+                              data-player-nick="${esc(user.nick)}"
+                              data-player-blog="${user.isBlogger ? '1' : ''}">
+                        ${user.isBlogger ? 'Снять блогера' : 'Сделать блогером'}
+                      </button>
+                      <button type="button" class="adm-btn adm-toggle${user.isLeader ? ' is-on' : ''}"
+                              data-player-leader="${esc(user.id)}"
+                              data-player-nick="${esc(user.nick)}"
+                              data-player-alliance="${esc(user.allianceTag || '')}"
+                              data-player-lead="${user.isLeader ? '1' : ''}">
+                        ${user.isLeader
+                          ? `Снять лидера${(user.leaderOf || '') ? ` (${esc((user.leaderOf || '').toUpperCase())})` : ''}`
+                          : `Сделать лидером${(user.allianceTag || '') ? ` (${esc(user.allianceTag.toUpperCase())})` : ''}`}
+                      </button>
+                      <button type="button" class="adm-btn adm-toggle${user.isVerified ? ' is-on' : ''}"
+                              data-player-verify="${esc(user.id)}"
+                              data-player-nick="${esc(user.nick)}"
+                              data-player-ver="${user.isVerified ? '1' : ''}">
+                        ${user.isVerified ? 'Снять проверку' : 'Проверить ник'}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="adm-player__act-group" role="group" aria-label="Аккаунт">
+                    <span class="adm-player__act-label" aria-hidden="true">Аккаунт</span>
+                    <div class="adm-player__act-buttons">
+                      <button type="button" class="adm-btn"
+                              data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                        Сбросить пароль
+                      </button>
+                      <button type="button" class="adm-btn"
+                              data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                        Переименовать
+                      </button>
+                    </div>
+                  </div>
+                  <div class="adm-player__act-group adm-player__act-group--danger"
+                       role="group" aria-label="Меры">
+                    <span class="adm-player__act-label" aria-hidden="true">Меры</span>
+                    <div class="adm-player__act-buttons">
+                      <button type="button" class="adm-btn"
+                              data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                        ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
+                      </button>
+                      <button type="button" class="adm-btn adm-btn--danger"
+                              data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                        Удалить навсегда
+                      </button>
+                    </div>
+                  </div>
                 </div>`
         }
       </div>
