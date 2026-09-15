@@ -93,7 +93,6 @@ export function renderPlayers(view) {
 
   const rows = forum.users.map((u) => renderRow(u, forum.me)).join('');
   const leaders = renderLeaders(forum.users);
-  const reserved = renderReservedBlock(forum.reservedNicks ?? []);
 
   return `
     <section class="panel">
@@ -112,8 +111,6 @@ export function renderPlayers(view) {
       ${leaders}
 
       <div class="adm-players">${rows}</div>
-
-      ${reserved}
 
       <div class="adm-players__notes">
         <p class="muted">
@@ -148,9 +145,9 @@ export function renderPlayers(view) {
           нельзя себе самому — это защита от прикола «под чужим ником».
         </p>
         <p class="muted">
-          <b>Стоп-лист</b> выше — ники, которые нельзя занять никому, включая
-          похожие написания («Кремль», «Крeмль»). Удобно, чтобы защитить имена
-          старых игроков от перехвата новичками.
+          <b>Защита ников</b> работает автоматически: совпадения и похожие
+          написания («Кремль», «Крeмль») блокируются базой. После переименования
+          прежний ник резервируется навсегда и не может быть перехвачен.
         </p>
         <p class="muted">
           Пароль показывается один раз и только вам — передайте его человеку сами.
@@ -324,36 +321,6 @@ function renderLeaderModal() {
           <div class="adm-result" data-leader-error hidden></div>
         </form>
       </div>
-    </div>`;
-}
-
-/**
- * Стоп-лист ников: ники, которые нельзя занять никому — вместе с похожими
- * написаниями (база сравнивает по нормализованному ключу). Ведёт владелец:
- * список, добавить, убрать. SPDX защищает имена старых игроков от перехвата.
- */
-function renderReservedBlock(reserved) {
-  const items = (reserved || []).map((r) => `
-    <li class="adm-reserved__item">
-      <code>${esc(r.nick)}</code>
-      <span class="muted">с ${esc(shortDate(r.createdAt))}</span>
-      <button type="button" class="adm-btn" data-reserved-remove="${esc(r.nick)}">Убрать</button>
-    </li>`).join('');
-
-  return `
-    <div class="adm-reserved">
-      <h2 class="adm-leaders__title">Стоп-лист ников</h2>
-      <p class="muted">
-        Эти ники не сможет занять никто — ни точно так, ни похожим написанием
-        («Крeмль» вместо «Кремль»). Вписывается как есть, регистр не важен.
-      </p>
-      <form data-reserved-form class="adm-reserved__add">
-        <input type="text" name="nick" maxlength="40"
-               placeholder="Например: Кремль" autocomplete="off">
-        <button type="submit" class="adm-btn adm-btn--primary">Бронировать</button>
-      </form>
-      <div class="adm-result" data-reserved-error hidden></div>
-      <ul class="adm-reserved__list">${items || '<li class="muted">Список пуст.</li>'}</ul>
     </div>`;
 }
 

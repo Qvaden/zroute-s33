@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=22';
-import { esc } from '../ui/helpers.js?v=22';
-import { mapDataset } from '../data/adapters/_map.js?v=22';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=22';
-import { validateDataset } from '../data/contract.js?v=22';
+import { CONFIG } from '../../config.js?v=23';
+import { esc } from '../ui/helpers.js?v=23';
+import { mapDataset } from '../data/adapters/_map.js?v=23';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=23';
+import { validateDataset } from '../data/contract.js?v=23';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=22';
-import { renderHome } from '../pages/home.js?v=22';
+} from '../logic/standings.js?v=23';
+import { renderHome } from '../pages/home.js?v=23';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=22';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=22';
+} from '../db/account.js?v=23';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=22';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=22';
-import { roleLabel } from '../forum/roles.js?v=22';
-import { prepareImage, uploadPath } from './image.js?v=22';
+} from './store.js?v=23';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=23';
+import { roleLabel } from '../forum/roles.js?v=23';
+import { prepareImage, uploadPath } from './image.js?v=23';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=22';
+} from './edit.js?v=23';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=22';
-import { renderShell } from './shell.js?v=22';
-import { renderLogin } from './login.js?v=22';
-import { renderOverview } from './screens/overview.js?v=22';
-import { renderWeek, describe } from './screens/week.js?v=22';
-import { renderAlliances } from './screens/alliances.js?v=22';
-import { renderEvents } from './screens/events.js?v=22';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=22';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=22';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=22';
-import { renderQuarter } from './screens/quarter.js?v=22';
-import { renderPresident } from './screens/president.js?v=22';
-import { renderPlayers } from './screens/players.js?v=22';
-import { renderModeration } from './screens/moderation.js?v=22';
-import { renderChatsAdmin } from './screens/chats.js?v=22';
-import { forum } from '../forum/index.js?v=22';
-import { deletionReason } from '../forum/rules.js?v=22';
+} from './draft.js?v=23';
+import { renderShell } from './shell.js?v=23';
+import { renderLogin } from './login.js?v=23';
+import { renderOverview } from './screens/overview.js?v=23';
+import { renderWeek, describe } from './screens/week.js?v=23';
+import { renderAlliances } from './screens/alliances.js?v=23';
+import { renderEvents } from './screens/events.js?v=23';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=23';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=23';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=23';
+import { renderQuarter } from './screens/quarter.js?v=23';
+import { renderPresident } from './screens/president.js?v=23';
+import { renderPlayers } from './screens/players.js?v=23';
+import { renderModeration } from './screens/moderation.js?v=23';
+import { renderChatsAdmin } from './screens/chats.js?v=23';
+import { forum } from '../forum/index.js?v=23';
+import { deletionReason } from '../forum/rules.js?v=23';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1242,15 +1242,6 @@ async function loadForumScreen(screenId) {
       // тащить весь список бессмысленно — ему он всё равно не покажется.
       if (canManagePeople(account)) {
         view.forum.users = await forum.listUsers();
-        // Стоп-лист ников — необязательная миграция: если база ещё не прогнала
-        // новый SQL, экран не рушится, просто блок остаётся пустым.
-        if (typeof forum.listReservedNicks === 'function') {
-          try {
-            view.forum.reservedNicks = await forum.listReservedNicks();
-          } catch {
-            view.forum.reservedNicks = null;
-          }
-        }
       }
     } else if (screenId === 'chats') {
       // Модерации база отдаёт все чаты; обычному участнику — только свои.
@@ -1532,29 +1523,6 @@ document.addEventListener('submit', async (e) => {
     return;
   }
 
-  /* ── Форум: стоп-лист ── */
-  const reservedForm = e.target.closest('[data-reserved-form]');
-  if (reservedForm) {
-    e.preventDefault();
-    const nick = String(reservedForm.elements.nick?.value ?? '').trim();
-    if (!nick) return;
-
-    try {
-      await forum.addReservedNick(nick);
-      reservedForm.elements.nick.value = '';
-      view.forum.loadedFor = null;
-      render();
-      showForumResult(
-        '[data-players-result]',
-        `Ник <code>${esc(nick)}</code> зарезервирован: никому больше его не занять, включая похожие написания.`,
-        'ok'
-      );
-    } catch (err) {
-      showPlayerActionError('[data-reserved-error]', err, 'nicks-verified.sql');
-    }
-    return;
-  }
-
   const form = e.target.closest('[data-login]');
   if (!form) return;
   e.preventDefault();
@@ -1827,26 +1795,6 @@ document.addEventListener('click', async (e) => {
   }
   if (e.target.closest('[data-rename-cancel]')) {
     closePlayerModal('[data-rename-modal]');
-    return;
-  }
-
-  const resRem = e.target.closest('[data-reserved-remove]');
-  if (resRem) {
-    const nick = resRem.dataset.reservedRemove;
-    resRem.disabled = true;
-    try {
-      await forum.removeReservedNick(nick);
-      view.forum.loadedFor = null;
-      render();
-      showForumResult(
-        '[data-players-result]',
-        `Ник <code>${esc(nick)}</code> убран из стоп-листа — его уже можно занимать.`,
-        'ok'
-      );
-    } catch (err) {
-      resRem.disabled = false;
-      showPlayerActionError('[data-players-result]', err, 'nicks-verified.sql');
-    }
     return;
   }
 

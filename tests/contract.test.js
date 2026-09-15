@@ -2480,7 +2480,13 @@ console.log('\nQ. Форум');
   const history = await loc.nickHistory(meAgain.id);
   check('смена записана в журнал переименований',
     history.length >= 1 && /писатель_для_тестов → Писатель/.test(`${history[history.length - 1].oldNick} → ${history[history.length - 1].newNick}`));
-  await loc.renameNick('писатель_для_тестов');
+  let oldNickRefused = false;
+  try {
+    await loc.renameNick('писатель_для_тестов');
+  } catch {
+    oldNickRefused = true;
+  }
+  check('освобождённый ник автоматически резервируется навсегда', oldNickRefused);
   let shapeRefused = false;
   try {
     await loc.renameNick('!!');
@@ -2539,7 +2545,7 @@ console.log('\nQ. Форум');
   }
   check('обычный участник закрепить не может', noRight);
   // Назад к администратору: следующие блоки ждут его сессию.
-  await loc.signIn('писатель_для_тестов');
+  await loc.signIn('Писатель');
 
   /* ── Поиск и правка: источник базы ── */
 
@@ -3181,15 +3187,11 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('переименование открывается окном с причиной и журналом',
     /data-player-rename="u2"/.test(playersHtml) && /data-rename-form/.test(playersHtml) && /data-nick-history/.test(playersHtml) && /Причина/.test(playersHtml));
 
-  check('стоп-лист рисуется с формой добавления',
-    /Стоп-лист ников/.test(playersHtml) && /data-reserved-form/.test(playersHtml));
-  const reservedHtml = renderPlayers({
-    forum: { configured: true, me, users: [me], reservedNicks: [{ nick: 'Кремль', createdAt: new Date() }] },
-  });
-  check('зарезервированный ник виден в стоп-листе с кнопкой «убрать»',
-    /data-reserved-remove="Кремль"/.test(reservedHtml));
-  check('легенда объясняет проверку и стоп-лист',
-    /Проверенный игрок/.test(playersHtml) && /Стоп-лист/.test(playersHtml));
+  check('ручного стоп-листа в панели нет',
+    !/Стоп-лист ников/.test(playersHtml) && !/data-reserved-form/.test(playersHtml));
+  check('легенда объясняет автоматическую защиту ников',
+    /Проверенный игрок/.test(playersHtml) && /Защита ников/.test(playersHtml)
+      && /автоматически/.test(playersHtml));
 
   const playersMainSource = await readFile('src/admin/main.js', 'utf8');
   check('панель объясняет ошибку неприменённой схемы, а не показывает сырой SQL-ответ',
@@ -4081,6 +4083,12 @@ console.log('\nS. Чистые функции');
     /Ник не менялся/.test(renderUserPage({ ...base, me: moderator, history: [] })));
 
   const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
+  const autoProtectedNicksSql = await readFile('supabase/auto-protected-nicks.sql', 'utf8');
+  check('база автоматически резервирует прежний ник триггером',
+    /create trigger forum_reserve_released_nick[\s\S]*?before update of nick/.test(nicksSql));
+  check('отдельная миграция включает защиту и сохраняет свободные старые ники',
+    /forum_reserve_released_nick/.test(autoProtectedNicksSql)
+      && /forum_nick_history/.test(autoProtectedNicksSql));
   check('журнал переименований в базе открыт модерации, а не только владельцу',
     /forum_nick_history_list\(target_user uuid\)[\s\S]*?not public\.forum_is_staff\(\)/.test(nicksSql));
   check('подтверждение ника в базе разрешает лидеру своего альянса',

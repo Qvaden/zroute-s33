@@ -899,6 +899,10 @@ export async function renameNick(newNick, reason = '') {
   if (s.reservedNicks.some((r) => nickKey(r.nick) === key)) throw new Error('Этот ник зарезервирован');
   if (s.users.some((u) => nickKey(u.nick) === key && u.id !== me.id)) throw new Error('Этот ник уже занят');
   const old = me.nick;
+  const oldKey = nickKey(old);
+  if (!s.reservedNicks.some((r) => r.nick === oldKey)) {
+    s.reservedNicks.push({ nick: oldKey, createdAt: new Date().toISOString() });
+  }
   me.nick = v;
   for (const p of s.posts) if (p.authorId === me.id) p.authorNick = v;
   for (const c of s.comments) if (c.authorId === me.id) c.authorNick = v;
@@ -923,6 +927,10 @@ export async function renameNickAs(userId, newNick, reason) {
   if (s.reservedNicks.some((r) => nickKey(r.nick) === key)) throw new Error('Этот ник зарезервирован');
   if (s.users.some((u) => nickKey(u.nick) === key && u.id !== target.id)) throw new Error('Этот ник уже занят');
   const old = target.nick;
+  const oldKey = nickKey(old);
+  if (!s.reservedNicks.some((r) => r.nick === oldKey)) {
+    s.reservedNicks.push({ nick: oldKey, createdAt: new Date().toISOString() });
+  }
   target.nick = v;
   for (const p of s.posts) if (p.authorId === target.id) p.authorNick = v;
   for (const c of s.comments) if (c.authorId === target.id) c.authorNick = v;

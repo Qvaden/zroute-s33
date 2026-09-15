@@ -9,8 +9,8 @@
 --    сменить ник сам, владелец — переименовать кого угодно (например, тролля
 --    обратно на осмысленный ник). Каждая смена пишется в журнал
 --    forum_nick_history, а копии ника в постах/комментариях/чатах/уведомлениях
---    синхронизируются. Стоп-лист (reserved_nicks) держит «святые» ники,
---    которые вообще нельзя занять никому.
+--    синхронизируются. Каждый освобождённый ник автоматически резервируется
+--    навсегда: его и похожее написание уже никто не сможет перехватить.
 --
 -- 2) ПРОВЕРЕННЫЙ ИГРОК. Профиль получает флаг is_verified — «ник подтверждён»:
 --    ставит лидер альянса игрока, модератор или владелец. Непроверенные
@@ -66,9 +66,9 @@ create unique index if not exists forum_users_nickkey_uniq
 
 -- ── Стоп-лист ───────────────────────────────────────────────────────────────
 --
--- Ники, которые нельзя занять никому. Без RLS и без grant'ов: читается и
--- правится только через RPC ниже (админ делает добавление/удаление).
--- В ключах хранится нормализованный вид, чтобы «НеЛЬЗЯ» и «нельзя» совпадали.
+-- Ники, которые нельзя занять никому. Освобождённые при переименовании
+-- попадают сюда автоматически. В ключах хранится нормализованный вид, чтобы
+-- «НеЛЬЗЯ» и «нельзя» совпадали.
 
 create table if not exists public.reserved_nicks (
   nick       text primary key,
@@ -77,6 +77,27 @@ create table if not exists public.reserved_nicks (
 );
 
 revoke all on table public.reserved_nicks from public, anon, authenticated;
+
+-- Любая смена ника автоматически оставляет прежний ник в резерве. Триггер
+-- защищает и будущие способы переименования, не только RPC ниже.
+create or replace function public.forum_reserve_released_nick()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if old.nick is distinct from new.nick and btrim(old.nick) <> '' then
+    insert into public.reserved_nicks (nick, added_by)
+    values (public.forum_nick_key(old.nick), auth.uid())
+    on conflict (nick) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists forum_reserve_released_nick on public.forum_users;
+create trigger forum_reserve_released_nick
+  before update of nick on public.forum_users
+  for each row execute function public.forum_reserve_released_nick();
 
 -- ── Журнал переименований ───────────────────────────────────────────────────
 --
