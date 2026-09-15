@@ -37,7 +37,7 @@
     а выглядит по-разному.
   -->
   <link rel="stylesheet" href="./src/styles-v8.css?v=6">
-  <link rel="stylesheet" href="./src/admin/admin.css?v=16">
+  <link rel="stylesheet" href="./src/admin/admin.css?v=17">
   <!--
     Телефон — последним слоем перед элементами ввода.
 
@@ -53,10 +53,16 @@
     друг с другом; теперь они в одном файле на оба входа.
   -->
   <link rel="stylesheet" href="./src/controls.css?v=1">
-  <link rel="stylesheet" href="./src/refine.css?v=12">
+  <link rel="stylesheet" href="./src/refine.css?v=13">
 </head>
 <body class="adm">
-  <div id="admin"><div class="loading">Загружаем панель…</div></div>
-  <script type="module" src="./src/admin/main.js?v=28"></script>
+  <div id="admin">
+    <div class="adm-boot" role="status" aria-live="polite">
+      <div class="adm-boot__mark" aria-hidden="true"><i></i><b>S33</b></div>
+      <div class="adm-boot__copy"><span>Командный центр</span><b>Подключаем данные сервера</b></div>
+      <div class="adm-boot__rail" aria-hidden="true"><i></i></div>
+    </div>
+  </div>
+  <script type="module" src="./src/admin/main.js?v=29"></script>
 </body>
 </html>

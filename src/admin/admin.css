@@ -1355,3 +1355,29 @@ body.guide-color-modal-open{overflow:hidden}
    поэтому шапка, подвал и заголовки экранов работают на дефолтных токенах.
    Здесь только янтарная сигнальная линия под шапкой — как у сайта. */
 :root[data-theme="light"] .adm-top { border-bottom-color: rgba(217,130,43,.35); }
+
+.adm-boot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 250px);
+  align-items: center;
+  gap: 14px;
+  width: min(100% - 32px, 390px);
+  margin: auto;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 18px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--bg) 82%, transparent));
+  box-shadow: 0 22px 60px -38px rgba(0, 0, 0, .9);
+}
+.adm-boot__mark { position: relative; display: grid; width: 56px; height: 56px; place-items: center; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.adm-boot__mark i { position: absolute; inset: -60%; background: conic-gradient(from 0deg, transparent 0 68%, var(--accent) 79%, transparent 91%); animation: adm-boot-spin 2.1s linear infinite; }
+.adm-boot__mark::after { content: ''; position: absolute; inset: 2px; border-radius: 11px; background: var(--surface); }
+.adm-boot__mark b { position: relative; z-index: 1; color: var(--accent); font: 800 15px/1 Unbounded, sans-serif; }
+.adm-boot__copy { display: grid; gap: 5px; }
+.adm-boot__copy span { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+.adm-boot__copy b { color: var(--text); font-size: 15px; }
+.adm-boot__rail { grid-column: 1 / -1; height: 3px; overflow: hidden; border-radius: 3px; background: color-mix(in srgb, var(--text) 7%, transparent); }
+.adm-boot__rail i { display:block; width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, transparent, var(--accent), #ffd36e, transparent); animation:adm-boot-scan 1.45s ease-in-out infinite; }
+@keyframes adm-boot-spin { to { transform: rotate(1turn); } }
+@keyframes adm-boot-scan { from { transform: translateX(-105%); } to { transform: translateX(245%); } }
+@media (prefers-reduced-motion: reduce) { .adm-boot__mark i, .adm-boot__rail i { animation: none; } .adm-boot__rail i { transform: translateX(70%); } }
