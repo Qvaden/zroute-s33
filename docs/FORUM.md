@@ -220,6 +220,25 @@ https://qvaden.github.io/zroute-s33/, на вкладке **Форум** вве�
 целиком → **Run**. Запускать после `schema.sql`, `profiles.sql` и
 `rich-forum.sql`; повторный запуск безопасен.
 
+### Управление игроками: обязательная цепочка SQL
+
+Кнопки на вкладке **«Игроки»** выполняются функциями и полями базы, а не
+только кодом панели. Если обновлялась только статическая часть сайта, в
+Supabase нужно по порядку выполнить целиком следующие файлы:
+
+1. [`supabase/profiles.sql`](../supabase/profiles.sql)
+2. [`supabase/site-data.sql`](../supabase/site-data.sql)
+3. [`supabase/rich-forum.sql`](../supabase/rich-forum.sql)
+4. [`supabase/chats.sql`](../supabase/chats.sql)
+5. [`supabase/leaders.sql`](../supabase/leaders.sql)
+6. [`supabase/nicks-verified.sql`](../supabase/nicks-verified.sql)
+
+Каждый файл можно выполнить повторно. В частности, ошибка
+`column "leader_of" of relation "forum_users" does not exist` означает, что
+не выполнен пункт 5: он добавляет колонку `leader_of`, синхронизацию статуса
+лидера и функцию кнопки «Сделать лидером». После выполнения перезайдите в
+админ-панель и повторите действие.
+
 Как это устроено:
 
 - **Создаёт чат лидер альянса.** Отметку «лидер» ставит владелец в панели,

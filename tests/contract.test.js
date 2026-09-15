@@ -3191,6 +3191,18 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('легенда объясняет проверку и стоп-лист',
     /Проверенный игрок/.test(playersHtml) && /Стоп-лист/.test(playersHtml));
 
+  const playersMainSource = await readFile('src/admin/main.js', 'utf8');
+  check('панель объясняет ошибку неприменённой схемы, а не показывает сырой SQL-ответ',
+    /function showPlayerActionError[\s\S]*?не применена миграция/.test(playersMainSource));
+  for (const migration of ['schema.sql', 'site-data.sql', 'profiles.sql', 'leaders.sql', 'nicks-verified.sql']) {
+    check(`управление игроками подсказывает миграцию ${migration}`,
+      playersMainSource.includes(`'${migration}'`));
+  }
+  check('кнопка лидера открывает диалог с подставленным тегом альянса',
+    /if \(!isLeader\) \{[\s\S]*?openPlayerModal\('\[data-leader-modal\]', nick, leadBtn\.dataset\.playerLeader, \{ leaderTag: alliance \}\)/.test(playersMainSource));
+  check('диалог лидера показывает ник выбранного игрока',
+    /\[data-reset-nick\][\s\S]*?\[data-leader-nick\]/.test(playersMainSource));
+
   const reportsHtml = renderModeration({
     forum: {
       configured: true,

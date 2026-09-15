@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=20';
-import { esc } from '../ui/helpers.js?v=20';
-import { mapDataset } from '../data/adapters/_map.js?v=20';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=20';
-import { validateDataset } from '../data/contract.js?v=20';
+import { CONFIG } from '../../config.js?v=21';
+import { esc } from '../ui/helpers.js?v=21';
+import { mapDataset } from '../data/adapters/_map.js?v=21';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=21';
+import { validateDataset } from '../data/contract.js?v=21';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=20';
-import { renderHome } from '../pages/home.js?v=20';
+} from '../logic/standings.js?v=21';
+import { renderHome } from '../pages/home.js?v=21';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=20';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=20';
+} from '../db/account.js?v=21';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=20';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=20';
-import { roleLabel } from '../forum/roles.js?v=20';
-import { prepareImage, uploadPath } from './image.js?v=20';
+} from './store.js?v=21';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=21';
+import { roleLabel } from '../forum/roles.js?v=21';
+import { prepareImage, uploadPath } from './image.js?v=21';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=20';
+} from './edit.js?v=21';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=20';
-import { renderShell } from './shell.js?v=20';
-import { renderLogin } from './login.js?v=20';
-import { renderOverview } from './screens/overview.js?v=20';
-import { renderWeek, describe } from './screens/week.js?v=20';
-import { renderAlliances } from './screens/alliances.js?v=20';
-import { renderEvents } from './screens/events.js?v=20';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=20';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=20';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=20';
-import { renderQuarter } from './screens/quarter.js?v=20';
-import { renderPresident } from './screens/president.js?v=20';
-import { renderPlayers } from './screens/players.js?v=20';
-import { renderModeration } from './screens/moderation.js?v=20';
-import { renderChatsAdmin } from './screens/chats.js?v=20';
-import { forum } from '../forum/index.js?v=20';
-import { deletionReason } from '../forum/rules.js?v=20';
+} from './draft.js?v=21';
+import { renderShell } from './shell.js?v=21';
+import { renderLogin } from './login.js?v=21';
+import { renderOverview } from './screens/overview.js?v=21';
+import { renderWeek, describe } from './screens/week.js?v=21';
+import { renderAlliances } from './screens/alliances.js?v=21';
+import { renderEvents } from './screens/events.js?v=21';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=21';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=21';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=21';
+import { renderQuarter } from './screens/quarter.js?v=21';
+import { renderPresident } from './screens/president.js?v=21';
+import { renderPlayers } from './screens/players.js?v=21';
+import { renderModeration } from './screens/moderation.js?v=21';
+import { renderChatsAdmin } from './screens/chats.js?v=21';
+import { forum } from '../forum/index.js?v=21';
+import { deletionReason } from '../forum/rules.js?v=21';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1263,16 +1263,33 @@ function showForumResult(selector, html, kind = 'ok') {
   box.hidden = false;
 }
 
+/**
+ * У панели и форума один клиент, но схема Supabase обновляется отдельными
+ * SQL-файлами. Сырой ответ Postgres вроде «column leader_of does not exist»
+ * не подсказывает владельцу, что именно нужно выполнить, поэтому для кнопок
+ * управления игроками называем недостающую миграцию прямо в интерфейсе.
+ */
+function showPlayerActionError(selector, err, migration) {
+  const message = String(err?.message ?? err);
+  const schemaMismatch = /does not exist|could not find (?:the )?function|schema cache/i.test(message);
+  const html = schemaMismatch
+    ? `В базе не применена миграция <code>supabase/${esc(migration)}</code>. Откройте SQL Editor в Supabase, выполните этот файл целиком и повторите действие.`
+    : esc(message);
+  showForumResult(selector, html, 'err');
+}
+
 function openPlayerModal(selector, nick, targetId, extra = {}) {
   const modal = root.querySelector(selector);
   if (!modal) return;
 
   modal.dataset.playerId = targetId;
-
   /* Меню «⋯» закрываем: иначе оно останется висеть за окном. */
   for (const menu of root.querySelectorAll('details[data-player-menu][open]')) menu.open = false;
-  const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick], [data-delete-nick], [data-rename-nick]');
+  const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick], [data-delete-nick], [data-rename-nick], [data-leader-nick]');
   if (nickBox) nickBox.textContent = nick;
+
+  const leaderTag = modal.querySelector('input[name="leaderOf"]');
+  if (leaderTag) leaderTag.value = extra.leaderTag ?? '';
 
   for (const [key, value] of Object.entries(extra)) modal.dataset[key] = value;
   modal.hidden = false;
@@ -1364,7 +1381,7 @@ document.addEventListener('submit', async (e) => {
         'ok'
       );
     } catch (err) {
-      showForumResult('[data-reset-error]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-reset-error]', err, 'schema.sql');
     }
     return;
   }
@@ -1407,7 +1424,7 @@ document.addEventListener('submit', async (e) => {
       view.forum.loadedFor = null;
       render();
     } catch (err) {
-      showForumResult('[data-restrict-error]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-restrict-error]', err, 'schema.sql');
     }
     return;
   }
@@ -1436,7 +1453,7 @@ document.addEventListener('submit', async (e) => {
         'ok'
       );
     } catch (err) {
-      showForumResult('[data-delete-error]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-delete-error]', err, 'schema.sql');
     }
     return;
   }
@@ -1465,7 +1482,7 @@ document.addEventListener('submit', async (e) => {
         'ok'
       );
     } catch (err) {
-      showForumResult('[data-leader-error]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-leader-error]', err, 'leaders.sql');
     }
     return;
   }
@@ -1499,7 +1516,7 @@ document.addEventListener('submit', async (e) => {
         'ok'
       );
     } catch (err) {
-      showForumResult('[data-rename-error]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-rename-error]', err, 'nicks-verified.sql');
     }
     return;
   }
@@ -1522,7 +1539,7 @@ document.addEventListener('submit', async (e) => {
         'ok'
       );
     } catch (err) {
-      showForumResult('[data-reserved-error]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-reserved-error]', err, 'nicks-verified.sql');
     }
     return;
   }
@@ -1649,7 +1666,7 @@ document.addEventListener('click', async (e) => {
       if (modBtn.isConnected) {
         modBtn.disabled = false;
       }
-      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-players-result]', err, 'site-data.sql');
     }
     return;
   }
@@ -1680,7 +1697,7 @@ document.addEventListener('click', async (e) => {
       if (blogBtn.isConnected) {
         blogBtn.disabled = false;
       }
-      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-players-result]', err, 'profiles.sql');
     }
     return;
   }
@@ -1692,12 +1709,13 @@ document.addEventListener('click', async (e) => {
     const alliance = (leadBtn.dataset.playerAlliance || '').trim();
 
     /*
-      Снятие — пустой тег. Назначение — тег альянса игрока из профиля;
-      если игрок без альянса, тег спрашивает окно ниже (data-leader-modal).
+      Снятие — пустой тег. Назначение всегда проходит через окно ниже:
+      тег альянса игрока из профиля подставляется, но его можно проверить
+      или поправить до подтверждения.
       Раньше сюда уходил boolean, и база делала человека «лидером TRUE».
     */
-    if (!isLeader && !alliance) {
-      openPlayerModal('[data-leader-modal]', nick, leadBtn.dataset.playerLeader);
+    if (!isLeader) {
+      openPlayerModal('[data-leader-modal]', nick, leadBtn.dataset.playerLeader, { leaderTag: alliance });
       return;
     }
 
@@ -1717,7 +1735,7 @@ document.addEventListener('click', async (e) => {
       if (leadBtn.isConnected) {
         leadBtn.disabled = false;
       }
-      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-players-result]', err, 'leaders.sql');
     }
     return;
   }
@@ -1752,7 +1770,7 @@ document.addEventListener('click', async (e) => {
       if (verBtn.isConnected) {
         verBtn.disabled = false;
       }
-      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-players-result]', err, 'nicks-verified.sql');
     }
     return;
   }
@@ -1810,7 +1828,7 @@ document.addEventListener('click', async (e) => {
       );
     } catch (err) {
       resRem.disabled = false;
-      showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
+      showPlayerActionError('[data-players-result]', err, 'nicks-verified.sql');
     }
     return;
   }
