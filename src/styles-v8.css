@@ -51,31 +51,30 @@
    текст — графитово-синие чернила, сигнальный акцент — янтарь. Пропорция:
    ~70% холодных нейтральных, ~20% графит, ~10% янтарь и статусы. */
 [data-theme="light"] {
-  --bg:        #eef2f5;
-  --surface:   #ffffff;
-  --raised:    #e4eaf0;
-  --raised-2:  #f4f7fa;
-  --line:      #d2dae2;
-  --line-soft: #dde4ea;
+  --bg:        #ece9e1;
+  --surface:   #f7f4ec;
+  --raised:    #e5e0d5;
+  --raised-2:  #fbf8f1;
+  --line:      #d4ccbd;
+  --line-soft: #dfd8ca;
 
-  --text:      #17212b;
-  --dim:       #657383;
-  --mute:      #93a0ad;
+  --text:      #2b2822;
+  --dim:       #625d53;
+  --mute:      #918a7c;
 
-  --accent:    #d9822b;
-  --accent-dk: #b06818;
-  --gold:      #c98a28;
-  --win:       #2f8f6b;
-  --loss:      #c85454;
+  --accent:    #c05a24;
+  --accent-dk: #943e19;
+  --gold:      #9a6a24;
+  --win:       #28745a;
+  --loss:      #b84b45;
 
-  --shadow: 0 2px 5px rgba(31,48,64,.04), 0 12px 30px rgba(31,48,64,.08);
+  --shadow: 0 1px 0 rgba(255,255,255,.72) inset, 0 12px 32px -24px rgba(69,51,30,.32);
 
-  /* Тот же смысл, что в тёмной, но читаемо на белом: пастель темнеет. */
   color-scheme: light;
-  --link:      #3b6c9e;
-  --soft-ok:   #267b5b;
-  --soft-bad:  #c85454;
-  --soft-warn: #c98a28;
+  --link:      #79502b;
+  --soft-ok:   #28745a;
+  --soft-bad:  #b84b45;
+  --soft-warn: #9a6a24;
 }
 
 /* ── Переключатель темы ──────────────────────────────────────────────────── */

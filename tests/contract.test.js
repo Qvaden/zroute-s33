@@ -3202,6 +3202,11 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /if \(!isLeader\) \{[\s\S]*?openPlayerModal\('\[data-leader-modal\]', nick, leadBtn\.dataset\.playerLeader, \{ leaderTag: alliance \}\)/.test(playersMainSource));
   check('диалог лидера показывает ник выбранного игрока',
     /\[data-reset-nick\][\s\S]*?\[data-leader-nick\]/.test(playersMainSource));
+  for (const path of ['supabase/leaders.sql', 'supabase/nicks-verified.sql', 'supabase/fix-leader-ambiguity.sql']) {
+    const leaderSql = await readFile(path, 'utf8');
+    check(`${path}: снятие прежнего лидера явно обращается к колонке, а не к параметру RPC`,
+      /update public\.forum_users as previous_leader[\s\S]*?where previous_leader\.leader_of = v_tag[\s\S]*?previous_leader\.id <> target_user/.test(leaderSql));
+  }
 
   const reportsHtml = renderModeration({
     forum: {

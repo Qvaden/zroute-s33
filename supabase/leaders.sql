@@ -96,10 +96,10 @@ begin
 
   -- Один лидер на альянс: сначала снимаем текущего держателя тега (не себя),
   -- потом назначаем. Два лидера одного альянса в базе исключены.
-  update public.forum_users
+  update public.forum_users as previous_leader
      set leader_of = ''
-   where leader_of = v_tag
-     and id <> target_user;
+   where previous_leader.leader_of = v_tag
+     and previous_leader.id <> target_user;
 
   update public.forum_users
      set leader_of = v_tag

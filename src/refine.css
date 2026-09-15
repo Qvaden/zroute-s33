@@ -1967,3 +1967,150 @@ body:has(.chat-layout) .site-foot { display: none; }
 @media (max-width: 640px) {
   .forum-verify .forum-btn { width: 100%; min-height: 44px; }
 }
+
+/* ── Светлая тема: «пыль, бумага и сталь» ───────────────────────────────── */
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(900px 480px at 100% -8%, rgba(192,90,36,.10), transparent 62%),
+    radial-gradient(720px 420px at -8% 24%, rgba(108,93,67,.08), transparent 66%),
+    linear-gradient(135deg, #ebe7dd 0%, var(--bg) 48%, #e7e1d5 100%);
+}
+:root[data-theme="light"] body::before {
+  opacity: .72;
+  background:
+    repeating-linear-gradient(115deg, rgba(74,59,40,.018) 0 1px, transparent 1px 11px),
+    radial-gradient(760px 400px at 50% -12%, rgba(255,255,255,.68), transparent 70%);
+}
+:root[data-theme="light"] body::after { opacity: .018; mix-blend-mode: multiply; }
+
+:root[data-theme="light"] .site-head {
+  background: rgba(247,244,236,.88);
+  border-bottom-color: rgba(123,101,69,.22);
+  box-shadow: 0 8px 26px -24px rgba(59,43,25,.55);
+  backdrop-filter: blur(18px) saturate(.86);
+}
+:root[data-theme="light"] .site-head__inner::before {
+  content: 'Z ROUTE // 33';
+  color: var(--mute);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  letter-spacing: .18em;
+}
+:root[data-theme="light"] .site-head::after { background: linear-gradient(90deg, transparent, rgba(192,90,36,.7), transparent); }
+:root[data-theme="light"] .brand__num {
+  color: #fff7ea;
+  background: linear-gradient(145deg, #c56430, #913c1e);
+  box-shadow: 0 7px 16px -10px rgba(104,43,19,.7);
+}
+:root[data-theme="light"] .nav__link { color: var(--dim); }
+:root[data-theme="light"] .nav__link:hover { background: rgba(114,91,55,.08); color: var(--text); }
+:root[data-theme="light"] .nav__link.is-active {
+  color: #fffaf1;
+  background: #40382e;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 6px 14px -11px rgba(53,42,29,.7);
+}
+:root[data-theme="light"] .theme-toggle {
+  color: #fffaf1;
+  background: #40382e;
+  border-color: #40382e;
+}
+:root[data-theme="light"] .theme-toggle:hover { color: #ffe0bb; background: #51463a; border-color: #51463a; }
+
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .forum-post,
+:root[data-theme="light"] .forum-hot,
+:root[data-theme="light"] .forum-lead,
+:root[data-theme="light"] .forum-theme,
+:root[data-theme="light"] .forum-welcome {
+  background: linear-gradient(145deg, rgba(251,248,241,.96), rgba(244,239,229,.94));
+  border-color: rgba(116,96,65,.20);
+  box-shadow: 0 1px 0 rgba(255,255,255,.82) inset, 0 16px 36px -32px rgba(69,51,30,.5);
+  backdrop-filter: none;
+}
+:root[data-theme="light"] .panel::before {
+  width: 100%;
+  opacity: 1;
+  background: linear-gradient(90deg, transparent 2%, rgba(192,90,36,.40) 22%, rgba(154,106,36,.24) 52%, transparent 96%);
+}
+@media (hover: hover) {
+  :root[data-theme="light"] .panel:hover {
+    transform: none;
+    border-color: rgba(145,94,52,.34);
+    box-shadow: 0 1px 0 rgba(255,255,255,.84) inset, 0 20px 42px -34px rgba(69,51,30,.58);
+  }
+}
+:root[data-theme="light"] .hero {
+  border-color: rgba(112,88,53,.26);
+  background:
+    linear-gradient(105deg, rgba(46,40,32,.04) 1px, transparent 1px) 0 0 / 20px 20px,
+    radial-gradient(560px 250px at 92% 6%, rgba(192,90,36,.17), transparent 68%),
+    linear-gradient(135deg, #fbf7ef, #e9e0d1);
+  box-shadow: 0 1px 0 rgba(255,255,255,.84) inset, 0 24px 48px -40px rgba(69,51,30,.62);
+  backdrop-filter: none;
+}
+:root[data-theme="light"] .hero::after { opacity: .16; background: repeating-linear-gradient(58deg, rgba(117,76,35,.13) 0 1px, transparent 1px 12px); }
+:root[data-theme="light"] .hero__num { background: linear-gradient(172deg, #44382b, #aa5227); -webkit-background-clip: text; background-clip: text; }
+
+:root[data-theme="light"] .forum-btn,
+:root[data-theme="light"] .chat-compose__send,
+:root[data-theme="light"] .adm-btn--primary {
+  color: #fff9ee;
+  border-color: #a94722;
+  background: linear-gradient(180deg, #c86231, #a94722);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 8px 15px -12px rgba(121,49,22,.7);
+}
+:root[data-theme="light"] .forum-btn:hover:not(:disabled),
+:root[data-theme="light"] .adm-btn--primary:hover {
+  color: #fff9ee;
+  border-color: #8e381b;
+  background: linear-gradient(180deg, #b95428, #8e381b);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 10px 18px -12px rgba(121,49,22,.75);
+}
+:root[data-theme="light"] :where(.forum-field input, .forum-field textarea, .forum-field select, .search input, .adm-field input, .adm-field textarea, .adm-field select) {
+  color: var(--text);
+  background-color: rgba(255,252,246,.78);
+  border-color: rgba(116,96,65,.27);
+}
+:root[data-theme="light"] :where(.forum-field input, .forum-field textarea, .forum-field select, .search input, .adm-field input, .adm-field textarea, .adm-field select):focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(192,90,36,.13);
+}
+:root[data-theme="light"] a { text-decoration-color: rgba(121,80,43,.34); text-underline-offset: .16em; }
+:root[data-theme="light"] a:hover { text-decoration-color: currentColor; }
+
+/* Админка использует те же токены: светлый режим — не «другая программа»,
+   а спокойный рабочий стол с чёткой иерархией данных. */
+:root[data-theme="light"] .adm-top {
+  background: rgba(247,244,236,.92);
+  border-bottom-color: rgba(116,96,65,.24);
+  box-shadow: 0 8px 22px -22px rgba(69,51,30,.54);
+  backdrop-filter: blur(18px) saturate(.86);
+}
+:root[data-theme="light"] .adm-top__brand b {
+  color: #fff8ed;
+  background: linear-gradient(145deg, #c56430, #913c1e);
+  box-shadow: 0 6px 14px -10px rgba(104,43,19,.7);
+}
+:root[data-theme="light"] .adm-nav__link:hover { background: rgba(114,91,55,.08); }
+:root[data-theme="light"] .adm-nav__link.is-active {
+  color: #fff9ef;
+  background: #40382e;
+  border-color: #40382e;
+}
+:root[data-theme="light"] .adm-btn {
+  color: var(--dim);
+  background: rgba(255,252,246,.72);
+  border-color: rgba(116,96,65,.25);
+  box-shadow: 0 1px 0 rgba(255,255,255,.72) inset;
+}
+:root[data-theme="light"] .adm-btn:hover { color: var(--text); border-color: rgba(145,94,52,.48); background: #fffaf1; }
+:root[data-theme="light"] .adm-theme-toggle { min-width: 76px; }
+:root[data-theme="light"] .adm-modal__box,
+:root[data-theme="light"] .adm-publish--top { background: var(--surface); border-color: rgba(116,96,65,.26); }
+
+/* В тёмной панели те же пропорции и состояния без смены её ночного характера. */
+.adm-top { box-shadow: 0 10px 30px -26px rgba(0,0,0,.86); }
+.adm-nav__link.is-active { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent); }
+.adm-btn { min-height: 36px; }
+.adm-theme-toggle { min-width: 76px; }

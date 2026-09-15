@@ -20,7 +20,7 @@ import { draftWeekIds } from './draft.js';
  *   weekIds?: string[],
  * }} opts
  */
-export function renderShell({ screens, activeId, inner, login = '', role = '', canPush = true, weekIds }) {
+export function renderShell({ screens, activeId, inner, login = '', role = '', canPush = true, weekIds, theme = 'dark' }) {
   /*
     Значок незаконченного ввода виден с любого экрана. Черновик живёт
     в браузере и молча ждёт публикации — без напоминания неделя может
@@ -62,6 +62,8 @@ export function renderShell({ screens, activeId, inner, login = '', role = '', c
                   }</a>`
             : ''
         }
+        <button type="button" class="adm-btn adm-theme-toggle" data-admin-theme
+                aria-label="Переключить тему" title="Переключить тему">${theme === 'light' ? 'Тёмная' : 'Светлая'}</button>
         <button type="button" class="adm-btn" data-refresh>Обновить</button>
         <span class="adm-who">
           ${login ? `<b>${esc(login)}</b>` : ''}
