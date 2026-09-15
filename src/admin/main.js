@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=23';
-import { esc } from '../ui/helpers.js?v=23';
-import { mapDataset } from '../data/adapters/_map.js?v=23';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=23';
-import { validateDataset } from '../data/contract.js?v=23';
+import { CONFIG } from '../../config.js?v=28';
+import { esc } from '../ui/helpers.js?v=28';
+import { mapDataset } from '../data/adapters/_map.js?v=28';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=28';
+import { validateDataset } from '../data/contract.js?v=28';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=23';
-import { renderHome } from '../pages/home.js?v=23';
+} from '../logic/standings.js?v=28';
+import { renderHome } from '../pages/home.js?v=28';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=23';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=23';
+} from '../db/account.js?v=28';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=23';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=23';
-import { roleLabel } from '../forum/roles.js?v=23';
-import { prepareImage, uploadPath } from './image.js?v=23';
+} from './store.js?v=28';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=28';
+import { roleLabel } from '../forum/roles.js?v=28';
+import { prepareImage, uploadPath } from './image.js?v=28';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=23';
+} from './edit.js?v=28';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=23';
-import { renderShell } from './shell.js?v=23';
-import { renderLogin } from './login.js?v=23';
-import { renderOverview } from './screens/overview.js?v=23';
-import { renderWeek, describe } from './screens/week.js?v=23';
-import { renderAlliances } from './screens/alliances.js?v=23';
-import { renderEvents } from './screens/events.js?v=23';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=23';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=23';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=23';
-import { renderQuarter } from './screens/quarter.js?v=23';
-import { renderPresident } from './screens/president.js?v=23';
-import { renderPlayers } from './screens/players.js?v=23';
-import { renderModeration } from './screens/moderation.js?v=23';
-import { renderChatsAdmin } from './screens/chats.js?v=23';
-import { forum } from '../forum/index.js?v=23';
-import { deletionReason } from '../forum/rules.js?v=23';
+} from './draft.js?v=28';
+import { renderShell } from './shell.js?v=28';
+import { renderLogin } from './login.js?v=28';
+import { renderOverview } from './screens/overview.js?v=28';
+import { renderWeek, describe } from './screens/week.js?v=28';
+import { renderAlliances } from './screens/alliances.js?v=28';
+import { renderEvents } from './screens/events.js?v=28';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=28';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=28';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=28';
+import { renderQuarter } from './screens/quarter.js?v=28';
+import { renderPresident } from './screens/president.js?v=28';
+import { renderPlayers } from './screens/players.js?v=28';
+import { renderModeration } from './screens/moderation.js?v=28';
+import { renderChatsAdmin } from './screens/chats.js?v=28';
+import { forum } from '../forum/index.js?v=28';
+import { deletionReason } from '../forum/rules.js?v=28';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1248,6 +1248,13 @@ async function loadForumScreen(screenId) {
       if (canModerate(account)) view.forum.chats = await forum.listChats();
     } else if (canModerate(account)) {
       view.forum.reports = await forum.listReports();
+      try {
+        view.forum.moderationQueue = await forum.listModerationQueue();
+        view.forum.moderationActions = await forum.listModerationActions();
+      } catch {
+        view.forum.moderationQueue = [];
+        view.forum.moderationActions = [];
+      }
     }
   } catch (err) {
     view.forum.error = String(err?.message ?? err);
@@ -1546,6 +1553,17 @@ document.addEventListener('submit', async (e) => {
 });
 
 document.addEventListener('click', async (e) => {
+  const restrictPreset = e.target.closest('[data-restrict-preset]');
+  if (restrictPreset) {
+    const form = restrictPreset.closest('[data-restrict-form]');
+    const [ruleId, duration] = String(restrictPreset.dataset.restrictPreset || '').split(':');
+    if (form?.elements.ruleId && form?.elements.duration) {
+      form.elements.ruleId.value = ruleId;
+      form.elements.duration.value = duration;
+      form.elements.note.focus();
+    }
+    return;
+  }
   if (!e.target.closest) return;
 
   /*
@@ -1702,6 +1720,15 @@ document.addEventListener('click', async (e) => {
     if (!isLeader) {
       openPlayerModal('[data-leader-modal]', nick, leadBtn.dataset.playerLeader, { leaderTag: alliance });
       return;
+    }
+
+    if (changes.some((change) => change.entity === 'result') && typeof forum.recordAllianceRankSnapshot === 'function') {
+      const data = mapDataset(candidate);
+      const weeks = weeksUpToLastData(data.weeks, data.results);
+      const standings = computeStandings(data.alliances, weeks, data.results, CONFIG.scoring, CONFIG.formLength);
+      try {
+        await forum.recordAllianceRankSnapshot(standings.map((row) => ({ allianceId: row.alliance.id, place: row.place, points: row.points })));
+      } catch { /* результаты уже опубликованы; повторная публикация запишет снимок */ }
     }
 
     leadBtn.disabled = true;
@@ -2150,6 +2177,26 @@ document.addEventListener('click', async (e) => {
   потому что поле не потеряло фокус.
 */
 document.addEventListener('input', (e) => {
+  const playerSearch = e.target.closest?.('[data-player-search]');
+  if (playerSearch) {
+    const query = playerSearch.value.trim().toLowerCase();
+    document.querySelectorAll('[data-player-search-text]').forEach((row) => {
+      row.hidden = Boolean(query) && !row.dataset.playerSearchText.includes(query);
+    });
+    return;
+  }
+
+  const reportRestore = e.target.closest('[data-report-restore]');
+  if (reportRestore) {
+    const [targetType, targetId] = reportRestore.dataset.reportRestore.split(':');
+    try {
+      await forum.restoreAutoHiddenContent(targetType, targetId);
+      view.forum.loadedFor = null;
+      render();
+      showForumResult('[data-moderation-result]', '<b>Материал восстановлен.</b>', 'ok');
+    } catch (err) { showForumResult('[data-moderation-result]', esc(String(err?.message ?? err)), 'err'); }
+    return;
+  }
   const presidentField = e.target.closest?.('[data-president-field]');
   if (presidentField && view?.presidentDraft) {
     collectPresidentFromDom();

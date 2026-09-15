@@ -22,7 +22,7 @@
  * пароля хуже отсутствия пароля, потому что выглядит защитой.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, REACTION_IDS, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, REACTION_IDS, TOPIC_TAG_IDS, reactionMeta } from '../rules.js';
 import { nickToEmail } from '../nick-email.js';
 /*
   ВЕСЬ ТРАНСПОРТ — ИЗ ОБЩЕГО КЛИЕНТА.
@@ -240,6 +240,7 @@ function postOut(row) {
     */
     authorAvatar: row.author_avatar || '',
     authorAlliance: row.author_alliance || '',
+    authorAlliance: row.author_alliance || '',
     /*
       Роль автора нужна для метки рядом с ником: читатель должен понимать,
       кто перед ним, когда речь о правилах или решении по жалобе — иначе слово
@@ -249,6 +250,7 @@ function postOut(row) {
     authorIsBlogger: Boolean(row.author_is_blogger),
     authorIsVerified: Boolean(row.author_is_verified),
     category: row.category,
+    tags: Array.isArray(row.tags) ? row.tags : [],
     title: row.title,
     body: row.body,
     createdAt: toDate(row.created_at) ?? new Date(),
@@ -290,9 +292,9 @@ function pollOut(p) {
   };
 }
 
-/** @param {{category?: string, sort?: string, limit?: number, offset?: number, q?: string}} [opts] */
+/** @param {{category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string}} [opts] */
 export async function listPosts(opts = {}) {
-  const { category = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
+  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
 
   const ORDER = {
     fresh: 'pinned.desc,created_at.desc',
@@ -312,6 +314,7 @@ export async function listPosts(opts = {}) {
   if (category !== 'all' && CATEGORY_IDS.includes(category)) {
     params.set('category', `eq.${category}`);
   }
+  if (tag !== 'all' && TOPIC_TAG_IDS.includes(tag)) params.set('tags', `cs.{${tag}}`);
   /*
     Поиск по названию и тексту. ilike ищет без учёта регистра, звёздочки —
     подстановочные знаки PostgREST, как у LIKE в Postgres. Введённые человеком
@@ -327,6 +330,11 @@ export async function listPosts(opts = {}) {
   const hasMore = Array.isArray(rows) && rows.length > limit;
   const posts = (hasMore ? rows.slice(0, limit) : (Array.isArray(rows) ? rows : []))
     .map(postOut);
+  if (currentUserId() && posts.length) {
+    const subscriptions = await rest('/forum_topic_subscriptions?select=post_id');
+    const subscribed = new Set((Array.isArray(subscriptions) ? subscriptions : []).map((row) => row.post_id));
+    posts.forEach((post) => { post.subscribed = subscribed.has(post.id); });
+  }
 
   return { posts, total: offset + posts.length + (hasMore ? 1 : 0) };
 }
@@ -380,11 +388,12 @@ export async function closePoll(pollId) {
 
 export async function createPost(draft) {
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
+  const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
 
   const rows = await rest('/forum_posts', {
     method: 'POST',
     prefer: 'return=representation',
-    body: { category: draft.category, title: draft.title, body: draft.body },
+    body: { category: draft.category, title: draft.title, body: draft.body, tags },
   });
   const created = Array.isArray(rows) ? rows[0] : rows;
   if (!created?.id) throw new Error('Пост не создан');
@@ -579,6 +588,7 @@ export async function listReports() {
     targetBody: r.target_body || '',
     targetAuthorNick: r.target_author_nick || '',
     targetPostId: r.target_post_id || null,
+    targetAutoHidden: Boolean(r.target_auto_hidden),
   }));
 }
 
@@ -588,6 +598,65 @@ export async function resolveReport(reportId) {
     method: 'PATCH',
     body: { resolved: true },
   });
+}
+
+export async function subscribeTopic(postId) {
+  await rest('/forum_topic_subscriptions', {
+    method: 'POST', prefer: 'resolution=merge-duplicates', body: { post_id: postId },
+  });
+}
+
+export async function unsubscribeTopic(postId) {
+  await rest(`/forum_topic_subscriptions?post_id=eq.${encodeURIComponent(postId)}`, { method: 'DELETE' });
+}
+
+export async function subscribeAlliance(allianceId) {
+  await rest('/forum_alliance_subscriptions', {
+    method: 'POST', prefer: 'resolution=merge-duplicates', body: { alliance_id: allianceId },
+  });
+}
+
+export async function unsubscribeAlliance(allianceId) {
+  await rest(`/forum_alliance_subscriptions?alliance_id=eq.${encodeURIComponent(allianceId)}`, { method: 'DELETE' });
+}
+
+export async function listAllianceSubscriptions() {
+  const rows = await rest('/forum_alliance_subscriptions?select=alliance_id');
+  return (Array.isArray(rows) ? rows : []).map((row) => row.alliance_id);
+}
+
+export async function recordAllianceRankSnapshot(rows) {
+  await rest('/rpc/forum_record_alliance_rank_snapshot', {
+    method: 'POST', body: { p_rows: rows.map((row) => ({ alliance_id: row.allianceId, place: row.place, points: row.points })) },
+  });
+}
+
+export async function restoreAutoHiddenContent(targetType, targetId) {
+  const table = targetType === 'post' ? 'forum_posts' : 'forum_comments';
+  await rest(`/${table}?id=eq.${encodeURIComponent(targetId)}`, {
+    method: 'PATCH', body: { deleted: false, deleted_reason: '', deleted_at: null, auto_hidden: false },
+  });
+}
+
+export async function listModerationQueue() {
+  const rows = await rest('/forum_moderation_queue?select=*&order=report_count.desc,last_report_at.desc');
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    targetType: row.target_type,
+    targetId: row.target_id,
+    reportCount: Number(row.report_count) || 0,
+    priority: row.priority || 'normal',
+    firstReportAt: toDate(row.first_report_at),
+    lastReportAt: toDate(row.last_report_at),
+  }));
+}
+
+export async function listModerationActions() {
+  const rows = await rest('/forum_moderation_actions?select=*&order=created_at.desc&limit=30');
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: String(row.id), actorNick: row.actor_nick || '', targetType: row.target_type,
+    targetId: row.target_id, targetNick: row.target_nick || '', action: row.action,
+    details: row.details || {}, createdAt: toDate(row.created_at) ?? new Date(),
+  }));
 }
 
 export async function listUsers() {

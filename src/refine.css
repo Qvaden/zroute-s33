@@ -2114,3 +2114,26 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-nav__link.is-active { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent); }
 .adm-btn { min-height: 36px; }
 .adm-theme-toggle { min-width: 76px; }
+
+/* Форум: метки, карточки альянсов и подписки на рейтинг. */
+.forum-topic-tags { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0; padding:0; border:0; }
+.forum-topic-tags legend { width:100%; margin-bottom:2px; color:var(--dim); font-size:13px; }
+.forum-topic-tags legend small { color:var(--mute); }
+.forum-topic-tags label { cursor:pointer; }
+.forum-topic-tags input { position:absolute; opacity:0; pointer-events:none; }
+.forum-topic-tags span, .forum-tag { display:inline-flex; align-items:center; min-height:27px; padding:3px 9px; border:1px solid var(--line); border-radius:999px; background:transparent; color:var(--dim); font:600 11px/1.2 Unbounded,sans-serif; cursor:pointer; }
+.forum-topic-tags input:checked + span, .forum-tag.is-on { border-color:color-mix(in srgb,var(--accent) 62%,var(--line)); background:color-mix(in srgb,var(--accent) 14%,transparent); color:var(--text); }
+.forum-tag-filter { display:flex; flex-wrap:wrap; gap:5px; width:100%; margin-top:8px; }
+.forum-post__tags { display:flex; flex-wrap:wrap; gap:5px; margin:-2px 0 12px; }
+.forum-post__tags .forum-tag { min-height:23px; font-size:10px; }
+.forum-alliance-card { display:inline-flex; align-items:center; gap:5px; max-width:190px; margin-left:6px; padding:2px 6px; border:1px solid color-mix(in srgb,var(--ally-color) 45%,var(--line)); border-radius:999px; color:inherit; text-decoration:none; vertical-align:middle; }
+.forum-alliance-card i, .forum-alliance-sub i { width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:var(--ally-color); }
+.forum-alliance-card b { color:var(--gold); font:700 10px/1 Unbounded,sans-serif; }
+.forum-alliance-card small { overflow:hidden; color:var(--mute); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.forum-alliance-subs header { display:grid; gap:3px; margin-bottom:10px; }
+.forum-alliance-subs header small { color:var(--mute); font-size:11px; }
+.forum-alliance-subs > div { display:grid; gap:5px; }
+.forum-alliance-sub { display:flex; align-items:center; gap:7px; width:100%; min-height:32px; padding:5px 7px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
+.forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:10px; }
+.forum-alliance-sub.is-on { border-color:color-mix(in srgb,var(--accent) 52%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
+.forum-alliance-sub.is-on span { color:var(--accent); }

@@ -40,6 +40,7 @@ const state = {
   posts: [],
   total: 0,
   category: 'all',
+  tag: 'all',
   sort: 'fresh',
   loading: true,
   error: '',
@@ -118,6 +119,22 @@ let mountToken = 0;
 /** Таймер отложенного поиска по ленте — живёт на уровне модуля, чтобы его
  *  можно было гасить при уходе со страницы. */
 let searchTimer = 0;
+const COMPOSER_DRAFT_KEY = 'zr33.forum.composer-draft';
+
+function saveComposerDraft() {
+  const form = host?.querySelector('[data-forum-new]');
+  if (!form) return;
+  const draft = {};
+  for (const el of form.elements) {
+    if (!el.name || el.type === 'file') continue;
+    draft[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+  }
+  try { localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft)); } catch { /* storage unavailable */ }
+}
+
+function clearComposerDraft() {
+  try { localStorage.removeItem(COMPOSER_DRAFT_KEY); } catch { /* storage unavailable */ }
+}
 
 /* ── Отрисовка ────────────────────────────────────────────────────────────── */
 
@@ -212,6 +229,17 @@ function restoreInput(snapshot) {
       }
     }
   }
+
+  try {
+    const draft = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY) || 'null');
+    if (draft && typeof draft === 'object') {
+      for (const [name, value] of Object.entries(draft)) {
+        const key = `new:${name}`;
+        if (!snapshot.forms[key]) snapshot.forms[key] = value;
+      }
+      if (!snapshot.open.includes('composer')) snapshot.open.push('composer');
+    }
+  } catch { /* no saved draft */ }
 
   for (const [key, value] of Object.entries(snapshot.forms)) {
     if (!value) continue;
@@ -477,6 +505,7 @@ async function loadFeed({ append = false } = {}) {
   try {
     const { posts, total } = await forum.listPosts({
       category: state.category,
+      tag: state.tag,
       sort: state.sort,
       q: state.query,
       limit: CONFIG.forum.pageSize,
@@ -899,6 +928,32 @@ function wire() {
     const menuAct = t.closest?.('.forum-act-menu__list .forum-act');
     if (menuAct) setTimeout(() => menuAct.closest('details')?.removeAttribute('open'), 0);
 
+    const subscribe = t.closest('[data-forum-subscribe]');
+    if (subscribe && host.contains(subscribe)) {
+      try {
+        const subscribed = subscribe.dataset.forumSubscribed === '1';
+        await (subscribed ? forum.unsubscribeTopic(subscribe.dataset.forumSubscribe) : forum.subscribeTopic(subscribe.dataset.forumSubscribe));
+        subscribe.dataset.forumSubscribed = subscribed ? '' : '1';
+        subscribe.textContent = subscribed ? 'Подписаться' : 'Отписаться';
+      } catch (err) {
+        notice(String(err?.message ?? err));
+      }
+      return;
+    }
+
+    const allianceSubscribe = t.closest('[data-forum-alliance-subscribe]');
+    if (allianceSubscribe && host.contains(allianceSubscribe)) {
+      try {
+        const subscribed = allianceSubscribe.dataset.forumAllianceSubscribed === '1';
+        const id = allianceSubscribe.dataset.forumAllianceSubscribe;
+        await (subscribed ? forum.unsubscribeAlliance(id) : forum.subscribeAlliance(id));
+        state.allianceSubscriptions = new Set(state.allianceSubscriptions || []);
+        subscribed ? state.allianceSubscriptions.delete(id) : state.allianceSubscriptions.add(id);
+        paint();
+      } catch (err) { notice(String(err?.message ?? err)); }
+      return;
+    }
+
     /* ── Выпадающий список разделов: открыть/закрыть ── */
 
     const pickBtn = t.closest('[data-pick-open]');
@@ -1057,6 +1112,14 @@ function wire() {
       // Выбор в выпадающем списке закрывает его; на сегментах безвредно.
       closePicks();
       state.category = cat.dataset.forumCat;
+      state.openPostId = null;
+      await loadFeed();
+      return;
+    }
+
+    const tag = t.closest('[data-forum-tag]');
+    if (tag && host.contains(tag)) {
+      state.tag = tag.dataset.forumTag;
       state.openPostId = null;
       await loadFeed();
       return;
@@ -1384,6 +1447,11 @@ function wire() {
   document.addEventListener('input', (e) => {
     if (!host || !host.contains(e.target)) return;
 
+    if (e.target.closest('[data-forum-new]')) {
+      saveComposerDraft();
+      return;
+    }
+
     const search = e.target.closest('[data-forum-search]');
     if (!search) return;
 
@@ -1493,6 +1561,7 @@ function wire() {
       if (!checked.ok) return showError('[data-forum-new-error]', checked.error);
 
       const draft = { ...checked.value, poll };
+      draft.tags = [...form.querySelectorAll('input[name="tags"]:checked')].map((input) => input.value);
 
       await withBusy(submitter, 'Публикуем…', async () => {
         try {
@@ -1515,7 +1584,9 @@ function wire() {
             за что.
           */
           resetForm(form);
+          clearComposerDraft();
           state.category = 'all';
+          state.tag = 'all';
           state.sort = 'fresh';
           await loadFeed();
           // Сразу открываем созданное: человек должен увидеть результат,
@@ -1821,6 +1892,7 @@ function cssEscape(value) {
 export async function mountForum(container, view, postId = null) {
   host = container;
   siteView = view;
+  state.alliances = Array.isArray(view?.alliances) ? view.alliances : [];
   mode = 'feed';
   mountToken++;
   wire();
@@ -1866,6 +1938,9 @@ export async function mountForum(container, view, postId = null) {
   }
 
   if (state.me) await loadNotifications();
+  if (state.me && typeof forum.listAllianceSubscriptions === 'function') {
+    try { state.allianceSubscriptions = new Set(await forum.listAllianceSubscriptions()); } catch { state.allianceSubscriptions = new Set(); }
+  }
 
   await loadPushPrefs();
 
@@ -1952,6 +2027,7 @@ export function unmountForum() {
   state.openPostId = null;
   state.comments = [];
   state.query = '';
+  state.tag = 'all';
   state.editingPostId = null;
   // Уведомления сбрасываем вместе с остальным состоянием страницы.
   state.notifyOpen = false;

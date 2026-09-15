@@ -21,7 +21,7 @@
  */
 import { esc, plural, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { leaderBadge } from './chats.js';
@@ -72,6 +72,7 @@ export function renderForum(view, state = {}) {
     posts: [],
     total: 0,
     category: 'all',
+    tag: 'all',
     sort: 'fresh',
     loading: true,
     error: '',
@@ -90,6 +91,7 @@ export function renderForum(view, state = {}) {
     notifyOpen: false,
     notifyList: [],
     notifyUnread: 0,
+    allianceSubscriptions: new Set(),
     ...state,
   };
 
@@ -114,6 +116,7 @@ export function renderForum(view, state = {}) {
         ${renderQuarterCountdown(view)}
         ${renderHotTopics(s)}
         ${renderLeaderboard(s)}
+        ${renderAllianceSubscriptions(view, s)}
         ${renderRules()}
       </aside>
       <div class="forum-main">
@@ -645,6 +648,10 @@ function renderAccountBar(s) {
 function notifyKindText(n) {
   if (n.kind === 'reply') return 'ответил на вашу запись';
   if (n.kind === 'mention') return 'упомянул вас';
+  if (n.kind === 'subscription') return 'написал в теме, на которую вы подписаны';
+  if (n.kind === 'alliance_rank') return 'изменил место альянса в рейтинге';
+  if (n.kind === 'moderation') return 'прислал сигнал модерации';
+  if (n.kind === 'digest') return 'прислал еженедельный дайджест';
   // Реакция: что именно — подсказывает значок в панели.
   return 'оценил вашу запись';
 }
@@ -748,6 +755,7 @@ ${renderPushPrefs(s)}`;
                  minlength="${L.nickMin}" maxlength="${L.nickMax}"
                  placeholder="как в игре">
         </label>
+
         <label class="forum-field">
           <span>Пароль</span>
           <input type="password" name="password" autocomplete="current-password" required
@@ -886,6 +894,11 @@ function renderComposer(s) {
             ).join('')}
           </select>
         </label>
+
+        <fieldset class="forum-topic-tags">
+          <legend>Теги темы <small>до трёх</small></legend>
+          ${TOPIC_TAGS.map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"><span>${esc(tag.label)}</span></label>`).join('')}
+        </fieldset>
 
         <label class="forum-field">
           <span>Заголовок</span>
@@ -1077,6 +1090,10 @@ function renderFeedControls(s) {
                           data-forum-sort="${esc(o.id)}">${esc(o.label)}</button>`
         ).join('')}
       </div>
+      <div class="forum-tag-filter" aria-label="Теги">
+        <button type="button" class="forum-tag${s.tag === 'all' ? ' is-on' : ''}" data-forum-tag="all">Все теги</button>
+        ${TOPIC_TAGS.map((tag) => `<button type="button" class="forum-tag${s.tag === tag.id ? ' is-on' : ''}" data-forum-tag="${esc(tag.id)}">#${esc(tag.label)}</button>`).join('')}
+      </div>
     </div>`;
 }
 
@@ -1091,6 +1108,26 @@ function renderFeedControls(s) {
 /** Ссылка на страницу участника. */
 function nickLink(nick) {
   return `<a class="forum-nick" href="#/user/${encodeURIComponent(nick)}">${esc(nick)}</a>`;
+}
+
+function allianceCard(tag, alliances = []) {
+  const alliance = alliances.find((item) => item.tag?.toUpperCase() === String(tag).toUpperCase());
+  if (!alliance) return `<span class="forum-post__ally">${esc(tag)}</span>`;
+  return `<a class="forum-alliance-card" href="#/alliance/${esc(encodeURIComponent(alliance.id))}" title="Открыть карточку альянса">
+    <i style="--ally-color:${esc(alliance.color || '#8a93a2')}"></i><b>${esc(alliance.tag)}</b><small>${esc(alliance.name)}</small>
+  </a>`;
+}
+
+function renderAllianceSubscriptions(view, s) {
+  const alliances = (view?.alliances || []).filter((item) => item.active).slice(0, 12);
+  if (!alliances.length) return '';
+  const subscribed = s.allianceSubscriptions instanceof Set ? s.allianceSubscriptions : new Set(s.allianceSubscriptions || []);
+  return `<section class="panel forum-alliance-subs" aria-label="Подписки на альянсы">
+    <header><b>Рейтинг альянсов</b><small>Сообщим, когда изменится место</small></header>
+    <div>${alliances.map((a) => `<button type="button" class="forum-alliance-sub${subscribed.has(a.id) ? ' is-on' : ''}"
+      data-forum-alliance-subscribe="${esc(a.id)}" data-forum-alliance-subscribed="${subscribed.has(a.id) ? '1' : ''}">
+      <i style="--ally-color:${esc(a.color || '#8a93a2')}"></i>${esc(a.tag)} <span>${subscribed.has(a.id) ? 'Подписан' : 'Подписаться'}</span></button>`).join('')}</div>
+  </section>`;
 }
 
 /**
@@ -1217,7 +1254,7 @@ export function renderPostCard(p, s) {
           }${
             verifiedBadge(p.authorIsVerified)
           }${
-            p.authorAlliance ? ` <span class="forum-post__ally">${esc(p.authorAlliance)}</span>` : ''
+            p.authorAlliance ? ` ${allianceCard(p.authorAlliance, s.alliances)}` : ''
           }</b>
           <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
             ${esc(timeAgo(p.createdAt))}${p.editedAt ? ' · изменён' : ''}
@@ -1239,6 +1276,8 @@ export function renderPostCard(p, s) {
       <h2 class="forum-post__title">
         ${isOpen ? esc(p.title) : `<a href="#/forum/${esc(p.id)}">${esc(p.title)}</a>`}
       </h2>
+
+      ${p.tags?.length ? `<div class="forum-post__tags">${p.tags.map((tag) => `<button type="button" class="forum-tag" data-forum-tag="${esc(tag)}">#${esc(TOPIC_TAGS.find((item) => item.id === tag)?.label || tag)}</button>`).join('')}</div>` : ''}
 
       <div class="forum-post__body">
         ${isOpen ? postBody(p.body) : `<p>${esc(excerpt(p.body))}</p>`}
@@ -1292,6 +1331,13 @@ export function renderPostCard(p, s) {
                     canReply
                       ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
                                  title="Вставить текст поста в ответ">Цитировать</button>`
+                      : ''
+                  }
+                  ${
+                    s.me
+                      ? `<button type="button" class="forum-act" data-forum-subscribe="${esc(p.id)}"
+                                 data-forum-subscribed="${p.subscribed ? '1' : ''}"
+                                 title="Получать уведомления о новых комментариях">${p.subscribed ? 'Отписаться' : 'Подписаться'}</button>`
                       : ''
                   }
                   ${
@@ -1457,6 +1503,8 @@ function renderComments(post, s) {
                   roleBadge({ role: c.authorRole }, { short: true })
                 }${
                   verifiedBadge(c.authorIsVerified)
+                }${
+                  c.authorAlliance ? ` ${allianceCard(c.authorAlliance, s.alliances)}` : ''
                 }</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>
               </div>

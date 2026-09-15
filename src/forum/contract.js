@@ -51,6 +51,7 @@
  * @property {boolean} [authorIsBlogger]  Автор ведёт блог: метка и ссылка на него.
  * @property {boolean} [authorIsVerified] Ник автора подтверждён; непроверенный виден с меткой.
  * @property {string}  category       Из CATEGORIES в rules.js.
+ * @property {string[]} [tags]        Метки темы для навигации внутри раздела.
  * @property {string}  title
  * @property {string}  body
  * @property {Date}    createdAt
@@ -77,6 +78,7 @@
  * @property {string}  postId
  * @property {string}  authorId
  * @property {boolean} [authorIsVerified] Ник автора подтверждён.
+ * @property {string} [authorAlliance] Тег альянса автора на момент чтения.
  * @property {string}  authorNick
  * @property {string}  body
  * @property {Date}    createdAt
@@ -99,7 +101,7 @@
  * @property {string}  userId        Кому.
  * @property {string|null} [actorId]    От кого; пусто, если аккаунт удалили.
  * @property {string}  actorNick     Копией, как ник автора у поста.
- * @property {'mention'|'reply'|'reaction'} kind
+ * @property {'mention'|'reply'|'reaction'|'subscription'|'alliance_rank'|'moderation'|'digest'} kind
  * @property {string}  [postId]      На какой пост ведёт уведомление.
  * @property {string}  [commentId]   Для реакции на комментарий.
  * @property {string}  preview       Кусок текста, чтобы читалось без перехода.
@@ -153,7 +155,7 @@
  * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string}) => Promise<{posts: ForumPost[], total: number}>} listPosts
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
- * @property {(draft: {title: string, body: string, category: string, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
@@ -164,6 +166,15 @@
  * @property {(report: {targetType: 'post'|'comment', targetId: string, ruleId: string, note?: string}) => Promise<void>} report
  * @property {() => Promise<ForumReport[]>} listReports
  * @property {(reportId: string) => Promise<void>} resolveReport
+ * @property {(postId: string) => Promise<void>} subscribeTopic
+ * @property {(postId: string) => Promise<void>} unsubscribeTopic
+ * @property {(allianceId: string) => Promise<void>} subscribeAlliance
+ * @property {(allianceId: string) => Promise<void>} unsubscribeAlliance
+ * @property {() => Promise<string[]>} listAllianceSubscriptions
+ * @property {(rows: {allianceId: string, place: number, points: number}[]) => Promise<void>} recordAllianceRankSnapshot
+ * @property {(targetType: 'post'|'comment', targetId: string) => Promise<void>} restoreAutoHiddenContent
+ * @property {() => Promise<{targetType: string, targetId: string, reportCount: number, priority: string}[]>} listModerationQueue
+ * @property {() => Promise<{id: string, actorNick: string, targetType: string, targetId: string, targetNick: string, action: string, details: object, createdAt: Date}[]>} listModerationActions
  * @property {() => Promise<ForumUser[]>} listUsers
  * @property {(userId: string, password: string) => Promise<void>} resetPassword
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction

@@ -613,6 +613,12 @@ html {
   vertical-align: 1px;
 }
 
+@media (max-width: 600px) {
+  .forum-alliance-card small { max-width: 70px; }
+  .forum-tag-filter { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 3px; }
+  .forum-tag-filter .forum-tag { flex: 0 0 auto; }
+}
+
 /* ── Президентская доска ──────────────────────────────────────────────────── */
 
 /*

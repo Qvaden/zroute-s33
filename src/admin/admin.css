@@ -1014,6 +1014,9 @@ body.guide-color-modal-open{overflow:hidden}
    частью той же панели, а не отдельным приложением. */
 
 .adm-players { display: grid; gap: 2px; margin-top: 18px; }
+.adm-player-search { display: block; margin-top: 18px; max-width: 420px; }
+.adm-player-search input { width: 100%; height: 40px; padding: 0 13px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.adm-player-search input:focus { outline: none; border-color: var(--accent); }
 
 /* Лидеры альянсов — отдельный блок над списком игроков. Лидерство привязано
    к альянсу, поэтому карточка показывает тег первым делом: так сразу видно,
@@ -1283,6 +1286,8 @@ body.guide-color-modal-open{overflow:hidden}
   line-height: 1.55;
 }
 .adm-modal__note b { color: var(--dim); }
+.adm-restrict-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.adm-restrict-presets .adm-btn { min-height: 30px; padding: 4px 9px; font-size: 12px; }
 
 /* ── Чаты ─────────────────────────────────────────────────────────────────── */
 .adm-badge--leader { color: #5cc8ff; border-color: rgba(92,200,255,.35); background: rgba(92,200,255,.1); }
@@ -1331,6 +1336,16 @@ body.guide-color-modal-open{overflow:hidden}
 }
 .adm-reserved__item code { color: var(--accent); font-size: 13px; overflow-wrap: anywhere; }
 .adm-reserved__item .adm-btn { margin-left: auto; min-height: 26px; }
+.adm-mod-queue, .adm-mod-log { margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--text) 2%, transparent); }
+.adm-mod-queue h2, .adm-mod-log h2 { margin: 0; font-size: 15px; }
+.adm-mod-queue p { margin: 6px 0 10px; font-size: 12px; }
+.adm-mod-queue__items { display: flex; flex-wrap: wrap; gap: 7px; }
+.adm-mod-priority { padding: 5px 8px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); }
+.adm-mod-priority--urgent { color: #c77b20; background: rgba(199,123,32,.1); border-color: rgba(199,123,32,.28); }
+.adm-mod-priority--critical { color: #d65252; background: rgba(214,82,82,.1); border-color: rgba(214,82,82,.3); }
+.adm-mod-log ul { display: grid; gap: 6px; padding: 0; margin: 10px 0 0; list-style: none; }
+.adm-mod-log li { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; font-size: 13px; }
+.adm-mod-log time { color: var(--mute); font-size: 12px; }
 .adm-rename-history { margin-top: 18px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
 .adm-rename-history h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .adm-rename-history .adm-reserved__item code { color: var(--dim); }

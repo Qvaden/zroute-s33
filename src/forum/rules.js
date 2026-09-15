@@ -122,6 +122,18 @@ export const CATEGORIES = [
   { id: 'blog', label: 'Блоги', hint: 'Личные блоги игроков' },
 ];
 
+/** Метки дополняют раздел, но не заменяют его: одна тема может быть и про VS,
+ * и про набор в альянс, без размножения одинаковых рубрик. */
+export const TOPIC_TAGS = [
+  { id: 'vs', label: 'VS' },
+  { id: 'recruiting', label: 'Набор' },
+  { id: 'diplomacy', label: 'Дипломатия' },
+  { id: 'guide', label: 'Гайд' },
+  { id: 'question', label: 'Вопрос' },
+  { id: 'event', label: 'Событие' },
+];
+export const TOPIC_TAG_IDS = TOPIC_TAGS.map((tag) => tag.id);
+
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 
 /** @param {string} id */

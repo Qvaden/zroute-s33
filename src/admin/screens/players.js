@@ -110,6 +110,9 @@ export function renderPlayers(view) {
 
       ${leaders}
 
+      <label class="adm-player-search">
+        <input type="search" data-player-search aria-label="Найти игрока" placeholder="Найти игрока, альянс или статус" autocomplete="off">
+      </label>
       <div class="adm-players">${rows}</div>
 
       <div class="adm-players__notes">
@@ -218,7 +221,7 @@ function renderRow(user, me) {
     : `Сделать лидером${(user.allianceTag || '') ? ` (${user.allianceTag.toUpperCase()})` : ''}`;
   const verTitle = user.isVerified ? 'Снять проверку' : 'Проверить ник';
   return `
-    <div class="adm-player" data-player="${esc(user.id)}">
+    <div class="adm-player" data-player="${esc(user.id)}" data-player-search-text="${esc(`${user.nick} ${user.allianceTag || ''} ${user.role} ${user.isLeader ? 'лидер' : ''} ${user.isVerified ? 'проверен' : ''}`.toLowerCase())}">
       <div class="adm-player__who">
         <b>${esc(user.nick)}${roleBadge(user, { short: true })}${verifiedBadge(user.isVerified)}${user.isLeader ? ` <span class="adm-badge adm-badge--leader">лидер ${esc((user.leaderOf || '').toUpperCase())}</span>` : ''}</b>
         <small>с ${esc(shortDate(user.createdAt))}</small>
@@ -420,6 +423,11 @@ function renderRestrictModal() {
       <div class="adm-modal__box" role="dialog" aria-modal="true" aria-label="Запрет писать">
         <h3>Ограничить <b data-restrict-nick></b></h3>
         <form data-restrict-form>
+          <div class="adm-restrict-presets" aria-label="Готовые меры">
+            <button type="button" class="adm-btn" data-restrict-preset="respect:1">Оскорбления · 1 день</button>
+            <button type="button" class="adm-btn" data-restrict-preset="ads:7">Реклама · неделя</button>
+            <button type="button" class="adm-btn" data-restrict-preset="hate:ban">Вражда · запрет</button>
+          </div>
           <label class="adm-field">
             <span>Пункт правил</span>
             <!--

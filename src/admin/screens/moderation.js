@@ -82,6 +82,9 @@ export function renderModeration(view) {
     return '<div class="loading">Читаем жалобы…</div>';
   }
 
+  const queue = f.moderationQueue ?? [];
+  const actions = f.moderationActions ?? [];
+
   if (!f.reports.length) {
     return `
       <section class="panel">
@@ -90,6 +93,7 @@ export function renderModeration(view) {
           <h1 class="adm-h1">Разбирать нечего</h1>
         </header>
         <p class="adm-lead">Ни одной нерассмотренной жалобы. Это хорошая новость.</p>
+        ${renderActionLog(actions)}
         <div class="adm-actions">
           <button type="button" class="adm-btn" data-forum-reload>Обновить</button>
         </div>
@@ -109,10 +113,44 @@ export function renderModeration(view) {
 
       <div class="adm-result" data-moderation-result hidden></div>
 
+      ${renderPriorityQueue(queue)}
+
       <div class="adm-reports">
         ${f.reports.map(renderReport).join('')}
       </div>
+
+      ${renderActionLog(actions)}
     </section>`;
+}
+
+function renderPriorityQueue(queue) {
+  const urgent = queue.filter((item) => item.priority !== 'normal');
+  if (!urgent.length) return '';
+  return `<section class="adm-mod-queue" aria-label="Срочные жалобы">
+    <h2>Сначала проверить</h2>
+    <p class="muted">Три жалобы на один материал помечаются срочными, пять — критическими. Решение всё равно принимает модератор.</p>
+    <div class="adm-mod-queue__items">${urgent.map((item) => `
+      <span class="adm-mod-priority adm-mod-priority--${esc(item.priority)}">
+        ${item.priority === 'critical' ? 'Критично' : 'Срочно'} · ${esc(String(item.reportCount))} жал.
+        на ${esc(item.targetType === 'post' ? 'пост' : 'комментарий')}
+      </span>`).join('')}</div>
+  </section>`;
+}
+
+function renderActionLog(actions) {
+  if (!actions.length) return '';
+  return `<section class="adm-mod-log">
+    <h2>Последние решения</h2>
+    <ul>${actions.map((item) => `
+      <li><b>${esc(item.actorNick || 'Модератор')}</b> — ${esc(actionLabel(item))}
+        <time>${esc(shortTime(item.createdAt))}</time></li>`).join('')}</ul>
+  </section>`;
+}
+
+function actionLabel(item) {
+  if (item.action === 'content_removed') return `удалил ${item.targetType === 'post' ? 'пост' : 'комментарий'} ${item.targetNick ? `игрока ${item.targetNick}` : ''}`;
+  if (item.action === 'restriction_changed') return `изменил ограничение для ${item.targetNick || 'игрока'}`;
+  return 'разобрал жалобу';
 }
 
 function renderReport(r) {
@@ -153,6 +191,7 @@ function renderReport(r) {
         <button type="button" class="adm-btn" data-report-dismiss="${esc(r.id)}">
           Оставить как есть
         </button>
+        ${r.targetAutoHidden ? `<button type="button" class="adm-btn" data-report-restore="${esc(r.targetType)}:${esc(r.targetId)}">Восстановить материал</button>` : ''}
       </div>
     </article>`;
 }

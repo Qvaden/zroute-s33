@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, REACTION_IDS, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, REACTION_IDS, TOPIC_TAG_IDS, reactionMeta } from '../rules.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -56,6 +56,9 @@ function emptyState() {
     comments: [],
     reactions: [],
     reports: [],
+    topicSubscriptions: [],
+    allianceSubscriptions: [],
+    moderationActions: [],
     polls: [],
     pollVotes: [],
     notifications: [],
@@ -227,10 +230,12 @@ function postOut(state, p) {
     */
     authorAvatar: author?.avatarUrl || '',
     authorAlliance: author?.allianceTag || '',
+    authorAlliance: author?.allianceTag || '',
     authorRole: author?.role || 'member',
     authorIsBlogger: Boolean(author?.isBlogger),
     authorIsVerified: Boolean(author?.isVerified),
     category: p.category,
+    tags: Array.isArray(p.tags) ? p.tags : [],
     title: p.title,
     body: p.body,
     createdAt: toDate(p.createdAt) ?? new Date(),
@@ -240,6 +245,7 @@ function postOut(state, p) {
     deletedReason: p.deletedReason || '',
     views: Number(p.views || 0),
     commentCount: state.comments.filter((c) => c.postId === p.id && !c.deleted).length,
+    subscribed: state.topicSubscriptions.some((s) => s.postId === p.id && s.userId === state.me),
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
     ...r,
@@ -279,10 +285,11 @@ function pollOut(state, postId) {
  */
 export async function listPosts(opts = {}) {
   const s = read();
-  const { category = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
+  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
 
   let list = s.posts.map((p) => postOut(s, p));
   if (category !== 'all') list = list.filter((p) => p.category === category);
+  if (tag !== 'all') list = list.filter((p) => p.tags.includes(tag));
   /*
     Поиск по названию и тексту. Регистр не важен — так же ведёт себя
     ilike в рабочем адаптере, и два режима не должны расходиться в этом.
@@ -342,12 +349,14 @@ export async function createPost(draft) {
   const s = read();
   const me = requireWriter(s);
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
+  const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
 
   const post = {
     id: newId('p'),
     authorId: me.id,
     authorNick: me.nick,
     category: draft.category,
+    tags,
     title: draft.title,
     body: draft.body,
     createdAt: new Date().toISOString(),
@@ -689,6 +698,7 @@ export async function report({ targetType, targetId, ruleId, note = '' }) {
     targetTitle: isPost ? String(post?.title ?? '') : '',
     targetBody: String(target?.body ?? '').slice(0, 400),
     targetAuthorNick: String(target?.authorNick ?? ''),
+    targetAutoHidden: Boolean(target?.autoHidden),
     reporterId: me.id,
     reporterNick: me.nick,
     ruleId,
@@ -696,6 +706,12 @@ export async function report({ targetType, targetId, ruleId, note = '' }) {
     createdAt: new Date().toISOString(),
     resolved: false,
   });
+  const reports = s.reports.filter((r) => !r.resolved && r.targetType === targetType && r.targetId === targetId);
+  if (reports.length >= 5 && target && !target.deleted) {
+    target.deleted = true;
+    target.autoHidden = true;
+    target.deletedReason = 'Скрыто автоматически после пяти жалоб: материал проверяет модератор.';
+  }
   write(s);
 }
 
@@ -715,8 +731,83 @@ export async function resolveReport(reportId) {
     throw new Error('Недостаточно прав');
   }
   const rep = s.reports.find((r) => r.id === reportId);
-  if (rep) rep.resolved = true;
+  if (rep) {
+    rep.resolved = true;
+    s.moderationActions.unshift({ id: newId('ma'), actorNick: me.nick, targetType: 'report', targetId: rep.id, targetNick: '', action: 'report_resolved', details: { ruleId: rep.ruleId }, createdAt: new Date().toISOString() });
+  }
   write(s);
+}
+
+export async function subscribeTopic(postId) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!s.topicSubscriptions.some((x) => x.postId === postId && x.userId === me.id)) {
+    s.topicSubscriptions.push({ postId, userId: me.id });
+    write(s);
+  }
+}
+
+export async function unsubscribeTopic(postId) {
+  const s = read();
+  s.topicSubscriptions = s.topicSubscriptions.filter((x) => x.postId !== postId || x.userId !== s.me);
+  write(s);
+}
+
+export async function subscribeAlliance(allianceId) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!s.allianceSubscriptions) s.allianceSubscriptions = [];
+  if (!s.allianceSubscriptions.some((x) => x.allianceId === allianceId && x.userId === me.id)) {
+    s.allianceSubscriptions.push({ allianceId, userId: me.id });
+    write(s);
+  }
+}
+
+export async function unsubscribeAlliance(allianceId) {
+  const s = read();
+  s.allianceSubscriptions = (s.allianceSubscriptions || []).filter((x) => x.allianceId !== allianceId || x.userId !== s.me);
+  write(s);
+}
+
+export async function listAllianceSubscriptions() {
+  const s = read();
+  return (s.allianceSubscriptions || []).filter((x) => x.userId === s.me).map((x) => x.allianceId);
+}
+
+export async function recordAllianceRankSnapshot() {}
+
+export async function restoreAutoHiddenContent(targetType, targetId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!isStaff(me)) throw new Error('Недостаточно прав');
+  const list = targetType === 'post' ? s.posts : s.comments;
+  const target = list.find((item) => item.id === targetId);
+  if (!target?.autoHidden) throw new Error('Материал не был скрыт автоматически');
+  target.deleted = false;
+  target.autoHidden = false;
+  target.deletedReason = '';
+  write(s);
+}
+
+export async function listModerationQueue() {
+  const s = read();
+  const groups = new Map();
+  for (const r of s.reports.filter((item) => !item.resolved)) {
+    const key = `${r.targetType}:${r.targetId}`;
+    const item = groups.get(key) || { targetType: r.targetType, targetId: r.targetId, reportCount: 0, firstReportAt: r.createdAt, lastReportAt: r.createdAt };
+    item.reportCount += 1;
+    if (new Date(r.createdAt) < new Date(item.firstReportAt)) item.firstReportAt = r.createdAt;
+    if (new Date(r.createdAt) > new Date(item.lastReportAt)) item.lastReportAt = r.createdAt;
+    groups.set(key, item);
+  }
+  return [...groups.values()].map((item) => ({ ...item, priority: item.reportCount >= 5 ? 'critical' : item.reportCount >= 3 ? 'urgent' : 'normal', firstReportAt: toDate(item.firstReportAt), lastReportAt: toDate(item.lastReportAt) })).sort((a, b) => b.reportCount - a.reportCount);
+}
+
+export async function listModerationActions() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me || !isStaff(me)) throw new Error('Недостаточно прав');
+  return (s.moderationActions || []).map((item) => ({ ...item, createdAt: toDate(item.createdAt) ?? new Date() }));
 }
 
 export async function listUsers() {
@@ -817,6 +908,7 @@ export async function setRestriction(userId, opts) {
     user.mutedUntil = opts.mutedUntil ? new Date(opts.mutedUntil).toISOString() : null;
   }
   if (opts.reason != null) user.banReason = String(opts.reason);
+  s.moderationActions.unshift({ id: newId('ma'), actorNick: me.nick, targetType: 'user', targetId: user.id, targetNick: user.nick, action: 'restriction_changed', details: { banned: Boolean(user.banned), mutedUntil: user.mutedUntil, reason: user.banReason || '' }, createdAt: new Date().toISOString() });
   write(s);
 }
 
