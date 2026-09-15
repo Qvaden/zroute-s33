@@ -54,6 +54,15 @@ function renderBody(raw) {
  * @property {string|null} [lightbox]
  */
 
+/**
+ * Вся страница чатов: слева список, справа комната.
+ *
+ * РАЗМЕТКА ЗДЕСЬ — СТРОГО ДВА РЕБЁНКА .chat-layout. Контейнер — grid
+ * «320px + 1fr», и любой текст или узел между списком и комнатой становится
+ * анонимной ячейкой: комната уезжает со своего места вниз. Поясняющие
+ * комментарии пишем снаружи шаблонной строки — фигурные комментарии внутри
+ * неё попадают в HTML как literal текст (однажды так и случилось).
+ */
 export function renderChats(s) {
   if (!s.ready) {
     return `
@@ -85,11 +94,6 @@ export function renderChats(s) {
         ${s.createOpen ? renderCreateForm(s) : ''}
         <div class="chat-list__area" data-chat-list-area>${renderChatList(s)}</div>
       </aside>
-      {/*
-        aria-live не на всей комнате: лента перерисовывается целиком, и
-        скринридер перечитывал бы её с начала. Живой регион для новых
-        сообщений лежит внутри комнаты и наполняется точечно.
-      */}
       <section class="chat-room">
         <div class="sr-only" aria-live="polite" data-chat-live></div>
         ${s.openId ? renderRoom(s) : renderRoomPlaceholder(s)}
