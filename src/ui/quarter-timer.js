@@ -10,7 +10,7 @@
 let quarterTimer = null;
 
 /** Сколько осталось до конца Кварта в формате «Xд Yч Zм». */
-export function formatQuarterLeft(endMs) {
+function formatQuarterLeft(endMs) {
   const ms = Math.max(0, Number(endMs) - Date.now());
   const days = Math.floor(ms / 86400000);
   const hours = Math.floor((ms % 86400000) / 3600000);

@@ -22,7 +22,7 @@
 import { esc, plural, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, categoryLabel } from '../forum/rules.js';
-import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
@@ -500,7 +500,7 @@ function renderLeaderboard(s) {
           .map(
             (l) => `<li class="forum-lead__row">
               <span class="forum-lead__rank${l.rank <= 3 ? ' forum-lead__rank--top' : ''}">${l.rank}</span>
-              ${avatar(l.nick, l.avatar)}
+              ${avatarHtml(l.nick, l.avatar)}
               <span class="forum-lead__who">
                 <b>${nickLink(l.nick)}</b>
                 <small>${esc(plural(l.posts, 'пост', 'поста', 'постов'))} ·
@@ -701,7 +701,7 @@ function renderWhoAmI(s) {
     const muted = s.me.mutedUntil && s.me.mutedUntil > new Date();
     return `
       <div class="forum-me">
-        ${avatar(s.me.nick, s.me.avatarUrl)}
+        ${avatarHtml(s.me.nick, s.me.avatarUrl)}
         <span class="forum-me__body">
           <b>${nickLink(s.me.nick)}</b>
           <small>${roleBadge(s.me) || esc(roleLabel(s.me))}${s.me.isLeader ? leaderBadge() : ''}</small>
@@ -1005,7 +1005,7 @@ function renderEditForm(p) {
                value="${esc(p.title)}">
       </label>
 
-<label class="forum-field">
+      <label class="forum-field">
         <span>Текст</span>
         <div class="forum-editor" contenteditable="true" role="textbox" aria-multiline="true"
              name="body" data-editor data-limit="${L.bodyMax}"
@@ -1081,23 +1081,12 @@ function renderFeedControls(s) {
 }
 
 /**
- * Метка участника: аватарка или буква в цветном квадрате.
- *
- * Буква не заглушка «пока не загрузил», а полноценный вариант: цвет считается
- * из ника и всегда один, поэтому знакомого человека видно в ленте по цвету
- * даже без фотографии.
+ * Аватарка участника — единая avatarHtml из format.js (когда-то здесь была
+ * своя копия, и три страницы разъехались в деталях).
  *
  * Ник — ссылка на профиль. Так устроены все форумы, и человек это пробует
  * первым делом: нажать на имя, чтобы узнать, кто пишет.
  */
-function avatar(nick, url, size = '') {
-  const cls = `forum-ava${size ? ` forum-ava--${size}` : ''}`;
-  if (url) {
-    return `<img class="${cls} forum-ava--img" src="${esc(url)}"
-                 alt="${esc(nick)}" loading="lazy" width="36" height="36">`;
-  }
-  return `<span class="${cls}" style="--ava:${esc(nickColor(nick))}">${esc(nickInitial(nick))}</span>`;
-}
 
 /** Ссылка на страницу участника. */
 function nickLink(nick) {
@@ -1111,8 +1100,8 @@ function nickLink(nick) {
  * при трёх в ряд на телефоне становится нечитаемым, и открывать его придётся
  * всё равно.
  *
- * Больше ${CONFIG.forum.limits.attachmentsMax} не бывает: предел держит база
- * (см. supabase/profiles.sql) и тот же предел стоит в config.js.
+ * Больше двенадцати не бывает: предел держит база (см. supabase/profiles.sql)
+ * и тот же предел стоит в config.js (CONFIG.forum.limits.attachmentsMax).
  */
 function renderShots(item) {
   const shots = Array.isArray(item.attachments) ? item.attachments.filter((a) => a?.url) : [];
@@ -1216,7 +1205,7 @@ export function renderPostCard(p, s) {
   return `
     <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}${inTrail ? ' forum-post--trail' : ''}" data-forum-post="${esc(p.id)}">
       <header class="forum-post__head">
-        ${avatar(p.authorNick, p.authorAvatar)}
+        ${avatarHtml(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
           <b>${nickLink(p.authorNick)}${
             p.authorIsBlogger
@@ -1281,29 +1270,43 @@ export function renderPostCard(p, s) {
               : ''
           }
           ${
-            canModerate
-              ? `<button type="button" class="forum-act" data-forum-pin="${esc(p.id)}"
-                         aria-pressed="${p.pinned ? 'true' : 'false'}"
-                         title="${p.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">${
-                   p.pinned ? 'Открепить' : 'Закрепить'
-                 }</button>`
-              : ''
-          }
-          ${
-            isMine || canModerate
-              ? `<button type="button" class="forum-act" data-forum-del-post="${esc(p.id)}"
-                         title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
-              : ''
-          }
-          ${
-            canReply
-              ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
-                         title="Вставить текст поста в ответ">Цитировать</button>`
-              : ''
-          }
-          ${
-            s.me && !isMine
-              ? `<button type="button" class="forum-act" data-forum-report="post:${esc(p.id)}">Пожаловаться</button>`
+            /*
+              Редкие действия собраны в меню «⋯»: у автора-модератора их
+              набиралось пять в одну строку, и на телефоне кнопки уезжали
+              за край карточки. Кнопки остаются в разметке — просто сложены.
+            */
+            (canModerate || canReply || (s.me && !isMine))
+              ? `<details class="forum-act-menu">
+                <summary class="forum-act" title="Ещё действия" aria-label="Ещё действия с постом">⋯</summary>
+                <div class="forum-act-menu__list">
+                  ${
+                    canModerate
+                      ? `<button type="button" class="forum-act" data-forum-pin="${esc(p.id)}"
+                                 aria-pressed="${p.pinned ? 'true' : 'false'}"
+                                 title="${p.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">${
+                            p.pinned ? 'Открепить' : 'Закрепить'
+                          }</button>`
+                      : ''
+                  }
+                  ${
+                    canReply
+                      ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
+                                 title="Вставить текст поста в ответ">Цитировать</button>`
+                      : ''
+                  }
+                  ${
+                    s.me && !isMine
+                      ? `<button type="button" class="forum-act" data-forum-report="post:${esc(p.id)}">Пожаловаться</button>`
+                      : ''
+                  }
+                  ${
+                    isMine || canModerate
+                      ? `<button type="button" class="forum-act forum-act--danger" data-forum-del-post="${esc(p.id)}"
+                                 title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
+                      : ''
+                  }
+                </div>
+              </details>`
               : ''
           }
         </span>
@@ -1411,7 +1414,17 @@ function renderPoll(poll, s) {
           </label>`;
         }).join('')}
       </div>
-      ${canVote ? '' : `<p class="forum-poll__hint muted">${poll.closed ? 'Опрос закрыт' : 'Войдите, чтобы проголосовать'}</p>`}
+      ${
+        canVote
+          ? ''
+          : `<p class="forum-poll__hint muted">${
+              poll.closed
+                ? 'Опрос закрыт'
+                : s.me?.banned
+                  ? 'Голосование закрыто для вашего аккаунта'
+                  : 'Войдите, чтобы проголосовать'
+            }</p>`
+      }
     </div>`;
 }
 
@@ -1432,7 +1445,7 @@ function renderComments(post, s) {
           const isMine = s.me && s.me.id === c.authorId;
           const canQuote = Boolean(s.me && !s.me.banned);
           return `<li class="forum-comment" data-forum-comment="${esc(c.id)}">
-            ${avatar(c.authorNick, c.authorAvatar, 'sm')}
+            ${avatarHtml(c.authorNick, c.authorAvatar, { size: 'sm' })}
             <div class="forum-comment__body">
               <div class="forum-comment__head">
                 <b>${nickLink(c.authorNick)}${

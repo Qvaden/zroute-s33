@@ -14,9 +14,9 @@
  */
 import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
-import { renderChats, renderScrollArea, renderChatList, renderMessage } from '../pages/chats.js';
+import { renderChats, renderScrollArea, renderChatList, renderMessage, dayLabel } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
-import { decodeEntities } from './sanitize.js';
+import { excerpt } from './format.js';
 import { uploadFile, currentUserId } from '../db/client.js';
 
 const POLL_MS = 4000;
@@ -242,16 +242,6 @@ function notice(text) {
   setTimeout(() => t.remove(), 2600);
 }
 
-/** Текст без HTML-тегов, обрезанный. Сущности декодируем: иначе &nbsp;
- *  из редактора показывался бы буквами «&nbsp;» в превью и в уведомлении. */
-function plainExcerpt(src, max = 80) {
-  const t = decodeEntities(String(src))
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
-}
-
 /* ── Вложения ───────────────────────────────────────────────────────────── */
 
 function addFiles(fileList) {
@@ -468,7 +458,7 @@ async function tick() {
         playNewMessageSound();
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           const sender = newFromOthers[newFromOthers.length - 1].authorNick;
-          const preview = plainExcerpt(newFromOthers[newFromOthers.length - 1].body || 'Вложение', 60);
+          const preview = excerpt(newFromOthers[newFromOthers.length - 1].body || 'Вложение', 60);
           new Notification(`${sender}: ${preview}`, { silent: true });
         }
       }
@@ -497,6 +487,26 @@ function stopPolling() {
 }
 
 /* ── Действия ───────────────────────────────────────────────────────────── */
+
+/*
+  Подгрузка старой порции сообщений. Один путь для бесконечного скролла:
+  IntersectionObserver над сентинелем — единственный триггер, повторные
+  вызовы (до ответа сети) игнорируются флагом.
+*/
+async function loadOlder() {
+  if (!state.openId || state._loadingMore || !state.hasMore) return;
+  state._loadingMore = true;
+  try {
+    const oldest = state.messages[0]?.createdAt;
+    const older = await forum.listChatMessages(state.openId, { limit: 60, before: oldest });
+    if (!state.openId) return;
+    state.messages = [...older, ...state.messages];
+    state.hasMore = older.length >= 60;
+    paintMessages();
+  } finally {
+    state._loadingMore = false;
+  }
+}
 
 async function send(form) {
   const input = form.querySelector('[data-chat-input]');
@@ -527,7 +537,13 @@ async function send(form) {
       poll,
       replyTo: reply ? { id: reply.id, authorNick: reply.authorNick, body: reply.body } : null,
     });
-    if (id !== state.openId) return;
+    if (id !== state.openId) {
+      // Человек ушёл в другой чат, пока сообщение летело: файлы уже
+      // отправлены, черновик нового чата чистим, чтобы они не висели
+      // в превью чужой переписки.
+      clearPendingFiles({ keepUrls: !forum.capabilities?.isShared });
+      return;
+    }
     state.messages.push(m);
     chatDrafts.set(id, '');
     if (input) {
@@ -590,7 +606,7 @@ function paintComposerMeta() {
       <div class="chat-reply-banner">
         <div class="chat-reply-banner__info">
           <span class="chat-reply-banner__label">Ответ для <b>${esc(state.replyingTo.authorNick)}</b></span>
-          <span class="chat-reply-banner__text muted">${esc(plainExcerpt(state.replyingTo.body, 90))}</span>
+          <span class="chat-reply-banner__text muted">${esc(excerpt(state.replyingTo.body, 90))}</span>
         </div>
         <button type="button" class="chat-reply-banner__cancel" data-chat-reply-cancel title="Отменить ответ">✕</button>
       </div>`);
@@ -637,15 +653,13 @@ function appendMessageToDOM(m) {
     const prevDay = new Date(prev.createdAt);
     const prevDayStr = `${prevDay.getFullYear()}-${prevDay.getMonth()}-${prevDay.getDate()}`;
     if (prevDayStr !== dayStr) {
-      const dayLabel = day.toDateString() === new Date().toDateString()
-        ? 'Сегодня'
-        : new Date(Date.now() - 86400000).toDateString() === day.toDateString()
-          ? 'Вчера'
-          : day.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-      msgs.insertAdjacentHTML('beforeend', `<div class="chat-day"><span>${esc(dayLabel)}</span></div>`);
+      msgs.insertAdjacentHTML('beforeend', `<div class="chat-day"><span>${esc(dayLabel(day))}</span></div>`);
     }
   }
   msgs.insertAdjacentHTML('beforeend', renderMessage(m, state, isMgr, grouped));
+  // Живой регион для скринридера: одно новое сообщение, а не вся лента.
+  const live = host?.querySelector('[data-chat-live]');
+  if (live) live.textContent = `${m.authorNick}: ${excerpt(m.body || 'Вложение', 80)}`;
 }
 
 async function withBusy(btn, label, fn) {
@@ -709,7 +723,7 @@ function wire() {
         state.createOpen = false;
         await loadList();
         location.hash = `#/chats/${chat.id}`;
-});
+      });
     }
 
     if (form.matches('[data-chat-dm]')) {
@@ -1039,37 +1053,6 @@ function wire() {
       });
       return;
     }
-    const more = t.closest('[data-chat-more]');
-    if (more && state.openId) {
-      await withBusy(more, 'Загружаем…', async () => {
-        const oldest = state.messages[0]?.createdAt;
-        const older = await forum.listChatMessages(state.openId, { limit: 60, before: oldest });
-        state.messages = [...older, ...state.messages];
-        state.hasMore = older.length >= 60;
-        paintMessages();
-      });
-      return;
-    }
-
-    /* Бесконечный скролл: IntersectionObserver следит за сентинелем
-       в верху ленты и подгружает порцию, когда он появляется в зоне
-       видимости. Срабатывает один раз на сентинел, потом сентинел
-       удаляется (paintMessages перерисовывает ленту, и если hasMore —
-       сентинел появляется снова). */
-    const sentinel = t.closest('[data-chat-sentinel]');
-    if (sentinel && state.openId && !state._loadingMore) {
-      state._loadingMore = true;
-      try {
-        const oldest = state.messages[0]?.createdAt;
-        const older = await forum.listChatMessages(state.openId, { limit: 60, before: oldest });
-        state.messages = [...older, ...state.messages];
-        state.hasMore = older.length >= 60;
-        paintMessages();
-      } finally {
-        state._loadingMore = false;
-      }
-      return;
-    }
 
     /* Кнопка «вниз» — прокрутка к последнему сообщению. */
     const goBottom = t.closest('[data-chat-go-bottom]');
@@ -1128,16 +1111,6 @@ function wire() {
       if (state.searchOpen) {
         host.querySelector('[data-chat-search-input]')?.focus({ preventScroll: true });
       }
-      return;
-    }
-
-    /* Закрепить сообщение (для будущего). */
-    const pinBtn = t.closest('[data-chat-pin]');
-    if (pinBtn && state.openId) {
-      const msgId = pinBtn.dataset.chatPin;
-      state.open.pinnedId = state.open.pinnedId === msgId ? null : msgId;
-      paintFull({ stick: true });
-      notice(state.open.pinnedId ? 'Сообщение закреплено' : 'Откреплено');
       return;
     }
 
@@ -1315,47 +1288,45 @@ function wire() {
 
   /* Бесконечный скролл: IntersectionObserver следит за сентинелем
      в верху ленты и подгружает порцию, когда он появляется в зоне
-     видимости. */
+     видимости. Срабатывает один раз на сентинел, потом сентинел
+     удаляется (paintMessages перерисовывает ленту, и если hasMore —
+     сентинел появляется снова). */
   const scrollObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
-      if (entry.isIntersecting && state.openId && !state._loadingMore && state.hasMore) {
-        state._loadingMore = true;
-        const oldest = state.messages[0]?.createdAt;
-        forum.listChatMessages(state.openId, { limit: 60, before: oldest }).then((older) => {
-          if (state.openId) {
-            state.messages = [...older, ...state.messages];
-            state.hasMore = older.length >= 60;
-            paintMessages();
-          }
-        }).finally(() => { state._loadingMore = false; });
-      }
+      if (entry.isIntersecting) loadOlder();
     }
   }, { root: null, threshold: 0.1 });
   state._scrollObserver = scrollObserver;
 
-  /* Уведомления о новых сообщениях: звук + системное уведомление. */
-  async function playNewMessageSound() {
+  /* Уведомления о новых сообщениях: звук + системное уведомление.
+     Контекст один на страницу и создаётся лениво: браузеры держат лимит
+     живых AudioContext (в Chrome — шесть), и контекст на каждое сообщение
+     исчерпал бы его за вечер, после чего звук молча пропадал. */
+  let audioCtx = null;
+  function playNewMessageSound() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      audioCtx = audioCtx ?? new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(audioCtx.destination);
       osc.type = 'sine';
       osc.frequency.value = 880;
       gain.gain.value = 0.08;
       osc.start();
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-      osc.stop(ctx.currentTime + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+      osc.stop(audioCtx.currentTime + 0.12);
     } catch {
       /* игнорируем ошибки звука */
     }
   }
 
-  /* Запросить разрешение на уведомления при первом открытии чата. */
-  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-    Notification.requestPermission().catch(() => {});
-  }
+  /*
+    Разрешение на уведомления спрашиваем только по нажатию на 🔔 в меню
+    чата: авто-запрос при входе браузеры блокируют или показывают нежеланный
+    промпт, а живая кнопка уже есть.
+  */
 }
 
 /* ── Входы ──────────────────────────────────────────────────────────────── */

@@ -9,8 +9,7 @@
  *   #/chats/<id>       — сам чат: лента снизу вверх, липкий ввод, вложения, опросы.
  */
 import { esc, plural } from '../ui/helpers.js';
-import { postBody, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
-import { decodeEntities } from '../forum/sanitize.js';
+import { postBody, timeAgo, fullTime, nickColor, nickInitial, avatarHtml, excerpt } from '../forum/format.js';
 import { roleBadge, verifiedBadge } from '../forum/roles.js';
 
 /**
@@ -86,7 +85,13 @@ export function renderChats(s) {
         ${s.createOpen ? renderCreateForm(s) : ''}
         <div class="chat-list__area" data-chat-list-area>${renderChatList(s)}</div>
       </aside>
-      <section class="chat-room" aria-live="polite">
+      {/*
+        aria-live не на всей комнате: лента перерисовывается целиком, и
+        скринридер перечитывал бы её с начала. Живой регион для новых
+        сообщений лежит внутри комнаты и наполняется точечно.
+      */}
+      <section class="chat-room">
+        <div class="sr-only" aria-live="polite" data-chat-live></div>
         ${s.openId ? renderRoom(s) : renderRoomPlaceholder(s)}
       </section>
       ${s.lightbox ? renderLightbox(s.lightbox) : ''}
@@ -174,7 +179,7 @@ export function renderLeaderboard(s) {
         ${rows.map((r, i) => `
           <li class="chat-leaderboard__row">
             <span class="chat-leaderboard__place">${i + 1}</span>
-            ${avatar(r.nick, r.avatarUrl)}
+            ${avatarHtml(r.nick, r.avatarUrl, { size: 'sm', px: 28 })}
             <span class="chat-leaderboard__nick">
               <a href="#/user/${encodeURIComponent(r.nick)}">${esc(r.nick)}</a>
               ${r.allianceTag ? `<small class="muted">${esc(r.allianceTag)}</small>` : ''}
@@ -224,7 +229,7 @@ export function renderChatItem(c, active) {
     ? `<img class="chat-item__avatar" src="${esc(c.avatarUrl)}" alt="" loading="lazy" width="42" height="42">`
     : `<span class="chat-item__mark" style="--ava:${esc(nickColor(c.title))}">${esc(initial)}</span>`;
   const last = c.lastBody
-    ? `<span class="chat-item__last"><b>${esc(c.lastNick)}:</b> ${esc(plainExcerpt(c.lastBody, 60))}</span>`
+    ? `<span class="chat-item__last"><b>${esc(c.lastNick)}:</b> ${esc(excerpt(c.lastBody, 60))}</span>`
     : `<span class="chat-item__last muted">Сообщений ещё нет</span>`;
   return `
     <li>
@@ -341,7 +346,7 @@ function renderRoom(s) {
     ${c.pinnedBody ? `
       <div class="chat-pinned">
         <span class="chat-pinned__badge">📌</span>
-        <span class="chat-pinned__text"><b>${esc(c.pinnedNick || '')}:</b> ${esc(plainExcerpt(c.pinnedBody, 160))}</span>
+        <span class="chat-pinned__text"><b>${esc(c.pinnedNick || '')}:</b> ${esc(excerpt(c.pinnedBody, 160))}</span>
         ${isMgr ? `<button type="button" class="chat-pinned__unpin" data-chat-unpin title="Открепить">✕</button>` : ''}
       </div>` : ''}
 
@@ -375,7 +380,7 @@ export function renderMembers(s, isMgr) {
       <ul class="chat-members__list">
         ${(s.members || []).map((m) => `
           <li class="chat-member">
-            ${avatar(m.nick, m.avatarUrl)}
+            ${avatarHtml(m.nick, m.avatarUrl, { size: 'sm', px: 28 })}
             <span class="chat-member__who">
               <a class="forum-nick" href="#/user/${encodeURIComponent(m.nick)}">${esc(m.nick)}</a>
               ${m.isLeader ? leaderBadge() : ''}
@@ -396,7 +401,6 @@ export function renderMembers(s, isMgr) {
 
 export function renderInvite(c) {
   const link = `${location.origin}${location.pathname}#/chats/join/${esc(c.inviteCode)}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(link)}`;
   return `
     <div class="chat-invite" data-chat-invite-panel>
       <div class="chat-invite__code">
@@ -407,11 +411,7 @@ export function renderInvite(c) {
         <button type="button" class="forum-btn forum-btn--ghost" data-chat-copy="${esc(link)}">Скопировать ссылку</button>
         <button type="button" class="forum-act" data-chat-rotate>Сменить код</button>
       </div>
-      <div class="chat-invite__qr">
-        <img src="${esc(qrUrl)}" alt="QR-код приглашения" width="140" height="140" loading="lazy">
-        <p class="muted">Наведите камеру телефона</p>
-      </div>
-      <p class="muted chat-invite__note">Кто знает код, тот войдёт. Утёк — смените, старый перестанет работать.</p>
+      <p class="muted chat-invite__note">Кто знает код или ссылку, тот войдёт. Утёк — смените, старый перестанет работать.</p>
     </div>`;
 }
 
@@ -456,7 +456,7 @@ export function renderMessage(m, s, isMgr, grouped) {
 
   return `
     <li class="chat-msg ${mine ? 'is-mine' : ''} ${grouped ? 'is-grouped' : ''}" id="m-${esc(m.id)}">
-      ${grouped ? '<span class="chat-msg__gap"></span>' : avatar(m.authorNick, avaUrl)}
+      ${grouped ? '<span class="chat-msg__gap"></span>' : avatarHtml(m.authorNick, avaUrl, { size: 'sm', px: 28 })}
       <div class="chat-msg__bubble">
         ${grouped ? '' : `
           <div class="chat-msg__head">
@@ -473,10 +473,10 @@ export function renderMessage(m, s, isMgr, grouped) {
         ${m.poll ? renderPoll(m.id, m.poll, s.me?.id) : ''}
         ${renderReactionsBar(m.id, m.reactions, s.me?.id)}
 
-          <div class="chat-msg__meta">
+        <div class="chat-msg__meta">
           <time title="${esc(fullTime(m.createdAt))}">${esc(clock(m.createdAt))}</time>
           <button type="button" class="chat-msg__reply-btn" data-chat-msg-reply="${esc(m.id)}"
-                  data-nick="${esc(m.authorNick)}" data-excerpt="${esc(plainExcerpt(m.body || 'Вложение', 50))}"
+                  data-nick="${esc(m.authorNick)}" data-excerpt="${esc(excerpt(m.body || 'Вложение', 50))}"
                   title="Ответить" aria-label="Ответить"><span class="chat-msg__reply-ico" aria-hidden="true">↩</span><span class="chat-msg__reply-label">Ответить</span></button>
           ${isMgr ? `<button type="button" class="chat-msg__pin-btn" data-chat-pin="${esc(m.id)}"
                     title="Закрепить сообщение" aria-label="Закрепить">📌</button>` : ''}
@@ -498,7 +498,7 @@ function renderReplyQuote(r) {
   return `
     <div class="chat-reply-quote" data-chat-jump="m-${esc(r.id)}">
       <span class="chat-reply-quote__nick">${esc(r.authorNick)}</span>
-      <span class="chat-reply-quote__body">${esc(plainExcerpt(r.body || 'Вложение', 60))}</span>
+      <span class="chat-reply-quote__body">${esc(excerpt(r.body || 'Вложение', 60))}</span>
     </div>`;
 }
 
@@ -644,7 +644,7 @@ function renderReplyBanner(r) {
     <div class="chat-reply-banner">
       <div class="chat-reply-banner__info">
         <span class="chat-reply-banner__label">Ответ для <b>${esc(r.authorNick)}</b></span>
-        <span class="chat-reply-banner__text muted">${esc(plainExcerpt(r.body || 'Вложение', 50))}</span>
+        <span class="chat-reply-banner__text muted">${esc(excerpt(r.body || 'Вложение', 50))}</span>
       </div>
       <button type="button" class="chat-reply-banner__cancel" data-chat-reply-cancel title="Отменить ответ">✕</button>
     </div>`;
@@ -691,25 +691,12 @@ export function leaderBadge() {
   return '<span class="role-badge role-badge--leader" style="--role-tone:#5cc8ff" title="лидер альянса" role="img" aria-label="лидер альянса"><i aria-hidden="true">⚑</i><b>лидер</b></span>';
 }
 
-function avatar(nick, url) {
-  if (url) return `<img class="forum-ava forum-ava--sm" src="${esc(url)}" alt="" loading="lazy" width="28" height="28">`;
-  return `<span class="forum-ava forum-ava--sm" style="--ava:${esc(nickColor(nick))}">${esc(nickInitial(nick))}</span>`;
-}
-
-function plainExcerpt(src, max) {
-  const t = decodeEntities(String(src))
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
-}
-
 function dayKey(d) {
   const dt = d instanceof Date ? d : new Date(d);
   return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
 }
 
-function dayLabel(d, now = new Date()) {
+export function dayLabel(d, now = new Date()) {
   const dt = d instanceof Date ? d : new Date(d);
   if (dayKey(dt) === dayKey(now)) return 'Сегодня';
   const y = new Date(now); y.setDate(y.getDate() - 1);

@@ -68,6 +68,11 @@ export function mapEvents(rows) {
       title: toStr(e.title),
       summary: e.summary ? toStr(e.summary) : undefined,
       body: e.body ? toStr(e.body) : undefined,
+      // База хранит галерею строкой-списком, а проводники ждут массив:
+      // без проброса стена фото в Хронологии молча пустела.
+      imageUrls: Array.isArray(e.imageUrls)
+        ? e.imageUrls.map((u) => toStr(u)).filter(Boolean)
+        : undefined,
       imageUrl: e.imageUrl ? toStr(e.imageUrl) : undefined,
       durationDays: e.durationDays != null ? Number(e.durationDays) : undefined,
     }))

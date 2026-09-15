@@ -178,8 +178,11 @@ export async function signUp(nick) {
 
 export async function signIn(nick) {
   const s = read();
-  const key = String(nick).trim().toLowerCase();
-  const user = s.users.find((u) => u.nick.toLowerCase() === key);
+  // Ищем по тому же ключу, каким ники закреплены за людьми: иначе вход
+  // с латинской «e» в нике с кириллической «е» не находил бы аккаунт,
+  // хотя дубликаты запрещены именно по этому ключу.
+  const key = nickKey(String(nick).trim());
+  const user = s.users.find((u) => nickKey(u.nick) === key);
   if (!user) throw new Error('Такого ника здесь нет');
   s.me = user.id;
   write(s);
@@ -504,7 +507,7 @@ export async function addComment(postId, body) {
     body,
     createdAt: new Date().toISOString(),
     deleted: false,
-};
+  };
 
   s.comments.push(comment);
 
@@ -1292,6 +1295,9 @@ export async function sendChatMessage(chatId, body, opts = {}) {
     authorAlliance: me.allianceTag ?? '',
     authorRole: me.role,
     authorIsLeader: Boolean(me.isLeader),
+    // Метка проверки нужна сразу: своё сообщение не должно мелькать
+    // серым «! не проверен» до первого обновления ленты.
+    authorIsVerified: Boolean(me.isVerified),
   };
 }
 

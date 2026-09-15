@@ -1,5 +1,5 @@
 import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl } from '../ui/helpers.js';
-import { EVENT_TYPE, EVENT_TYPE_ORDER, serverEvents, verdictText, pillText } from '../logic/event-types.js';
+import { EVENT_TYPE, EVENT_TYPE_ORDER, verdictText, pillText } from '../logic/event-types.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
@@ -18,14 +18,6 @@ const WEEKS_SHOWN = 4;
  */
 export function renderTimeline({ events } = {}) {
   const list = Array.isArray(events) ? events : [];
-
-  /*
-    Серверные события — захваты и защиты — это то, за чем на эту вкладку
-    и заходят. Они живут среди обычных событий, а не у недели: кампания может
-    тянуться через несколько недель, и один и тот же захват не должен
-    записываться в двух местах.
-  */
-  const server = serverEvents(list);
 
   if (!list.length) {
     return `
@@ -75,8 +67,8 @@ export function renderTimeline({ events } = {}) {
   return `
     ${renderServerSection(sorted)}
     ${trophies}
-    ${sorted.length ? renderFilters(sorted) : ''}
-    ${sorted.length ? renderFeed(sorted) : ''}
+    ${renderFilters(sorted)}
+    ${renderFeed(sorted)}
     <p class="tl__empty" data-tl-empty hidden>Событий такого типа пока нет.</p>`;
 }
 

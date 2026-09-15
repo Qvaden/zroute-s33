@@ -12,8 +12,8 @@
  * Функции чистые: получают данные, возвращают строку. Живое поведение —
  * в forum/mount.js, как и у ленты.
  */
-import { esc } from '../ui/helpers.js';
-import { excerpt, timeAgo, fullTime, nickColor, nickInitial } from '../forum/format.js';
+import { esc, pluralWord } from '../ui/helpers.js';
+import { excerpt, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 
 function isOnline(lastSeen) {
@@ -240,19 +240,14 @@ function renderBlog(p, posts) {
 
 /**
  * Аватарка или буква в цветном квадрате.
- *
- * Буква — не заглушка «пока не загрузил», а полноценный вариант: цвет считается
- * из ника и всегда один и тот же, поэтому знакомого человека видно в ленте
- * по цвету, даже если картинки у него нет. Заставлять загружать фото ради
- * узнаваемости незачем.
- */
+  *
+  * Буква — не заглушка «пока не загрузил», а полноценный вариант: цвет считается
+  * из ника и всегда один и тот же, поэтому знакомого человека видно в ленте
+  * по цвету, даже если картинки у него нет. Заставлять загружать фото ради
+  * узнаваемости незачем.
+  */
 function renderAvatar(p, size = 'md') {
-  const cls = `forum-ava forum-ava--${size}`;
-  if (p.avatarUrl) {
-    return `<img class="${cls} forum-ava--img" src="${esc(p.avatarUrl)}"
-                 alt="Аватарка ${esc(p.nick)}" loading="lazy" width="96" height="96">`;
-  }
-  return `<span class="${cls}" style="--ava:${esc(nickColor(p.nick))}">${esc(nickInitial(p.nick))}</span>`;
+  return avatarHtml(p.nick, p.avatarUrl, { size, px: 96, alt: `Аватарка ${p.nick}` });
 }
 
 /* ── Правка ───────────────────────────────────────────────────────────────── */
@@ -470,12 +465,4 @@ const MONTHS = ['января', 'февраля', 'марта', 'апреля', 
 function joinDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '—';
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
-}
-
-function pluralWord(n, one, few, many) {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
 }

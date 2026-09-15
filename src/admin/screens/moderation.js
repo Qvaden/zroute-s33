@@ -134,7 +134,7 @@ function renderReport(r) {
 
       ${r.note ? `<p class="adm-report__note">«${esc(r.note)}»</p>` : ''}
 
-<div class="adm-report__target">
+      <div class="adm-report__target">
           <div class="adm-report__author">${esc(r.targetAuthorNick || 'автор неизвестен')}</div>
           ${r.targetTitle ? `<b class="adm-report__title">${esc(r.targetTitle)}</b>` : ''}
           <div class="adm-report__body">${r.targetBody ? postBody(r.targetBody) : esc('(текст недоступен)')}</div>

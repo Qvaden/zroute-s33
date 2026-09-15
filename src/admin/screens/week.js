@@ -120,8 +120,7 @@ export function renderWeek(view, param) {
       <div class="adm-publish" data-publish-bar>
         <div class="adm-publish__state" data-publish-state>${describe(diff, draftSaved)}</div>
         <div class="adm-publish__actions">
-          <button type="button" class="adm-btn" data-preview-toggle
-                  ${diff.total ? '' : 'disabled'}>Предпросмотр</button>
+          <button type="button" class="adm-btn" data-preview-toggle>Предпросмотр</button>
           <button type="button" class="adm-btn" data-draft-reset
                   ${diff.total ? '' : 'disabled'}>Сбросить</button>
           <button type="button" class="adm-btn adm-btn--primary" data-publish

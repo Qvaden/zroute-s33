@@ -194,7 +194,7 @@ function renderForm(form, canPush, raw, list) {
         <input type="text" data-alliance-field="name" value="${esc(form.name)}" placeholder="Например, Сталкеры">
       </label>
 
-      <label class="adm-field"><span>Статус</span></label>
+      <span class="adm-field__solo-label">Статус</span>
       <div class="adm-weeks adm-types">
         <button type="button" class="adm-chip ${form.active ? 'is-on' : ''}"
                 data-alliance-active-choice="true">В игре</button>

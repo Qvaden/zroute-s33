@@ -403,7 +403,7 @@ function paintPendingShots() {
         (f, i) => `<div class="forum-attach__item">
           <img src="${f.preview}" alt="">
           <button type="button" class="forum-attach__drop"
-                  data-attach-drop="${cssEscape(scope)}:${i}" title="Убрать">✕</button>
+                  data-attach-drop="${esc(scope)}:${i}" title="Убрать">✕</button>
         </div>`
       )
       .join('');
@@ -482,6 +482,9 @@ async function loadFeed({ append = false } = {}) {
       limit: CONFIG.forum.pageSize,
       offset: append ? state.posts.length : 0,
     });
+    // Пока ждали сеть, человек мог уйти с форума: позднему ответу нельзя
+    // подменять данные той страницы, что на экране сейчас.
+    if (token !== mountToken) return;
     state.posts = append ? [...state.posts, ...posts] : posts;
     state.total = total;
 
@@ -495,7 +498,7 @@ async function loadFeed({ append = false } = {}) {
         const hot = await forum.listPosts({ sort: 'talked', limit: 3 });
         state.hot = (hot.posts ?? []).filter((p) => !p.deleted && p.commentCount > 0);
       } catch {
-        state.hot = state.hot;
+        /* горячие темы — витрина, а не договор: остаёмся с прошлыми */
       }
 
       /*
@@ -512,7 +515,7 @@ async function loadFeed({ append = false } = {}) {
           all: leaderboardOf(wide.posts ?? [], { period: 'all' }),
         };
       } catch {
-        state.lead = state.lead;
+        /* лидерборд переживает и старый */
       }
     }
   } catch (err) {
@@ -541,6 +544,9 @@ async function loadThread(postId) {
       старую копию значит соврать.
     */
     const [post, comments] = await Promise.all([forum.getPost(postId), forum.listComments(postId)]);
+    // Тему могли закрыть и уйти, пока грузилась: поздний ответ не должен
+    // подменять ленту другой страницы.
+    if (token !== mountToken) return;
     if (post) {
       const i = state.posts.findIndex((p) => p.id === postId);
       if (i >= 0) state.posts[i] = post;
@@ -885,6 +891,14 @@ function wire() {
     if (!host || !host.contains(e.target) || !e.target.closest) return;
     const t = e.target;
 
+    /*
+      Меню редких действий поста закрывается сразу после выбора: действие
+      уже сделано, держать раскрытым нечего. Без return — сам обработчик
+      действия сработает ниже по цепочке.
+    */
+    const menuAct = t.closest?.('.forum-act-menu__list .forum-act');
+    if (menuAct) setTimeout(() => menuAct.closest('details')?.removeAttribute('open'), 0);
+
     /* ── Выпадающий список разделов: открыть/закрыть ── */
 
     const pickBtn = t.closest('[data-pick-open]');
@@ -923,8 +937,11 @@ function wire() {
 
     const dropBtn = t.closest('[data-attach-drop]');
     if (dropBtn && host.contains(dropBtn)) {
-      const [scope, index] = dropBtn.dataset.attachDrop.split(':');
-      dropShot(scope, Number(index));
+      // Скоупы бывают с двоеточием («edit:p_12»), поэтому режем по
+      // ПОСЛЕДНЕМУ двоеточию: индекс всегда последний сегмент.
+      const raw = dropBtn.dataset.attachDrop;
+      const sep = raw.lastIndexOf(':');
+      dropShot(raw.slice(0, sep), Number(raw.slice(sep + 1)));
       return;
     }
 
@@ -1440,10 +1457,12 @@ function wire() {
     const submitter = e.submitter ?? form.querySelector('button[type="submit"]');
 
     // Вход и регистрация: две кнопки в одной форме, различаем по нажатой.
+    // Локальное имя authMode, а не mode: module-scope «mode» уже занят
+    // выбором «лента или страница участника», затенять его — мина.
     if (form.matches('[data-forum-auth]')) {
       e.preventDefault();
-      const mode = submitter?.dataset.forumMode === 'signup' ? 'signup' : 'signin';
-      await handleAuth(form, mode, submitter);
+      const authMode = submitter?.dataset.forumMode === 'signup' ? 'signup' : 'signin';
+      await handleAuth(form, authMode, submitter);
       return;
     }
 

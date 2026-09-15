@@ -27,7 +27,7 @@ export function renderPresident(view) {
       <div class="adm-actions">
         <button type="button" class="adm-btn" data-president-reset>Сбросить</button>
         <button type="button" class="adm-btn adm-btn--primary" data-president-save>Сохранить черновик</button>
-        <button type="button" class="adm-btn adm-btn--primary" data-president-publish data-texts-publish>Опубликовать доску</button>
+        <button type="button" class="adm-btn adm-btn--primary" data-president-publish>Опубликовать доску</button>
       </div>
     </section>`;
 }

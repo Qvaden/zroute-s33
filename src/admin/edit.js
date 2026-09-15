@@ -326,9 +326,8 @@ export function applyEvents(raw, list) {
         id: String(e.id),
         date: isoDay(e.date),
         type: String(e.type),
-      title: String(e.title).trim(),
-      summary: String(e.summary ?? '').trim(),
-    };
+        title: String(e.title).trim(),
+      };
       // Необязательные поля не пишем пустыми: файл читают люди.
       if (Number.isFinite(Number(e.serverNumber)) && e.serverNumber !== null && e.serverNumber !== '') {
         out.serverNumber = Number(e.serverNumber);
@@ -379,7 +378,7 @@ export function eventsDiff(raw, list) {
     const sameNums =
       Number(was.serverNumber ?? 0) === Number(ev.serverNumber ?? 0) &&
       Number(was.durationDays ?? 0) === Number(ev.durationDays ?? 0);
-    if (!same || !sameNums || ev._pendingImages?.length || ev._pendingImage) changed++;
+    if (!same || !sameNums || ev._pendingImages?.length) changed++;
   }
 
   for (const id of before.keys()) if (!after.has(id)) removed++;

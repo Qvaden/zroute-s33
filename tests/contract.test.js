@@ -1502,7 +1502,7 @@ console.log('\nM. Правка хронологии');
   */
   equal(
     'ещё не загруженная картинка тоже считается изменением',
-    eventsDiff(raw, [{ ...list[1], _pendingImage: { blob: {} } }, list[0]]).changed,
+    eventsDiff(raw, [{ ...list[1], _pendingImages: [{ blob: {} }] }, list[0]]).changed,
     1
   );
 
@@ -1544,7 +1544,7 @@ console.log('\nM. Правка хронологии');
   check('вместо неё — выбор файла', blankForm.includes('data-event-image-input'));
 
   const pendingForm = renderEvents(
-    viewFor({ eventDraft: { ...blankEvent(), _pendingImage: { previewUrl: 'blob:фейковое-превью' } } })
+    viewFor({ eventDraft: { ...blankEvent(), _pendingImages: [{ previewUrl: 'blob:фейковое-превью' }] } })
   );
   check('превью невыгруженной картинки показано', pendingForm.includes('blob:фейковое-превью'));
   check('подписано, что загрузится при публикации', pendingForm.includes('Загрузится при публикации'));
@@ -3634,7 +3634,7 @@ console.log('\nS. Чистые функции');
   check('лента тянет горячие темы через sort=talked',
     /listPosts\(\{ sort: 'talked', limit: 3 \}\)/.test(mountSource));
   check('горячие темы не роняют ленту при ошибке',
-    /catch\s*\{\s*state\.hot\s*=\s*state\.hot/.test(mountSource));
+    /sort: 'talked', limit: 3[\s\S]{0,220}\}\s*catch\s*\{/.test(mountSource));
   check('удалённые темы не попадают в горячие',
     /!p\.deleted\s*&&\s*p\.commentCount\s*>\s*0/.test(mountSource));
   check('гостю рисуется призыв, вошедшему нет',

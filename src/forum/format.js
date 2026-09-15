@@ -178,3 +178,24 @@ export function nickInitial(nick) {
   const s = String(nick ?? '').trim();
   return s ? s[0].toUpperCase() : '?';
 }
+
+/**
+ * Аватарка или буква в цветном квадрате — одна на все страницы.
+ *
+ * Буква — не заглушка «пока не загрузил», а полноценный вариант: цвет считается
+ * из ника и всегда один, поэтому знакомого человека видно в ленте по цвету
+ * даже без фотографии. Три страницы писали этот разметку каждая по-своему —
+ * теперь она одна.
+ *
+ * @param {string} nick
+ * @param {string} [url]
+ * @param {{size?: string, px?: number, alt?: string}} [opts] size — модификатор
+ *        класса (`sm`/`lg`), px — сторона картинки-заглушки, alt — своя подпись.
+ */
+export function avatarHtml(nick, url, { size = '', px = 36, alt = null } = {}) {
+  const cls = `forum-ava${size ? ` forum-ava--${size}` : ''}`;
+  if (url) {
+    return `<img class="${cls} forum-ava--img" src="${esc(url)}" alt="${esc(alt ?? nick)}" loading="lazy" width="${px}" height="${px}">`;
+  }
+  return `<span class="${cls}" style="--ava:${esc(nickColor(nick))}">${esc(nickInitial(nick))}</span>`;
+}

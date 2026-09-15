@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=39';
-import { loadAll, capabilities, db } from './data/index.js?v=39';
-import { validateDataset } from './data/contract.js?v=39';
+import { CONFIG } from '../config.js?v=40';
+import { loadAll, capabilities, db } from './data/index.js?v=40';
+import { validateDataset } from './data/contract.js?v=40';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,25 +9,25 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=39';
-import { renderHome } from './pages/home.js?v=39';
-import { renderLadder } from './pages/ladder.js?v=39';
-import { renderQuarter } from './pages/quarter-final.js?v=39';
-import { renderTimeline } from './pages/timeline.js?v=39';
-import { renderGuide } from './pages/guide.js?v=39';
-import { renderBot } from './pages/bot.js?v=39';
-import { renderAlliance } from './pages/alliance.js?v=39';
-import { computeAchievements } from './logic/achievements.js?v=39';
-import { esc } from './ui/helpers.js?v=39';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=39';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=39';
+} from './logic/standings.js?v=40';
+import { renderHome } from './pages/home.js?v=40';
+import { renderLadder } from './pages/ladder.js?v=40';
+import { renderQuarter } from './pages/quarter-final.js?v=40';
+import { renderTimeline } from './pages/timeline.js?v=40';
+import { renderGuide } from './pages/guide.js?v=40';
+import { renderBot } from './pages/bot.js?v=40';
+import { renderAlliance } from './pages/alliance.js?v=40';
+import { computeAchievements } from './logic/achievements.js?v=40';
+import { esc } from './ui/helpers.js?v=40';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=40';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=40';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=39';
-import './ui/timeline-controls.js?v=39';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=39';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=39';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=39';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=39';
+import './ui/ladder-controls.js?v=40';
+import './ui/timeline-controls.js?v=40';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=40';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=40';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=40';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=40';
 
 /*
   РАЗДЕЛЫ.
@@ -330,7 +330,10 @@ function render() {
       Ник в адресе закодирован, а русские буквы браузер кодирует сам:
       без decodeURIComponent пришло бы «%D0%9A%D0%BE...» вместо имени.
     */
+    unmountForum();
     unmountChats();
+    unmountTournaments();
+    unmountGuides();
     renderNav('forum');
     app.innerHTML = '';
     mountUser(app, decodeURIComponent(param));
@@ -427,7 +430,9 @@ function emptyView(loadError = '') {
   return {
     alliances: [], weeks: [], allWeeks: [], results: [], events: [], texts: [],
     standings: [], quarterStandings: [],
-    quarter: { weeks: [], from: null, to: null },
+    // Форма — как у computeQuarterWindow: пустой кадр не должен отличаться
+    // полями от настоящего, иначе страница Кварта упадёт до прихода данных.
+    quarter: { weeks: [], playedWeeks: 0, number: 0, startNumber: 0, endNumber: 0, endDate: null },
     summary: null, movers: { up: [], down: [] },
     placeHistory: new Map(), achievements: new Map(),
     problems: [],

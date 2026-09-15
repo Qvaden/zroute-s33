@@ -139,7 +139,7 @@ function tallyUpTo(alliances, weeks, index, scoring, upToIndex) {
  * @param {import('../data/types.js').Week[]} weeks
  * @param {import('../data/types.js').Result[]} results
  * @param {number} periodLength
- * @returns {{weeks: import('../data/types.js').Week[], number: number, startNumber: number|null, endNumber: number|null, endDate: Date|null}}
+ * @returns {{weeks: import('../data/types.js').Week[], playedWeeks: number, number: number, startNumber: number|null, endNumber: number|null, endDate: Date|null}}
  */
 export function computeQuarterWindow(weeks, results, periodLength = 4) {
   const ordered = [...weeks].sort(byWeekStart);
@@ -147,7 +147,7 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
   const last = [...ordered].reverse().find((week) => filled.has(week.id));
 
   if (!last) {
-    return { weeks: [], number: 0, startNumber: null, endNumber: null, endDate: null };
+    return { weeks: [], playedWeeks: 0, number: 0, startNumber: null, endNumber: null, endDate: null };
   }
 
   const number = Math.floor((last.number - 1) / periodLength) + 1;
@@ -156,6 +156,10 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
   const currentWeeks = ordered.filter(
     (week) => week.number >= startNumber && week.number <= endNumber
   );
+  // Сыгранные — те, куда уже внесены результаты. Недели заводят на месяц
+  // вперёд, поэтому «сколько создано» показывало бы готовый период в первый
+  // же день. Это счёт для индикатора «N из 4 недель».
+  const playedWeeks = currentWeeks.filter((week) => filled.has(week.id)).length;
 
   /*
     Конец Кварта — это конец недели endNumber, а не последней недели, что
@@ -177,7 +181,7 @@ export function computeQuarterWindow(weeks, results, periodLength = 4) {
     break;
   }
 
-  return { weeks: currentWeeks, number, startNumber, endNumber, endDate };
+  return { weeks: currentWeeks, playedWeeks, number, startNumber, endNumber, endDate };
 }
 
 /**

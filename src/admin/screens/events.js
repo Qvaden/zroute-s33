@@ -127,8 +127,7 @@ function renderEventImages(event) {
 
 function imageField(form) {
   const existing = eventImageUrls(form);
-  const pendingItems = form._pendingImages?.length ? form._pendingImages : (form._pendingImage ? [form._pendingImage] : []);
-  const pending = pendingItems.map((item) => item.previewUrl).filter(Boolean);
+  const pending = (form._pendingImages ?? []).map((item) => item.previewUrl).filter(Boolean);
   const previews = [...existing, ...pending];
 
   return `
@@ -184,7 +183,7 @@ function renderForm(form, canPush) {
         <button type="button" class="adm-btn" data-event-cancel>Отмена</button>
       </header>
 
-      <label class="adm-field"><span>Тип</span></label>
+      <span class="adm-field__solo-label">Тип</span>
       <div class="adm-weeks adm-types">${types}</div>
 
       <div class="adm-grid2">
@@ -197,7 +196,6 @@ function renderForm(form, canPush) {
           <input type="number" inputmode="numeric" min="1" max="9999"
                  data-event-field="serverNumber" value="${esc(form.serverNumber ?? '')}"
                  placeholder="${esc(meta.numberHint ?? 'необязательно')}">
-          ${meta.action ? `<i class="muted">${esc(meta.numberHint ?? '')}</i>` : ''}
         </label>
       </div>
 

@@ -199,13 +199,8 @@ export async function signIn(nick, password) {
 
   const me = await currentUser();
   if (!me) throw new Error('Профиль не найден');
-  if (me.banned) {
-    /*
-      Забаненного впускаем, но не молчим: он должен прочитать причину.
-      Писать ему всё равно не даст база, а не эта строка.
-    */
-    return me;
-  }
+  // Забаненного впускаем и молчим при входе: причину он прочитает на форуме,
+  // а писать ему всё равно не даст база, не эта строка.
   return me;
 }
 
@@ -958,6 +953,9 @@ export async function sendChatMessage(chatId, body, opts = {}) {
   if (!out.authorAlliance && me?.allianceTag) out.authorAlliance = me.allianceTag;
   if (!out.authorRole && me?.role) out.authorRole = me.role;
   if (!out.authorIsLeader && me?.isLeader) out.authorIsLeader = Boolean(me.isLeader);
+  // Сырая строка не знает о верификации — без подстановки своё только что
+  // отправленное сообщение получало бы серую метку «не проверен».
+  out.authorIsVerified = Boolean(me?.isVerified);
   return out;
 }
 
@@ -973,7 +971,7 @@ export async function reactChatMessage(messageId, emoji) {
   const rows = await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}&select=reactions`);
   const row = Array.isArray(rows) ? rows[0] : rows;
   const src = (row && typeof row.reactions === 'object' && row.reactions) ? row.reactions : {};
-  // Глубокая копия: реакции — массивы id, мутация原物 сломает кэш.
+  // Глубокая копия: реакции — массивы id, мутация оригинала сломала бы кэш.
   const reactions = {};
   for (const [k, v] of Object.entries(src)) {
     if (Array.isArray(v)) reactions[k] = [...v];
@@ -999,7 +997,7 @@ export async function reactChatMessage(messageId, emoji) {
   await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}`, {
     method: 'PATCH',
     body: { reactions },
-  }).catch(() => {});
+  });
 }
 
 export async function voteChatPoll(messageId, optionIndex) {
@@ -1031,7 +1029,7 @@ export async function voteChatPoll(messageId, optionIndex) {
   await rest(`/forum_chat_messages?id=eq.${encodeURIComponent(messageId)}`, {
     method: 'PATCH',
     body: { poll },
-  }).catch(() => {});
+  });
 }
 
 export async function deleteChat(chatId) {

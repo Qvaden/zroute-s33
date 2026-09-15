@@ -1,4 +1,4 @@
-import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v=2';
+import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v=39';
 
 /**
  * Общий рейтинг — главная ценность сайта.
@@ -123,15 +123,15 @@ function rowHtml(r, byId, variant = 'season', achievements) {
   */
   return `
   <a class="lad__row${medal}${isQuarter ? ' lad__row--quarter' : ''}${a.active ? '' : ' lad__row--off'}"
-       href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
-       style="--tag-color:${esc(color)}"
-       data-name="${esc(a.name.toLowerCase())}"
-       data-tag="${esc(a.tag.toLowerCase())}"
-       data-points="${r.points}"
-       data-wins="${r.wins}"
-       data-form="${formScore}"
-       data-place="${r.place}"
-       data-active="${a.active ? 1 : 0}">
+     href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
+     style="--tag-color:${esc(color)}"
+     data-name="${esc(a.name.toLowerCase())}"
+     data-tag="${esc(a.tag.toLowerCase())}"
+     data-points="${r.points}"
+     data-wins="${r.wins}"
+     data-form="${formScore}"
+     data-place="${r.place}"
+     data-active="${a.active ? 1 : 0}">
 
     <span class="lad__place">
       <b class="num">${r.place}</b>${deltaBadge(r.delta)}

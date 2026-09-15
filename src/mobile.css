@@ -55,9 +55,6 @@
   .lad__pts { text-align: left; }
   .lad__place b { font-size: 14px; }
 
-  /* Кварт: та же беда и то же решение. */
-  .quart-row { grid-template-columns: 44px 1fr auto; }
-
   /*
     Строка недели в карточке альянса: пять колонок на 360px невозможны.
     Собираем в два яруса.
@@ -117,7 +114,7 @@
     внутри grid и flex не сжимается меньше своего содержимого, и именно так
     фиксированная колонка выдавливает страницу за край.
   */
-  .lad__row > *, .quart-row > *, .vs__row > *,
+  .lad__row > *, .vs__row > *,
   .forum-post__head > *, .forum-me > * { min-width: 0; }
 
   /*
@@ -447,16 +444,6 @@ html {
   font-size: 10.5px;
 }
 .forum-blog__head .forum-btn { margin-left: auto; }
-.forum-blog__posts { margin: 12px 0 0; padding: 0; list-style: none; }
-.forum-blog__post {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-.forum-blog__post:last-child { border-bottom: none; }
-.forum-blog__post-meta {
-  margin-top: 3px;
-  font-size: 11px;
-}
 
 .forum-profile__posts { margin: 0; padding: 0; list-style: none; }
 .forum-profile__posts li {
@@ -549,13 +536,6 @@ html {
   object-fit: cover;
 }
 .forum-shots--multi img { height: 130px; object-fit: cover; }
-
-.forum-shots__more {
-  display: grid;
-  place-items: center;
-  color: var(--dim);
-  font-size: 13px;
-}
 
 /* Выбранные, но ещё не отправленные картинки в форме. */
 .forum-attach {

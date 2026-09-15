@@ -244,52 +244,61 @@ function renderRow(user, me) {
                     Теперь одно нажатие. Роль владельца при этом не выдаётся:
                     владелец один, и передача сайта делается осознанно,
                     запросом в базу, а не нажатием рядом с обычной кнопкой.
+
+                    Кнопки собраны в три смысловые группы — «Роль», «Аккаунт»,
+                    «Меры» — иначе их восемь в один ряд, и на телефоне
+                    карточка игрока превращалась в лестницу из кнопок.
                   */
                   ''
                 }
-                <button type="button" class="adm-btn ${isModerator ? '' : 'adm-btn--primary'}"
-                        data-player-moderator="${esc(user.nick)}"
-                        data-player-allow="${isModerator ? '' : '1'}">
-                  ${isModerator ? 'Снять модератора' : 'Сделать модератором'}
-                </button>
-                <button type="button" class="adm-btn"
-                        data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                  Сбросить пароль
-                </button>
-                <button type="button" class="adm-btn"
-                        data-player-blogger="${esc(user.id)}"
-                        data-player-nick="${esc(user.nick)}"
-                        data-player-blog="${user.isBlogger ? '1' : ''}">
-                  ${user.isBlogger ? 'Снять блогера' : 'Сделать блогером'}
-                </button>
-                <button type="button" class="adm-btn"
-                        data-player-leader="${esc(user.id)}"
-                        data-player-nick="${esc(user.nick)}"
-                        data-player-alliance="${esc(user.allianceTag || '')}"
-                        data-player-lead="${user.isLeader ? '1' : ''}">
-                  ${user.isLeader
-                    ? `Снять лидера${(user.leaderOf || '') ? ` (${esc((user.leaderOf || '').toUpperCase())})` : ''}`
-                    : `Сделать лидером${(user.allianceTag || '') ? ` (${esc(user.allianceTag.toUpperCase())})` : ''}`}
-                </button>
-                <button type="button" class="adm-btn"
-                        data-player-verify="${esc(user.id)}"
-                        data-player-nick="${esc(user.nick)}"
-                        data-player-ver="${user.isVerified ? '1' : ''}">
-                  ${user.isVerified ? 'Снять проверку' : 'Проверить ник'}
-                </button>
-                <button type="button" class="adm-btn"
-                        data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                  Переименовать
-                </button>
-                <button type="button" class="adm-btn"
-                        data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}"
-                        data-player-banned="${user.banned ? '1' : ''}">
-                  ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
-                </button>
-                <button type="button" class="adm-btn adm-btn--danger"
-                        data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
-                  Удалить навсегда
-                </button>`
+                <div class="adm-player__act-group">
+                  <button type="button" class="adm-btn ${isModerator ? '' : 'adm-btn--primary'}"
+                          data-player-moderator="${esc(user.nick)}"
+                          data-player-allow="${isModerator ? '' : '1'}">
+                    ${isModerator ? 'Снять модератора' : 'Сделать модератором'}
+                  </button>
+                  <button type="button" class="adm-btn"
+                          data-player-blogger="${esc(user.id)}"
+                          data-player-nick="${esc(user.nick)}"
+                          data-player-blog="${user.isBlogger ? '1' : ''}">
+                    ${user.isBlogger ? 'Снять блогера' : 'Сделать блогером'}
+                  </button>
+                  <button type="button" class="adm-btn"
+                          data-player-leader="${esc(user.id)}"
+                          data-player-nick="${esc(user.nick)}"
+                          data-player-alliance="${esc(user.allianceTag || '')}"
+                          data-player-lead="${user.isLeader ? '1' : ''}">
+                    ${user.isLeader
+                      ? `Снять лидера${(user.leaderOf || '') ? ` (${esc((user.leaderOf || '').toUpperCase())})` : ''}`
+                      : `Сделать лидером${(user.allianceTag || '') ? ` (${esc(user.allianceTag.toUpperCase())})` : ''}`}
+                  </button>
+                  <button type="button" class="adm-btn"
+                          data-player-verify="${esc(user.id)}"
+                          data-player-nick="${esc(user.nick)}"
+                          data-player-ver="${user.isVerified ? '1' : ''}">
+                    ${user.isVerified ? 'Снять проверку' : 'Проверить ник'}
+                  </button>
+                </div>
+                <div class="adm-player__act-group">
+                  <button type="button" class="adm-btn"
+                          data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                    Сбросить пароль
+                  </button>
+                  <button type="button" class="adm-btn"
+                          data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                    Переименовать
+                  </button>
+                </div>
+                <div class="adm-player__act-group adm-player__act-group--danger">
+                  <button type="button" class="adm-btn"
+                          data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                    ${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}
+                  </button>
+                  <button type="button" class="adm-btn adm-btn--danger"
+                          data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">
+                    Удалить навсегда
+                  </button>
+                </div>`
         }
       </div>
     </div>`;
@@ -393,7 +402,7 @@ function renderRenameModal() {
         </form>
         <div class="adm-rename-history">
           <h4 class="muted">История переименований</h4>
-          <div data-nick-history class="adm-reserved__list"><span class="muted">Загружаем…</span></div>
+          <ul data-nick-history class="adm-reserved__list"><li class="muted">Загружаем…</li></ul>
         </div>
       </div>
     </div>`;

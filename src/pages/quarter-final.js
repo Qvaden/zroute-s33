@@ -1,4 +1,4 @@
-import { esc, formDots, plural } from '../ui/helpers.js?v=2';
+import { esc, formDots, plural } from '../ui/helpers.js?v=39';
 
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,
@@ -32,7 +32,9 @@ export function renderQuarter({ standings, quarter } = {}) {
     ? 'Период ещё не начат'
     : `Недели ${period.startNumber}–${period.endNumber}`;
   const periodNumber = period.number ? String(period.number).padStart(2, '0') : '—';
-  const progress = (period.weeks ?? []).length;
+  // Сыгранные недели, а не созданные: их заводят на месяц вперёд, и по
+  // «созданным» период выглядел бы законченным в первый же день.
+  const progress = Math.min(4, period.playedWeeks ?? (period.weeks ?? []).length);
 
   // Расчёт даты конца текущего Кварта и дней до следующего.
   const now = new Date();
@@ -61,8 +63,8 @@ export function renderQuarter({ standings, quarter } = {}) {
         </div>
         <div class="quart-hero__bottom">
           <span><b>${progress}</b> из 4 недель периода</span>
-          ${daysLeft != null ? `<span class="quart-hero__countdown" data-quarter-end="${endDate ? endDate.getTime() : ''}">До конца Кварта: <span class="quart-countdown-num">${daysLeft}</span> ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
-          <span class="quart-hero__legend"><i class="quart-led quart-led--on"></i><i class="quart-led"></i><i class="quart-led"></i><i class="quart-led"></i></span>
+          ${daysLeft != null ? `<span class="quart-hero__countdown" data-quarter-end="${endDate ? endDate.getTime() : ''}">До конца Кварта: <span class="quart-countdown-num">${daysLeft}</span> ${plural(daysLeft, 'день', 'дня', 'дней')}${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
+          <span class="quart-hero__legend" aria-hidden="true">${[1, 2, 3, 4].map((n) => `<i class="quart-led${n <= progress ? ' quart-led--on' : ''}"></i>`).join('')}</span>
         </div>
       </header>
 

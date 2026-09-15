@@ -76,6 +76,7 @@
  * @property {string}  type            'server_capture' | 'war' | 'merge' | 'other'
  * @property {number}  [serverNumber]  Номер сервера — для захватов.
  * @property {string}  title
+ * @property {string}  [summary]       Короткая выжимка для плашки в ленте.
  * @property {string}  [body]
  * @property {string}  [imageUrl]      Старая одиночная внешняя ссылка.
  * @property {string[]} [imageUrls]    Несколько внешних ссылок на фотографии.

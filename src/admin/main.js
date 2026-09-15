@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=18';
-import { esc } from '../ui/helpers.js?v=18';
-import { mapDataset } from '../data/adapters/_map.js?v=18';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=18';
-import { validateDataset } from '../data/contract.js?v=18';
+import { CONFIG } from '../../config.js?v=19';
+import { esc } from '../ui/helpers.js?v=19';
+import { mapDataset } from '../data/adapters/_map.js?v=19';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=19';
+import { validateDataset } from '../data/contract.js?v=19';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=18';
-import { renderHome } from '../pages/home.js?v=18';
+} from '../logic/standings.js?v=19';
+import { renderHome } from '../pages/home.js?v=19';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=18';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=18';
+} from '../db/account.js?v=19';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=18';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=18';
-import { roleLabel } from '../forum/roles.js?v=18';
-import { prepareImage, uploadPath } from './image.js?v=18';
+} from './store.js?v=19';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=19';
+import { roleLabel } from '../forum/roles.js?v=19';
+import { prepareImage, uploadPath } from './image.js?v=19';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=18';
+} from './edit.js?v=19';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=18';
-import { renderShell } from './shell.js?v=18';
-import { renderLogin } from './login.js?v=18';
-import { renderOverview } from './screens/overview.js?v=18';
-import { renderWeek, describe } from './screens/week.js?v=18';
-import { renderAlliances } from './screens/alliances.js?v=18';
-import { renderEvents } from './screens/events.js?v=18';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=18';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=18';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=18';
-import { renderQuarter } from './screens/quarter.js?v=18';
-import { renderPresident } from './screens/president.js?v=18';
-import { renderPlayers } from './screens/players.js?v=18';
-import { renderModeration } from './screens/moderation.js?v=18';
-import { renderChatsAdmin } from './screens/chats.js?v=18';
-import { forum } from '../forum/index.js?v=18';
-import { deletionReason } from '../forum/rules.js?v=18';
+} from './draft.js?v=19';
+import { renderShell } from './shell.js?v=19';
+import { renderLogin } from './login.js?v=19';
+import { renderOverview } from './screens/overview.js?v=19';
+import { renderWeek, describe } from './screens/week.js?v=19';
+import { renderAlliances } from './screens/alliances.js?v=19';
+import { renderEvents } from './screens/events.js?v=19';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=19';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=19';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=19';
+import { renderQuarter } from './screens/quarter.js?v=19';
+import { renderPresident } from './screens/president.js?v=19';
+import { renderPlayers } from './screens/players.js?v=19';
+import { renderModeration } from './screens/moderation.js?v=19';
+import { renderChatsAdmin } from './screens/chats.js?v=19';
+import { forum } from '../forum/index.js?v=19';
+import { deletionReason } from '../forum/rules.js?v=19';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -176,10 +176,15 @@ function pickWeek(param) {
   return findCurrentWeek(weeks) ?? weeks[0];
 }
 
+/** Какой экран отрисован сейчас — чтобы скроллить наверх только при смене. */
+let lastScreenId = null;
+
 function render() {
   if (!view) return;
   const { id, param } = parseHash();
   const screen = SCREENS.find((s) => s.id === id) ?? SCREENS[0];
+  const screenChanged = screen.id !== lastScreenId;
+  lastScreenId = screen.id;
 
   // Неделя — единственный экран с состоянием, поэтому оно готовится здесь,
   // а сам экран остаётся чистой функцией от данных.
@@ -244,7 +249,12 @@ function render() {
     weekIds: view.data.weeks.map((w) => w.id),
   });
 
-  window.scrollTo(0, 0);
+  /*
+    Наверх — только при переходе на другой экран. Перерисовка того же экрана
+    (назначение модератора, отметка блогера) не должна выбрасывать человека
+    из середины длинного списка игроков.
+  */
+  if (screenChanged) window.scrollTo(0, 0);
 }
 
 function showLogin(error) {
@@ -424,7 +434,9 @@ function paintProgress() {
   const state = form.querySelector('[data-publish-state]');
   if (state) state.innerHTML = describe(diff, draftSavedAt(view.weekId));
 
-  for (const selector of ['[data-publish]', '[data-draft-reset]', '[data-preview-toggle]']) {
+  // Предпросмотр живёт всегда — и на опубликованной неделе; Disabled только
+  // сброс и публикация, которым нечего отправлять.
+  for (const selector of ['[data-publish]', '[data-draft-reset]']) {
     const button = form.querySelector(selector);
     if (!button) continue;
     const needsPush = selector === '[data-publish]';
@@ -496,14 +508,6 @@ function togglePreview() {
 /** Данные, какими они станут после публикации недели. */
 function candidateRaw() {
   return applyMarks(view.raw, view.weekId, view.marks);
-}
-
-function showPublishResult(html, kind) {
-  const box = root.querySelector('[data-publish-result]');
-  if (!box) return;
-  box.className = `adm-result adm-result--${kind}`;
-  box.innerHTML = html;
-  box.hidden = false;
 }
 
 /**
@@ -646,7 +650,9 @@ async function addWeek(button) {
     resultBox: '[data-publish-result]',
     button,
     // Открыть панель на только что заведённой неделе: править хотят её.
-    onDone: () => { view.weekId = week.id; },
+    // Хэш, а не view.weekId: pickWeek после load() выбирает неделю из хэша,
+    // и прямое присваивание просто перетиралось.
+    onDone: () => { location.hash = `#/week/${week.id}`; },
   });
 }
 
@@ -1187,6 +1193,9 @@ function removeGuideRole(index) {
   collectGuideDraftFromDom();
   if (view.guideDraft.roles.length <= 1) return;
   view.guideDraft = { ...view.guideDraft, roles: view.guideDraft.roles.filter((_, i) => i !== index) };
+  // Удаление — тоже правка: без сохранения в черновик роль возвращалась
+  // после перезагрузки страницы.
+  saveGuideToList();
   render();
 }
 
@@ -1429,6 +1438,35 @@ document.addEventListener('submit', async (e) => {
     return;
   }
 
+  /* ── Форум: назначение лидера игроку без альянса ── */
+  const leaderForm = e.target.closest('[data-leader-form]');
+  if (leaderForm) {
+    e.preventDefault();
+    const modal = leaderForm.closest('[data-leader-modal]');
+    const nick = modal.querySelector('[data-leader-nick]')?.textContent ?? '';
+    const tag = String(leaderForm.elements.leaderOf?.value ?? '').trim();
+
+    if (tag.length < 2) {
+      showForumResult('[data-leader-error]', 'Тег альянса короче двух символов', 'err');
+      return;
+    }
+
+    try {
+      await forum.setLeader(modal.dataset.playerId, tag);
+      closePlayerModal('[data-leader-modal]');
+      view.forum.loadedFor = null;
+      render();
+      showForumResult(
+        '[data-players-result]',
+        `<b>${esc(nick)} теперь лидер альянса ${esc(tag.toUpperCase())}.</b> Если тег вёл другой игрок, он снят; ник подтверждён автоматически.`,
+        'ok'
+      );
+    } catch (err) {
+      showForumResult('[data-leader-error]', esc(String(err?.message ?? err)), 'err');
+    }
+    return;
+  }
+
   /* ── Форум: переименование ── */
   const renameForm = e.target.closest('[data-rename-form]');
   if (renameForm) {
@@ -1642,17 +1680,29 @@ document.addEventListener('click', async (e) => {
   if (leadBtn) {
     const nick = leadBtn.dataset.playerNick;
     const isLeader = leadBtn.dataset.playerLead === '1';
+    const alliance = (leadBtn.dataset.playerAlliance || '').trim();
+
+    /*
+      Снятие — пустой тег. Назначение — тег альянса игрока из профиля;
+      если игрок без альянса, тег спрашивает окно ниже (data-leader-modal).
+      Раньше сюда уходил boolean, и база делала человека «лидером TRUE».
+    */
+    if (!isLeader && !alliance) {
+      openPlayerModal('[data-leader-modal]', nick, leadBtn.dataset.playerLeader);
+      return;
+    }
+
     leadBtn.disabled = true;
     leadBtn.textContent = isLeader ? 'Снимаем…' : 'Назначаем…';
     try {
-      await forum.setLeader(leadBtn.dataset.playerLeader, !isLeader);
+      await forum.setLeader(leadBtn.dataset.playerLeader, isLeader ? '' : alliance);
       view.forum.loadedFor = null;
       render();
       showForumResult(
         '[data-players-result]',
         isLeader
           ? `<b>${esc(nick)} больше не лидер.</b> Созданные им чаты остались — закрыть их можно на вкладке «Чаты».`
-          : `<b>${esc(nick)} теперь лидер альянса.</b> Он может создавать закрытые чаты и давать код приглашения; ник автоматически подтверждён.`,
+          : `<b>${esc(nick)} теперь лидер альянса ${esc(alliance.toUpperCase())}.</b> Он может создавать закрытые чаты и давать код приглашения; ник автоматически подтверждён.`,
         'ok'
       );
     } catch (err) {
@@ -1662,6 +1712,11 @@ document.addEventListener('click', async (e) => {
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }
+    return;
+  }
+
+  if (e.target.closest('[data-leader-cancel]')) {
+    closePlayerModal('[data-leader-modal]');
     return;
   }
 
@@ -1704,7 +1759,7 @@ document.addEventListener('click', async (e) => {
     openPlayerModal('[data-rename-modal]', renameBtn.dataset.playerNick, userId);
     const box = root.querySelector('[data-nick-history]');
     if (box) {
-      box.textContent = 'Загружаем…';
+      box.innerHTML = '<li class="muted">Загружаем…</li>';
       try {
         if (typeof forum.nickHistory !== 'function') {
           box.innerHTML = '<li class="muted">История переименований недоступна.</li>';
@@ -2048,6 +2103,7 @@ document.addEventListener('click', async (e) => {
     collectGuideDraftFromDom();
     const index = Number(extraRemove.dataset.guideExtraRemove);
     view.guideDraft = { ...view.guideDraft, extraBlocks: (view.guideDraft.extraBlocks ?? []).filter((_, i) => i !== index) };
+    saveGuideToList();
     render(); return;
   }
   const guideRemove = e.target.closest('[data-guide-remove]');
@@ -2107,7 +2163,20 @@ document.addEventListener('click', async (e) => {
 */
 document.addEventListener('input', (e) => {
   const presidentField = e.target.closest?.('[data-president-field]');
-  if (presidentField && view?.presidentDraft) { collectPresidentFromDom(); savePresidentToList(); return; }
+  if (presidentField && view?.presidentDraft) {
+    collectPresidentFromDom();
+    savePresidentToList();
+    /*
+      Превью доски обновляем сразу: человек смотрит на карточку, которую
+      собирается опубликовать, и она должна отвечать на каждую букву.
+    */
+    const box = e.target.closest('[data-president-editor]');
+    const nameEl = box?.querySelector('[data-president-preview-name]');
+    const allyEl = box?.querySelector('[data-president-preview-alliance]');
+    if (nameEl) nameEl.textContent = view.presidentDraft.name || '';
+    if (allyEl) allyEl.textContent = view.presidentDraft.alliance || '';
+    return;
+  }
   /*
     Поля формы события пишем в состояние на каждый ввод и НЕ перерисовываем:
     перерисовка на каждую букву уносила бы курсор в конец строки.
@@ -2170,9 +2239,10 @@ document.addEventListener('input', (e) => {
       const key = guideField.dataset.guideField;
       view.guideDraft = { ...view.guideDraft, [key]: guideField.value };
     }
-    // Не теряем длинный ввод при переходе между экранами или перезагрузке.
-    syncGuideDraft();
   }
+  // Черновик пишем на каждый ввод — и для ролей, и для доп.блоков: иначе
+  // закрытая сразу после набора вкладка теряла последнее слово.
+  if (guideField && view?.guideDraft) syncGuideDraft();
 
   // Поля формы текста — ключ (только у нового), заголовок, тело.
   const textField = e.target.closest?.('[data-text-field]');
@@ -2216,6 +2286,13 @@ async function processEventFiles(files) {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && root.querySelector('[data-guide-color-modal]:not([hidden])')) closeGuideColorModal();
+  // Окна игроков закрываются тем же жестом, что и остальные: Esc — самый
+  // ожидаемый способ убрать модалку, а раньше он работал только у палитры.
+  if (e.key === 'Escape') {
+    for (const sel of ['[data-reset-modal]', '[data-restrict-modal]', '[data-delete-modal]', '[data-rename-modal]', '[data-leader-modal]']) {
+      if (root.querySelector(`${sel}:not([hidden])`)) { closePlayerModal(sel); break; }
+    }
+  }
 });
 
 document.addEventListener('change', (e) => {

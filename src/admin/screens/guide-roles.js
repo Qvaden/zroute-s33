@@ -54,7 +54,7 @@ export function renderGuideRoles(view) {
 }
 
 function renderExtraBlock(block, index, disabled) {
-  return `<article class="guide-editor__extra" data-guide-extra="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">＋</span><h3>Дополнительный блок ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-extra-remove="${index}" ${disabled}>Удалить</button></header>${field('Заголовок блока', 'title', block.title, disabled, 'data-guide-extra-field')}${colorPicker('Цвет блока', 'tone', block.tone, disabled, 'data-guide-extra-field')}${textarea('Текст блока', 'body', block.body, disabled, 8, 'data-guide-extra-field')}</article>`;
+  return `<article class="guide-editor__extra" data-guide-extra="${index}"><header class="guide-editor__role-head"><span class="guide-editor__number">＋</span><h3>Дополнительный блок ${index + 1}</h3><button type="button" class="adm-btn adm-btn--danger" data-guide-extra-remove="${index}" ${disabled}>Удалить</button></header>${field('Заголовок блока', 'title', block.title, disabled)}${colorPicker('Цвет блока', 'tone', block.tone, disabled)}${textarea('Текст блока', 'body', block.body, disabled, 8)}</article>`;
 }
 
 function renderRole(role, index, disabled) {
