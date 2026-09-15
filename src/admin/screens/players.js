@@ -93,6 +93,8 @@ export function renderPlayers(view) {
 
   const rows = forum.users.map((u) => renderRow(u, forum.me)).join('');
   const leaders = renderLeaders(forum.users);
+  const moderators = forum.users.filter((u) => u.role === 'moderator').length;
+  const verified = forum.users.filter((u) => u.isVerified).length;
 
   return `
     <section class="panel">
@@ -110,9 +112,15 @@ export function renderPlayers(view) {
 
       ${leaders}
 
-      <label class="adm-player-search">
-        <input type="search" data-player-search aria-label="Найти игрока" placeholder="Найти игрока, альянс или статус" autocomplete="off">
-      </label>
+      <div class="adm-players__toolbar">
+        <label class="adm-player-search">
+          <input type="search" data-player-search aria-label="Найти игрока" placeholder="Найти игрока, альянс или статус" autocomplete="off">
+        </label>
+        <div class="adm-players__stats" aria-label="Статистика игроков">
+          <span><b>${moderators}</b> модераторов</span>
+          <span><b>${verified}</b> проверенных</span>
+        </div>
+      </div>
       <div class="adm-players">${rows}</div>
 
       <div class="adm-players__notes">
@@ -223,11 +231,15 @@ function renderRow(user, me) {
   return `
     <div class="adm-player" data-player="${esc(user.id)}" data-player-search-text="${esc(`${user.nick} ${user.allianceTag || ''} ${user.role} ${user.isLeader ? 'лидер' : ''} ${user.isVerified ? 'проверен' : ''}`.toLowerCase())}">
       <div class="adm-player__who">
-        <b>${esc(user.nick)}${roleBadge(user, { short: true })}${verifiedBadge(user.isVerified)}${user.isLeader ? ` <span class="adm-badge adm-badge--leader">лидер ${esc((user.leaderOf || '').toUpperCase())}</span>` : ''}</b>
-        <small>с ${esc(shortDate(user.createdAt))}</small>
+        <div class="adm-player__name">
+          <b>${esc(user.nick)}</b>${roleBadge(user, { short: true })}${verifiedBadge(user.isVerified)}
+          ${isMe ? '<span class="adm-player__self">вы</span>' : ''}
+        </div>
+        <small>На форуме с ${esc(shortDate(user.createdAt))}${user.allianceTag ? ` · ${esc(user.allianceTag.toUpperCase())}` : ''}</small>
       </div>
 
       <div class="adm-player__state">
+        ${user.isLeader ? `<span class="adm-badge adm-badge--leader">лидер ${esc((user.leaderOf || '').toUpperCase())}</span>` : ''}
         ${status}
         ${user.banned && user.banReason ? `<span class="adm-player__reason">${esc(user.banReason)}</span>` : ''}
       </div>

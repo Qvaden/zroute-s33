@@ -2115,6 +2115,44 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-btn { min-height: 36px; }
 .adm-theme-toggle { min-width: 76px; }
 
+/* Управление игроками: вместо разреженных строк — компактные карточки с
+   действиями, которые читаются как состояния, а не как панель приборов. */
+.adm-players__toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:20px; }
+.adm-player-search { flex:1 1 280px; max-width:460px; margin:0; }
+.adm-players__stats { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; color:var(--mute); font-size:11px; }
+.adm-players__stats span { padding:5px 8px; border:1px solid var(--line); border-radius:999px; background:color-mix(in srgb,var(--text) 3%,transparent); }
+.adm-players__stats b { color:var(--text); }
+.adm-players { grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:10px; margin-top:14px; }
+.adm-player { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"who state" "acts acts"; gap:12px; min-height:138px; padding:15px; border:1px solid var(--line); border-radius:15px; background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 96%,transparent),color-mix(in srgb,var(--text) 2%,transparent)); box-shadow:0 12px 26px -26px rgba(0,0,0,.9); }
+.adm-player:hover { border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); }
+.adm-player__who { grid-area:who; align-self:start; }
+.adm-player__name { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
+.adm-player__who b { font-size:16px; line-height:1.2; }
+.adm-player__who small { margin-top:7px; font-size:11.5px; }
+.adm-player__self { padding:2px 6px; border-radius:999px; color:var(--mute); background:color-mix(in srgb,var(--text) 7%,transparent); font-size:10px; font-weight:700; }
+.adm-player__state { grid-area:state; align-self:start; justify-content:flex-end; flex-wrap:wrap; }
+.adm-player__acts { grid-area:acts; justify-content:space-between; padding-top:11px; border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent); }
+.adm-player__roles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); flex:1; gap:6px; }
+.adm-player .adm-pill { min-height:38px; padding:6px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+.adm-player .adm-toggle.is-on { color:#7ee6a8; border-color:rgba(71,210,130,.44); background:rgba(48,177,103,.14); }
+.adm-player .adm-toggle[data-player-moderator].is-on { color:#ffc06b; border-color:rgba(255,154,51,.48); background:rgba(210,107,23,.15); }
+.adm-player .adm-toggle[data-player-blogger].is-on { color:#8fc7ff; border-color:rgba(91,164,246,.48); background:rgba(62,119,215,.15); }
+.adm-player .adm-toggle[data-player-leader].is-on { color:#d3a9ff; border-color:rgba(167,104,236,.48); background:rgba(132,70,203,.15); }
+.adm-player .adm-menu__btn { width:38px; height:38px; border-radius:10px; }
+
+@media (max-width:700px) {
+  .adm-players__toolbar { align-items:stretch; flex-direction:column; }
+  .adm-player-search { max-width:none; }
+  .adm-players__stats { justify-content:flex-start; }
+  .adm-players { grid-template-columns:1fr; }
+}
+@media (max-width:430px) {
+  .adm-player { grid-template-areas:"who" "state" "acts"; grid-template-columns:1fr; min-height:0; }
+  .adm-player__state { justify-content:flex-start; }
+  .adm-player__roles { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .adm-player__acts { align-items:flex-end; }
+}
+
 /* Форум: метки, карточки альянсов и подписки на рейтинг. */
 .forum-topic-tags { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0; padding:0; border:0; }
 .forum-topic-tags legend { width:100%; margin-bottom:2px; color:var(--dim); font-size:13px; }
