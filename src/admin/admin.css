@@ -1057,94 +1057,108 @@ body.guide-color-modal-open{overflow:hidden}
 
 .adm-player {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px 14px;
-  padding: 13px 0;
+  gap: 8px 14px;
+  padding: 9px 0;
   border-bottom: 1px solid var(--line-soft, color-mix(in srgb, var(--text) 6%, transparent));
 }
 .adm-player:last-child { border-bottom: none; }
 .adm-player__who { min-width: 0; }
-.adm-player__who b { display: flex; flex-wrap: wrap; align-items: center; font-size: 14.5px; overflow-wrap: anywhere; }
-.adm-player__who small { display: block; margin-top: 2px; color: var(--mute); font-size: 11.5px; }
+.adm-player__who b { display: flex; flex-wrap: wrap; align-items: center; font-size: 14px; overflow-wrap: anywhere; }
+.adm-player__who small { display: block; margin-top: 1px; color: var(--mute); font-size: 11px; }
 .adm-player__state { display: flex; align-items: center; gap: 8px; }
 .adm-player__reason { color: var(--mute); font-size: 11.5px; max-width: 22ch; }
 
 /*
-  ПУЛЬТ УПРАВЛЕНИЯ ИГРОКОМ.
+  ПУЛЬТ ИГРОКА — в одну строку.
 
-  Восемь кнопок стояли третьей колонкой строки и не помещались: ряд уезжал за
-  край карточки, а на телефоне карточка вытягивалась лестницей. Поэтому кнопки
-  ушли из строки вниз — панель занимает всю ширину карточки под ником и
-  читается сверху вниз: роль → аккаунт → меры.
-
-  Ряд — сетка «подпись + кнопки», а не строка подряд: подпись держит свою
-  колонку, кнопки начинаются на одной вертикали во всех трёх рядах, и при
-  переносе второй ряд кнопок не уезжает под подпись.
+  Восемь кнопок на игрока занимали треть карточки: ряд уезжал за край, а на
+  телефоне карточка вытягивалась лестницей. Частые действия стали компактными
+  чипами прямо в строке игрока — чип показывает состояние (модератор, блогер,
+  лидер, проверен), а не действие: видно, кто есть кто, не читая подпись, а
+  само действие подсказывает тултип. Редкое и опасное (пароль, переименование,
+  запрет, удаление) убрано под «⋯», чтобы не стояло под рукой.
 */
-.adm-player__acts { grid-column: 1 / -1; }
-.adm-player__panel {
-  display: grid;
-  gap: 7px;
-  padding: 10px 12px;
-  border: 1px solid var(--line-soft, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--text) 2.5%, transparent);
-}
-.adm-player__act-group {
-  display: grid;
-  grid-template-columns: 66px minmax(0, 1fr);
-  align-items: center;
-  gap: 6px 12px;
-}
-/* Подпись ряда: узкая колонка моно-кеглем, чтобы кнопки всех рядов встали
-   на одну вертикаль. */
-.adm-player__act-label {
-  font: 700 9.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+.adm-player__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.adm-player__roles { display: flex; flex-wrap: wrap; gap: 5px; }
+/* Чип-переключатель: включён — залит акцентом и помечен галочкой. */
+.adm-pill {
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 999px;
   color: var(--mute);
+  background: transparent;
+  border: 1px solid var(--line);
 }
-.adm-player__act-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  min-width: 0;
-}
-/* Восемь кнопок в карточке — список, а не призыв к действию: кнопки плотнее
-   общих, иначе каждая лишняя строка высоты множится на число игроков. */
-.adm-player__act-group .adm-btn {
-  padding: 6px 11px;
-  font-size: 12.5px;
-  border-radius: 8px;
-}
-/* Переключаемые роли и статусы. Включено — залито акцентом и помечено
-   галочкой: видно, кто модератор или блогер, не читая подпись кнопки. */
+.adm-pill:hover { color: var(--text); border-color: var(--mute); }
 .adm-toggle.is-on {
   color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-.adm-toggle.is-on::before {
-  content: '✓';
-  margin-right: 5px;
-  font-weight: 700;
+.adm-toggle.is-on::before { content: '✓'; margin-right: 4px; font-weight: 700; }
+.adm-toggle.is-on:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+/* «⋯»: редкие и опасные действия — под меню. */
+.adm-menu { position: relative; display: inline-flex; }
+.adm-menu__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--mute);
+  background: transparent;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
 }
-.adm-toggle.is-on:hover {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+.adm-menu__btn::-webkit-details-marker { display: none; }
+.adm-menu__btn:hover,
+.adm-menu[open] > .adm-menu__btn { color: var(--text); border-color: var(--mute); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.adm-menu__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.adm-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 186px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--raised);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .5);
 }
-/* Меры отделены линией и красной подписью: «Удалить навсегда» не должно
-   стоять вплотную к «сделать блогером». */
-.adm-player__act-group--danger {
-  margin-top: 2px;
-  padding-top: 9px;
-  border-top: 1px solid color-mix(in srgb, var(--loss) 26%, var(--line-soft));
+.adm-menu__item {
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
 }
-.adm-player__act-group--danger .adm-player__act-label {
-  color: color-mix(in srgb, var(--loss) 72%, var(--mute));
+.adm-menu__item:hover { color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); }
+.adm-menu__item--danger { color: #ff8b8b; }
+.adm-menu__item--danger:hover { color: #ff8b8b; background: color-mix(in srgb, var(--loss) 16%, transparent); }
+
+/* Средняя ширина: статус уходит на вторую строку, пульт остаётся справа. */
+@media (max-width: 820px) {
+  .adm-player { grid-template-columns: minmax(0, 1fr) auto; }
+  .adm-player__who { grid-area: 1 / 1; }
+  .adm-player__acts { grid-area: 1 / 2; }
+  .adm-player__state { grid-area: 2 / 1 / 3 / 3; }
 }
+
 .adm-badge--stop {
   color: #ff8b8b;
   border-color: rgba(255,110,110,.4);
@@ -1232,18 +1246,17 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-modal__box .adm-actions { margin-top: 4px; }
 
 @media (max-width: 600px) {
-  .adm-player { grid-template-columns: minmax(0, 1fr); gap: 9px; }
-  /* Две колонки вместо лестницы из восьми кнопок; опасные меры —
-     на всю ширину, чтобы случайно не ткнуть. */
-  .adm-player__panel { padding: 10px; gap: 10px; }
-  /* Подпись встаёт над кнопками, кнопки — в две колонки: на 360 пикселах
-     рядом с подписью остаётся полоса в одну кнопку. */
-  .adm-player__act-group { grid-template-columns: minmax(0, 1fr); gap: 7px; }
-  .adm-player__act-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .adm-player__act-group--danger .adm-player__act-buttons { grid-template-columns: 1fr; }
-  /* Палец, а не курсор: 44 пиксела — высота, ниже которой начинаются
-     промахи, а промах здесь стоит чужого аккаунта. */
-  .adm-player__act-buttons .adm-btn { width: 100%; min-height: 44px; }
+  .adm-player { grid-template-columns: minmax(0, 1fr); gap: 7px; padding: 12px 0; }
+  .adm-player__who { grid-area: auto; }
+  .adm-player__state { grid-area: auto; }
+  .adm-player__acts { grid-area: auto; justify-content: flex-start; }
+  /* Палец, а не курсор: 42 пиксела — ниже начинаются промахи, а промах
+     здесь стоит чужого аккаунта. */
+  .adm-player__roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; flex: 1 1 auto; min-width: 0; }
+  .adm-pill { justify-content: center; width: 100%; min-height: 42px; }
+  .adm-menu__btn { width: 42px; height: 42px; }
+  .adm-menu__list { min-width: 210px; }
+  .adm-player__reason { max-width: none; }
   .adm-player__reason { max-width: none; }
   .adm-modal__box { padding: 16px; border-radius: 16px; }
 }

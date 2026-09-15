@@ -1268,6 +1268,9 @@ function openPlayerModal(selector, nick, targetId, extra = {}) {
   if (!modal) return;
 
   modal.dataset.playerId = targetId;
+
+  /* Меню «⋯» закрываем: иначе оно останется висеть за окном. */
+  for (const menu of root.querySelectorAll('details[data-player-menu][open]')) menu.open = false;
   const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick], [data-delete-nick], [data-rename-nick]');
   if (nickBox) nickBox.textContent = nick;
 
@@ -1549,6 +1552,16 @@ document.addEventListener('submit', async (e) => {
 document.addEventListener('click', async (e) => {
   if (!e.target.closest) return;
 
+  /*
+    Меню действий игрока: клик мимо открытого «⋯» закрывает его, а открытие
+    соседнего — закрывает предыдущее. Своё меню не трогаем: его переключает
+    сам <details>.
+  */
+  const clickedMenu = e.target.closest('details[data-player-menu]');
+  for (const menu of document.querySelectorAll('details[data-player-menu][open]')) {
+    if (menu !== clickedMenu) menu.open = false;
+  }
+
   if (e.target.closest('[data-logout]')) {
     /*
       Выход из панели выкидывает и с форума: учётная запись одна. Раньше это
@@ -1620,7 +1633,6 @@ document.addEventListener('click', async (e) => {
     const allow = modBtn.dataset.playerAllow === '1';
 
     modBtn.disabled = true;
-    modBtn.textContent = allow ? 'Назначаем…' : 'Снимаем…';
 
     try {
       await setModerator(nick, allow);
@@ -1636,7 +1648,6 @@ document.addEventListener('click', async (e) => {
     } catch (err) {
       if (modBtn.isConnected) {
         modBtn.disabled = false;
-        modBtn.textContent = allow ? 'Сделать модератором' : 'Снять модератора';
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }
@@ -1653,7 +1664,6 @@ document.addEventListener('click', async (e) => {
     const isBlogger = blogBtn.dataset.playerBlog === '1';
 
     blogBtn.disabled = true;
-    blogBtn.textContent = isBlogger ? 'Снимаем…' : 'Отмечаем…';
 
     try {
       await forum.setBlogger(blogBtn.dataset.playerBlogger, !isBlogger);
@@ -1669,7 +1679,6 @@ document.addEventListener('click', async (e) => {
     } catch (err) {
       if (blogBtn.isConnected) {
         blogBtn.disabled = false;
-        blogBtn.textContent = isBlogger ? 'Снять блогера' : 'Сделать блогером';
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }
@@ -1693,7 +1702,6 @@ document.addEventListener('click', async (e) => {
     }
 
     leadBtn.disabled = true;
-    leadBtn.textContent = isLeader ? 'Снимаем…' : 'Назначаем…';
     try {
       await forum.setLeader(leadBtn.dataset.playerLeader, isLeader ? '' : alliance);
       view.forum.loadedFor = null;
@@ -1708,7 +1716,6 @@ document.addEventListener('click', async (e) => {
     } catch (err) {
       if (leadBtn.isConnected) {
         leadBtn.disabled = false;
-        leadBtn.textContent = isLeader ? 'Снять лидера' : 'Сделать лидером';
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }
@@ -1730,7 +1737,6 @@ document.addEventListener('click', async (e) => {
     const nick = verBtn.dataset.playerNick;
     const isVerified = verBtn.dataset.playerVer === '1';
     verBtn.disabled = true;
-    verBtn.textContent = isVerified ? 'Снимаем…' : 'Проверяем…';
     try {
       await forum.setVerified(verBtn.dataset.playerVerify, !isVerified);
       view.forum.loadedFor = null;
@@ -1745,7 +1751,6 @@ document.addEventListener('click', async (e) => {
     } catch (err) {
       if (verBtn.isConnected) {
         verBtn.disabled = false;
-        verBtn.textContent = isVerified ? 'Снять проверку' : 'Проверить ник';
       }
       showForumResult('[data-players-result]', esc(String(err?.message ?? err)), 'err');
     }
