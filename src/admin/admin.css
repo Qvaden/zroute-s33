@@ -1101,7 +1101,7 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-toggle.is-on::before { content: '✓'; margin-right: 4px; font-weight: 700; }
 .adm-toggle.is-on:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 /* «⋯»: редкие и опасные действия — под меню. */
-.adm-menu { position: relative; display: inline-flex; }
+.adm-menu { position: relative; }
 .adm-menu__btn {
   display: inline-flex;
   align-items: center;
@@ -1122,13 +1122,21 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-menu__btn:hover,
 .adm-menu[open] > .adm-menu__btn { color: var(--text); border-color: var(--mute); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .adm-menu__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/*
+  Меню «⋯» показывается ТОЛЬКО у открытого <details>.
+
+  Это не украшение, а исправление поломки: если у <details> задать свой
+  display (например inline-flex), браузер перестаёт сам прятать содержимое
+  закрытого меню — и все закрытые списки висят поверх соседних строк,
+  перехватывая нажатия. Поэтому display задан явно и только для [open].
+*/
 .adm-menu__list {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
   z-index: 40;
   min-width: 186px;
-  display: grid;
+  display: none;
   gap: 2px;
   padding: 6px;
   border: 1px solid var(--line);
@@ -1136,6 +1144,7 @@ body.guide-color-modal-open{overflow:hidden}
   background: var(--raised);
   box-shadow: 0 18px 44px rgba(0, 0, 0, .5);
 }
+.adm-menu[open] > .adm-menu__list { display: grid; }
 .adm-menu__item {
   padding: 7px 9px;
   border: 0;

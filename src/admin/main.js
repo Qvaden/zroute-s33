@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=19';
-import { esc } from '../ui/helpers.js?v=19';
-import { mapDataset } from '../data/adapters/_map.js?v=19';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=19';
-import { validateDataset } from '../data/contract.js?v=19';
+import { CONFIG } from '../../config.js?v=20';
+import { esc } from '../ui/helpers.js?v=20';
+import { mapDataset } from '../data/adapters/_map.js?v=20';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=20';
+import { validateDataset } from '../data/contract.js?v=20';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=19';
-import { renderHome } from '../pages/home.js?v=19';
+} from '../logic/standings.js?v=20';
+import { renderHome } from '../pages/home.js?v=20';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=19';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=19';
+} from '../db/account.js?v=20';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=19';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=19';
-import { roleLabel } from '../forum/roles.js?v=19';
-import { prepareImage, uploadPath } from './image.js?v=19';
+} from './store.js?v=20';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=20';
+import { roleLabel } from '../forum/roles.js?v=20';
+import { prepareImage, uploadPath } from './image.js?v=20';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=19';
+} from './edit.js?v=20';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=19';
-import { renderShell } from './shell.js?v=19';
-import { renderLogin } from './login.js?v=19';
-import { renderOverview } from './screens/overview.js?v=19';
-import { renderWeek, describe } from './screens/week.js?v=19';
-import { renderAlliances } from './screens/alliances.js?v=19';
-import { renderEvents } from './screens/events.js?v=19';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=19';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=19';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=19';
-import { renderQuarter } from './screens/quarter.js?v=19';
-import { renderPresident } from './screens/president.js?v=19';
-import { renderPlayers } from './screens/players.js?v=19';
-import { renderModeration } from './screens/moderation.js?v=19';
-import { renderChatsAdmin } from './screens/chats.js?v=19';
-import { forum } from '../forum/index.js?v=19';
-import { deletionReason } from '../forum/rules.js?v=19';
+} from './draft.js?v=20';
+import { renderShell } from './shell.js?v=20';
+import { renderLogin } from './login.js?v=20';
+import { renderOverview } from './screens/overview.js?v=20';
+import { renderWeek, describe } from './screens/week.js?v=20';
+import { renderAlliances } from './screens/alliances.js?v=20';
+import { renderEvents } from './screens/events.js?v=20';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=20';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=20';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=20';
+import { renderQuarter } from './screens/quarter.js?v=20';
+import { renderPresident } from './screens/president.js?v=20';
+import { renderPlayers } from './screens/players.js?v=20';
+import { renderModeration } from './screens/moderation.js?v=20';
+import { renderChatsAdmin } from './screens/chats.js?v=20';
+import { forum } from '../forum/index.js?v=20';
+import { deletionReason } from '../forum/rules.js?v=20';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
