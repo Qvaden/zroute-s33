@@ -1309,50 +1309,12 @@ export function renderPostCard(p, s) {
               : ''
           }
           ${
-            /*
-              Редкие действия собраны в меню «⋯»: у автора-модератора их
-              набиралось пять в одну строку, и на телефоне кнопки уезжали
-              за край карточки. Кнопки остаются в разметке — просто сложены.
-            */
             (canModerate || canReply || (s.me && !isMine))
-              ? `<details class="forum-act-menu">
-                <summary class="forum-act" title="Ещё действия" aria-label="Ещё действия с постом">⋯</summary>
-                <div class="forum-act-menu__list">
-                  ${
-                    canModerate
-                      ? `<button type="button" class="forum-act" data-forum-pin="${esc(p.id)}"
-                                 aria-pressed="${p.pinned ? 'true' : 'false'}"
-                                 title="${p.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">${
-                            p.pinned ? 'Открепить' : 'Закрепить'
-                          }</button>`
-                      : ''
-                  }
-                  ${
-                    canReply
-                      ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
-                                 title="Вставить текст поста в ответ">Цитировать</button>`
-                      : ''
-                  }
-                  ${
-                    s.me
-                      ? `<button type="button" class="forum-act" data-forum-subscribe="${esc(p.id)}"
-                                 data-forum-subscribed="${p.subscribed ? '1' : ''}"
-                                 title="Получать уведомления о новых комментариях">${p.subscribed ? 'Отписаться' : 'Подписаться'}</button>`
-                      : ''
-                  }
-                  ${
-                    s.me && !isMine
-                      ? `<button type="button" class="forum-act" data-forum-report="post:${esc(p.id)}">Пожаловаться</button>`
-                      : ''
-                  }
-                  ${
-                    isMine || canModerate
-                      ? `<button type="button" class="forum-act forum-act--danger" data-forum-del-post="${esc(p.id)}"
-                                 title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
-                      : ''
-                  }
-                </div>
-              </details>`
+              ? `<button type="button" class="forum-act forum-act-trigger"
+                         data-forum-menu="${esc(p.id)}"
+                         title="Ещё действия"
+                         aria-label="Ещё действия с постом"
+                         aria-haspopup="menu">⋯</button>`
               : ''
           }
         </span>

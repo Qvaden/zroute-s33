@@ -950,6 +950,10 @@ html {
   .forum-modal__box { padding: 16px; }
   .forum-modal__rule { padding: 10px; }
 
+  /* Меню действий поста: уже ограничено vw с отступами в refine.css,
+     на узких экранах добавим только плотные пункты. */
+  .forum-act-portal__list .forum-act { padding: 9px 11px; font-size: 13px; min-height: 40px; }
+
   /* Сводка сервера на форуме. */
   .forum-chron { padding-bottom: 14px; }
   .forum-chron__stats { margin: 14px 0 12px; }
