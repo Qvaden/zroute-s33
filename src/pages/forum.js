@@ -1480,14 +1480,10 @@ function renderComments(post, s) {
   const canModerate = s.me && (s.me.role === 'admin' || s.me.role === 'moderator');
   const L = CONFIG.forum.limits;
 
-  const items = s.comments.length
-    ? s.comments
+  const visible = s.comments.filter((c) => !c.deleted);
+  const items = visible.length
+    ? visible
         .map((c) => {
-          if (c.deleted) {
-            return `<li class="forum-comment forum-comment--deleted">
-              <p class="muted">Комментарий удалён · ${esc(c.deletedReason || 'нарушение правил')}</p>
-            </li>`;
-          }
           const isMine = s.me && s.me.id === c.authorId;
           const canQuote = Boolean(s.me && !s.me.banned);
           return `<li class="forum-comment" data-forum-comment="${esc(c.id)}">
