@@ -2460,6 +2460,38 @@ console.log('\nQ. Форум');
   check('checkNick отвечает «занято» на существующий ник',
     (await loc.checkNick('гек_к_проверке')).status === 'taken');
 
+  /* Confusable-ники: стоп-лист и занятые ключи ловят похожие написания —
+     латинскую диакритику, цифры 0/1 вместо букв и греческие буквы. */
+  await loc.addReservedNick('няша0');
+  let digitAsO = false;
+  try {
+    await loc.signUp('няшао');
+  } catch {
+    digitAsO = true;
+  }
+  check('стоп-лист ловит «0» как «о»', digitAsO);
+  await loc.removeReservedNick('няша0');
+
+  await loc.addReservedNick('крéмль');
+  let accentAsE = false;
+  try {
+    await loc.signUp('кремль');
+  } catch {
+    accentAsE = true;
+  }
+  check('стоп-лист ловит диакритику «é» как «е»', accentAsE);
+  await loc.removeReservedNick('крéмль');
+
+  await loc.addReservedNick('маскарад');
+  let greekAsO = false;
+  try {
+    await loc.signUp('масκарад');
+  } catch {
+    greekAsO = true;
+  }
+  check('стоп-лист ловит греческую «κ» как «к»', greekAsO);
+  await loc.removeReservedNick('маскарад');
+
   await loc.setVerified(wannabe.id, true);
   const checkOk = await loc.signIn('гек_к_проверке');
   check('проверка отразилась в профиле', checkOk.isVerified === true && typeof checkOk.verifiedBy === 'string');
@@ -3083,6 +3115,35 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('удалённый пост остаётся на месте', deletedHtml.includes('Пост удалён'));
   check('удалённый пост объясняет причину', /Без рекламы/.test(deletedHtml));
   check('текст удалённого поста не показывается', !deletedHtml.includes('текст поста'));
+
+  /*
+    Удалённый комментарий исчезает из списка целиком — ни заглушки, ни пустой
+    строки. Если удалены все — на их месте «Ответов пока нет». Обычные
+    комментарии остаются на своих местах.
+  */
+  const threadHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, me,
+    posts: [post], openPostId: post.id, comments: [
+      { id: 'c1', authorId: 'u2', authorNick: 'Человек', authorRole: 'member', body: 'живой', createdAt: new Date(), deleted: false, deletedReason: '' },
+      { id: 'c2', authorId: 'u3', authorNick: 'Другой', authorRole: 'member', body: 'удалённое содержимое', createdAt: new Date(), deleted: true, deletedReason: 'Спам' },
+      { id: 'c3', authorId: 'u2', authorNick: 'Человек', authorRole: 'member', body: 'второй живой', createdAt: new Date(), deleted: false, deletedReason: '' },
+    ],
+  });
+  check('удалённый комментарий не рисуется в списке',
+    threadHtml.includes('живой')
+      && threadHtml.includes('второй живой')
+      && !threadHtml.includes('удалённое содержимое')
+      && !threadHtml.includes('Комментарий удалён'));
+  check('удалённый комментарий не оставляет пустой плашки',
+    !threadHtml.includes('forum-comment--deleted'));
+  const noCommentsHtml = renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, me,
+    posts: [post], openPostId: post.id, comments: [
+      { id: 'c1', authorId: 'u2', authorNick: 'Человек', authorRole: 'member', body: 'пропаж', createdAt: new Date(), deleted: true, deletedReason: 'Спам' },
+    ],
+  });
+  check('если все комментарии удалены — место честно пусто',
+    !noCommentsHtml.includes('пропаж') && /Ответов пока нет/.test(noCommentsHtml));
 
   /* ── Экраны панели ── */
 
@@ -4082,13 +4143,19 @@ console.log('\nS. Чистые функции');
   check('пустой журнал честно говорит «не менялся»',
     /Ник не менялся/.test(renderUserPage({ ...base, me: moderator, history: [] })));
 
-  const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
+const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
   const autoProtectedNicksSql = await readFile('supabase/auto-protected-nicks.sql', 'utf8');
   check('база автоматически резервирует прежний ник триггером',
     /create trigger forum_reserve_released_nick[\s\S]*?before update of nick/.test(nicksSql));
   check('отдельная миграция включает защиту и сохраняет свободные старые ники',
     /forum_reserve_released_nick/.test(autoProtectedNicksSql)
       && /forum_nick_history/.test(autoProtectedNicksSql));
+  check('функция ключа ника в базе применяет NFKC и полную карту двойников',
+    /normalize\(coalesce\(nick, ''\), NFKC\)/.test(nicksSql)
+      && /'авекмнорстухіїєοικερτχνàáâãäåą/.test(nicksSql)
+      && /01l'/.test(nicksSql));
+  check('миграция пересоздаёт уникальный индекс под новый ключ ника',
+    (/forum_users_nickkey_uniq/).test(await readFile('supabase/nick-confusables.sql', 'utf8')));
   check('журнал переименований в базе открыт модерации, а не только владельцу',
     /forum_nick_history_list\(target_user uuid\)[\s\S]*?not public\.forum_is_staff\(\)/.test(nicksSql));
   check('подтверждение ника в базе разрешает лидеру своего альянса',
