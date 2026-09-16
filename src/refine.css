@@ -800,6 +800,33 @@ body:has(.chat-layout) .site-foot { display: none; }
   text-transform: uppercase;
 }
 
+/* ── Разделитель «Новые сообщения» ────────────────────────────────────────
+   Ставится перед первым непрочитанным сообщением. Спокойный акцент: линии
+   приглушённые, подпись в мягкой капсуле — не выглядит как предупреждение. */
+
+.chat-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 2px 12px;
+}
+.chat-divider__line {
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 24%, var(--line));
+}
+.chat-divider__label {
+  padding: 3px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--raised));
+  color: color-mix(in srgb, var(--accent) 82%, var(--dim));
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
 .chat-msgs { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 
 .chat-msg { display: flex; align-items: flex-end; gap: 8px; }
@@ -1299,6 +1326,42 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-go-bottom:hover { color: var(--text); border-color: var(--accent); }
 .chat-go-bottom.is-visible { display: inline-flex; }
 .chat-go-bottom span { min-width: 18px; text-align: center; }
+
+/* ── Кнопка «К новым» ──────────────────────────────────────────────────────
+   Плавающая кнопка к границе непрочитанных. Живёт над кнопкой «вниз» на
+   одной стороне: стрелка вверх + счётчик. Видна только при непрочитанных,
+   когда пользователь ещё не дошёл до границы новых сообщений. */
+
+.chat-go-new {
+  position: absolute;
+  bottom: 128px;
+  right: 14px;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--raised-2));
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px -6px rgba(0,0,0,.6);
+  z-index: 6;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color .16s var(--ease), background .16s var(--ease), color .16s var(--ease);
+}
+.chat-go-new:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 24%, var(--raised-2));
+}
+.chat-go-new:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.chat-go-new.is-visible { display: inline-flex; }
+.chat-go-new span { min-width: 18px; text-align: center; }
 
 /* ── Поиск по сообщениям ────────────────────────────────────────────────── */
 
@@ -1846,6 +1909,10 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .chat-menu__pop { box-shadow: 0 18px 44px -18px rgba(31,48,64,.3), 0 4px 18px -10px rgba(31,48,64,.18); }
 :root[data-theme="light"] .chat-msg__reactions-pop { box-shadow: 0 8px 24px -12px rgba(31,48,64,.28); }
 :root[data-theme="light"] .chat-go-bottom { box-shadow: 0 4px 14px -6px rgba(31,48,64,.3); }
+:root[data-theme="light"] .chat-go-new { box-shadow: 0 4px 14px -6px rgba(31,48,64,.3); }
+:root[data-theme="light"] .chat-divider__label {
+  background: color-mix(in srgb, var(--accent) 8%, #fff);
+}
 :root[data-theme="light"] .pick__menu { box-shadow: 0 18px 44px -18px rgba(31,48,64,.3), 0 4px 18px -10px rgba(31,48,64,.18); }
 
 /* Тёмные «острова» (бот, роли, кварт) остаются тёмными: на холодном светлом

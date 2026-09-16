@@ -1273,3 +1273,20 @@ body { min-height: 100svh; }
   .forum-welcome .forum-btn { margin-left: 0; width: 100%; }
   .forum-hot__item a { flex-direction: column; align-items: flex-start; gap: 2px; }
 }
+
+/* ── Чаты: кнопка «К новым» на телефоне ──────────────────────────────────────
+   Кнопка стоит над кнопкой «вниз», не наезжает на поле ввода и кнопку
+   отправки; область нажатия не меньше тач-минимума. */
+
+@media (max-width: 759px) {
+  .chat-go-new {
+    right: 10px;
+    bottom: 130px;
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 380px) {
+  .chat-go-new { padding: 6px 10px; }
+  .chat-go-new span { min-width: 16px; }
+}

@@ -893,6 +893,7 @@ function chatOut(row) {
     onlineCount: Number(row.online_count || 0),
     myRole: row.my_role || null,
     unread: Number(row.unread_count || 0),
+    myLastReadAt: toDate(row.my_last_read_at),
     lastBody: row.last_body || '',
     lastNick: row.last_nick || '',
     lastAt: toDate(row.last_at),

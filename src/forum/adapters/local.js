@@ -1217,6 +1217,7 @@ function chatView(s, c, meId) {
     }).length,
     myRole: mine?.role ?? null,
     unread: msgs.filter((x) => new Date(x.createdAt).getTime() > since && x.authorId !== meId).length,
+    myLastReadAt: mine?.lastReadAt ? new Date(mine.lastReadAt) : null,
     lastBody: lastText,
     lastNick: last?.authorNick ?? '',
     lastAt: last ? new Date(last.createdAt) : null,

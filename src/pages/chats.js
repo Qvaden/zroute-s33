@@ -47,6 +47,8 @@ function renderBody(raw) {
  * @property {boolean} createOpen
  * @property {boolean} pollOpen
  * @property {boolean} hasMore
+ * @property {number} unread        Непрочитанных в открытом чате (для кнопки «К новым»).
+ * @property {Date|null} readAt     Отметка прочтения открытого чата; граница «Новые сообщения».
  * @property {boolean} sending
  * @property {any[]} [pendingFiles]
  * @property {any|null} [pollDraft]
@@ -374,6 +376,18 @@ function renderRoom(s) {
       <span data-chat-go-count>${s.newMessages > 99 ? '99+' : s.newMessages}</span>
     </button>
 
+    <button type="button" class="chat-go-new${s.readAt && s.unread > 0 ? ' is-visible' : ''}"
+            data-chat-go-new title="К новым сообщениям" aria-label="К новым сообщениям (${
+              s.unread > 99 ? '99+' : s.unread
+            } непрочитанных)">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M7 17l5-5 5 5"/>
+        <path d="M7 9l5-5 5 5"/>
+      </svg>
+      <span data-chat-go-new-count>${s.unread > 99 ? '99+' : s.unread}</span>
+    </button>
+
     ${renderComposer(s, c)}`;
 }
 
@@ -428,12 +442,51 @@ export function renderMessages(s, isMgr) {
         <p class="muted">Напишите первым — участники увидят это сразу.</p>
       </div>`;
   }
+  /*
+    Граница «Новых сообщений»: первое непрочитанное — это сообщение не от себя,
+    созданное позже отметки прочтения (read_at). Разделитель ставим строго перед
+    ним, и только если сама граница уже загружена (до неё есть хотя бы одно
+    прочитанное сообщение). В поиске разделитель не рисуем — контекст ленты
+    нарушен фильтром.
+  */
+  const searching = s.searchOpen && String(s.searchQuery || '').trim();
+  let firstNewIdx = -1;
+  const readMs = s.readAt ? toMs(s.readAt) : null;
+  if (!searching && readMs != null && s.me?.id) {
+    for (let i = 0; i < s.messages.length; i++) {
+      const m = s.messages[i];
+      if (m.deleted) continue;
+      if (m.authorId !== s.me.id && toMs(m.createdAt) > readMs) {
+        firstNewIdx = i;
+        break;
+      }
+    }
+  }
   let out = '';
   let prev = null;
-  for (const m of s.messages) {
+  for (let i = 0; i < s.messages.length; i++) {
+    const m = s.messages[i];
     const day = dayKey(m.createdAt);
     if (!prev || dayKey(prev.createdAt) !== day) {
       out += `<div class="chat-day"><span>${esc(dayLabel(m.createdAt))}</span></div>`;
+    }
+    /*
+      Разделитель рисуем только если граница загружена: firstNewIdx > 0 значит,
+      что выше него есть хотя бы одно прочитанное сообщение — место постановки
+      определено точно. Если все загруженные сообщения непрочитанные
+      (firstNewIdx === 0), подождём подгрузки истории (ensureUnreadBoundary).
+    */
+    if (firstNewIdx > 0 && i === firstNewIdx) {
+      out += `<div class="chat-divider" role="separator" aria-label="Новые сообщения">
+        <span class="chat-divider__line" aria-hidden="true"></span>
+        <span class="chat-divider__label">Новые сообщения</span>
+        <span class="chat-divider__line" aria-hidden="true"></span>
+      </div>`;
+      /*
+        Первое новое сообщение не «склеиваем» с последним прочитанным: у него
+        появляется свой аватар и имя автора, как у начала свежей группы.
+      */
+      prev = null;
     }
     const grouped = prev && prev.authorId === m.authorId && !prev.deleted
       && dayKey(prev.createdAt) === day
@@ -698,6 +751,12 @@ export function leaderBadge() {
 function dayKey(d) {
   const dt = d instanceof Date ? d : new Date(d);
   return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+}
+
+function toMs(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  const t = dt.getTime();
+  return Number.isFinite(t) ? t : null;
 }
 
 export function dayLabel(d, now = new Date()) {

@@ -41,6 +41,8 @@ const state = {
   pollOpen: false,
   hasMore: false,
   newMessages: 0,
+  unread: 0,
+  readAt: null,
   sending: false,
   pendingFiles: [],
   replyingTo: null,
@@ -172,6 +174,8 @@ function paintFull({ stick = false } = {}) {
     if (stick || atBottom) nextScroll.scrollTop = nextScroll.scrollHeight;
     else nextScroll.scrollTop = prevTop + (nextScroll.scrollHeight - prevHeight);
   }
+  paintGoBottom();
+  paintGoNew();
 }
 
 /**
@@ -197,6 +201,7 @@ function paintMessages({ stick = false } = {}) {
     scroll.scrollTop = prevTop + (scroll.scrollHeight - prevHeight);
   }
   paintGoBottom();
+  paintGoNew();
 
   /* Наблюдаем сентинел для бесконечной прокрутки. */
   const sentinel = scroll.querySelector('[data-chat-sentinel]');
@@ -224,6 +229,116 @@ function paintGoBottom() {
   btn.classList.toggle('is-visible', has);
   const count = btn.querySelector('[data-chat-go-count]');
   if (count) count.textContent = state.newMessages > 99 ? '99+' : String(state.newMessages);
+}
+
+/* ── Непрочитанные: граница, кнопка «К новым», отметка прочтения ─────────── */
+
+function toMs(d) {
+  const t = d instanceof Date ? d : new Date(d).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Пользователь в самой нижней части ленты. */
+function isAtBottom(scroll) {
+  return scroll ? scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80 : true;
+}
+
+/**
+ * Модель непрочитанных в открытом чате по отметке прочтения (readAt).
+ * Новым считается сообщение не от себя, созданное позже readAt.
+ * Возвращает индекс первого непрочитанного и его id; boundaryLoaded говорит,
+ * что до границы в ленте есть хотя бы одно прочитанное сообщение.
+ */
+function unreadModel() {
+  const meId = state.me?.id;
+  const readMs = toMs(state.readAt);
+  if (!meId || readMs == null) return { firstIndex: -1, firstId: null, boundaryLoaded: false };
+  for (let i = 0; i < state.messages.length; i++) {
+    const m = state.messages[i];
+    if (m.deleted) continue;
+    if (m.authorId !== meId && toMs(m.createdAt) > readMs) {
+      return { firstIndex: i, firstId: m.id, boundaryLoaded: i > 0 };
+    }
+  }
+  return { firstIndex: -1, firstId: null, boundaryLoaded: false };
+}
+
+/**
+ * Видна ли кнопка «К новым»: непрочитанные есть и первый из них находится
+ * ниже нижней границы видимой области (пользователь ещё не дошёл до границы).
+ */
+function goNewVisible() {
+  const scroll = host?.querySelector('[data-chat-scroll]');
+  if (!scroll || !state.unread || state.searchOpen) return false;
+  const model = unreadModel();
+  if (model.firstId) {
+    const el = scroll.querySelector(`#${CSS.escape('m-' + model.firstId)}`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const sr = scroll.getBoundingClientRect();
+      // «Не дошёл до границы» = первый непрочитанный начинается ниже края ленты.
+      return r.top > sr.bottom - 4;
+    }
+  }
+  return !isAtBottom(scroll);
+}
+
+/** Обновить кнопку «К новым» и её счётчик. */
+function paintGoNew() {
+  if (!host) return;
+  const btn = host.querySelector('[data-chat-go-new]');
+  if (!btn) return;
+  btn.classList.toggle('is-visible', goNewVisible());
+  const title = state.unread > 0
+    ? `К новым сообщениям (${state.unread > 99 ? '99+' : state.unread})`
+    : 'К новым сообщениям';
+  btn.title = title;
+  btn.setAttribute('aria-label', title);
+  const count = btn.querySelector('[data-chat-go-new-count]');
+  if (count) count.textContent = state.unread > 99 ? '99+' : String(state.unread);
+}
+
+/**
+ * Отметить открытый чат прочитанным: локально (граница и счётчики) и на базе.
+ * Вызывается, только когда пользователь фактически дошёл до низа ленты или
+ * первого непрочитанного — при одном открытии чата отметку не ставим.
+ */
+function markReadNow() {
+  if (!state.openId) return;
+  /*
+    Нет непрочитанных и отметка уже стоит — отправлять ещё раз нечего:
+    защита от лишних запросов при повторных скролл-событиях у низа.
+  */
+  if (state.unread === 0 && state.readAt) return;
+  const now = new Date();
+  state.readAt = now;
+  state.unread = 0;
+  state.newMessages = 0;
+  const c = state.chats.find((x) => x.id === state.openId);
+  if (c) c.unread = 0;
+  paintMessages();
+  paintGoBottom();
+  paintGoNew();
+  paintList();
+  forum.markChatRead(state.openId).then(() => {
+    /* База подтвердила: держим локальную отметку в синхроне. */
+    if (state.open) state.open.myLastReadAt = state.readAt;
+    const cur = state.chats.find((x) => x.id === state.openId);
+    if (cur) cur.myLastReadAt = state.readAt;
+  }).catch(() => {});
+}
+
+/**
+ * Если первый непрочитанный — самый верх загруженной ленты, граница ещё не
+ * подгружена (непрочитанных больше порции). Подтягиваем одну порцию истории,
+ * чтобы разделитель встал точно, и снова ведём скролл к границе.
+ */
+async function ensureUnreadBoundary() {
+  const model = unreadModel();
+  if (state.openId && state.unread > 0 && model.firstIndex === 0 && state.hasMore && !state._loadingMore) {
+    await loadOlder();
+    if (unreadModel().firstIndex > 0) positionAtBoundary();
+  }
 }
 
 function autosize(el) {
@@ -367,6 +482,8 @@ async function openChat(id) {
   state.searchOpen = false;
   state.searchQuery = '';
   state.hasMore = false;
+  state.unread = 0;
+  state.readAt = null;
   state.loading = true;
   paintFull({ stick: true });
 
@@ -383,12 +500,9 @@ async function openChat(id) {
       state.open = chat;
       state.messages = messages;
       state.hasMore = messages.length >= 60;
+      state.readAt = chat.myLastReadAt;
+      state.unread = chat.unread || 0;
       state.error = '';
-      forum.markChatRead(id).then(() => {
-        const c = state.chats.find((x) => x.id === id);
-        if (c) c.unread = 0;
-        paintList();
-      });
     }
   } catch (err) {
     if (my !== token) return;
@@ -396,6 +510,53 @@ async function openChat(id) {
   }
   state.loading = false;
   paintFull({ stick: true });
+
+  /*
+    Открытие само по себе НЕ снимает отметку прочтения: чат с непрочитанными
+    встаёт к их границе (разделитель и первые новые видны), но markReadNow
+    сработает только когда пользователь реально дойдёт до низа ленты —
+    то есть пройдёт границу до конца. Если граница не загружена
+    (непрочитанных больше 60), подтягиваем одну старшую порцию истории.
+  */
+  if (state.openId === id) {
+    if (state.unread > 0 && unreadModel().firstIndex > 0) positionAtBoundary();
+    paintGoNew();
+    ensureUnreadBoundary();
+  }
+}
+
+/**
+ * Встать к границе непрочитанных: первый новый доводится до нижней кромки
+ * видимой области, и сам скролл не снимает отметку — первые новые ещё не
+ * вошли в кадр, их надо прокрутить, а для этого и стоит кнопка «К новым».
+ */
+function positionAtBoundary() {
+  const scroll = host?.querySelector('[data-chat-scroll]');
+  if (!scroll) return;
+  const firstId = unreadModel().firstId;
+  const el = firstId ? scroll.querySelector(`#${CSS.escape('m-' + firstId)}`) : null;
+  if (!el) return;
+  const sr = scroll.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  // Небольшой запас в 12px: граница вплотную к кромке, но не перейдена.
+  scroll.scrollTop = scroll.scrollTop + (r.top - sr.bottom) + 12;
+}
+
+/**
+ * Граница непрочитанных достигнута: первый новый вошёл в видимую область
+ * (его верх не ниже нижней кромки ленты). Отметка прочтения ставится
+ * именно в этот момент, а не при открытии чата.
+ */
+function boundaryReached() {
+  const scroll = host?.querySelector('[data-chat-scroll]');
+  const firstId = unreadModel().firstId;
+  const el = firstId ? scroll?.querySelector(`#${CSS.escape('m-' + firstId)}`) : null;
+  if (el) {
+    const r = el.getBoundingClientRect();
+    const sr = scroll.getBoundingClientRect();
+    return r.top <= sr.bottom - 4;
+  }
+  return false;
 }
 
 /** Только новые сообщения — с даты последнего у нас. */
@@ -450,7 +611,19 @@ async function tick() {
       const atBottom = scroll ? scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80 : true;
       state.messages = [...state.messages, ...added].sort((a, b) => a.createdAt - b.createdAt);
       const newFromOthers = added.filter((m) => m.authorId !== state.me?.id);
-      if (newFromOthers.length) forum.markChatRead(id).catch(() => {});
+      if (newFromOthers.length) {
+        /*
+          Сначала прибавляем к счётчику непрочитанных — от отметки прочтения
+          зависит guard в markReadNow. Если пользователь видит самый низ ленты,
+          сообщения появляются на экране, и прочтение ставим сразу же.
+        */
+        state.unread += newFromOthers.length;
+        if (atBottom) {
+          markReadNow();
+          state.newMessages = 0;
+          paintGoBottom();
+        }
+      }
       if (!atBottom) state.newMessages += newFromOthers.length;
 
       /* Звук и уведомление: только для чужих сообщений, только когда видим. */
@@ -576,6 +749,7 @@ async function send(form) {
 
     paintList();
     paintComposerMeta();
+    paintGoNew();
   } catch (err) {
     notice(String(err?.message ?? err));
   } finally {
@@ -1064,6 +1238,22 @@ function wire() {
       return;
     }
 
+    /*
+      Кнопка «К новым» — плавная прокрутка к границе непрочитанных.
+      Если граница ещё не загружена, ведём к верху загруженной ленты;
+      докрутившись до низа, пользователь увидит всё новое.
+    */
+    const goNew = t.closest('[data-chat-go-new]');
+    if (goNew) {
+      const scroll = host?.querySelector('[data-chat-scroll]');
+      const target = unreadModel().firstId
+        ? scroll?.querySelector(`#${CSS.escape('m-' + unreadModel().firstId)}`)
+        : null;
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      else if (scroll) scroll.scrollTo({ top: scroll.scrollHeight, behavior: 'smooth' });
+      return;
+    }
+
     /* Переименовать чат. */
     const rename = t.closest('[data-chat-rename]');
     if (rename && state.openId && state.open) {
@@ -1275,14 +1465,19 @@ function wire() {
     if (!document.hidden && host) tick();
   });
 
-  /* Слушатель скролла: сбрасываем newMessages, когда пользователь докрутился до низа. */
+  /* Слушатель скролла: у низа — сбрасываем newMessages и ставим прочтение;
+     на достижении границы непрочитанных — тоже ставим прочтение;
+     на любом положении — переслеживаем видимость кнопки «К новым». */
   host?.addEventListener('scroll', (e) => {
     const target = e.target.closest('[data-chat-scroll]');
     if (!target) return;
     const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
-    if (atBottom) {
+    if (atBottom || boundaryReached()) {
       state.newMessages = 0;
       paintGoBottom();
+      markReadNow();
+    } else {
+      paintGoNew();
     }
   }, { passive: true });
 
@@ -1419,6 +1614,8 @@ export function unmountChats() {
   state.searchOpen = false;
   state.searchQuery = '';
   state.newMessages = 0;
+  state.unread = 0;
+  state.readAt = null;
   state._loadingMore = false;
   clearPendingFiles();
   renderedChatId = undefined;

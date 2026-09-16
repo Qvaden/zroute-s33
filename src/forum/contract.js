@@ -303,6 +303,7 @@
  * @property {number} onlineCount
  * @property {'owner'|'admin'|'member'|null} myRole
  * @property {number} unread
+ * @property {Date|null} myLastReadAt  Когда пользователь последний раз дочитал чат (forum_chat_members.last_read_at); null — отметки нет, все сообщения считаются прочитанными.
  * @property {string} lastBody
  * @property {string} lastNick
  * @property {Date|null} lastAt
