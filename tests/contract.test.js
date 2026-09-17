@@ -4174,5 +4174,16 @@ const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+{
+  const { renderAbout } = await import('../src/pages/about.js');
+  const html = renderAbout();
+  check('о проекте: один заголовок страницы', (html.match(/<h1>/g) || []).length === 1);
+  check('о проекте: предупреждение о чтении чатов', html.includes('Содержимое чатов могут читать владелец и модераторы.'));
+  check('о проекте: сброс пароля через владельца', html.includes('Сброс пароля выполняет владелец сайта.'));
+  check('о проекте: нет восстановления почтой', html.includes('Восстановления пароля по почте нет.'));
+  check('о проекте: нет технических и служебных деталей', !/Supabase|SQL|админ-панел|бэкап|service.worker/i.test(html));
+  check('о проекте: ссылки на основные разделы', ['forum', 'ladder', 'timeline', 'chats', 'guides', 'tournaments'].every((id) => html.includes(`href="#/${id}"`)));
+}
+
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

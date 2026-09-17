@@ -2250,3 +2250,17 @@ body:has(.chat-layout) .site-foot { display: none; }
 .forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:10px; }
 .forum-alliance-sub.is-on { border-color:color-mix(in srgb,var(--accent) 52%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
 .forum-alliance-sub.is-on span { color:var(--accent); }
+
+.about-page { display:grid; gap:16px; max-width:960px; margin:0 auto; }
+.about-page .about-panel { margin:0; padding:clamp(16px,3vw,28px); color:var(--text); background:var(--surface); }
+.about-panel h1 { margin:12px 0 20px; font-size:clamp(26px,5vw,42px); }
+.about-panel h2 { margin:0 0 18px; font-size:clamp(19px,3vw,25px); }
+.about-panel h3 { margin:0 0 10px; font-size:17px; }
+.about-panel p { margin:12px 0 0; line-height:1.7; overflow-wrap:anywhere; }
+.about-panel a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
+.about-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.about-card { min-width:0; padding:16px; border:1px solid var(--line); border-radius:var(--r); }
+.about-page .about-panel--privacy { border-inline-start:4px solid var(--accent); }
+@media (max-width:640px) {
+  .about-grid { grid-template-columns:1fr; }
+}

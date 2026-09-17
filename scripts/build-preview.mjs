@@ -27,6 +27,7 @@ import { renderGuide } from '../src/pages/guide.js';
 import { renderAlliance } from '../src/pages/alliance.js';
 import { renderQuarter } from '../src/pages/quarter-final.js';
 import { renderBot } from '../src/pages/bot.js';
+import { renderAbout } from '../src/pages/about.js';
 import { renderForum } from '../src/pages/forum.js';
 import { renderChats } from '../src/pages/chats.js';
 import { renderTournaments } from '../src/pages/tournaments.js';
@@ -84,6 +85,7 @@ const NAV = [
   { id: 'timeline', label: 'Хронология', html: renderTimeline(view) },
   { id: 'guide', label: 'Малым алам', html: renderGuide(view) },
   { id: 'bot', label: 'Бот в ТГ', html: renderBot() },
+  { id: 'about', label: 'О проекте', html: renderAbout() },
 ];
 
 /*
