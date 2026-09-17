@@ -965,9 +965,9 @@ function openActMenu(btn, postId) {
   const html = buildActMenuHtml(postId);
   if (!html || !host) return;
   actMenuEl = document.createElement('div');
-  actMenuEl.className = 'forum-act-portal';
+  actMenuEl.className = 'forum-act-menu__list';
   actMenuEl.setAttribute('role', 'menu');
-  actMenuEl.innerHTML = `<div class="forum-act-portal__list">${html}</div>`;
+  actMenuEl.innerHTML = html;
   host.appendChild(actMenuEl);
   actMenuBtn = btn;
   btn.setAttribute('aria-expanded', 'true');
@@ -1007,8 +1007,10 @@ function positionActMenu() {
   let left = rect.right - menuRect.width;
   if (left < MARGIN) left = MARGIN;
   if (left + menuRect.width > vw - MARGIN) left = vw - MARGIN - menuRect.width;
+  actMenuEl.style.position = 'fixed';
   actMenuEl.style.top = `${top}px`;
   actMenuEl.style.left = `${left}px`;
+  actMenuEl.style.zIndex = '60';
   actMenuEl.style.visibility = '';
   actMenuEl.style.display = '';
 }
@@ -1053,7 +1055,7 @@ function wire() {
       хранилища (await), setTimeout(0) вызывает closeActMenu уже после завершения
       цепочки, и кнопка ещё прикреплена к host.
     */
-    const actItem = t.closest?.('.forum-act-portal .forum-act');
+    const actItem = t.closest?.('.forum-act-menu__list .forum-act');
     if (actItem) window.setTimeout(closeActMenu, 0);
 
     const subscribe = t.closest('[data-forum-subscribe]');
