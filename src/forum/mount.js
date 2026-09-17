@@ -1444,6 +1444,7 @@ function wire() {
       const id = delPost.dataset.forumDelPost;
       const post = state.posts.find((p) => p.id === id) || profileState.posts.find((p) => p.id === id);
       const own = Boolean(post && state.me && String(post.authorId) === String(state.me.id));
+      console.log('delPost clicked', id, post, own);
       state.pending = { kind: 'delete', targetType: 'post', targetId: id, own };
       openDeleteModal();
       return;
@@ -1874,16 +1875,23 @@ function closeModal(selector) {
 /** Своё удаление и чужое — разные окна по смыслу, но одно по разметке. */
 function openDeleteModal() {
   const modal = host?.querySelector('[data-forum-delete-modal]');
-  if (!modal) return;
+  console.log('openDeleteModal', modal, 'pending:', state.pending, 'host innerHTML contains modal:', host?.innerHTML.includes('data-forum-delete-modal'));
+  if (!modal) {
+    console.error('Modal not found in host');
+    return;
+  }
   const own = Boolean(state.pending?.own);
   const isStaff = state.me?.role === 'admin' || state.me?.role === 'moderator';
-  // Свой пост автор удаляет без объяснений: причина нужна тому, кому
-  // удалили, а не тому, кто удалил сам.
   const needReason = !own || isStaff;
 
-  modal.querySelector('[data-forum-delete-own]').hidden = !own;
-  modal.querySelector('[data-forum-delete-rules]').hidden = !needReason || own;
-  modal.querySelector('[data-forum-delete-note]').hidden = !needReason || own;
+  const ownEl = modal.querySelector('[data-forum-delete-own]');
+  const rulesEl = modal.querySelector('[data-forum-delete-rules]');
+  const noteEl = modal.querySelector('[data-forum-delete-note]');
+  console.log('Elements:', ownEl, rulesEl, noteEl);
+  
+  if (ownEl) ownEl.hidden = !own;
+  if (rulesEl) rulesEl.hidden = !needReason || own;
+  if (noteEl) noteEl.hidden = !needReason || own;
 
   modal.hidden = false;
   document.documentElement.classList.add('is-modal-open');
