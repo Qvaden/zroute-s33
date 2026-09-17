@@ -952,7 +952,7 @@ function wire() {
       действия сработает ниже по цепочке.
     */
     const menuAct = t.closest?.('.forum-act-menu__list .forum-act');
-    if (menuAct) menuAct.closest('details')?.removeAttribute('open');
+    if (menuAct) window.setTimeout(() => menuAct.closest('details')?.removeAttribute('open'), 0);
 
     const subscribe = t.closest('[data-forum-subscribe]');
     if (subscribe && host.contains(subscribe)) {
@@ -1887,7 +1887,10 @@ function openDeleteModal() {
 
   modal.hidden = false;
   document.documentElement.classList.add('is-modal-open');
-  modal.querySelector('input, button')?.focus({ preventScroll: true });
+  // Найдём ПЕРВЫЙ ВИДИМЫЙ элемент для фокуса
+  const firstFocusable = [...modal.querySelectorAll('button, input, textarea, select')]
+    .find((el) => el.offsetParent !== null);
+  firstFocusable?.focus({ preventScroll: true });
 }
 
 /**
