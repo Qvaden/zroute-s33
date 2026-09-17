@@ -389,7 +389,6 @@ function resetForm(form) {
 
 function paint() {
   if (!host) return;
-  closeActMenu();
   const snapshot = captureInput();
 
   /*
@@ -911,122 +910,6 @@ function closePicks() {
   host.querySelectorAll('.pick.is-open').forEach((p) => setPickOpen(p, false));
 }
 
-/* ── Выпадающее меню действий поста (portal) ────────────────────────────── */
-
-let actMenuEl = null;
-let actMenuBtn = null;
-
-function buildActMenuHtml(postId) {
-  const post = state.posts.find((p) => p.id === postId);
-  if (!post) return '';
-  const me = state.me;
-  const canModerate = me && (me.role === 'admin' || me.role === 'moderator');
-  const isMine = me && me.id === post.authorId;
-  const isOpen = state.openPostId === postId;
-  const canReply = Boolean(isOpen && me && !me.banned);
-  const items = [];
-  if (canModerate) {
-    items.push(
-      `<button type="button" class="forum-act" data-forum-pin="${esc(post.id)}"` +
-      ` aria-pressed="${post.pinned ? 'true' : 'false'}"` +
-      ` title="${post.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">` +
-      `${post.pinned ? 'Открепить' : 'Закрепить'}</button>`
-    );
-  }
-  if (canReply) {
-    items.push(
-      `<button type="button" class="forum-act" data-forum-quote="post:${esc(post.id)}"` +
-      ` title="Вставить текст поста в ответ">Цитировать</button>`
-    );
-  }
-  if (me && !isMine) {
-    items.push(
-      `<button type="button" class="forum-act" data-forum-subscribe="${esc(post.id)}"` +
-      ` data-forum-subscribed="${post.subscribed ? '1' : ''}"` +
-      ` title="Получать уведомления о новых комментариях">${post.subscribed ? 'Отписаться' : 'Подписаться'}</button>`
-    );
-  }
-  if (me && !isMine) {
-    items.push(
-      `<button type="button" class="forum-act" data-forum-report="post:${esc(post.id)}">Пожаловаться</button>`
-    );
-  }
-  if (isMine || canModerate) {
-    items.push(
-      `<button type="button" class="forum-act forum-act--danger" data-forum-del-post="${esc(post.id)}"` +
-      ` title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
-    );
-  }
-  return items.join('');
-}
-
-function openActMenu(btn, postId) {
-  closeActMenu();
-  const html = buildActMenuHtml(postId);
-  if (!html || !host) return;
-  actMenuEl = document.createElement('div');
-  actMenuEl.className = 'forum-act-menu__list';
-  actMenuEl.setAttribute('role', 'menu');
-  actMenuEl.innerHTML = html;
-  host.appendChild(actMenuEl);
-  actMenuBtn = btn;
-  btn.setAttribute('aria-expanded', 'true');
-  positionActMenu();
-  window.addEventListener('scroll', closeActMenu, { passive: true, capture: true });
-  window.addEventListener('resize', closeActMenu, { passive: true });
-}
-
-function positionActMenu() {
-  if (!actMenuEl || !actMenuBtn) return;
-  const GAP = 6;
-  const MARGIN = 8;
-  const rect = actMenuBtn.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  actMenuEl.style.visibility = 'hidden';
-  actMenuEl.style.display = 'block';
-  // Выше 88vh список не растягиваем: скроллим внутри, как в окнах.
-  actMenuEl.style.maxHeight = 'min(88vh, 260px)';
-  const menuRect = actMenuEl.getBoundingClientRect();
-  const below = vh - (rect.bottom + GAP) - MARGIN;
-  const above = rect.top - GAP - MARGIN;
-  let top;
-  // Сначала обычно место под кнопкой; не влезает — над ней.
-  if (menuRect.height <= below) {
-    top = rect.bottom + GAP;
-  } else if (menuRect.height <= above) {
-    top = rect.top - GAP - menuRect.height;
-  } else {
-    // Ни туда, ни сюда: сторону выбираем по большему запасу, верхнее
-    // ограничение всё равно держим, чтобы меню не ушло за край экрана.
-    top = below > above
-      ? rect.bottom + GAP
-      : rect.top - GAP - menuRect.height;
-    if (top < MARGIN) top = MARGIN;
-  }
-  let left = rect.right - menuRect.width;
-  if (left < MARGIN) left = MARGIN;
-  if (left + menuRect.width > vw - MARGIN) left = vw - MARGIN - menuRect.width;
-  actMenuEl.style.position = 'fixed';
-  actMenuEl.style.top = `${top}px`;
-  actMenuEl.style.left = `${left}px`;
-  actMenuEl.style.zIndex = '60';
-  actMenuEl.style.visibility = '';
-  actMenuEl.style.display = '';
-}
-
-function closeActMenu() {
-  if (!actMenuEl) return;
-  actMenuEl.remove();
-  actMenuEl = null;
-  if (actMenuBtn) {
-    actMenuBtn.setAttribute('aria-expanded', 'false');
-    actMenuBtn = null;
-  }
-  window.removeEventListener('scroll', closeActMenu, { capture: true });
-  window.removeEventListener('resize', closeActMenu);
-}
-
 /* ── Обработчики ──────────────────────────────────────────────────────────── */
 
 function wire() {
@@ -1038,33 +921,40 @@ function wire() {
     const t = e.target;
 
     /*
-      Кнопка «⋯» открывает/закрывает portal-меню действий поста.
+      При открытии меню действий поста: закрываем остальные меню и вычисляем,
+      хватает ли места снизу экрана. Если нет — открываем вверх.
     */
-    const menuBtn = t.closest?.('[data-forum-menu]');
-    if (menuBtn && host.contains(menuBtn)) {
-      e.preventDefault();
-      if (actMenuBtn === menuBtn) { closeActMenu(); }
-      else { openActMenu(menuBtn, menuBtn.dataset.forumMenu); }
-      return;
+    const actSummary = t.closest?.('.forum-act-menu > summary');
+    if (actSummary && host.contains(actSummary)) {
+      const details = actSummary.closest('.forum-act-menu');
+      if (details) {
+        host.querySelectorAll('.forum-act-menu[open]').forEach((el) => {
+          if (el !== details) el.removeAttribute('open');
+        });
+        if (!details.hasAttribute('open')) {
+          const rect = actSummary.getBoundingClientRect();
+          const vh = window.innerHeight;
+          const openUp = (vh - rect.bottom < 190) && (rect.top > (vh - rect.bottom));
+          details.classList.toggle('forum-act-menu--up', openUp);
+        }
+      }
     }
 
-/*
-      Действие внутри portal-меню: меню закрываем, но чуть позже — обработчики
-      действия ниже проверяют host.contains(target), а элементы живут в портале,
-      который сам лежит в host. Пока обработчик шёл синхронно и ждал ответа
-      хранилища (await), setTimeout(0) вызывает closeActMenu уже после завершения
-      цепочки, и кнопка ещё прикреплена к host.
+    /*
+      Меню редких действий поста закрывается сразу после выбора: действие
+      уже сделано, держать раскрытым нечего. Без return — сам обработчик
+      действия сработает ниже по цепочке.
     */
-    const actItem = t.closest?.('.forum-act-menu__list .forum-act');
-    if (actItem) window.setTimeout(closeActMenu, 0);
+    const menuAct = t.closest?.('.forum-act-menu__list .forum-act');
+    if (menuAct) setTimeout(() => menuAct.closest('details')?.removeAttribute('open'), 0);
 
     const subscribe = t.closest('[data-forum-subscribe]');
     if (subscribe && host.contains(subscribe)) {
       try {
         const subscribed = subscribe.dataset.forumSubscribed === '1';
         await (subscribed ? forum.unsubscribeTopic(subscribe.dataset.forumSubscribe) : forum.subscribeTopic(subscribe.dataset.forumSubscribe));
-        const target = state.posts.find((post) => post.id === subscribe.dataset.forumSubscribe);
-        if (target) target.subscribed = !subscribed;
+        subscribe.dataset.forumSubscribed = subscribed ? '' : '1';
+        subscribe.textContent = subscribed ? 'Подписаться' : 'Отписаться';
       } catch (err) {
         notice(String(err?.message ?? err));
       }
@@ -1894,7 +1784,7 @@ function wire() {
       closeModal('[data-forum-delete-modal]');
       host.querySelectorAll('[data-forum-emoji-pop]').forEach((p) => { p.hidden = true; });
       closePicks();
-      if (actMenuEl) { closeActMenu(); return; }
+      host.querySelectorAll('.forum-act-menu[open]').forEach((el) => el.removeAttribute('open'));
       return;
     }
 
@@ -1942,18 +1832,12 @@ function wire() {
   document.addEventListener('click', (e) => {
     if (e.target.closest && e.target.closest('.pick')) return;
     closePicks();
-
-    // Клик мимо portal-меню действий поста закрывает его.
-    if (actMenuEl && !actMenuEl.contains(e.target) && !actMenuBtn?.contains(e.target)) {
-      closeActMenu();
-    }
   });
 }
 
 /* ── Окна ─────────────────────────────────────────────────────────────────── */
 
 function openModal(selector) {
-  closeActMenu();
   const modal = host?.querySelector(selector);
   if (!modal) return;
   modal.hidden = false;
@@ -1981,7 +1865,6 @@ function closeModal(selector) {
 
 /** Своё удаление и чужое — разные окна по смыслу, но одно по разметке. */
 function openDeleteModal() {
-  closeActMenu();
   const modal = host?.querySelector('[data-forum-delete-modal]');
   if (!modal) return;
   const own = Boolean(state.pending?.own);
@@ -2160,7 +2043,6 @@ export async function mountUser(container, nick) {
 /** Ушли на другую вкладку: держать чужую разметку в руках незачем. */
 export function unmountForum() {
   stopQuarterTimer();
-  closeActMenu();
   host = null;
   mode = 'feed';
   state.openPostId = null;

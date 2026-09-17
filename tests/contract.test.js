@@ -2614,8 +2614,8 @@ console.log('\nQ. Форум');
     дергает setPinned и перерисовывает ленту (закреплённые уходят наверх).
   */
   const forumPagesSource = await readFile('src/pages/forum.js', 'utf8');
-  check('кнопка закрепления есть в портал-меню поста',
-    /data-forum-pin/.test(mountSource) && /Закрепить/.test(mountSource) && /Открепить/.test(mountSource));
+  check('кнопка закрепления есть в карточке поста',
+    /data-forum-pin/.test(forumPagesSource) && /Закрепить/.test(forumPagesSource) && /Открепить/.test(forumPagesSource));
   check('обработчик закрепления зовёт адаптер и перерисовывает ленту',
     /\[data-forum-pin\]/.test(mountSource) && /forum\.setPinned/.test(mountSource) && /loadFeed\(\)/.test(mountSource));
   check('адаптер базы спрашивает предел из конфига перед запросом',
@@ -3038,9 +3038,7 @@ console.log('\nQ. Форум');
     memberHtml.includes('data-editor') && memberHtml.includes('forum-md'));
   check('текст вводится в редактор, стили видны сразу',
     memberHtml.includes('contenteditable') && memberHtml.includes('data-placeholder'));
-  check('чужой пост можно пожаловаться',
-    memberHtml.includes('data-forum-menu="p1"') &&
-      /data-forum-report="post:\$\{esc\(post\.id\)\}"/.test(await readFile('src/forum/mount.js', 'utf8')));
+  check('чужой пост можно пожаловаться', memberHtml.includes('data-forum-report="post:p1"'));
   check('счётчик лайков виден', memberHtml.includes('>2<'));
   check('в карточке виден счётчик просмотров', memberHtml.includes('👁 7'));
   /* Разделы управляются и кнопками, и выпадающим списком (телефон).

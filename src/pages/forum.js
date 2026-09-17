@@ -1309,8 +1309,13 @@ export function renderPostCard(p, s) {
               : ''
           }
           ${
+            /*
+              Редкие действия собраны в меню «⋯»: у автора-модератора их
+              набиралось пять в одну строку, и на телефоне кнопки уезжали
+              за край карточки. Кнопки остаются в разметке — просто сложены.
+            */
             (canModerate || canReply || (s.me && !isMine))
-              ? `<details class="forum-act-menu" data-forum-menu="${esc(p.id)}">
+              ? `<details class="forum-act-menu">
                 <summary class="forum-act" title="Ещё действия" aria-label="Ещё действия с постом">⋯</summary>
                 <div class="forum-act-menu__list">
                   ${
