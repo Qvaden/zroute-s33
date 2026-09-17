@@ -396,9 +396,15 @@ function paint() {
     отрисовки на весь форум. Два разных пути привели бы к двум наборам
     обработчиков и двум способам потерять набранный текст.
   */
+  /*
+    Окна жалобы и удаления нужны на обеих страницах: посты есть и в ленте,
+    и в профиле участника, и «Удалить» из карточки там должно открывать
+    подтверждение так же, как в ленте.
+  */
+  const dialogs = renderReportDialog() + renderDeleteDialog();
   host.innerHTML = mode === 'user'
-    ? renderUserPage({ ...profileState, me: state.me })
-    : renderForum(siteView, state) + renderReportDialog() + renderDeleteDialog();
+    ? renderUserPage({ ...profileState, me: state.me }) + dialogs
+    : renderForum(siteView, state) + dialogs;
 
   /*
     Таймер Кварта в боковой колонке форума — свой интервал. При каждой
@@ -946,7 +952,7 @@ function wire() {
       действия сработает ниже по цепочке.
     */
     const menuAct = t.closest?.('.forum-act-menu__list .forum-act');
-    if (menuAct) setTimeout(() => menuAct.closest('details')?.removeAttribute('open'), 0);
+    if (menuAct) menuAct.closest('details')?.removeAttribute('open');
 
     const subscribe = t.closest('[data-forum-subscribe]');
     if (subscribe && host.contains(subscribe)) {
@@ -1436,8 +1442,9 @@ function wire() {
     const delPost = t.closest('[data-forum-del-post]');
     if (delPost && host.contains(delPost)) {
       const id = delPost.dataset.forumDelPost;
-      const post = state.posts.find((p) => p.id === id);
-      state.pending = { kind: 'delete', targetType: 'post', targetId: id, own: post?.authorId === state.me?.id };
+      const post = state.posts.find((p) => p.id === id) || profileState.posts.find((p) => p.id === id);
+      const own = Boolean(post && state.me && String(post.authorId) === String(state.me.id));
+      state.pending = { kind: 'delete', targetType: 'post', targetId: id, own };
       openDeleteModal();
       return;
     }
@@ -1445,7 +1452,8 @@ function wire() {
     if (delComment && host.contains(delComment)) {
       const id = delComment.dataset.forumDelComment;
       const comment = state.comments.find((c) => c.id === id);
-      state.pending = { kind: 'delete', targetType: 'comment', targetId: id, own: comment?.authorId === state.me?.id };
+      const own = Boolean(comment && state.me && String(comment.authorId) === String(state.me.id));
+      state.pending = { kind: 'delete', targetType: 'comment', targetId: id, own };
       openDeleteModal();
       return;
     }
