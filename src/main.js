@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=45';
-import { loadAll, capabilities, db } from './data/index.js?v=45';
-import { validateDataset } from './data/contract.js?v=45';
+import { CONFIG } from '../config.js?v=46';
+import { loadAll, capabilities, db } from './data/index.js?v=46';
+import { validateDataset } from './data/contract.js?v=46';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,25 +9,25 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=45';
-import { renderHome } from './pages/home.js?v=45';
-import { renderLadder } from './pages/ladder.js?v=45';
-import { renderQuarter } from './pages/quarter-final.js?v=45';
-import { renderTimeline } from './pages/timeline.js?v=45';
-import { renderGuide } from './pages/guide.js?v=45';
-import { renderBot } from './pages/bot.js?v=45';
-import { renderAlliance } from './pages/alliance.js?v=45';
-import { computeAchievements } from './logic/achievements.js?v=45';
-import { esc } from './ui/helpers.js?v=45';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=45';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=45';
+} from './logic/standings.js?v=46';
+import { renderHome } from './pages/home.js?v=46';
+import { renderLadder } from './pages/ladder.js?v=46';
+import { renderQuarter } from './pages/quarter-final.js?v=46';
+import { renderTimeline } from './pages/timeline.js?v=46';
+import { renderGuide } from './pages/guide.js?v=46';
+import { renderBot } from './pages/bot.js?v=46';
+import { renderAlliance } from './pages/alliance.js?v=46';
+import { computeAchievements } from './logic/achievements.js?v=46';
+import { esc } from './ui/helpers.js?v=46';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=46';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=46';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=45';
-import './ui/timeline-controls.js?v=45';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=45';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=45';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=45';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=45';
+import './ui/ladder-controls.js?v=46';
+import './ui/timeline-controls.js?v=46';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=46';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=46';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=46';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=46';
 
 /*
   РАЗДЕЛЫ.

@@ -3114,15 +3114,14 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('забаненный видит причину запрета', /Пункт 2/.test(bannedHtml));
 
   /*
-    Удалённый пост остаётся на месте заглушкой с причиной. Молча исчезнувший
-    пост читается как поломка сайта и порождает второй такой же.
+    Удалённый пост исчезает с форума: причина нужна модерации, а не читателям.
   */
   const deletedHtml = renderForum({ events: eventsSample }, {
     ready: true, shared: true, loading: false, me,
     posts: [{ ...post, deleted: true, deletedReason: 'Пункт 4: Без рекламы' }],
   });
-  check('удалённый пост остаётся на месте', deletedHtml.includes('Пост удалён'));
-  check('удалённый пост объясняет причину', /Без рекламы/.test(deletedHtml));
+  check('удалённый пост исчезает с форума', !deletedHtml.includes('Пост удалён'));
+  check('причина удаления не показывается', !deletedHtml.includes('forum-post--deleted'));
   check('текст удалённого поста не показывается', !deletedHtml.includes('текст поста'));
 
   /*

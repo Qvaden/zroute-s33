@@ -304,6 +304,7 @@ export async function listPosts(opts = {}) {
 
   const params = new URLSearchParams();
   params.set('select', '*');
+  params.set('deleted', 'eq.false');
   params.set('order', ORDER[sort] ?? ORDER.fresh);
   // Просим на одну строку больше: точное число записей вернулось бы только
   // в заголовке Content-Range, а он прячется за обёрткой rest(). Лишняя

@@ -301,9 +301,8 @@ function pollOut(state, postId) {
 /**
  * Лента.
  *
- * Удалённые посты из ленты НЕ выкидываются: на их месте остаётся заглушка
- * с причиной. Молча исчезнувший пост читается как поломка сайта и порождает
- * второй такой же — см. рассуждение в contract.js.
+ * Удалённые посты из ленты исчезают: причина удаления нужна модерации,
+ * а не читателям.
  *
  * @param {{category?: string, sort?: string, limit?: number, offset?: number}} [opts]
  */
@@ -311,7 +310,7 @@ export async function listPosts(opts = {}) {
   const s = read();
   const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
 
-  let list = s.posts.map((p) => postOut(s, p));
+  let list = s.posts.filter((p) => !p.deleted).map((p) => postOut(s, p));
   if (category !== 'all') list = list.filter((p) => p.category === category);
   if (tag !== 'all') list = list.filter((p) => p.tags.includes(tag));
   /*

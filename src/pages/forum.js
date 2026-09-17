@@ -1174,7 +1174,7 @@ function renderFeed(s) {
     return '<div class="loading" data-forum-loading>Загружаем ленту…</div>';
   }
 
-  if (!s.posts.length) {
+  if (!s.posts.some((p) => !p.deleted)) {
     if (s.query) {
       return `<section class="panel forum-empty">
         <span class="eyebrow">Поиск по форуму</span>
@@ -1210,22 +1210,11 @@ function renderFeed(s) {
 /**
  * Карточка поста в ленте.
  *
- * Удалённый пост остаётся на месте заглушкой с причиной. Молча исчезнувший
- * пост читается как поломка сайта и порождает второй такой же, а причина —
- * единственное, чем правило вообще чему-то учит.
+ * Удалённый пост исчезает с форума целиком: причины не нужны читателям,
+ * она живёт в базе для модерации.
  */
 export function renderPostCard(p, s) {
-  if (p.deleted) {
-    return `<article class="panel forum-post forum-post--deleted" data-forum-post="${esc(p.id)}">
-      <div class="forum-post__gone">
-        <span class="forum-post__gone-mark" aria-hidden="true">✕</span>
-        <div>
-          <b>Пост удалён</b>
-          <p class="muted">${esc(p.deletedReason || 'Нарушение правил форума')}</p>
-        </div>
-      </div>
-    </article>`;
-  }
+  if (p.deleted) return '';
 
   const isOpen = s.openPostId === p.id;
   const canModerate = s.me && (s.me.role === 'admin' || s.me.role === 'moderator');
@@ -1602,7 +1591,7 @@ export function renderDeleteDialog() {
         <h3>Удалить запись</h3>
         <form data-forum-delete-form>
           <p class="muted" data-forum-delete-own hidden>
-            Это ваша запись. Она останется на месте с пометкой «удалено автором».
+            Это ваша запись. После удаления она исчезнет с форума.
           </p>
           <div class="forum-modal__rules" data-forum-delete-rules>
             ${RULES.map(
