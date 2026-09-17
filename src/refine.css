@@ -1389,6 +1389,10 @@ body:has(.chat-layout) .site-foot { display: none; }
 /* ── Меню редких действий в карточке поста ───────────────────────────────────
    У автора-модератора действий набиралось пять в строку, и на телефоне они
    уезжали за край. Кнопки те же, но сложены за «⋯». */
+#app:has(.forum-modal) { animation: none; }
+#app:has(.forum-modal:not([hidden])) { z-index: 60; }
+.forum-post:has(.forum-act-menu[open]) { z-index: 3; }
+.forum-post > .forum-post__foot:has(.forum-act-menu[open]) { z-index: 3; }
 .forum-act-menu { position: relative; }
 .forum-act-menu > summary {
   list-style: none;

@@ -2613,6 +2613,15 @@ console.log('\nQ. Форум');
     Закрепление — действие модерации: кнопка в карточке поста, а обработчик
     дергает setPinned и перерисовывает ленту (закреплённые уходят наверх).
   */
+  const forumOverlayStyles = await readFile('src/refine.css', 'utf8');
+  check('окна форума не привязаны к анимированному контейнеру страницы',
+    /#app:has\(\.forum-modal\)\s*\{\s*animation:\s*none;\s*\}/.test(forumOverlayStyles));
+  check('открытое окно форума выше шапки и бокового меню',
+    /#app:has\(\.forum-modal:not\(\[hidden\]\)\)\s*\{\s*z-index:\s*60;\s*\}/.test(forumOverlayStyles));
+  check('карточка с открытым меню выше соседних карточек',
+    /\.forum-post:has\(\.forum-act-menu\[open\]\)\s*\{\s*z-index:\s*3;\s*\}/.test(forumOverlayStyles));
+  check('редактор ответа не перекрывает меню действий поста',
+    /\.forum-post\s*>\s*\.forum-post__foot:has\(\.forum-act-menu\[open\]\)\s*\{\s*z-index:\s*3;\s*\}/.test(forumOverlayStyles));
   const forumPagesSource = await readFile('src/pages/forum.js', 'utf8');
   check('кнопка закрепления есть в карточке поста',
     /data-forum-pin/.test(forumPagesSource) && /Закрепить/.test(forumPagesSource) && /Открепить/.test(forumPagesSource));
