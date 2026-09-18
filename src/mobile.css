@@ -1290,3 +1290,71 @@ body { min-height: 100svh; }
   .chat-go-new { padding: 6px 10px; }
   .chat-go-new span { min-width: 16px; }
 }
+
+/* ── Полировка: широкие телефоны (до 480) ────────────────────────────────── */
+
+/*
+  Мобильная плотность жила на 420px, а самые массовые свежие диагонали
+  (iPhone Pro Max, Plus-модели) — 430px. Они получали десктопные отступы
+  панелей: посадка карточки на экране «топорщилась», хотя места не меньше.
+  Добираем ту же плотность до 480px. Правила для 420 остаются — они точнее
+  для старых узких корпусов.
+*/
+@media (max-width: 480px) {
+  .panel, .hero, div.forum-post { padding-left: 13px; padding-right: 13px; border-radius: 13px; }
+
+  /* Один шаг воздуха между карточками: панель и лента не должны спорить. */
+  .panel, .hero { margin-bottom: 10px; }
+  div.forum-feed { gap: 10px; }
+
+  /*
+    Категория поста («Новости сервера») — no-wrap. На узком экране длинное
+    название выдавливало строку или резалось без многоточия. Обрезаем по
+    ширине экрана: категория, как и тег, — подпись, а не заголовок.
+  */
+  .forum-post__head .forum-post__cat {
+    flex: none;
+    max-width: 34vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/*
+  Вертикальный ритм карточек. Горизонталь уже сбита к 13px; вертикаль жила
+  своей жизнью — 20 у панели, 22 у героя, 13 у поста. Снаружи это читалось
+  как «карточка присела», внутри — как разнобой. Приводим к шагу 14/16.
+  Селектор с классом и тегом: refine.css задаёт .forum-post последним,
+  при равной силе перебил бы это правило.
+*/
+@media (max-width: 420px) {
+  .panel { padding-top: 14px; padding-bottom: 14px; }
+  .hero  { padding-top: 16px; padding-bottom: 16px; }
+  div.forum-post { padding: 13px 14px; }
+}
+
+/*
+  Сервисные подписи 10px — граница читаемости на телефоне в движении.
+  Поджимаем на полтора пиксела. Усиление против refine.css (он грузится
+  последним и при равной силе перебивал бы правку).
+*/
+@media (max-width: 480px) {
+  body .forum-post__by time,
+  body .forum-comment__head time { font-size: 11px; }
+  .forum-post__head .forum-post__cat { font-size: 10.5px; }
+  body .chat-item__time { font-size: 11px; }
+}
+
+/*
+  Реакции и действия поста — тач-цель. Остальные кнопки уже 40–46px,
+  а эти оставались 24–32px: палец промахивался. min-height добирает высоту
+  отступами, вид не меняется. Усиление против refine.css — тот задаёт
+  min-height 28px для реакций и грузится после.
+*/
+@media (hover: none) and (pointer: coarse) {
+  body .forum-post__foot .forum-react__btn,
+  body .forum-comment__foot .forum-react__btn,
+  body .forum-post__acts .forum-act,
+  body .forum-act-menu__list .forum-act { min-height: 36px; }
+  body .forum-me .forum-btn { min-height: 40px; padding: 8px 12px; }
+}
