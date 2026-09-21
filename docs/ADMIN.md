@@ -1,6 +1,6 @@
 # Админ-панель
 
-Адрес: **`admin.html`** рядом с сайтом — https://qvaden.github.io/zroute-s33/admin.html
+Адрес: **`admin.html`** рядом с сайтом — https://zroutehub.bond/admin.html
 
 Панель открывается только с токеном GitHub. Без него это просто экран входа,
 поэтому ссылку можно никак не прятать.
