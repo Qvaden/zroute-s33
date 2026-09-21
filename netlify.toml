@@ -1,0 +1,21 @@
+# Публикация сайта. Исходники живут в GitHub; Netlify только раздаёт файлы
+# и держит TLS для zroutehub.bond — подробности в docs/HOSTING.md.
+# Сборки нет: обычные ES-модули, зависимостей в проекте нет, поэтому
+# publish directory и build command заданы в интерфейсе Netlify и здесь
+# не переопределяются.
+
+# Единственная ссылка на сайт — https://zroutehub.bond.
+# Поддомен zroutehub.netlify.app технически необходим (через него идут
+# сертификаты и откаты деплоев), поэтому не удаляем его, а гасим редиректом.
+[[redirects]]
+  from = "https://zroutehub.netlify.app/*"
+  to = "https://zroutehub.bond/:splat"
+  status = 301
+  force = true
+
+# Сервис-воркер не кэшируем, иначе после обновления части игроков достаётся
+# старый воркер: ?v= из ссылок на него не работает, воркер перечитывается сам.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
