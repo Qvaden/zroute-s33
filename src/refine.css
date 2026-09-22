@@ -247,9 +247,9 @@
 
 .forum-notify { padding: 10px 14px; }
 .forum-notify__link { padding: 7px 8px; }
-.forum-notify__text { font-size: 12.5px; }
+.forum-notify__line { font-size: 12.5px; }
 .forum-notify__preview { font-size: 11.5px; }
-.forum-notify__time { font-size: 10.5px; }
+.forum-notify__meta { font-size: 10.5px; }
 
 .forum-auth__head { margin-bottom: 8px; }
 .forum-auth__fields { gap: 8px; }

@@ -641,65 +641,164 @@ function renderAccountBar(s) {
 
 /* ── Уведомления ──────────────────────────────────────────────────────────── */
 
+/*
+  Вид уведомления: подпись, значок и цвет. Подпись читается как продолжение
+  ника («@Ник — ответил на вашу запись»), а значок и цвет работают там, где
+  подпись не читают: в списке из десяти строк и на телефоне.
+
+  «Рейтинг», «Модерация» и «Дайджест недели» пишет база, а не человек. Автора
+  у них нет, поэтому идут своим заголовком и без «@» — в базе на этом месте
+  лежат служебные слова, и показать их как ник было бы неправдой.
+*/
+const NOTIFY_KINDS = {
+  reply: { label: 'ответил на вашу запись', icon: 'reply', tone: 'var(--link)' },
+  mention: { label: 'упомянул вас', icon: 'mention', tone: 'var(--gold)' },
+  reaction: { label: 'оценил вашу запись', icon: 'reaction', tone: 'var(--win)' },
+  subscription: { label: 'написал в подписанной теме', icon: 'subscription', tone: 'var(--link)' },
+  alliance_rank: { system: 'Рейтинг', label: 'место альянса изменилось', icon: 'rank', tone: 'var(--gold)', href: '#/ladder' },
+  moderation: { system: 'Модерация', label: 'новый сигнал', icon: 'flag', tone: 'var(--loss)', href: '#/forum' },
+  digest: { system: 'Дайджест недели', icon: 'digest', tone: 'var(--accent)', href: '#/home' },
+};
+
+/* Значки в той же графике, что колокольчик: 24×24, штрих currentColor. */
+const NOTIFY_ICONS = {
+  reply: '<path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v3"/>',
+  mention: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+  reaction: '<path d="M7 21V10"/><path d="M7 10l4.5-7a2.2 2.2 0 0 1 3.2 2.7L13.2 9H19a2 2 0 0 1 2 2.4l-1.5 7.8A2 2 0 0 1 17.5 21z"/>',
+  subscription: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  rank: '<path d="M4 20v-9"/><path d="M10 20V4"/><path d="M16 20v-6"/><path d="M2 20h20"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 5h11l-1.7 3.5L16 12H5z"/>',
+  digest: '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8M8 16h5"/>',
+};
+
+function notifyGlyph(kind) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${NOTIFY_ICONS[kind] || ''}</svg>`;
+}
+
 /**
- * Короткое человеческое слово о том, что случилось. Сама запись (кто, где,
- * какой текст) — в списке ниже; здесь только «что за событие».
+ * Заголовок группы уведомлений: «Сегодня», «Вчера», дальше — та же
+ * короткая дата, что в ленте (см. timeAgo), чтобы не плодить форматы.
  */
-function notifyKindText(n) {
-  if (n.kind === 'reply') return 'ответил на вашу запись';
-  if (n.kind === 'mention') return 'упомянул вас';
-  if (n.kind === 'subscription') return 'написал в теме, на которую вы подписаны';
-  if (n.kind === 'alliance_rank') return 'изменил место альянса в рейтинге';
-  if (n.kind === 'moderation') return 'прислал сигнал модерации';
-  if (n.kind === 'digest') return 'прислал еженедельный дайджест';
-  // Реакция: что именно — подсказывает значок в панели.
-  return 'оценил вашу запись';
+function notifyDayTitle(date, now = new Date()) {
+  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((day(now) - day(date)) / 86400000);
+  if (diff <= 0) return 'Сегодня';
+  if (diff === 1) return 'Вчера';
+  return timeAgo(date, now);
+}
+
+/**
+ * Одна строка списка. Ведёт на пост, а если поста нет (служебные виды) —
+ * на ту страницу, где событие и видно: ссылку на пустой адрес давать
+ * нельзя, она привела бы в никуда.
+ */
+function notifyRow(n, isNew) {
+  const kind = NOTIFY_KINDS[n.kind] || NOTIFY_KINDS.reply;
+  /*
+    preview приходит из базы куском исходного текста, а текст участник
+    форматирует в редакторе — то есть с разметкой. Без excerpt панель
+    показывала бы «Сосал?<p><br></p>» вместо «Сосал?».
+  */
+  const preview = excerpt(n.preview, 140);
+  const href = n.postId ? `#/forum/${encodeURIComponent(n.postId)}` : kind.href || '#/forum';
+  /*
+    Метку «буква ника» рисуем только там, где ник действительно есть. Иначе
+    удалённый аккаунт получал бы квадрат с вопросительным знаком — а это
+    выглядит как живой участник, которого просто не удалось показать.
+  */
+  const person = !kind.system && n.actorNick;
+  const who = kind.system
+    ? `<b class="forum-notify__title">${esc(kind.system)}</b>`
+    : person
+      ? `<b class="forum-notify__title">@${esc(n.actorNick)}</b><span class="forum-notify__what">${esc(kind.label)}</span>`
+      : `<b class="forum-notify__title forum-notify__title--gone">аккаунт удалён</b><span class="forum-notify__what">${esc(kind.label)}</span>`;
+
+  return `
+    <li class="forum-notify__item${isNew ? ' is-new' : ''}" style="--tone:${kind.tone}">
+      <a class="forum-notify__link" href="${esc(href)}">
+        <span class="forum-notify__mark">
+          ${
+            person
+              /* Значок вида — надставкой на аватарке: метка уже занята ником.
+                 Служебному виду меткой служит сам значок, второй такой же
+                 поверх него превращал строку в повторяющийся рисунок. */
+              ? `${avatarHtml(n.actorNick, '', { size: 'sm' })}
+                 <span class="forum-notify__glyph">${notifyGlyph(kind.icon)}</span>`
+              : `<span class="forum-notify__system">${notifyGlyph(kind.icon)}</span>`
+          }
+        </span>
+        <span class="forum-notify__body">
+          <span class="forum-notify__line">${who}</span>
+          ${preview ? `<span class="forum-notify__preview">${esc(preview)}</span>` : ''}
+          <span class="forum-notify__meta">
+            <time title="${esc(fullTime(n.createdAt))}">${esc(timeAgo(n.createdAt))}</time>
+            <span class="forum-notify__go">Открыть</span>
+          </span>
+        </span>
+        ${isNew ? '<span class="forum-notify__dot" aria-hidden="true"></span>' : ''}
+      </a>
+    </li>`;
 }
 
 /**
  * Панель уведомлений. Сворачивает и разворачивает колокольчик рядом
  * с профилем: панель не модальное окно (его легче не заметить за экраном
  * на телефоне), а лист под учётной строкой.
+ *
+ * Отметка «прочитано» ставится сама при открытии, поэтому «новые» здесь —
+ * не состояние базы, а то, что человек ещё не видел: набор id панель
+ * получает от состояния сессии (notifyFresh) и теряет при закрытии.
  */
 function renderNotifications(s) {
   if (!s.me || !s.notifyOpen) return '';
 
   const list = s.notifyList;
+  const fresh = s.notifyFresh || new Set();
+  const freshCount = list.filter((n) => fresh.has(n.id)).length;
+
+  const head = `
+    <div class="forum-notify__head">
+      <span class="eyebrow">Уведомления</span>
+      <span class="forum-notify__count${freshCount ? ' is-new' : ''}">${
+        freshCount
+          ? esc(plural(freshCount, 'новое уведомление', 'новых уведомления', 'новых уведомлений'))
+          : 'Прочитаны все'
+      }</span>
+      <button type="button" class="forum-btn forum-btn--ghost forum-btn--sm"
+              data-forum-notify-open aria-expanded="true">Свернуть</button>
+    </div>`;
 
   if (!list.length) {
     return `
       <section class="panel forum-notify" data-forum-notify-panel>
-        <div class="forum-notify__head">
-          <span class="eyebrow">Уведомления</span>
+        ${head}
+        <div class="forum-notify__empty">
+          <span class="forum-notify__empty-icon">${notifyGlyph('subscription')}</span>
+          <p>Пока пусто: сюда приходят ответы, упоминания и оценки ваших записей.</p>
         </div>
-        <p class="muted forum-notify__empty">Пока пусто: сюда приходят ответы, упоминания и оценки ваших записей.</p>
       </section>`;
+  }
+
+  const groups = [];
+  for (const n of list) {
+    const title = notifyDayTitle(n.createdAt);
+    const last = groups[groups.length - 1];
+    if (last && last.title === title) last.items.push(n);
+    else groups.push({ title, items: [n] });
   }
 
   return `
     <section class="panel forum-notify" data-forum-notify-panel>
-      <div class="forum-notify__head">
-        <span class="eyebrow">Уведомления</span>
-        <small class="muted">${plural(list.length, 'уведомление', 'уведомления', 'уведомлений')}</small>
+      ${head}
+      <div class="forum-notify__scroll">
+        ${groups.map((g) => `
+          <div class="forum-notify__group">
+            <span class="forum-notify__day">${esc(g.title)}</span>
+            <ul class="forum-notify__list">
+              ${g.items.map((n) => notifyRow(n, fresh.has(n.id))).join('')}
+            </ul>
+          </div>`).join('')}
       </div>
-      <ul class="forum-notify__list">
-        ${list.map((n) => {
-          const actor = n.actorNick
-            ? `@${esc(n.actorNick)}`
-            : '<em>аккаунт удалён</em>';
-          return `
-            <li class="forum-notify__item">
-              <a class="forum-notify__link" href="#/forum/${esc(n.postId || '')}">
-                <span class="forum-notify__text">
-                  <span class="forum-notify__actor">${actor}</span>
-                  <span class="forum-notify__what">${esc(notifyKindText(n))}</span>
-                </span>
-                <span class="forum-notify__preview">${esc(n.preview || '')}</span>
-                <span class="forum-notify__time">${esc(fullTime(n.createdAt))}</span>
-              </a>
-            </li>`;
-        }).join('')}
-      </ul>
     </section>`;
 }
 

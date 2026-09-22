@@ -60,6 +60,12 @@ const state = {
   notifyOpen: false,
   notifyList: [],
   notifyUnread: 0,
+  /*
+    id тех, что были непрочитанными, когда панель открыли. Отметку «прочитано»
+    панель ставит сама, поэтому состояние базы для неё бесполезно: без этого
+    набора человек не увидел бы, что именно он ещё не читал.
+  */
+  notifyFresh: new Set(),
   /** Активность сервера: посты и сообщения по дням за неделю; null — нет данных. */
   activity: null,
 };
@@ -1247,6 +1253,7 @@ function wire() {
       state.notifyOpen = false;
       state.notifyList = [];
       state.notifyUnread = 0;
+      state.notifyFresh = new Set();
       state.pushPrefs = null;
       await loadFeed();
       return;
@@ -1289,13 +1296,19 @@ function wire() {
           Открыли — прочитали. Отметку не ждём и не перерисовываем дважды:
           если сеть ответит быстро, повторный запрос списка пришёл бы
           с уже прочитанными строками и стёр бы их с экрана на глазах.
-          Помечаем локально те, что были непрочитанными.
+          Помечаем локально те, что были непрочитанными, — и запомним их
+          до перестановки отметки, иначе панель откроется «пустой от новых»
+          и человек не поймёт, что он ещё не читал.
         */
-        if (state.notifyUnread > 0) {
+        const unread = state.notifyList.filter((n) => !n.readAt);
+        state.notifyFresh = new Set(unread.map((n) => n.id));
+        if (unread.length > 0) {
           forum.markAllNotificationsRead().catch(() => {});
           state.notifyUnread = 0;
           state.notifyList = state.notifyList.map((n) => (n.readAt ? n : { ...n, readAt: new Date() }));
         }
+      } else {
+        state.notifyFresh = new Set();
       }
       paint();
       return;
@@ -2065,6 +2078,7 @@ export function unmountForum() {
   state.notifyOpen = false;
   state.notifyList = [];
   state.notifyUnread = 0;
+  state.notifyFresh = new Set();
 
   // Не даём отложенному поиску сработать уже на новой вкладке: он чистит
   // query и лезет в базу, когда хост другой страницы.
