@@ -143,13 +143,45 @@ function renderLive({ allWeeks, results, quarter, quarterStandings }, now = new 
 
   if (week) {
     const left = daysUntil(week.endDate, now);
-    const upcoming = daysUntil(week.startDate, now) > 0;
+    const toStart = daysUntil(week.startDate, now);
+    /*
+      До начала недели считать нечего: «12 дней до конца» у недели, которая
+      ещё не началась, — правда, но правда бесполезная. Человек хочет знать,
+      когда выходить играть, поэтому до старта показываем обратный отсчёт
+      до понедельника, а «до конца» — только идущей недели.
+    */
+    const upcoming = toStart > 0;
+    const note = upcoming
+      ? `${plural(toStart, ...DAYS)} до начала`
+      : left === 0
+        ? 'последний день недели'
+        : `${plural(left, ...DAYS)} до конца`;
     items.push(`
       <div class="live__item">
         <span class="live__label">${upcoming ? 'Скоро неделя' : 'Идёт неделя'} <b class="num">${week.number}</b></span>
         <span class="live__value">${fmtDate(week.startDate)} — ${fmtDate(week.endDate)}</span>
-        <span class="live__note">${left === 0 ? 'последний день недели' : `${plural(left, ...DAYS)} до конца`}</span>
+        <span class="live__note">${note}</span>
       </div>`);
+  } else if (played > 0) {
+    /*
+      Активной недели нет: либо следующую ещё не завели, либо текущая уже
+      закрыта результатами, а новая не начата. Молчать нельзя — панель
+      называется «Прямо сейчас», и «сейчас» как раз пауза между VS.
+
+      Формулировка намеренно не говорит «неделя не заведена»: это было бы
+      верно только для одного из двух случаев, а различить их по данным
+      нельзя.
+    */
+    const filled = new Set((results ?? []).map((r) => r.weekId));
+    const last = [...(allWeeks ?? [])].sort(byWeekStart).filter((w) => filled.has(w.id)).pop();
+    if (last) {
+      items.push(`
+        <div class="live__item">
+          <span class="live__label">Пауза между VS</span>
+          <span class="live__value">Сыграна неделя <b class="num">${last.number}</b></span>
+          <span class="live__note">новых результатов пока нет — следующие появятся здесь</span>
+        </div>`);
+    }
   }
 
   if (played > 0) {
@@ -160,6 +192,12 @@ function renderLive({ allWeeks, results, quarter, quarterStandings }, now = new 
       звучало бы как опоздание, и мы говорим, что период закрыт.
     */
     const nextStart = period.endDate ? new Date(period.endDate.getTime() + 86400000) : null;
+    /*
+      Идущая неделя может лежать уже за краем показанного периода: в конце
+      Кварта так бывает каждую сессию. Сказать тогда «завершён 20 сен» — значит
+      столкнуть две строки одной панели: вверху «идёт», внизу «завершён».
+    */
+    const beyond = week && period.endNumber != null && week.number > period.endNumber;
     const dots = Array.from(
       { length: totalWeeks },
       (_, i) => `<i class="live__dot${i < played ? ' is-on' : ''}"></i>`
@@ -173,7 +211,9 @@ function renderLive({ allWeeks, results, quarter, quarterStandings }, now = new 
           ? 'все недели сыграны'
           : daysUntil(nextStart, now) > 0
             ? `новый Кварт с ${fmtDate(nextStart)}`
-            : `завершён ${fmtDate(period.endDate)}`;
+            : beyond
+              ? 'новый Кварт уже идёт'
+              : `завершён ${fmtDate(period.endDate)}`;
 
     items.push(`
       <div class="live__item">

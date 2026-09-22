@@ -1358,3 +1358,16 @@ body { min-height: 100svh; }
   body .forum-act-menu__list .forum-act { min-height: 36px; }
   body .forum-me .forum-btn { min-height: 40px; padding: 8px 12px; }
 }
+
+/*
+  Ссылки «Вся таблица» и «Страница Кварта» на главной — 19–20px высотой,
+  в них попадали мимо пальцем. min-height с отступами поднимает зону нажатия
+  до 40px; на десктопе плотность остаётся прежней.
+*/
+@media (hover: none) and (pointer: coarse) {
+  body .who__more,
+  body .live__more {
+    display: inline-flex; align-items: center;
+    min-height: 40px; padding: 9px 8px;
+  }
+}

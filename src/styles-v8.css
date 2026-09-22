@@ -468,6 +468,7 @@ h1,h2,h3,h4 {
 .who { position: relative; z-index: 1; margin-top: 12px; }
 .who__summary {
   display: flex; align-items: center; gap: 10px;
+  min-height: 38px; /* тот же рост, что у кнопок сайта: в цель должно попадаться пальцем */
   padding: 10px 13px;
   border: 1px solid var(--line); border-radius: 10px;
   background: color-mix(in srgb, var(--text) 3%, transparent);

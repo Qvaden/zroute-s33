@@ -4185,5 +4185,257 @@ console.log(`\n${'─'.repeat(52)}`);
   check('о проекте: ссылки на основные разделы', ['forum', 'ladder', 'timeline', 'chats', 'guides', 'tournaments'].every((id) => html.includes(`href="#/${id}"`)));
 }
 
+console.log(`\n${'─'.repeat(52)}`);
+// ── R2. Главная: «Прямо сейчас», счёт недели и «Кто именно» ────────────────
+console.log('\nR2. Главная страница');
+{
+  const { renderHome } = await import('../src/pages/home.js');
+  const { computeStandings, computeQuarterWindow, computeWeekSummary, computeMovers, weeksUpToLastData } =
+    await import('../src/logic/standings.js');
+  const { readFile } = await import('node:fs/promises');
+  const h = await import('../src/ui/helpers.js');
+
+  const scoring = { win: 1, loss: -1 };
+  const DAY = 86400000;
+
+  /*
+    Даты недель ставятся относительно сегодняшнего дня. Панель «Прямо сейчас»
+    смотрит на часы, и тест с жёсткой датой начал бы падать или врать каждые
+    сутки, а не по причине поломки кода.
+
+    Недели — как в боевой таблице: понедельник .. воскресенье, полночь UTC.
+  */
+  const monday = new Date(new Date().setUTCHours(0, 0, 0, 0));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  const week = (number, offset) => ({
+    id: `W${number}`,
+    number,
+    startDate: new Date(monday.getTime() + offset * 7 * DAY),
+    endDate: new Date(monday.getTime() + (offset * 7 + 6) * DAY),
+  });
+
+  const alliances = [1, 2, 3, 4].map((i) => ({
+    id: `a${i}`, tag: `T${i}`, name: `Альянс ${i}`, active: true, color: '#123456',
+  }));
+
+  // Каждый VS: двое победили, двое проиграли — как требует доменная модель.
+  const playedWeek = (w) => [
+    { weekId: w.id, allianceId: 'a1', outcome: 'win' },
+    { weekId: w.id, allianceId: 'a2', outcome: 'win' },
+    { weekId: w.id, allianceId: 'a3', outcome: 'loss' },
+    { weekId: w.id, allianceId: 'a4', outcome: 'loss' },
+  ];
+
+  /*
+    НАБОР ПОЛЕЙ СОБИРАЕТСЯ ТЕМИ ЖЕ ФУНКЦИЯМИ, ЧТО И MAIN.JS.
+
+    Это не выдуманный view: weeks режутся weeksUpToLastData, Кварт считается
+    computeQuarterWindow, итоги недели — computeWeekSummary. Если главная
+    начнёт читать поле, которого сайт ей не даёт, тест это увидит.
+  */
+  const build = (allWeeks, results) => {
+    const weeks = weeksUpToLastData(allWeeks, results);
+    const standings = computeStandings(alliances, weeks, results, scoring, 5);
+    const quarter = computeQuarterWindow(allWeeks, results, 4);
+    return {
+      allWeeks,
+      results,
+      weeks,
+      standings,
+      quarter,
+      quarterStandings: computeStandings(alliances, quarter.weeks, results, scoring, 4),
+      summary: computeWeekSummary(alliances, weeks, results),
+      movers: computeMovers(standings),
+    };
+  };
+
+  // ── Состояние 1: идёт неделя, её результаты ещё не внесены ──────────────
+  const w5 = week(5, -3), w6 = week(6, -2), w7 = week(7, -1), w8 = week(8, 0), w9 = week(9, 1);
+  const live = build([w5, w6, w7, w8, w9], [...playedWeek(w5), ...playedWeek(w6), ...playedWeek(w7)]);
+  const liveHtml = renderHome(live);
+
+  check('идущая неделя: панель «Прямо сейчас» есть', /class="panel live"/.test(liveHtml));
+  check('идущая неделя: названа та, чей VS впереди, а не последняя с данными',
+    /Идёт неделя <b class="num">8<\/b>/.test(liveHtml));
+  check('идущая неделя: показан её собственный диапазон дат',
+    liveHtml.includes(`${h.fmtDate(w8.startDate)} — ${h.fmtDate(w8.endDate)}`));
+  check('идущая неделя: есть счётчик дней до конца',
+    /до конца|последний день недели/.test(liveHtml));
+  check('идущая неделя: Кварт считается по сыгранным, а не по заведённым',
+    /Кварт <b class="num">2<\/b> · сыграно 3 из 4/.test(liveHtml));
+  check('идущая неделя: точек ровно по числу недель периода',
+    (liveHtml.match(/<i class="live__dot/g) ?? []).length === 4);
+  check('идущая неделя: горят только сыгранные',
+    (liveHtml.match(/live__dot is-on/g) ?? []).length === 3);
+  check('идущая неделя: ссылка на страницу Кварта ведёт куда надо',
+    liveHtml.includes('href="#/quarter"'));
+
+  /*
+    Главный смысл панели: «итоги» и «сейчас» — разные недели. Если кто-то
+    склеит их обратно в одну, тест упадёт здесь, а не на глазах у людей.
+  */
+  check('идущая неделя: герой говорит про неделю 7, панель — про неделю 8',
+    /Неделя<\/span>\s*<span class="hero__num num">7<\/span>/.test(liveHtml) &&
+      /Идёт неделя <b class="num">8<\/b>/.test(liveHtml));
+
+  // ── Состояние 2: последняя заведённая неделя закрыта, новой нет ──────────
+  /*
+    Ровно та картина, на которой панель молчала: неделя кончилась, следующую
+    ещё не завели, вносить нечего. Проверено на живой выгрузке 22.09.2026.
+  */
+  const p6 = week(6, -3), p7 = week(7, -2), p8 = week(8, -1);
+  const paused = build([p6, p7, p8], [...playedWeek(p6), ...playedWeek(p7), ...playedWeek(p8)]);
+  const pausedHtml = renderHome(paused);
+  check('пауза: панель не молчит', /class="panel live"/.test(pausedHtml));
+  check('пауза: честно сказано, что активной недели нет',
+    /Пауза между VS/.test(pausedHtml) && !/Идёт неделя/.test(pausedHtml));
+  check('пауза: названа последняя сыгранная неделя',
+    /Сыграна неделя <b class="num">8<\/b>/.test(pausedHtml));
+  check('пауза: не выдумывает «неделя не заведена»',
+    !/не заведена/.test(pausedHtml));
+
+  // ── Состояние 3: ближайшая неделя уже в таблице, но ещё не началась ─────
+  const upcoming = build([w5, w6, w7, w8, w9], [...playedWeek(w5), ...playedWeek(w6), ...playedWeek(w7), ...playedWeek(w8)]);
+  const upcomingHtml = renderHome(upcoming);
+  check('будущая неделя: «Скоро», а не «Идёт»',
+    /Скоро неделя <b class="num">9<\/b>/.test(upcomingHtml) && !/Идёт неделя/.test(upcomingHtml));
+  check('будущая неделя: до неё считают дни', /новый Кварт с/.test(upcomingHtml));
+  check('будущая неделя: отсчёт до начала, а не до конца ещё не начавшейся недели',
+    /Скоро неделя <b class="num">9<\/b>[\s\S]{0,200}до начала/.test(upcomingHtml) &&
+      !/до конца/.test(upcomingHtml));
+
+  // ── Состояние 4: новый Кварт уже идёт, а впереди неделя 9 ───────────────
+  const x5 = week(5, -4), x6 = week(6, -3), x7 = week(7, -2), x8 = week(8, -1), x9 = week(9, 0);
+  const crossed = renderHome(
+    build([x5, x6, x7, x8, x9], [...playedWeek(x5), ...playedWeek(x6), ...playedWeek(x7), ...playedWeek(x8)])
+  );
+  check('стык Квартов: идущая неделя названа', /Идёт неделя <b class="num">9<\/b>/.test(crossed));
+  check('стык Квартов: закрытый период не называется «завершён» рядом со словом «идёт»',
+    /новый Кварт уже идёт/.test(crossed) && !/завершён/.test(crossed));
+  check('пауза между VS: тот же период честно назван завершённым',
+    /завершён/.test(pausedHtml));
+
+  /*
+    Последний день недели — отдельная подпись, и поймать её «на календаре»
+    нельзя: недели в тесте строим так, чтобы конец одной из них пришёлся
+    ровно на сегодня.
+  */
+  const today0 = new Date(new Date().setUTCHours(0, 0, 0, 0));
+  const span = (number, from, to) => ({
+    id: `W${number}`,
+    number,
+    startDate: new Date(today0.getTime() + from * DAY),
+    endDate: new Date(today0.getTime() + to * DAY),
+  });
+  const e5 = span(5, -34, -28), e6 = span(6, -27, -21), e7 = span(7, -20, -14), e8 = span(8, -13, -7);
+  const lastDayHtml = renderHome(
+    build([e5, e6, e7, e8, span(9, -6, 0)],
+      [...playedWeek(e5), ...playedWeek(e6), ...playedWeek(e7), ...playedWeek(e8)])
+  );
+  check('последний день: сказано «последний день недели», без отсчёта',
+    /последний день недели/.test(lastDayHtml) && !/до конца/.test(lastDayHtml));
+  check('последний день: итоги недели и идущая неделя не перепутаны',
+    /Неделя<\/span>\s*<span class="hero__num num">8<\/span>/.test(lastDayHtml) &&
+      /Идёт неделя <b class="num">9<\/b>/.test(lastDayHtml));
+
+  // ── Герой: счёт вместо стен тайлов ──────────────────────────────────────
+  check('счёт недели: ровно две клетки — победа и поражение',
+    (liveHtml.match(/weekscore__cell/g) ?? []).length === 2);
+  check('счёт недели: цифры сходятся с составом недели',
+    /winscore[\s\S]{0,120}<b class="num">2<\/b>/.test(liveHtml) &&
+      /losscore[\s\S]{0,120}<b class="num">2<\/b>/.test(liveHtml));
+  check('счёт недели: склонение выбрано по числу',
+    /победител/.test(liveHtml) && /проигравш/.test(liveHtml));
+  check('«Кто именно» спрятан в раскрытие и работает без скрипта',
+    /<details class="who">/.test(liveHtml) && /<summary class="who__summary">/.test(liveHtml));
+  check('списки победителей и проигравших остались, просто под катом',
+    (liveHtml.match(/class="tile"/g) ?? []).length === 4);
+  check('до раскрытия на первом экране нет ни одного тайла',
+    !liveHtml.slice(0, liveHtml.indexOf('<details')).includes('class="tile"'));
+  check('«Вершина таблицы» не вернулась третьим дублем топа',
+    !/Вершина таблицы/.test(liveHtml));
+  check('гонка сезона и движение рейтинга остались',
+    /Гонка сезона/.test(liveHtml) && /Движение в рейтинге/.test(liveHtml));
+  check('ссылка на весь рейтинг есть под катом', liveHtml.includes('href="#/ladder"'));
+
+  // Внесены не все: главная обязана сказать «N из M», а не «всё внесено».
+  const partial = build([w5, w6, w7], [
+    ...playedWeek(w5), ...playedWeek(w6),
+    { weekId: 'W7', allianceId: 'a1', outcome: 'win' },
+    { weekId: 'W7', allianceId: 'a3', outcome: 'loss' },
+  ]);
+  check('неполная неделя: честно «внесено 2 из 4»',
+    /внесено 2 из 4/.test(renderHome(partial)));
+  const full = build([w5, w6, w7], [...playedWeek(w5), ...playedWeek(w6), ...playedWeek(w7)]);
+  check('полная неделя: «4 результата внесено» без дроби',
+    /4 результата внесено/.test(renderHome(full)) && !/внесено 4 из 4/.test(renderHome(full)));
+
+  // ── Предсезонка и пустой кадр ────────────────────────────────────────────
+  const pre = renderHome(build([w8, w9], []));
+  check('до первого результата: герой про старт отсчёта',
+    /Отсчёт начинается/.test(pre) && /первый VS в истории сайта/.test(pre));
+  check('до первого результата: счёт недели и кат с тайлами не рисуются',
+    !/weekscore/.test(pre) && !/<details class="who">/.test(pre));
+  check('до первого результата: панель «Прямо сейчас» всё равно есть',
+    /Идёт неделя <b class="num">8<\/b>/.test(pre));
+
+  const blank = renderHome({
+    allWeeks: [], results: [], weeks: [], standings: [], quarterStandings: [],
+    quarter: { weeks: [], playedWeeks: 0, number: 0, startNumber: 0, endNumber: 0, endDate: null },
+    summary: null, movers: { up: [], down: [] },
+  });
+  check('пустой кадр: страница рисуется и не падает', /Отсчёт начинается/.test(blank));
+  check('пустой кадр: недель нет — так и сказано', /Недели ещё не заведены/.test(blank));
+  check('пустой кадр: придуманной панели «Прямо сейчас» нет', !/Прямо сейчас/.test(blank));
+  check('вызов вообще без аргументов не роняет страницу',
+    typeof renderHome() === 'string' && renderHome().length > 0);
+
+  // Имя альянса не должно становиться разметкой.
+  const evil = build([w5, w6], playedWeek(w5));
+  const evilHtml = renderHome({
+    ...evil,
+    standings: evil.standings.map((row) => ({ ...row, alliance: { ...row.alliance, name: '<b>х</b>' } })),
+  });
+  check('главная: имя альянса экранируется', !evilHtml.includes('<b>х</b>'));
+
+  /*
+    ГЛАВНАЯ НЕ ЧИТАЕТ ПОЛЕЙ, КОТОРЫХ ЕЙ НЕ ОТДАЮТ.
+
+    Функции собирают список полей из исходника самой страницы, а проверяют
+    против main.js: пустого кадра, с которым страница рисуется до прихода
+    данных, и загруженного набора. Если страница начнёт читать то, чего ей
+    не кладут, сломается здесь, а не у человека на пустой вкладке.
+  */
+  const homeSrc = await readFile('src/pages/home.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const fields = new Set();
+  for (const match of homeSrc.matchAll(/const \{([^}]+)\} = view/g)) {
+    for (const name of match[1].split(',')) if (name.trim()) fields.add(name.trim());
+  }
+  for (const match of homeSrc.matchAll(/function renderLive\(\{([^}]+)\}/g)) {
+    for (const name of match[1].split(',')) if (name.trim()) fields.add(name.trim());
+  }
+  check('список читаемых главной полей найден в её исходнике',
+    fields.size >= 6, `найдено ${fields.size}`);
+
+  const emptyBlock = mainSrc.match(/function emptyView[\s\S]*?return \{([\s\S]*?)\n\s{2,}\};/)?.[1] ?? '';
+  const loadedBlock = mainSrc.match(/\n\s*view = \{([\s\S]*?)\n\s{4,}\};/)?.[1] ?? '';
+  check('оба набора полей найдены в main.js',
+    emptyBlock.length > 0 && loadedBlock.length > 0);
+
+  /*
+    Загруженный набор начинается с `...data`: поля адаптера приходят оттуда,
+    и их имена берутся из того же контракта, что проверяет тест A.
+  */
+  const dataFields = ['alliances', 'weeks', 'results', 'events', 'texts'];
+  const has = (block, field) => new RegExp(`(^|[\\s{,])${field}\\s*[:,]`).test(block);
+
+  for (const field of fields) {
+    check(`главная: поле «${field}» есть в пустом кадре`, has(emptyBlock, field));
+    check(`главная: поле «${field}» отдаётся после загрузки`,
+      has(loadedBlock, field) || dataFields.includes(field));
+  }
+}
+
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
