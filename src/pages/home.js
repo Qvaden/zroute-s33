@@ -1,6 +1,23 @@
 import { esc, fmtDate, deltaBadge, plural, pluralWord } from '../ui/helpers.js';
 import { raceChart } from '../ui/chart.js';
-import { byWeekStart } from '../data/week-order.js';
+import { byWeekStart, findCurrentWeek } from '../data/week-order.js';
+
+/* Формы слова «день» для счёта: 1 день, 2 дня, 5 дней. */
+const DAYS = ['день', 'дня', 'дней'];
+
+/**
+ * Полных календарных дней от сегодня до даты. Отрицательных не бывает:
+ * прошедшая дата даёт ноль, а «было вчера» текст рисует сам.
+ *
+ * Считаем по UTC, потому что даты недель приходят из таблицы как полночь UTC
+ * (см. fmtDate). В местном поясе вечер вторника дал бы «4 дня» вместо «5».
+ */
+function daysUntil(date, now = new Date()) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  const day = (d) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.max(0, Math.round((day(date) - day(now)) / 86400000));
+}
+
 
 /**
  * Состояние до первого внесённого результата.
@@ -86,28 +103,133 @@ function renderPreSeason(standings, allWeeks) {
 }
 
 /**
+ * Неделя, чей VS ещё впереди.
+ *
+ * Это не «последняя неделя с результатами» (то было бы прошлое) и не
+ * «последняя заведённая» (их заводят на месяц вперёд). Берём ту, что идёт
+ * сейчас; если результаты в неё уже внесли — правят и в среду, — то следующую
+ * заведённую без результатов. Отсюда и «сколько дней до конца недели».
+ */
+function liveWeek(allWeeks, results, now = new Date()) {
+  const ordered = [...(allWeeks ?? [])].sort(byWeekStart);
+  if (!ordered.length) return null;
+
+  const filled = new Set((results ?? []).map((r) => r.weekId));
+  const current = findCurrentWeek(ordered, now);
+  if (!filled.has(current.id)) return current;
+
+  return ordered.find((w) => w.startDate > current.startDate && !filled.has(w.id)) ?? null;
+}
+
+/**
+ * «Прямо сейчас» — ответ на «а уже можно заходить смотреть?».
+ *
+ * Старая главная умела говорить только про прошлую неделю, и человек,
+ * зашедший во вторник, узнавал про неё то же, что видел в воскресенье.
+ * Здесь — две вещи, которые ещё не случилось: сколько дней до конца текущей
+ * недели и на какой неделе Кварта мы находимся.
+ *
+ * Ни одна строка не выдумывает расписание: и дата конца недели, и сыгранные
+ * недели Кварта берутся из тех же данных, из которых считается рейтинг.
+ */
+function renderLive({ allWeeks, results, quarter, quarterStandings }, now = new Date()) {
+  const week = liveWeek(allWeeks, results, now);
+  const period = quarter ?? {};
+  const totalWeeks = (period.weeks ?? []).length || 4;
+  const played = period.playedWeeks ?? 0;
+  const leader = (Array.isArray(quarterStandings) ? quarterStandings : []).find((r) => r.alliance.active) ?? null;
+
+  const items = [];
+
+  if (week) {
+    const left = daysUntil(week.endDate, now);
+    const upcoming = daysUntil(week.startDate, now) > 0;
+    items.push(`
+      <div class="live__item">
+        <span class="live__label">${upcoming ? 'Скоро неделя' : 'Идёт неделя'} <b class="num">${week.number}</b></span>
+        <span class="live__value">${fmtDate(week.startDate)} — ${fmtDate(week.endDate)}</span>
+        <span class="live__note">${left === 0 ? 'последний день недели' : `${plural(left, ...DAYS)} до конца`}</span>
+      </div>`);
+  }
+
+  if (played > 0) {
+    const left = daysUntil(period.endDate, now);
+    /*
+      Начало следующего Кварта — день после конца текущего. Пока он не
+      наступил, «новый Кварт с 21 сен» обещает будущее; после — то же слово
+      звучало бы как опоздание, и мы говорим, что период закрыт.
+    */
+    const nextStart = period.endDate ? new Date(period.endDate.getTime() + 86400000) : null;
+    const dots = Array.from(
+      { length: totalWeeks },
+      (_, i) => `<i class="live__dot${i < played ? ' is-on' : ''}"></i>`
+    ).join('');
+    const tail =
+      played < totalWeeks
+        ? left === 0
+          ? 'сегодня последний день'
+          : `${plural(left, ...DAYS)} до конца`
+        : !nextStart
+          ? 'все недели сыграны'
+          : daysUntil(nextStart, now) > 0
+            ? `новый Кварт с ${fmtDate(nextStart)}`
+            : `завершён ${fmtDate(period.endDate)}`;
+
+    items.push(`
+      <div class="live__item">
+        <span class="live__label">Кварт <b class="num">${period.number}</b> · сыграно ${played} из ${totalWeeks}</span>
+        <span class="live__dots">${dots}</span>
+        <span class="live__value">${
+          leader
+            ? `<span class="tag" style="--tag-color:${esc(leader.alliance.color || '#7a8494')}">${esc(leader.alliance.tag)}</span> ${esc(leader.alliance.name)} · ${leader.points > 0 ? '+' : ''}${leader.points}`
+            : 'лидер ещё не определился'
+        }</span>
+        <span class="live__note">${tail}</span>
+      </div>`);
+  }
+
+  if (!items.length) return '';
+
+  return `
+    <section class="panel live">
+      <header class="panel__head">
+        <span class="eyebrow">Прямо сейчас</span>
+        <a class="live__more" href="#/quarter">Страница Кварта<span aria-hidden="true"> →</span></a>
+      </header>
+      <div class="live__row">${items.join('')}</div>
+    </section>`;
+}
+
+/**
  * Главная — ответ на «зашёл и понял, у кого получается».
- * Всё главное должно читаться за пять секунд: номер недели, лидер сезона,
- * кто победил и кто проиграл. Остальное — ниже, для тех, кому интересно.
+ * Всё главное должно читаться за пять секунд: номер недели, лидер сезона
+ * и счёт недели. Остальное — ниже, для тех, кому интересно.
  *
  * Про подстановку по умолчанию: недоступная таблица результатов больше
  * не закрывает сайт целиком — форум с ней не связан. Значит эта страница
  * может законно получить пустоту, и падать ей нельзя.
+ *
+ * Про список победителей: раньше он занимал первый экран двумя стенами
+ * тайлов, и это был самый большой блок на странице про самый короткий
+ * факт. Теперь счёт — две цифры, а кто именно прячется под «Кто именно»;
+ * список целиком всё равно есть в рейтинге.
  */
-export function renderHome({ summary, standings, movers, weeks, allWeeks } = {}) {
+export function renderHome(view = {}) {
+  const { summary, standings, movers, weeks, allWeeks } = view;
   const list = Array.isArray(standings) ? standings : [];
 
   // Пока не внесён ни один результат, показывать нечего — но и «пусто» писать
   // нельзя: в этом состоянии сайт проживёт несколько дней после запуска,
   // и это первое, что увидят люди.
-  if (!summary) return renderPreSeason(list, allWeeks ?? weeks ?? []);
+  if (!summary) return renderPreSeason(list, allWeeks ?? weeks ?? []) + renderLive(view);
 
   const { week, winners, losers, recorded } = summary;
   const leader = list[0];
+  const total = list.filter((r) => r.alliance.active).length;
 
-  const tiles = (list) =>
-    list.length
-      ? list
+  const tiles = (items) =>
+    items.length
+      ? items
           .map(
             (a) => `<span class="tile" style="--tag-color:${esc(a.color || '#7a8494')}">
                       <b>${esc(a.tag)}</b>${esc(a.name)}
@@ -139,6 +261,11 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks } = {})
   // Движение за неделю — необязательная часть: без него страница осмысленна.
   const moved = movers ?? { up: [], down: [] };
 
+  const entered =
+    recorded === total
+      ? plural(recorded, 'результат внесён', 'результата внесено', 'результатов внесено')
+      : `внесено ${recorded} из ${total}`;
+
   return `
     <section class="hero">
       <div class="hero__top">
@@ -151,7 +278,7 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks } = {})
           <div class="hero__dates">
             ${fmtDate(week.startDate)} — ${fmtDate(week.endDate)}
             <span class="hero__sep">·</span>
-            ${plural(recorded, 'результат внесён', 'результата внесено', 'результатов внесено')}
+            ${entered}
           </div>
         </div>
       </div>
@@ -173,17 +300,36 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks } = {})
           : ''
       }
 
-      <div class="split">
-        <div class="split__col split__col--win">
-          <h3>Победа в VS <span class="split__count num">${winners.length}</span><i class="split__bar"></i></h3>
-          <div class="tiles">${tiles(winners)}</div>
+      <div class="weekscore">
+        <div class="weekscore__cell winscore">
+          <b class="num">${winners.length}</b>
+          <span>${pluralWord(winners.length, 'победитель', 'победителя', 'победителей')}</span>
         </div>
-        <div class="split__col split__col--loss">
-          <h3>Поражение в VS <span class="split__count num">${losers.length}</span><i class="split__bar"></i></h3>
-          <div class="tiles">${tiles(losers)}</div>
+        <div class="weekscore__cell losscore">
+          <b class="num">${losers.length}</b>
+          <span>${pluralWord(losers.length, 'проигравший', 'проигравших', 'проигравших')}</span>
         </div>
       </div>
+
+      <details class="who">
+        <summary class="who__summary">
+          Кто именно<span class="who__hint muted">VS ${fmtDate(week.endDate)}</span>
+        </summary>
+        <div class="split">
+          <div class="split__col split__col--win">
+            <h3>Победа в VS <span class="split__count num">${winners.length}</span><i class="split__bar"></i></h3>
+            <div class="tiles">${tiles(winners)}</div>
+          </div>
+          <div class="split__col split__col--loss">
+            <h3>Поражение в VS <span class="split__count num">${losers.length}</span><i class="split__bar"></i></h3>
+            <div class="tiles">${tiles(losers)}</div>
+          </div>
+        </div>
+        <a class="who__more" href="#/ladder">Вся таблица<span aria-hidden="true"> →</span></a>
+      </details>
     </section>
+
+    ${renderLive(view)}
 
     <section class="panel">
       <header class="panel__head">
@@ -194,40 +340,24 @@ export function renderHome({ summary, standings, movers, weeks, allWeeks } = {})
       ${raceChart(top5, weeks)}
     </section>
 
-    <div class="grid-2">
-      <section class="panel">
-        <header class="panel__head"><h2>Вершина таблицы</h2></header>
-        <ol class="podium">
-          ${list
-            .slice(0, 5)
-            .map(
-              (r, i) => `<li class="podium__item podium__item--${i + 1}">
-                <span class="podium__place num">${i + 1}</span>
-                <span class="tag" style="--tag-color:${esc(r.alliance.color || '#7a8494')}">${esc(r.alliance.tag)}</span>
-                <span class="podium__name">${esc(r.alliance.name)}</span>
-                <span class="podium__points num">${r.points > 0 ? '+' : ''}${r.points}</span>
-              </li>`
-            )
-            .join('')}
-        </ol>
-      </section>
-
-      <section class="panel">
-        <header class="panel__head"><h2>Движение за неделю</h2></header>
-        <div class="movers">
-          <div>
-            <h4 class="movers__title movers__title--up">Рейтинг поднялся</h4>
-            <ul class="movers__list">${
-              moved.up.length ? moved.up.map(moverRow).join('') : '<li class="muted">без изменений</li>'
-            }</ul>
-          </div>
-          <div>
-            <h4 class="movers__title movers__title--down">Рейтинг снизился</h4>
-            <ul class="movers__list">${
-              moved.down.length ? moved.down.map(moverRow).join('') : '<li class="muted">без изменений</li>'
-            }</ul>
-          </div>
+    <section class="panel">
+      <header class="panel__head">
+        <span class="eyebrow">За последнюю неделю</span>
+        <h2>Движение в рейтинге</h2>
+      </header>
+      <div class="movers">
+        <div>
+          <h4 class="movers__title movers__title--up">Рейтинг поднялся</h4>
+          <ul class="movers__list">${
+            moved.up.length ? moved.up.map(moverRow).join('') : '<li class="muted">без изменений</li>'
+          }</ul>
         </div>
-      </section>
-    </div>`;
+        <div>
+          <h4 class="movers__title movers__title--down">Рейтинг снизился</h4>
+          <ul class="movers__list">${
+            moved.down.length ? moved.down.map(moverRow).join('') : '<li class="muted">без изменений</li>'
+          }</ul>
+        </div>
+      </div>
+    </section>`;
 }
