@@ -24,6 +24,7 @@ import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
+import { formatRecoveryKey } from '../forum/recovery.js';
 import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
@@ -866,11 +867,138 @@ ${renderPushPrefs(s)}`;
         <button type="submit" class="forum-btn forum-btn--ghost" data-forum-mode="signup">Зарегистрироваться</button>
       </div>
       <p class="forum-auth__note muted">
-        Пароль восстановить письмом нельзя — почты у форума нет.
-        Если забудете, сброс делает администратор.
+        Забыли пароль? Восстановите доступ сами — ниже. Письма «забыли пароль»
+        нет, потому что нет почты, но и просить кого-то менять пароль больше
+        не нужно.
       </p>
       <p class="forum-error" data-forum-auth-error hidden></p>
-    </form>`;
+    </form>
+    ${renderRecovery(s)}`;
+}
+
+/**
+ * САМОВОССТАНОВЛЕНИЕ ДОСТУПА.
+ *
+ * Три шага на одном экране, и все они — про одно: пароль придумывает человек,
+ * а не тот, кто его впускает.
+ *
+ *   1. Ник. Браузер придумывает ключ и показывает его только здесь.
+ *   2. Ожидание. Владелец видит в панели ник и время — этого хватает, чтобы
+ *      спросить «это ты?» в игре, и этого не хватает, чтобы войти в аккаунт.
+ *   3. Новый пароль. Вводится дважды и уходит прямо в базу.
+ *
+ * Шаг 2 может растянуться на часы, поэтому состояние живёт в state.recovery, а
+ * ключ — в localStorage: страница за это время успеет перерисоваться не раз.
+ *
+ * Ключ показывается один раз и открыто. Это не оплошность, а единственный
+ * способ не зависеть от одного устройства: человек мог зайти с телефона, а
+ * продолжить с компьютера, и записанный ключ — то, что приносит его обратно.
+ */
+function renderRecovery(s) {
+  const r = s.recovery;
+  if (!r || !r.available) return '';
+
+  if (!r.open) {
+    return `
+      <p class="forum-recovery__entry">
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="open">
+          Забыли пароль?
+        </button>
+      </p>`;
+  }
+
+  const L = CONFIG.forum.limits;
+  const error = r.error ? `<p class="forum-error">${esc(r.error)}</p>` : '';
+
+  if (r.phase === 'done') {
+    return `
+      <div class="forum-recovery">
+        <p class="forum-recovery__ok"><b>Готово.</b> Входите с тем паролем, который
+        только что придумали — прежний больше не работает.</p>
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="close">Свернуть</button>
+      </div>`;
+  }
+
+  const steps = `
+    <ol class="forum-recovery__steps">
+      <li${r.phase === 'begin' ? ' class="is-now"' : ' class="is-done"'}>Заявка</li>
+      <li${r.phase === 'begin' ? '' : r.phase === 'wait' ? ' class="is-now"' : ' class="is-done"'}>Подтверждение владельца</li>
+      <li${r.phase === 'set' ? ' class="is-now"' : ''}>Ваш новый пароль</li>
+    </ol>`;
+
+  if (r.phase === 'begin') {
+    return `
+      <div class="forum-recovery">
+        ${steps}
+        <p class="muted">Назовите ник — браузер придумает ключ. Им вы докажете,
+        что аккаунт ваш, когда придёте ставить пароль.</p>
+        <form data-forum-recovery-begin>
+          <label class="forum-field">
+            <span>Ник</span>
+            <input type="text" name="nick" value="${esc(r.nick)}" required
+                   autocomplete="username" spellcheck="false"
+                   minlength="${L.nickMin}" maxlength="${L.nickMax}"
+                   placeholder="как в игре">
+          </label>
+          <div class="forum-recovery__actions">
+            <button type="submit" class="forum-btn" data-forum-recovery-submit>Создать заявку</button>
+            <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="close">Отмена</button>
+          </div>
+        </form>
+        ${error}
+      </div>`;
+  }
+
+  const STATUS = {
+    pending: ['Ждёт подтверждения владельца', 'Как только он подтвердит — здесь появится поле для нового пароля.'],
+    approved: ['Подтверждено', 'Придумайте новый пароль. Старый перестанет работать сразу.'],
+    rejected: ['Владелец отклонил заявку', 'Если это ошибка — поговорите с ним в игре и создайте заявку заново.'],
+    expired: ['Срок заявки вышел', 'Подтверждение живёт сутки. Создайте новую заявку.'],
+    none: ['Заявка не найдена', 'Проверьте ник: ключ привязан к тому нику, который вы указали.'],
+  };
+  const [statusLine, statusHint] = STATUS[r.status] || STATUS.pending;
+
+  return `
+    <div class="forum-recovery">
+      ${steps}
+      <p class="forum-recovery__nick">Заявка для <b>${esc(r.nick)}</b> — <span class="forum-recovery__status" data-forum-recovery-status>${esc(statusLine)}</span></p>
+      <p class="muted">${esc(statusHint)}</p>
+
+      <p class="forum-recovery__keylabel">Ваш ключ. Сохраните его: с другого устройства
+      продолжение ищется именно по нему.</p>
+      <div class="forum-recovery__keyrow">
+        <code class="forum-recovery__key" data-forum-recovery-key>${esc(formatRecoveryKey(r.key))}</code>
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="copy">Скопировать</button>
+      </div>
+
+      ${
+        r.phase === 'set'
+          ? `
+      <form data-forum-recovery-finish>
+        <label class="forum-field">
+          <span>Новый пароль</span>
+          <input type="password" name="password" required autocomplete="new-password"
+                 minlength="${L.passwordMin}" placeholder="от ${L.passwordMin} символов">
+        </label>
+        <label class="forum-field">
+          <span>Повторите</span>
+          <input type="password" name="password2" required autocomplete="new-password"
+                 minlength="${L.passwordMin}">
+        </label>
+        <div class="forum-recovery__actions">
+          <button type="submit" class="forum-btn" data-forum-recovery-submit>Поставить пароль</button>
+          <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="close">Позже</button>
+        </div>
+      </form>`
+          : `
+      <div class="forum-recovery__actions">
+        <button type="button" class="forum-btn" data-forum-recovery="check">Проверить</button>
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="again">Начать заново</button>
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-recovery="close">Свернуть</button>
+      </div>`
+      }
+      ${error}
+    </div>`;
 }
 
 /**

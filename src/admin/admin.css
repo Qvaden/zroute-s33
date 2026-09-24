@@ -1013,6 +1013,38 @@ body.guide-color-modal-open{overflow:hidden}
    а с базой форума. Оформление переиспользует .adm-* — они обязаны выглядеть
    частью той же панели, а не отдельным приложением. */
 
+/* Заявки на восстановление доступа. Стоят выше списка игроков не для красоты:
+   у заявки есть срок, а у списка нет — неподтверждённое подтверждение
+   обесценивается, и владельцу это надо увидеть первым, ещё до поиска ника. */
+.adm-recoveries {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.adm-recoveries--off,
+.adm-recoveries--empty { padding: 6px 0 0; border: 0; background: none; }
+.adm-recoveries h2 { margin: 0 0 6px; font-size: 14px; letter-spacing: .01em; }
+.adm-recoveries p { margin: 0 0 10px; }
+.adm-recovery {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.adm-recovery__nick { min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.adm-recovery__when,
+.adm-recovery__deadline { font-size: 12px; }
+.adm-recovery__acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.adm-recoveries__held { margin: 10px 0 0; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; }
+@media (min-width: 760px) {
+  .adm-recovery { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .adm-recovery__acts { grid-column: auto; margin-top: 0; justify-content: flex-end; }
+}
+
 .adm-players { display: grid; gap: 2px; margin-top: 18px; }
 .adm-player-search { display: block; margin-top: 18px; max-width: 420px; }
 .adm-player-search input { width: 100%; height: 40px; padding: 0 13px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); }
@@ -1224,7 +1256,7 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-report__acts { margin-top: 0; }
 
 /*
-  Окна сброса и запрета. Своя разметка, а не палитра цветов из guide-color-modal:
+  Окно запрета. Своя разметка, а не палитра цветов из guide-color-modal:
   та заточена под выбор оттенка. Общее только поведение — прокрутка внутри окна,
   потому что на телефоне список пунктов правил не влезает.
 */

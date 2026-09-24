@@ -952,6 +952,70 @@
 .forum-auth__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .forum-auth__note { margin: 11px 0 0; font-size: 11.5px; line-height: 1.5; }
 
+/* ── Самовосстановление доступа ─────────────────────────────────────────────
+   Единственный путь назад для того, кто не может войти, поэтому он под
+   формой входа, а не на отдельной странице: человек уже здесь и уже набрал
+   ник. Список шагов держится в разметке специально — заявка живёт до суток,
+   и без «я на втором из трёх» возвращаться на страницу страшно. */
+
+.forum-recovery__entry { margin: 10px 0 0; }
+
+.forum-recovery {
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.forum-recovery > p { margin: 0 0 9px; }
+.forum-recovery > p:last-child { margin-bottom: 0; }
+
+.forum-recovery__steps {
+  counter-reset: rstep;
+  display: grid;
+  gap: 5px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--dim);
+}
+.forum-recovery__steps li { display: flex; gap: 8px; align-items: baseline; }
+.forum-recovery__steps li::before {
+  counter-increment: rstep;
+  content: counter(rstep);
+  flex: 0 0 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font: 700 10px/1 ui-monospace, SFMono-Regular, monospace;
+}
+.forum-recovery__steps li.is-now { color: var(--text); font-weight: 600; }
+.forum-recovery__steps li.is-now::before { border-color: var(--accent); color: var(--accent); }
+.forum-recovery__steps li.is-done::before { content: '✓'; border-color: var(--accent); color: var(--accent); }
+
+.forum-recovery__nick { font-size: 12.5px; }
+.forum-recovery__status { font-weight: 600; }
+.forum-recovery__keylabel { font-size: 11.5px; }
+.forum-recovery__keyrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.forum-recovery__key {
+  flex: 1 1 190px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  font: 500 12px/1.6 ui-monospace, SFMono-Regular, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.forum-recovery__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.forum-recovery__ok { font-size: 13px; line-height: 1.5; }
+
 /* ── Написать пост ────────────────────────────────────────────────────────── */
 
 .forum-composer { padding: 0; }

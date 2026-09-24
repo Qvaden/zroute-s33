@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=30';
-import { esc } from '../ui/helpers.js?v=30';
-import { mapDataset } from '../data/adapters/_map.js?v=30';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=30';
-import { validateDataset } from '../data/contract.js?v=30';
+import { CONFIG } from '../../config.js?v=31';
+import { esc } from '../ui/helpers.js?v=31';
+import { mapDataset } from '../data/adapters/_map.js?v=31';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=31';
+import { validateDataset } from '../data/contract.js?v=31';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=30';
-import { renderHome } from '../pages/home.js?v=30';
+} from '../logic/standings.js?v=31';
+import { renderHome } from '../pages/home.js?v=31';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=30';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=30';
+} from '../db/account.js?v=31';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=30';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=30';
-import { roleLabel } from '../forum/roles.js?v=30';
-import { prepareImage, uploadPath } from './image.js?v=30';
+} from './store.js?v=31';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=31';
+import { roleLabel } from '../forum/roles.js?v=31';
+import { prepareImage, uploadPath } from './image.js?v=31';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=30';
+} from './edit.js?v=31';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=30';
-import { renderShell } from './shell.js?v=30';
-import { renderLogin } from './login.js?v=30';
-import { renderOverview } from './screens/overview.js?v=30';
-import { renderWeek, describe } from './screens/week.js?v=30';
-import { renderAlliances } from './screens/alliances.js?v=30';
-import { renderEvents } from './screens/events.js?v=30';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=30';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=30';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=30';
-import { renderQuarter } from './screens/quarter.js?v=30';
-import { renderPresident } from './screens/president.js?v=30';
-import { renderPlayers } from './screens/players.js?v=30';
-import { renderModeration } from './screens/moderation.js?v=30';
-import { renderChatsAdmin } from './screens/chats.js?v=30';
-import { forum } from '../forum/index.js?v=30';
-import { deletionReason } from '../forum/rules.js?v=30';
+} from './draft.js?v=31';
+import { renderShell } from './shell.js?v=31';
+import { renderLogin } from './login.js?v=31';
+import { renderOverview } from './screens/overview.js?v=31';
+import { renderWeek, describe } from './screens/week.js?v=31';
+import { renderAlliances } from './screens/alliances.js?v=31';
+import { renderEvents } from './screens/events.js?v=31';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=31';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=31';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=31';
+import { renderQuarter } from './screens/quarter.js?v=31';
+import { renderPresident } from './screens/president.js?v=31';
+import { renderPlayers } from './screens/players.js?v=31';
+import { renderModeration } from './screens/moderation.js?v=31';
+import { renderChatsAdmin } from './screens/chats.js?v=31';
+import { forum } from '../forum/index.js?v=31';
+import { deletionReason } from '../forum/rules.js?v=31';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1253,6 +1253,16 @@ async function loadForumScreen(screenId) {
       // тащить весь список бессмысленно — ему он всё равно не покажется.
       if (canManagePeople(account)) {
         view.forum.users = await forum.listUsers();
+        /*
+          Заявки грузятся своим отдельным броском и своей ошибкой не роняют
+          вкладку: без миграции 20260925-self-recovery.sql список игроков нужен
+          владельцу по-прежнему, а блок заявок просто показывает «недоступно».
+        */
+        try {
+          view.forum.recoveries = await forum.listRecoveryRequests();
+        } catch {
+          view.forum.recoveries = null;
+        }
       }
     } else if (screenId === 'chats') {
       // Модерации база отдаёт все чаты; обычному участнику — только свои.
@@ -1305,7 +1315,7 @@ function openPlayerModal(selector, nick, targetId, extra = {}) {
   modal.dataset.playerId = targetId;
   /* Меню «⋯» закрываем: иначе оно останется висеть за окном. */
   for (const menu of root.querySelectorAll('details[data-player-menu][open]')) menu.open = false;
-  const nickBox = modal.querySelector('[data-reset-nick], [data-restrict-nick], [data-delete-nick], [data-rename-nick], [data-leader-nick]');
+  const nickBox = modal.querySelector('[data-restrict-nick], [data-delete-nick], [data-rename-nick], [data-leader-nick]');
   if (nickBox) nickBox.textContent = nick;
 
   const leaderTag = modal.querySelector('input[name="leaderOf"]');
@@ -1323,20 +1333,6 @@ function closePlayerModal(selector) {
   modal.querySelectorAll('.adm-result').forEach((b) => { b.hidden = true; });
 }
 
-/**
- * Пароль, который не стыдно передать голосом.
- *
- * Собран из слогов, а не из случайных байтов: «xK7#pQ2z» человек будет
- * набирать в игре с телефона по одному символу и трижды опечатается.
- * Стойкость даёт длина, а не набор символов — тот же довод, что в rules.js.
- */
-function suggestPassword() {
-  const parts = ['вер', 'кам', 'лис', 'тор', 'сад', 'нор', 'дым', 'рек', 'зов', 'пик', 'мост', 'клён'];
-  const pick = () => parts[Math.floor(Math.random() * parts.length)];
-  const digits = String(Math.floor(Math.random() * 90) + 10);
-  return `${pick()}-${pick()}-${digits}`;
-}
-
 /** Жалоба разобрана: пометить и убрать из списка. */
 async function resolveReport(reportId) {
   try {
@@ -1345,6 +1341,45 @@ async function resolveReport(reportId) {
     render();
   } catch (err) {
     showForumResult('[data-moderation-result]', esc(String(err?.message ?? err)), 'err');
+  }
+}
+
+/**
+ * Решение по заявке на восстановление доступа.
+ *
+ * После нажатия очередь перечитывается целиком, а не правится на месте:
+ * заявка либо уходит из ожидающих, либо остаётся с текстом отказа рядом.
+ * Молча она исчезнуть не должна — владелец обязан видеть, что именно он
+ * только что разрешил.
+ *
+ * Перечитывание ждём, а не запускаем и идём дальше: loadForumScreen сам
+ * перерисовывает вкладку в конце, и сообщение, написанное до неё, пропало бы
+ * не успев появиться.
+ *
+ * Подтверждение выдаётся конкретному ключу, который лежит в браузере игрока,
+ * поэтому отсюда не видно ни пароля, ни самого ключа — только ник и срок.
+ */
+async function reviewRecovery(button) {
+  const id = button.dataset.recoveryReview;
+  const approve = button.dataset.recoveryApprove === '1';
+  const nick = button.dataset.recoveryNick ?? '';
+
+  try {
+    await forum.reviewRecovery(id, approve);
+    view.forum.loadedFor = null;
+    await loadForumScreen('players');
+    showForumResult(
+      '[data-players-result]',
+      approve
+        ? `Заявка <b>${esc(nick)}</b> подтверждена. Теперь человек сам придумывает
+           пароль — сутки с момента подтверждения. Передайте ему: «заявку видел,
+           заходи на сайт».`
+        : `Заявка <b>${esc(nick)}</b> отклонена. Если игрок передумал или это
+           не он — пусть заведёт новую.`,
+      'ok'
+    );
+  } catch (err) {
+    showPlayerActionError('[data-players-result]', err, '20260925-self-recovery.sql');
   }
 }
 
@@ -1373,39 +1408,6 @@ async function deleteByReport({ reportId, ruleId, targetType, targetId }) {
 /* ── События ── */
 
 document.addEventListener('submit', async (e) => {
-  /* ── Форум: сброс пароля ── */
-  const resetForm = e.target.closest('[data-reset-form]');
-  if (resetForm) {
-    e.preventDefault();
-    const modal = resetForm.closest('[data-reset-modal]');
-    const password = String(resetForm.password.value ?? '');
-
-    if (password.length < 8) {
-      showForumResult('[data-reset-error]', 'Пароль короче 8 символов', 'err');
-      return;
-    }
-
-    try {
-      await forum.resetPassword(modal.dataset.playerId, password);
-      const nick = modal.querySelector('[data-reset-nick]')?.textContent ?? '';
-      closePlayerModal('[data-reset-modal]');
-      /*
-        Пароль показываем здесь и только один раз: сохранённого пароля
-        не существует — база держит необратимый отпечаток, а не сам пароль.
-        Подсмотреть его позже нельзя даже администратору, поэтому передать
-        человеку надо сейчас.
-      */
-      showForumResult(
-        '[data-players-result]',
-        `Пароль для <b>${esc(nick)}</b> изменён. Новый пароль: <code>${esc(password)}</code> — передайте его сами, второй раз он не покажется.`,
-        'ok'
-      );
-    } catch (err) {
-      showPlayerActionError('[data-reset-error]', err, 'schema.sql');
-    }
-    return;
-  }
-
   /* ── Форум: запрет писать ── */
   const restrictForm = e.target.closest('[data-restrict-form]');
   if (restrictForm) {
@@ -1618,18 +1620,9 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  const resetBtn = e.target.closest('[data-player-reset]');
-  if (resetBtn) {
-    openPlayerModal('[data-reset-modal]', resetBtn.dataset.playerNick, resetBtn.dataset.playerReset);
-    return;
-  }
-  if (e.target.closest('[data-reset-cancel]')) {
-    closePlayerModal('[data-reset-modal]');
-    return;
-  }
-  if (e.target.closest('[data-reset-suggest]')) {
-    const input = root.querySelector('[data-reset-form] input[name="password"]');
-    if (input) input.value = suggestPassword();
+  const reviewBtn = e.target.closest('[data-recovery-review]');
+  if (reviewBtn) {
+    await reviewRecovery(reviewBtn);
     return;
   }
 
@@ -2327,7 +2320,7 @@ document.addEventListener('keydown', (e) => {
   // Окна игроков закрываются тем же жестом, что и остальные: Esc — самый
   // ожидаемый способ убрать модалку, а раньше он работал только у палитры.
   if (e.key === 'Escape') {
-    for (const sel of ['[data-reset-modal]', '[data-restrict-modal]', '[data-delete-modal]', '[data-rename-modal]', '[data-leader-modal]']) {
+    for (const sel of ['[data-restrict-modal]', '[data-delete-modal]', '[data-rename-modal]', '[data-leader-modal]']) {
       if (root.querySelector(`${sel}:not([hidden])`)) { closePlayerModal(sel); break; }
     }
   }

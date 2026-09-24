@@ -28,6 +28,9 @@ import { textOf } from './format.js';
 import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { esc } from '../ui/helpers.js';
 import { leaderboardOf } from './leaderboard.js';
+import {
+  createRecoveryKey, hashRecoveryKey, saveRecovery, loadRecovery, clearRecovery, formatRecoveryKey,
+} from './recovery.js';
 import { CONFIG } from '../../config.js';
 import { startQuarterTimer, stopQuarterTimer } from '../ui/quarter-timer.js';
 
@@ -68,6 +71,24 @@ const state = {
   notifyFresh: new Set(),
   /** Активность сервера: посты и сообщения по дням за неделю; null — нет данных. */
   activity: null,
+  /*
+    Восстановление доступа. Живёт в состоянии, а не только в разметке, потому
+    что между «создал заявку» и «поставил пароль» проходят часы: страница за
+    это время перерисовывается десятки раз, и каждый раз ей нужно знать, на
+    каком шаге человек.
+
+    available — ложь в черновом режиме, где паролей нет вовсе; там весь блок
+    не рисуется, а не отказывает по нажатию.
+  */
+  recovery: {
+    available: false,
+    open: false,
+    phase: 'begin',
+    nick: '',
+    key: '',
+    status: 'pending',
+    error: '',
+  },
 };
 
 /**
@@ -750,6 +771,191 @@ async function handleAuth(form, mode, submitter) {
   }
 }
 
+/* ── Восстановление доступа ───────────────────────────────────────────────── */
+
+/**
+ * Привести блок восстановления в соответствие действительности при входе.
+ *
+ * Здесь нет ни запроса, ни решения — только два факта: умеет ли этот режим
+ * восстанавливать вообще и есть ли на этом устройстве невыведенная заявка.
+ * Если есть, человек возвращается на середину пути, и показывать ему снова
+ * первую страницу было бы издевательством: он уже ждал.
+ *
+ * Проверку статуса не ждём: страница обязана появиться сразу, а «ожидает»
+ * и «подтверждено» различатся, когда база ответит.
+ */
+function initRecovery() {
+  const r = state.recovery;
+  r.available = forum.capabilities?.canAuth !== false && typeof forum.beginRecovery === 'function';
+  r.error = '';
+
+  if (!r.available) {
+    r.open = false;
+    r.key = '';
+    return;
+  }
+
+  const saved = loadRecovery();
+  if (!saved) {
+    r.open = false;
+    r.phase = 'begin';
+    r.status = 'pending';
+    r.key = '';
+    return;
+  }
+  r.nick = saved.nick;
+  r.key = saved.key;
+  r.open = true;
+  r.phase = 'wait';
+  recoveryCheck();
+}
+
+/**
+ * Текст ошибки для игрока.
+ *
+ * Сырой ответ PostgREST вроде «Could not find the function … in the schema
+ * cache» появляется ровно в одном случае: база ещё не перестроена под новый
+ * порядок. Игрок от такой строки ничего не поймёт, поэтому технические
+ * отказы сворачиваем в человеческий, настоящие же тексты базы («заявок уже
+ * достаточно», «срок вышел») показываем как есть — они и так про него.
+ */
+function recoveryErrorText(err) {
+  const message = String(err?.message ?? err);
+  if (/could not find (?:the )?(?:function|view)|schema cache|not found/i.test(message)) {
+    return 'Сайт пока не может принять заявку. Попробуйте через несколько минут или передайте владельцу, что пора обновить базу.';
+  }
+  return message;
+}
+
+/** Спросить базу, до чего доехала заявка. */
+async function recoveryCheck() {
+  const r = state.recovery;
+  if (!r.nick || !r.key) return;
+  const token = mountToken;
+
+  try {
+    const status = await forum.recoveryStatus(r.nick, r.key);
+    if (token !== mountToken) return;
+
+    r.status = status;
+    r.error = '';
+    if (status === 'used') {
+      clearRecovery();
+      r.key = '';
+      r.phase = 'done';
+    } else {
+      r.phase = status === 'approved' ? 'set' : 'wait';
+    }
+    paint();
+  } catch (err) {
+    if (token !== mountToken) return;
+    r.error = recoveryErrorText(err);
+    paint();
+  }
+}
+
+/**
+ * Шаг 1: заявка.
+ *
+ * Ключ рождается ДО запроса и никуда не денется, если запрос не удался: он
+ * просто не сохранится. Сохраняем его только вместе с принятой базой заявкой,
+ * иначе на устройстве осталась бы запись, под которую в базе ничего нет.
+ */
+async function recoveryBegin(form, submitter) {
+  const r = state.recovery;
+  r.error = '';
+
+  const nick = validateNick(form.nick.value);
+  if (!nick.ok) {
+    r.error = nick.error;
+    paint();
+    return;
+  }
+
+  const key = createRecoveryKey();
+  try {
+    const hash = await hashRecoveryKey(key);
+    await withBusy(submitter, 'Заводим заявку…', async () => {
+      await forum.beginRecovery(nick.value, hash);
+    });
+  } catch (err) {
+    r.error = recoveryErrorText(err);
+    paint();
+    return;
+  }
+
+  r.nick = nick.value;
+  r.key = key;
+  r.status = 'pending';
+  r.phase = 'wait';
+  r.open = true;
+
+  /*
+    Хранилище могло отказать — приватный режим, запрещённые данные сайтов.
+    Заявка при этом всё равно создана, и единственный способ её продолжить —
+    переписать ключ руками, поэтому не молчим и не откатываем шаг.
+  */
+  if (!saveRecovery(r.nick, r.key)) {
+    r.error = 'Браузер не разрешил сохранить ключ. Перепишите его: без него заявка не откроется.';
+  }
+  paint();
+
+  /*
+    Статус спрашиваем сразу. Молчаливый ответ базы на неизвестный ник означал бы
+    неделю ожидания для человека, который просто опечатался в собственном нике,
+    а «ник занят» и так открыто отвечает форма регистрации (forum_check_nick) —
+    то есть ничего лишнего этот запрос постороннему не выдаёт.
+  */
+  await recoveryCheck();
+}
+
+/** Шаг 3: новый пароль. */
+async function recoveryFinish(form, submitter) {
+  const r = state.recovery;
+  r.error = '';
+
+  const checked = validatePassword(form.password.value);
+  if (!checked.ok) {
+    r.error = checked.error;
+    paint();
+    return;
+  }
+  if (form.password.value !== form.password2.value) {
+    r.error = 'Пароли не совпали — посмотрите ещё раз, оба поля должны повторять друг друга';
+    paint();
+    return;
+  }
+
+  try {
+    await withBusy(submitter, 'Ставим пароль…', async () => {
+      await forum.finishRecovery(r.nick, r.key, checked.value);
+    });
+  } catch (err) {
+    r.error = recoveryErrorText(err);
+    paint();
+    return;
+  }
+
+  /*
+    Ключ сжигаем: заявка закрыта, и держать в браузере пропуск, который больше
+    не открывается, — значит оставить его лишней мишенью.
+  */
+  clearRecovery();
+  r.key = '';
+  r.status = 'used';
+  r.phase = 'done';
+  paint();
+}
+
+/** Начать заново: сбрасываем локальную половину пути. */
+function recoveryAgain() {
+  clearRecovery();
+  Object.assign(state.recovery, {
+    open: true, phase: 'begin', nick: '', key: '', status: 'pending', error: '',
+  });
+  paint();
+}
+
 /* ── Картинки в форме ─────────────────────────────────────────────────────── */
 
 /*
@@ -959,6 +1165,39 @@ function wire() {
     */
     const menuAct = t.closest?.('.forum-act-menu__list .forum-act');
     if (menuAct) window.setTimeout(() => menuAct.closest('details')?.removeAttribute('open'), 0);
+
+    /*
+      Восстановление доступа: один обработчик на все кнопки блока. Разметка
+      пересобирается целиком, поэтому состояние шага живёт в state.recovery,
+      а не в DOM.
+    */
+    const rec = t.closest('[data-forum-recovery]');
+    if (rec && host.contains(rec)) {
+      const r = state.recovery;
+      const act = rec.dataset.forumRecovery;
+
+      if (act === 'open') {
+        r.open = true;
+        r.error = '';
+        paint();
+      } else if (act === 'close') {
+        r.open = false;
+        r.error = '';
+        paint();
+      } else if (act === 'again') {
+        recoveryAgain();
+      } else if (act === 'check') {
+        await recoveryCheck();
+      } else if (act === 'copy') {
+        try {
+          await navigator.clipboard.writeText(r.key);
+          notice('Ключ скопирован');
+        } catch {
+          notice(`Ключ: ${formatRecoveryKey(r.key)}`);
+        }
+      }
+      return;
+    }
 
     const subscribe = t.closest('[data-forum-subscribe]');
     if (subscribe && host.contains(subscribe)) {
@@ -1565,6 +1804,18 @@ function wire() {
     */
     const submitter = e.submitter ?? form.querySelector('button[type="submit"]');
 
+    // Восстановление доступа: шаг 1 и шаг 3 — две разные формы.
+    if (form.matches('[data-forum-recovery-begin]')) {
+      e.preventDefault();
+      await recoveryBegin(form, submitter);
+      return;
+    }
+    if (form.matches('[data-forum-recovery-finish]')) {
+      e.preventDefault();
+      await recoveryFinish(form, submitter);
+      return;
+    }
+
     // Вход и регистрация: две кнопки в одной форме, различаем по нажатой.
     // Локальное имя authMode, а не mode: module-scope «mode» уже занят
     // выбором «лента или страница участника», затенять его — мина.
@@ -1983,6 +2234,7 @@ export async function mountForum(container, view, postId = null) {
   }
 
   if (state.me) await loadNotifications();
+  if (!state.me) initRecovery();
   if (state.me && typeof forum.listAllianceSubscriptions === 'function') {
     try { state.allianceSubscriptions = new Set(await forum.listAllianceSubscriptions()); } catch { state.allianceSubscriptions = new Set(); }
   }

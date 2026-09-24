@@ -666,21 +666,79 @@ export async function listUsers() {
 }
 
 /**
- * СБРОС ПАРОЛЯ ИГРОКУ.
+ * ВОССТАНОВЛЕНИЕ ДОСТУПА.
  *
- * Почты нет, значит «восстановить самому» невозможно — пароль меняет
- * администратор из панели. Менять чужой пароль напрямую в системе входа
- * может только служебный ключ, а его на сайте нет и быть не должно:
- * он даёт полный доступ ко всей базе, а панель открывается в браузере.
+ * Пароль придумывает сам игрок, а владелец только подтверждает, что это он.
+ * Порядок и причины — в supabase/20260925-self-recovery.sql; здесь только пять
+ * вызовов, которые этот порядок обслуживают.
  *
- * Поэтому смену делает функция внутри базы (`forum_admin_reset_password`):
- * она проверяет, что вызвавший — администратор, и только после этого пишет
- * новый пароль. Служебный ключ при этом не покидает базу.
+ * ВСЕ ОНИ ЖИВУТ ФУНКЦИЯМИ В БАЗЕ, и не из вежливости: сменить чужой пароль
+ * напрямую может только служебный ключ, а его на сайте нет и быть не должно.
+ * наружу уходит право «создать заявку» и право «подтвердить», но не право «всё».
+ *
+ * КЛЮЧ НЕ ПОКИДАЕТ БРАУЗЕР ИГРОКА. В базу уходит SHA-256 от него, а обратно —
+ * сам ключ: база сворачивает его ещё раз и сравнивает с тем, что лежит.
+ * Поэтому владельцу из всего этого потока не виден ни один секрет — только ник
+ * и время заявки.
  */
-export async function resetPassword(userId, password) {
-  await rest('/rpc/forum_admin_reset_password', {
+
+/** Шаг 1: игрок заводит заявку. keyHash — SHA-256 от его случайного ключа. */
+export async function beginRecovery(nick, keyHash) {
+  await rest('/rpc/forum_begin_recovery', {
     method: 'POST',
-    body: { target_user: userId, new_password: password },
+    body: { p_nick: String(nick).trim(), p_code_hash: keyHash },
+  });
+}
+
+/**
+ * Шаг 1.5: на каком она этапе. Возвращает 'none' | 'pending' | 'approved' |
+ * 'rejected' | 'used' | 'expired'.
+ *
+ * Ответ 'none' база даёт и когда ника нет, и когда ключ не подходит, и когда
+ * заявка уже закрыта: различать эти случаи наружу незачем, а смешивать удобно —
+ * спрашивать статус можно, только предъявив ключ. Занят ли ник, при этом и так
+ * открыто отвечает forum_check_nick, так что скрывать здесь нечего.
+ */
+export async function recoveryStatus(nick, key) {
+  const rows = await rest('/rpc/forum_recovery_status', {
+    method: 'POST',
+    body: { p_nick: String(nick).trim(), p_code: key },
+  });
+  return typeof rows === 'string' ? rows : 'none';
+}
+
+/** Шаг 3: игрок ставит новый пароль. Отсюда наружу не возвращается ничего. */
+export async function finishRecovery(nick, key, password) {
+  await rest('/rpc/forum_finish_recovery', {
+    method: 'POST',
+    body: { p_nick: String(nick).trim(), p_code: key, p_password: password },
+  });
+}
+
+/*
+ * Очередь для панели владельца. Читается представление, а не таблица: в нём
+ * нет отпечатков ключей, так что даже открывший список не увидит ничего, чем
+ * можно воспользоваться.
+ */
+export async function listRecoveryRequests() {
+  const rows = await rest('/forum_recovery_requests?select=*&order=created_at.asc');
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: String(row.id),
+    userId: String(row.user_id),
+    nick: row.nick || '',
+    status: row.status,
+    createdAt: toDate(row.created_at) ?? new Date(),
+    decidedAt: toDate(row.decided_at),
+    expiresAt: toDate(row.expires_at),
+    decidedByNick: row.decided_by_nick || '',
+  }));
+}
+
+/** Подтвердить или отклонить заявку. Право проверяет база. */
+export async function reviewRecovery(id, approve) {
+  await rest('/rpc/forum_review_recovery', {
+    method: 'POST',
+    body: { p_id: id, p_approve: Boolean(approve) },
   });
 }
 
@@ -725,7 +783,7 @@ export async function setLeader(userId, allianceTag) {
 /**
  * УДАЛЕНИЕ АККАУНТА.
  *
- * Так же, как сброс пароля, это живёт функцией в базе (forum_admin_delete_user):
+ * Как и восстановление доступа, это живёт функцией в базе (forum_admin_delete_user):
  * удалять строки напрямую может только служебный ключ, а его на сайте нет.
  * Функция проверяет, что вызвавший — администратор, и только потом удаляет.
  * Посты и комментарии игрока при этом остаются: ник лежит копией в записи.

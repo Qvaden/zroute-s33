@@ -2358,7 +2358,9 @@ console.log('\nQ. Форум');
     'listPosts', 'getPost', 'createPost', 'editPost', 'deletePost', 'setPinned',
     'listComments', 'addComment', 'deleteComment',
     'setReaction', 'report', 'listReports', 'resolveReport',
-    'listUsers', 'resetPassword', 'setRestriction',
+    'listUsers', 'setRestriction',
+    'beginRecovery', 'recoveryStatus', 'finishRecovery',
+    'listRecoveryRequests', 'reviewRecovery',
     'votePoll', 'unvotePoll', 'closePoll',
     'listNotifications', 'markNotificationsRead', 'markAllNotificationsRead',
     'checkNick', 'setVerified', 'renameNick', 'renameNickAs',
@@ -2402,16 +2404,26 @@ console.log('\nQ. Форум');
     !/\$\{CFG\.url\}\/(rest|auth)/.test(clientSource) && /baseUrl\(\)/.test(clientSource));
 
   /*
-    Локальный режим паролей не знает вовсе. Изобразить успешный сброс было бы
-    хуже отказа: администратор решил бы, что пароль сменён.
+    Локальный режим паролей не знает вовсе. Изобразить очередь заявок было бы
+    хуже отказа: владелец решил бы, что подтвердил восстановление, хотя
+    подтверждать там нечего. Отказываемся всеми пятью методами — проверка
+    держит это на месте.
   */
-  let localResetRefused = false;
-  try {
-    await localAdapter.resetPassword('u1', 'какой-то пароль');
-  } catch {
-    localResetRefused = true;
+  const recoveryMethods = [
+    'beginRecovery', 'recoveryStatus', 'finishRecovery',
+    'listRecoveryRequests', 'reviewRecovery',
+  ];
+  for (const name of recoveryMethods) {
+    let refused = false;
+    try {
+      await localAdapter[name]('u1', 'x');
+    } catch {
+      refused = true;
+    }
+    check(`в локальном режиме «${name}» честно отказывает`, refused);
   }
-  check('в локальном режиме сброс пароля честно отказывает', localResetRefused);
+  check('сброса пароля из панели больше нет ни в одном адаптере',
+    !('resetPassword' in localAdapter) && !('resetPassword' in supabaseAdapter));
 
   /* ── Правка поста и поиск: локальный режим ── */
 
@@ -2631,6 +2643,35 @@ console.log('\nQ. Форум');
     /pinsMax/.test(supabaseSource) && /forum_posts\?select=id&pinned=eq\.true/.test(supabaseSource));
 
   /*
+    Проводка восстановления в mount.js. Страницы и адаптеры проверяются
+    тестами выше, но между ними живёт склейка: кто создаёт ключ, кто спрашивает
+    статус и что происходит, когда база ещё не перестроена. Всё это не видно
+    ни в одном рендере, и разрыв обнаружился бы только у человека с потерянным
+    паролем.
+  */
+  check('ключ рождается в браузере, а в адаптер уходит только отпечаток',
+    /const key = createRecoveryKey\(\)/.test(mountSource)
+    && /const hash = await hashRecoveryKey\(key\)/.test(mountSource)
+    && /forum\.beginRecovery\(nick\.value, hash\)/.test(mountSource));
+  check('заявка сохраняется только после принятого запроса',
+    mountSource.indexOf('await forum.beginRecovery(') > 0
+    && mountSource.indexOf('await forum.beginRecovery(') < mountSource.indexOf('if (!saveRecovery(')
+    && /catch \(err\) \{[\s\S]{0,120}?r\.error = recoveryErrorText\(err\);\s*\n\s*paint\(\);\s*\n\s*return;/.test(mountSource));
+  check('после успешно поставленного пароля ключ сжигается',
+    /await forum\.finishRecovery[\s\S]{0,400}?clearRecovery\(\)/.test(mountSource));
+  check('возврат на страницу продолжает с того же шага',
+    /const saved = loadRecovery\(\)/.test(mountSource) && /r\.phase = 'wait'/.test(mountSource));
+  check('кнопка «Проверить» есть на странице и спрашивает базу',
+    /data-forum-recovery="check"/.test(forumPagesSource) && /act === 'check'/.test(mountSource)
+    && /await recoveryCheck\(\)/.test(mountSource));
+  check('сырой ответ базы игрок не видит',
+    /function recoveryErrorText/.test(mountSource)
+    && (mountSource.match(/r\.error = recoveryErrorText\(err\)/g) || []).length === 3
+    && !/r\.error = String\(err\?\.message/.test(mountSource));
+  check('перерисовка во время ответа базы не подменяет состояние',
+    /const token = mountToken;[\s\S]{0,300}?if \(token !== mountToken\) return;/.test(mountSource));
+
+  /*
     Панель форматирования: кнопки дёргают document.execCommand — жирный, цвет
     и прочее видно в редакторе сразу, разметка при показе не собирается.
     Сами команды переехали в общий модуль редактора (forum/editor.js),
@@ -2687,14 +2728,90 @@ console.log('\nQ. Форум');
   /*
     Служебный ключ (service_role) даёт полный доступ ко всей базе в обход
     политик. Панель открывается в браузере, поэтому такой ключ там появиться
-    не должен ни при каких условиях: смену пароля делает функция внутри базы.
+    не должен ни при каких условиях: пароль пишет функция внутри базы.
+
+    Функция сброса пароля из панели удалена совсем. Проверка держит её мёртвой:
+    пока она есть в схеме, любой, кому доверили панель, знает чужие пароли,
+    и никакие тексты в интерфейсе этого не отменят.
   */
-  check('сброс пароля живёт функцией в базе, а не запросом из панели',
-    /create or replace function public\.forum_admin_reset_password/.test(schema));
-  check('сброс пароля проверяет права администратора внутри базы',
-    /forum_is_admin\(\)/.test(schema) && /raise exception/.test(schema));
-  check('анонимному запросу сброс пароля недоступен',
-    /revoke all on function public\.forum_admin_reset_password[\s\S]*?from public, anon/.test(schema));
+  check('сброса пароля властью панели в схеме больше нет',
+    !/create (or replace )?function public\.forum_admin_reset_password/.test(schema)
+    && !/grant execute on function public\.forum_admin_reset_password/.test(schema));
+
+  /*
+    САМОВОССТАНОВЛЕНИЕ ДОСТУПА.
+
+    Отдельный файл, а не правка schema.sql: живая база уже развёрнута, и ей
+    нужен скрипт, который прогоняют один раз. Schema.sql описывает новую базу
+    целиком, а recovery-миграция — переход. Проверки читают именно миграцию,
+    потому что на боевой базе выполняется она.
+  */
+  const recoverySql = await readFile('supabase/20260925-self-recovery.sql', 'utf8');
+
+  /*
+    Неоткрытая скобка dollar-quoted тела — ошибка, которую Supabase показывает
+    как «syntax error at end of input» в самой последней строке файла. Найти её
+    глазами в шестистах строках сложно, а считается она просто: чётное число.
+  */
+  check('миграция восстановления: dollar-скобки закрыты',
+    (recoverySql.match(/\$\$/g) || []).length % 2 === 0);
+
+  for (const fn of ['forum_begin_recovery', 'forum_review_recovery', 'forum_recovery_status', 'forum_finish_recovery']) {
+    check(`${fn}: существует в миграции и защищена правами вызывающего`,
+      new RegExp(`create or replace function public\\.${fn}\\b[\\s\\S]*?security definer set search_path`).test(recoverySql));
+  }
+
+  /*
+    Потерявший доступ войти не может — значит все три шага игрока вызываются
+    АНОНИМНО. Если хотя бы одному закроить доступ от anon, страница восстановления
+    превратится в «не удалось связаться с базой» ровно для тех, ради кого её делали.
+  */
+  for (const fn of ['forum_begin_recovery', 'forum_recovery_status', 'forum_finish_recovery']) {
+    check(`${fn}: доступна анонимному запросу`,
+      new RegExp(`grant execute on function public\\.${fn}\\([^)]*\\) to anon, authenticated`).test(recoverySql));
+  }
+  check('решать заявку может только вошедший владелец',
+    /revoke all on function public\.forum_review_recovery[^;]*from public, anon/.test(recoverySql)
+    && /grant execute on function public\.forum_review_recovery\(uuid, boolean\) to authenticated/.test(recoverySql));
+  check('решение о заявке проверяет владельца внутри базы',
+    /forum_review_recovery[\s\S]*?if not public\.forum_is_admin\(\) then\s+raise exception/.test(recoverySql));
+
+  /*
+    Ключа и пароля наружу — нигде. Это и есть смысл изменений, поэтому держится
+    проверкой: достаточно одному будущему правке добавить code_hash в список
+    полей представления, и «владелец не знает ваш пароль» станет неправдой.
+  */
+  check('список для панели не отдаёт отпечатки ключей',
+    /create or replace view public\.forum_recovery_requests[\s\S]*?from public\.forum_recoveries/.test(recoverySql)
+    && !/create or replace view public\.forum_recovery_requests[\s\S]*?code_hash/.test(recoverySql));
+  check('представление заявок читается правами запрашивающего',
+    /create or replace view public\.forum_recovery_requests\s+with \(security_invoker = true\)/.test(recoverySql));
+  check('функция финала ничего не возвращает — показывать пароль нечем',
+    /create or replace function public\.forum_finish_recovery\([\s\S]*?\)\s*returns void/.test(recoverySql));
+
+  /*
+    Одна открытая заявка на игрока и срок у каждой. Без частичного уникального
+    индекса анонимный вызов забил бы очередь владельца мусором за минуту;
+    без сроков подтверждение превратилось бы в постоянную открытую дверь.
+  */
+  check('открытая заявка на игрока возможна только одна',
+    /create unique index[^;]*forum_recoveries_one_open[\s\S]*?where status in \('pending', 'approved'\)/.test(recoverySql));
+  check('заявка живёт неделю, подтверждённая — сутки',
+    /interval '7 days'/.test(recoverySql) && /interval '24 hours'/.test(recoverySql));
+  check('частые заявки с одного ника останавливаются',
+    /interval '24 hours'\s*\n\s*\) >= 3/.test(recoverySql));
+  check('таблица заявок закрыта политиками доступа',
+    /alter table public\.forum_recoveries enable row level security/.test(recoverySql)
+    && /create policy forum_recoveries_staff_read on public\.forum_recoveries\s+for select using \(public\.forum_is_admin\(\)\)/.test(recoverySql));
+  check('старый сброс пароля убирается из живой базы',
+    /drop function if exists public\.forum_admin_reset_password/.test(recoverySql));
+  /*
+    Вход для самого владельца, если подтверждать заявку некому, обязан остаться
+    закомментированным: кнопка в панели для этого была бы дырой ровно того же
+    размера, от которой мы сейчас ушли.
+  */
+  check('запасной вход владельца существует только как комментарий',
+    /^--\s+update auth\.users[\s\S]*?role = 'admin'/m.test(recoverySql));
 
   /*
     security_invoker обязателен: без него представление читало бы данные
@@ -3030,6 +3147,42 @@ console.log('\nQ. Форум');
     guestHtml.indexOf('Правила форума') < guestHtml.indexOf('data-forum-feed') ||
       guestHtml.includes('Правила форума'));
 
+  /*
+    САМОВОССТАНОВЛЕНИЕ ДОСТУПА СО СТОРОНЫ ИГРОКА.
+
+    Держим главное обещание новых правил: пароль вводит сам человек. Пока он не
+    назвал ник, на странице нечего копировать и негде набрать пароль, а форма
+    восстановления — сосед формы входа: вложенные формы браузер расколол бы
+    так, что кнопка «войти» начала отправлять заявку.
+  */
+  const recHtml = (over) => renderForum({ events: eventsSample }, {
+    ready: true, shared: true, loading: false, posts: [], me: null,
+    recovery: { available: true, open: true, phase: 'begin', nick: 'Игрок', key: '0123456789abcdef0123456789abcdef', status: 'pending', error: '', ...over },
+  });
+  const begin = recHtml({ phase: 'begin' });
+  const wait = recHtml({ phase: 'wait' });
+  const set = recHtml({ phase: 'set', status: 'approved' });
+
+  check('без доступного входа шага восстановления нет',
+    !guestHtml.includes('data-forum-recovery'));
+  check('свёрнутая заявка — одна кнопка, без ключа',
+    /data-forum-recovery="open"/.test(recHtml({ open: false }))
+    && !recHtml({ open: false }).includes('data-forum-recovery-key'));
+  check('на шаге ника есть форма заявки', begin.includes('<form data-forum-recovery-begin'));
+  check('ключа ещё нет — придумывать его рано', !begin.includes('data-forum-recovery-key'));
+  check('и поля для пароля на первом шаге нет', !begin.includes('data-forum-recovery-finish'));
+  check('ожидание показывает ключ и статус', wait.includes('data-forum-recovery-key') && /Ждёт подтверждения/.test(wait));
+  check('после подтверждения появляется поле нового пароля', set.includes('<form data-forum-recovery-finish'));
+  check('пароль вводится дважды и не подставляется браузером',
+    (set.match(/autocomplete="new-password"/g) || []).length === 2);
+  check('форма восстановления не вложена в форму входа',
+    begin.slice(0, begin.indexOf('<form data-forum-recovery-begin')).includes('</form>'));
+  const shownKey = (wait.match(/data-forum-recovery-key>([\s\S]*?)<\/code>/) || [, ''])[1];
+  check('ключ разбит на две строки — его переписывают с экрана',
+    shownKey === '0123456789abcdef\n0123456789abcdef');
+  check('ошибку адаптера показывают рядом, а не молчат',
+    /forum-error/.test(recHtml({ error: 'Заявок на этот ник уже достаточно' })));
+
   const me = { id: 'u1', nick: 'Qvaden', role: 'admin', createdAt: new Date(), banned: false, mutedUntil: null };
   const post = {
     id: 'p1', authorId: 'u2', authorNick: 'Игрок', category: 'vs',
@@ -3168,10 +3321,10 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /не подключ/i.test(renderPlayers({ forum: { configured: false } })));
   check('не вошедшему на форум панель объясняет, что токен GitHub здесь не действует',
     /токен GitHub/i.test(renderPlayers({ forum: { configured: true, me: null } })));
-  check('участнику кнопка сброса пароля не показывается',
-    !renderPlayers({
-      forum: { configured: true, me: { id: 'u9', nick: 'Кто-то', role: 'member' }, users: [] },
-    }).includes('data-player-reset'));
+  check('не владельцу очередь заявок не показывается',
+    !/data-recovery-review/.test(renderPlayers({
+      forum: { configured: true, me: { id: 'u9', nick: 'Кто-то', role: 'moderator' }, users: [], recoveries: [] },
+    })));
 
   const playersHtml = renderPlayers({
     forum: {
@@ -3180,7 +3333,19 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
       users: [me, { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null }],
     },
   });
-  check('администратору доступен сброс пароля', playersHtml.includes('data-player-reset="u2"'));
+  /*
+    Восстановление доступа вместо сброса.
+
+    Очередь рендерится отдельным кадром с заявками: `playersHtml` строится без
+    `forum.recoveries`, и это самостоятельный случай — панель не должна падать
+    и обязана объяснить, что блок появится после миграции.
+  */
+  check('без применённой миграции панель говорит об этом прямо',
+    /Заявки на восстановление недоступны/.test(playersHtml)
+    && playersHtml.includes('supabase/20260925-self-recovery.sql'));
+  check('в панели нет ни одного поля для пароля', !/type="password"/.test(playersHtml));
+  check('панель объясняет, что паролей не видит никто',
+    /Паролей вы не видите ни у кого/.test(playersHtml));
   check('администратору доступно ограничение писать', playersHtml.includes('data-player-restrict="u2"'));
   check('администратору доступно удаление аккаунта', playersHtml.includes('data-player-delete="u2"'));
   check('отдельной кнопки бана нет — запрет идёт через модалку «Ограничить»',
@@ -3191,10 +3356,32 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     playersHtml.includes('data-delete-player-form') && /Введите ник игрока/.test(playersHtml));
   check('окно удаления честно говорит, что посты и комментарии останутся',
     /Посты и комментарии/.test(playersHtml) && /останутся/.test(playersHtml));
-  check('себе пароль сбросить нельзя — для этого есть обычная смена',
-    !playersHtml.includes('data-player-reset="u1"'));
-  check('панель предупреждает, что пароль покажется один раз',
-    /один раз/.test(playersHtml));
+  const recoveryHtml = renderPlayers({
+    forum: {
+      configured: true,
+      me,
+      users: [me, { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null }],
+      recoveries: [
+        { id: 'r1', userId: 'u2', nick: 'Игрок', status: 'pending', createdAt: new Date(), decidedAt: null, expiresAt: new Date(Date.now() + 6 * 864e5), decidedByNick: '' },
+        { id: 'r2', userId: 'u8', nick: 'Тихон', status: 'approved', createdAt: new Date(), decidedAt: new Date(), expiresAt: new Date(Date.now() + 40 * 6e4), decidedByNick: 'Владелец' },
+        { id: 'r3', userId: 'u9', nick: 'Отказан', status: 'rejected', createdAt: new Date(), decidedAt: new Date(), expiresAt: new Date(Date.now() - 6e4), decidedByNick: 'Владелец' },
+      ],
+    },
+  });
+  check('заявка показана ником игрока', recoveryHtml.includes('adm-recovery__nick') && /Игрок/.test(recoveryHtml));
+  check('у заявки есть обе кнопки решения',
+    /data-recovery-review="r1"[\s\S]*?data-recovery-approve="1"/.test(recoveryHtml)
+    && /data-recovery-review="r1"[\s\S]*?data-recovery-approve="0"/.test(recoveryHtml));
+  check('срок заявки показан остатком, а не датой создания', /осталось \d+ дн/.test(recoveryHtml));
+  check('подтверждённая заявка упоминается отдельно',
+    /Подтверждено и ждёт/.test(recoveryHtml) && /Тихон/.test(recoveryHtml));
+  check('разобранная заявка не висит в очереди', !/Отказан/.test(recoveryHtml));
+  check('очередь не показывает отпечаток ключа', !/code_hash|codeHash/i.test(recoveryHtml));
+  check('и в очереди нет поля пароля', !/type="password"/.test(recoveryHtml));
+  check('очередь стоит над списком игроков',
+    recoveryHtml.indexOf('adm-recoveries') < recoveryHtml.indexOf('class="adm-players"'));
+  check('пустая очередь не выглядит поломкой',
+    /Заявок нет/.test(renderPlayers({ forum: { configured: true, me, users: [me], recoveries: [] } })));
 
   /*
     Лидерство привязано к альянсу: лидер ведёт конкретный тег, инспекция в
@@ -3272,7 +3459,9 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('кнопка лидера открывает диалог с подставленным тегом альянса',
     /if \(!isLeader\) \{[\s\S]*?openPlayerModal\('\[data-leader-modal\]', nick, leadBtn\.dataset\.playerLeader, \{ leaderTag: alliance \}\)/.test(playersMainSource));
   check('диалог лидера показывает ник выбранного игрока',
-    /\[data-reset-nick\][\s\S]*?\[data-leader-nick\]/.test(playersMainSource));
+    /\[data-leader-nick\]/.test(playersMainSource));
+  check('в панели не осталось окна сброса пароля',
+    !/data-reset-modal|data-reset-form|data-player-reset|suggestPassword/.test(playersMainSource));
   for (const path of ['supabase/leaders.sql', 'supabase/nicks-verified.sql', 'supabase/fix-leader-ambiguity.sql']) {
     const leaderSql = await readFile(path, 'utf8');
     check(`${path}: снятие прежнего лидера явно обращается к колонке, а не к параметру RPC`,
@@ -4179,8 +4368,22 @@ console.log(`\n${'─'.repeat(52)}`);
   const html = renderAbout();
   check('о проекте: один заголовок страницы', (html.match(/<h1>/g) || []).length === 1);
   check('о проекте: предупреждение о чтении чатов', html.includes('Содержимое чатов могут читать владелец и модераторы.'));
-  check('о проекте: сброс пароля через владельца', html.includes('Сброс пароля выполняет владелец сайта.'));
-  check('о проекте: нет восстановления почтой', html.includes('Восстановления пароля по почте нет.'));
+  /*
+    Страница «О проекте» — единственное место, где игроку объясняют новый
+    порядок входа. Проверки держат её в согласии с кодом: текст обещает
+    восстановление самому, а не переписку с владельцем, и не обещает настройки
+    смены пароля, которых на сайте нет.
+  */
+  check('о проекте: доступ восстанавливает сам игрок',
+    html.includes('Восстанавливаете доступ сами.'));
+  check('о проекте: нет восстановления почтой',
+    html.includes('Письма «забыли пароль» нет'));
+  check('о проекте: владелец не узнаёт новый пароль',
+    /не видит ни старый, ни новый пароль/.test(html));
+  check('о проекте: пароль игрок вводит сам',
+    /введите новый пароль прямо на сайте: его знаете только вы/i.test(html));
+  check('о проекте: нет обещания сменить пароль в настройках',
+    !/настройк[а-яё]* аккаунта/i.test(html));
   check('о проекте: нет технических и служебных деталей', !/Supabase|SQL|админ-панел|бэкап|service.worker/i.test(html));
   check('о проекте: ссылки на основные разделы', ['forum', 'ladder', 'timeline', 'chats', 'guides', 'tournaments'].every((id) => html.includes(`href="#/${id}"`)));
 }
@@ -4435,6 +4638,71 @@ console.log('\nR2. Главная страница');
     check(`главная: поле «${field}» отдаётся после загрузки`,
       has(loadedBlock, field) || dataFields.includes(field));
   }
+}
+
+console.log(`\n${'─'.repeat(52)}`);
+// ── R3. Ключ восстановления: криптография браузера ──────────────────────────
+console.log('\nR3. Ключ восстановления');
+{
+  const rec = await import('../src/forum/recovery.js');
+
+  /*
+    Ключ — единственное, что доказывает право на чужой аккаунт. Он живёт в
+    браузере и нигде больше, поэтому проверяем его форму до того, как он
+    уйдёт в SHA-256: 16 случайных байт, 32 hex-символа, нижний регистр.
+  */
+  const key = rec.createRecoveryKey();
+  check('ключ — 32 hex-символа', /^[0-9a-f]{32}$/.test(key));
+  check('ключ не повторяется', new Set(Array.from({ length: 50 }, () => rec.createRecoveryKey())).size === 50);
+
+  /*
+    Один и тот же ключ обязан давать один и тот же отпечаток: заявка создаётся
+    на телефоне, а продолжается с компьютера. Ошибка здесь выглядела бы как
+    «ключ не найден» у человека, который ничего не менял.
+  */
+  const hash = await rec.hashRecoveryKey(key);
+  check('отпечаток — 64 hex-символа', /^[0-9a-f]{64}$/.test(hash));
+  check('отпечаток стабилен', (await rec.hashRecoveryKey(key)) === hash);
+  check('другой ключ даёт другой отпечаток', (await rec.hashRecoveryKey('0'.repeat(32))) !== hash);
+  check('в базу уходит отпечаток, а не ключ', !hash.includes(key));
+
+  equal('отпечаток совпадает с SHA-256 из базы',
+    hash,
+    Buffer.from(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))).toString('hex'));
+
+  check('ключ с пробелами и верхним регистром принимается',
+    rec.looksLikeRecoveryKey(`  ${key.toUpperCase().replace(/(.{8})(?=.)/g, '$1 ')}  `));
+  check('короткий и мусор отклоняются',
+    !rec.looksLikeRecoveryKey('abc') && !rec.looksLikeRecoveryKey('g'.repeat(32)));
+  check('нормализация оставляет только hex в нижнем регистре',
+    rec.normalizeRecoveryKey(` ${key.toUpperCase().replace(/(.{8})(?=.)/g, '$1-')} `) === key);
+  check('на экране ключ в две строки',
+    rec.formatRecoveryKey(key).split('\n').every((line) => /^[0-9a-f]{16}$/.test(line))
+    && rec.formatRecoveryKey(key).replace('\n', '') === key);
+
+  /*
+    В Node localStorage нет — и это ровно тот случай, который встречается у
+    человека с запретом хранения данных. Сохранение должно вернуть false,
+    чтобы страница велела записать ключ, а не сделала вид, что записала.
+    Хранилище снимаем явно: до этого блока его подставили тесты локального
+    адаптера, и проверка отказывала бы не по своей причине.
+  */
+  const hadStorage = globalThis.localStorage;
+  delete globalThis.localStorage;
+  check('без хранилища сохранение честно отказывает',
+    rec.saveRecovery('Игрок', key) === false && rec.loadRecovery() === null);
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  check('с хранилищем пара ник/ключ возвращается назад',
+    rec.saveRecovery('Игрок', key) === true
+    && rec.loadRecovery().nick === 'Игрок' && rec.loadRecovery().key === key);
+  rec.clearRecovery();
+  check('после успеха ключ стирается', rec.loadRecovery() === null);
+  globalThis.localStorage = hadStorage;
 }
 
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);

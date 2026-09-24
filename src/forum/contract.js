@@ -174,7 +174,15 @@
  * @property {() => Promise<{targetType: string, targetId: string, reportCount: number, priority: string}[]>} listModerationQueue
  * @property {() => Promise<{id: string, actorNick: string, targetType: string, targetId: string, targetNick: string, action: string, details: object, createdAt: Date}[]>} listModerationActions
  * @property {() => Promise<ForumUser[]>} listUsers
- * @property {(userId: string, password: string) => Promise<void>} resetPassword
+ *
+ * Восстановление доступа (см. supabase/20260925-self-recovery.sql). Пароль
+ * придумывает игрок, владелец только подтверждает заявку, поэтому ни один из
+ * этих вызовов не несёт пароль через панель.
+ * @property {(nick: string, keyHash: string) => Promise<void>} beginRecovery  Заявка; keyHash — SHA-256 ключа из браузера игрока.
+ * @property {(nick: string, key: string) => Promise<'none'|'pending'|'approved'|'rejected'|'used'|'expired'>} recoveryStatus
+ * @property {(nick: string, key: string, password: string) => Promise<void>} finishRecovery  Ставит пароль; наружу не возвращает ничего.
+ * @property {() => Promise<ForumRecoveryRequest[]>} listRecoveryRequests  Очередь для владельца; отпечатков ключей в ней нет.
+ * @property {(id: string, approve: boolean) => Promise<void>} reviewRecovery
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
@@ -239,6 +247,21 @@
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
  * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
  * @property {(userId: string) => Promise<ForumUserActivity|null>} [getUserActivity]  Личный GitHub-график: активность по дням.
+ */
+
+/**
+ * Заявка на восстановление доступа. Поля выбраны так, чтобы ни одно из них
+ * не было секретом: nick и сроки — всё, что видит владелец.
+ *
+ * @typedef {Object} ForumRecoveryRequest
+ * @property {string} id
+ * @property {string} userId
+ * @property {string} nick
+ * @property {'pending'|'approved'|'rejected'|'used'|'expired'} status
+ * @property {Date} createdAt
+ * @property {Date|null} decidedAt
+ * @property {Date} expiresAt
+ * @property {string} decidedByNick  Кто подтвердил; пустой — ещё никто.
  */
 
 /**

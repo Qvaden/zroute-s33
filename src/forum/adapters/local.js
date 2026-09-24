@@ -908,12 +908,36 @@ export async function saveProfile(patch) {
 }
 
 /**
- * Сброс пароля. В локальном режиме паролей нет вовсе, поэтому честно
- * отказываемся вместо того, чтобы изобразить успех: администратор должен
- * видеть, что здесь этой возможности нет, а не думать, что он сбросил пароль.
+ * ВОССТАНОВЛЕНИЕ ДОСТУПА В ЧЕРНОВОМ РЕЖИМЕ.
+ *
+ * Паролей здесь нет вовсе (см. `capabilities.canAuth` ниже), поэтому
+ * восстанавливать нечего, а очередь заявок была бы бутафорией:
+ * «подтвердить» без пароля за кем следить — значит просто двигать строчку.
+ *
+ * Отказываемся честно и одним текстом, а не пустым списком: и панель, и
+ * страница входа показывают тогда «здесь этого нет», а не молчаливую видимость
+ * работы.
  */
-export async function resetPassword() {
-  throw new Error('В локальном режиме паролей нет — сбрасывать нечего');
+const NO_RECOVERY = 'В локальном режиме паролей нет — восстанавливать нечего';
+
+export async function beginRecovery() {
+  throw new Error(NO_RECOVERY);
+}
+
+export async function recoveryStatus() {
+  throw new Error(NO_RECOVERY);
+}
+
+export async function finishRecovery() {
+  throw new Error(NO_RECOVERY);
+}
+
+export async function listRecoveryRequests() {
+  throw new Error(NO_RECOVERY);
+}
+
+export async function reviewRecovery() {
+  throw new Error(NO_RECOVERY);
 }
 
 export async function setRestriction(userId, opts) {

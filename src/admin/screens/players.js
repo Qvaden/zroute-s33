@@ -5,17 +5,21 @@ import { roleBadge, roleLabel, verifiedBadge } from '../../forum/roles.js';
 /**
  * ЭКРАН «ИГРОКИ» — учётные записи форума.
  *
- * Здесь три вещи, которых нет больше нигде: назначение модератора, сброс
- * пароля и запрет писать.
+ * Здесь три вещи, которых нет больше нигде: назначение модератора, решение
+ * по заявке на восстановление доступа и запрет писать.
  *
- * ПОЧЕМУ СБРОС ПАРОЛЯ ВООБЩЕ НУЖЕН. Вход по нику и паролю, без почты — так
- * решено осознанно (см. config.js). Значит письма «восстановить пароль»
- * не существует, и единственный способ вернуть человеку доступ — сделать это
- * руками. Без этого экрана забытый пароль означал бы потерянный аккаунт
- * навсегда.
+ * ПОЧЕМУ ВООБЩЕ НУЖНЫ ЗАЯВКИ. Вход по нику и паролю, без почты — так решено
+ * осознанно (см. config.js). Значит письма «восстановить пароль» не существует,
+ * и без участия человека, забывшего пароль, доступ не возвращается никак.
  *
- * ГДЕ ЖИВУТ ПРАВА. Не здесь. Роли и пароли — дело владельца, и проверяет это
- * сама база: функции forum_admin_reset_password и site_set_moderator.
+ * РАНИЕШНИЙ ПОРЯДОК БЫЛ ХУЖЕ, ЧЕМ КАЖЕТСЯ. Владелец набирал новый пароль сам и
+ * передавал его игроку — то есть каждый игрок жил с паролем, который знает
+ * владелец, и сменить его самому было негде. Теперь владелец отвечает только на
+ * вопрос «это правда тот человек?», а пароль придумывает сам игрок в своём
+ * браузере. Право пускать остаётся здесь, знание пароля — не появляется нигде.
+ *
+ * ГДЕ ЖИВУТ ПРАВА. Не здесь. Роли решает база (site_set_moderator), заявки
+ * подтверждает forum_review_recovery — она же проверяет, что вызвавший владелец.
  * Панель лишь показывает кнопки; отказ приходит из базы, а не отсюда.
  *
  * Экран — чистая функция от данных, как и остальные: его можно отрисовать
@@ -34,7 +38,7 @@ export function renderPlayers(view) {
         <p class="adm-lead">
           Форум ещё не подключён: в <code>config.js</code> пустой раздел
           <code>forum.supabase</code>. Пока его нет, учётных записей не существует
-          и сбрасывать нечего.
+          и возвращать доступ не к чему.
         </p>
         <p class="muted">Порядок подключения описан в <code>docs/FORUM.md</code>.</p>
       </section>`;
@@ -81,8 +85,8 @@ export function renderPlayers(view) {
         </header>
         <p class="adm-lead">
           Вы вошли как <b>${esc(forum.me.nick)}</b> (${esc(roleLabel(forum.me))}).
-          Роли назначает и пароли сбрасывает только владелец — это единственная
-          граница между вами.
+          Роли назначает и заявки на восстановление доступа подтверждает только
+          владелец — это единственная граница между вами.
         </p>
       </section>`;
   }
@@ -93,6 +97,7 @@ export function renderPlayers(view) {
 
   const rows = forum.users.map((u) => renderRow(u, forum.me)).join('');
   const leaders = renderLeaders(forum.users);
+  const recoveries = renderRecoveries(forum.recoveries);
   const moderators = forum.users.filter((u) => u.role === 'moderator').length;
   const verified = forum.users.filter((u) => u.isVerified).length;
 
@@ -103,13 +108,15 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь назначают модераторов, подтверждают ники, сбрасывают забытый
-          пароль, закрывают возможность писать и удаляют чужие аккаунты.
+          Здесь назначают модераторов, подтверждают ники, решают заявки на
+          восстановление доступа, закрывают возможность писать и удаляют чужие
+          аккаунты.
         </p>
       </header>
 
       <div class="adm-result" data-players-result hidden></div>
 
+      ${recoveries}
       ${leaders}
 
       <div class="adm-players__toolbar">
@@ -126,9 +133,9 @@ export function renderPlayers(view) {
       <div class="adm-players__notes">
         <p class="muted">
           <b>Модератор</b> разбирает жалобы, удаляет чужие записи, выдаёт запреты
-          и правит данные сайта. Не может одного: назначать роли и сбрасывать
-          пароли — иначе он назначил бы владельцем себя, и разница между ролями
-          исчезла бы.
+          и правит данные сайта. Не может одного: назначать роли и подтверждать
+          заявки на доступ — иначе он назначил бы владельцем себя, и разница
+          между ролями исчезла бы.
         </p>
         <p class="muted">
           <b>Владелец один</b>, и это правило держит база, а не договорённость.
@@ -161,18 +168,87 @@ export function renderPlayers(view) {
           прежний ник резервируется навсегда и не может быть перехвачен.
         </p>
         <p class="muted">
-          Пароль показывается один раз и только вам — передайте его человеку сами.
-          Сохранённого пароля не существует: база хранит не его, а необратимый
-          отпечаток, поэтому подсмотреть старый нельзя даже владельцу.
+          <b>Паролей вы не видите ни у кого</b> — и это не вежливость, а
+          устройство входа: база держит необратимый отпечаток, и новый пароль
+          игрок придумывает сам, в своём браузере. Из этой панели заметно только,
+          кто просит вернуть доступ и когда.
         </p>
       </div>
     </section>
 
     ${renderLeaderModal()}
     ${renderRenameModal()}
-    ${renderResetModal()}
     ${renderRestrictModal()}
     ${renderDeleteModal()}`;
+}
+
+/**
+ * Очередь заявок на восстановление доступа.
+ *
+ * Стоит выше списка игроков, а не в нём внутри: заявка — это дело, у которого
+ * есть срок, а игроков просмотрели и забыли. Подтверждённая живёт сутки,
+ * неразобранная — неделю, и показывать это надо часами, а не датой создания:
+ * «создано 3 дня назад» не говорит владельцу, что он уже опоздал.
+ *
+ * null — источник не ответил (черновой режим без паролей или база без
+ * миграции). Пустой список при этом выглядит точно так же, поэтому отдельная
+ * строка с объяснением нужнее галочки «всё чисто».
+ */
+function renderRecoveries(recoveries) {
+  if (recoveries === null || recoveries === undefined) {
+    return `
+      <div class="adm-recoveries adm-recoveries--off">
+        <p class="muted">Заявки на восстановление недоступны: этот режим входа
+        паролей не имеет, а на боевой базе блок появится после применения
+        <code>supabase/20260925-self-recovery.sql</code>.</p>
+      </div>`;
+  }
+
+  const open = recoveries.filter((r) => r.status === 'pending');
+  const held = recoveries.filter((r) => r.status === 'approved');
+
+  if (!open.length && !held.length) {
+    return `
+      <div class="adm-recoveries adm-recoveries--empty">
+        <p class="muted"><b>Заявок нет.</b> Восстановление доступа никому не
+        требуется, или игроки ещё не знают, что теперь его делают сами —
+        об этом пишет страница «О проекте».</p>
+      </div>`;
+  }
+
+  const card = (r) => `
+    <div class="adm-recovery" data-recovery="${esc(r.id)}">
+      <b class="adm-recovery__nick">${esc(r.nick)}</b>
+      <span class="adm-recovery__when muted">заявка ${esc(shortTime(r.createdAt))}</span>
+      <span class="adm-recovery__deadline muted">${esc(remaining(r.expiresAt))}</span>
+      <div class="adm-recovery__acts">
+        <button type="button" class="adm-btn adm-btn--primary"
+                data-recovery-review="${esc(r.id)}" data-recovery-approve="1"
+                data-recovery-nick="${esc(r.nick)}">Подтвердить</button>
+        <button type="button" class="adm-btn"
+                data-recovery-review="${esc(r.id)}" data-recovery-approve="0"
+                data-recovery-nick="${esc(r.nick)}">Отклонить</button>
+      </div>
+    </div>`;
+
+  return `
+    <div class="adm-recoveries">
+      <h2>Заявки на восстановление доступа</h2>
+      <p class="muted">
+        Игрок сам придумал ключ и сам придумает пароль. Ваша работа здесь —
+        ответить на один вопрос: это действительно он. Спросите в игре или
+        через лидера его альянса, и только потом подтверждайте.
+      </p>
+      ${open.map((r) => card(r)).join('')}
+      ${
+        held.length
+          ? `<p class="adm-recoveries__held muted">
+               Подтверждено и ждёт, пока игрок поставит пароль:
+               ${esc(held.map((r) => `${r.nick} — ${remaining(r.expiresAt)}`).join(', '))}
+             </p>`
+          : ''
+      }
+    </div>`;
 }
 
 /**
@@ -261,7 +337,7 @@ function renderRow(user, me) {
                     игрока — чип показывает состояние (модератор, блогер, лидер,
                     проверен), а не действие, поэтому видно, кто есть кто, не
                     читая подпись, а само действие подсказывает тултип. Редкое
-                    и опасное (пароль, переименование, запрет, удаление) убрано
+                    и опасное (переименование, запрет, удаление) убрано
                     под «⋯», чтобы не стояло под рукой.
                   */
                   ''
@@ -291,8 +367,6 @@ function renderRow(user, me) {
                 <details class="adm-menu" data-player-menu name="player-menu">
                   <summary class="adm-menu__btn" title="Ещё действия" aria-label="Ещё действия">⋯</summary>
                   <div class="adm-menu__list">
-                    <button type="button" class="adm-menu__item"
-                            data-player-reset="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Сбросить пароль</button>
                     <button type="button" class="adm-menu__item"
                             data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Переименовать</button>
                     <button type="button" class="adm-menu__item"
@@ -376,40 +450,6 @@ function renderRenameModal() {
           <h4 class="muted">История переименований</h4>
           <ul data-nick-history class="adm-reserved__list"><li class="muted">Загружаем…</li></ul>
         </div>
-      </div>
-    </div>`;
-}
-
-/**
- * Окно сброса.
- *
- * Пароль вводится, а не придумывается панелью автоматически: сгенерированный
- * пароль пришлось бы куда-то показать и откуда-то скопировать, а человеку
- * потом ещё и набрать его в игре с телефона. Кнопка «придумать» рядом есть —
- * для тех случаев, когда придумывать самому лень.
- */
-function renderResetModal() {
-  return `
-    <div class="adm-modal" data-reset-modal hidden>
-      <div class="adm-modal__box" role="dialog" aria-modal="true" aria-label="Сброс пароля">
-        <h3>Новый пароль для <b data-reset-nick></b></h3>
-        <p class="muted">
-          Старый пароль перестанет работать сразу. Человек войдёт с новым
-          и сможет поменять его сам.
-        </p>
-        <form data-reset-form>
-          <label class="adm-field">
-            <span>Новый пароль</span>
-            <input type="text" name="password" required minlength="8" autocomplete="off"
-                   placeholder="от 8 символов">
-          </label>
-          <div class="adm-actions">
-            <button type="button" class="adm-btn" data-reset-suggest>Придумать за меня</button>
-            <button type="submit" class="adm-btn adm-btn--primary">Сбросить</button>
-            <button type="button" class="adm-btn" data-reset-cancel>Отмена</button>
-          </div>
-          <div class="adm-result" data-reset-error hidden></div>
-        </form>
       </div>
     </div>`;
 }
@@ -546,4 +586,22 @@ function shortTime(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '—';
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getDate()} ${MONTHS[date.getMonth()]}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * Сколько заявке осталось жить.
+ *
+ * Дата окончания тут не полезна: «до 26 сен, 04:10» не отвечает на единственный
+ * вопрос владельца — решать сейчас или игрок уже не придёт. Поэтому часы и дни,
+ * а не секунды: подтверждение живёт сутки, заявка — неделю.
+ */
+function remaining(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'срок неизвестен';
+  const ms = date.getTime() - Date.now();
+  if (ms <= 0) return 'срок вышел';
+  const hours = Math.floor(ms / 3600000);
+  if (hours < 1) return `осталось ${Math.max(1, Math.floor(ms / 60000))} мин`;
+  if (hours < 24) return `осталось ${hours} ч`;
+  const days = Math.floor(hours / 24);
+  return `осталось ${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}`;
 }
