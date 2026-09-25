@@ -592,9 +592,10 @@ Supabase нужно по порядку выполнить целиком сле
 `forum_answer_event`, `forum_event_going`, `forum_event_maybe` и
 `forum_send_event_reminders` — в
 [`supabase/20260925-event-rsvp.sql`](../supabase/20260925-event-rsvp.sql).
-Напоминания носит планировщик: Supabase → Database → Cron → задача с выражением
-`*/15 * * * *` и командой `select public.forum_send_event_reminders();` (тот же
-способ, что у еженедельного дайджеста). Без задачи календарь, ответы и лимит
+Напоминания носит планировщик: Supabase → Integrations → Cron Jobs → New job →
+имя, выражение `*/15 * * * *`, тип **Database function**, схема `public`,
+функция `forum_send_event_reminders` → Create cron job (тот же способ, что у
+еженедельного дайджеста). Без задачи календарь, ответы и лимит
 мест работают, а колокольник о встрече молчит.
 
 Миграция **не обязана** быть выполнена до пуша: страница календаря читает
