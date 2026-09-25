@@ -66,3 +66,22 @@ export function searchFromFilters(filters) {
   if (filters.query) params.set('q', filters.query);
   return params.toString().replace(/\+/g, '%20');
 }
+
+/**
+ * Куда привести человека сразу, помимо ленты: `#/forum?new=event`.
+ *
+ * Кнопка «Создать встречу» в календаре ведёт на форум, потому что встреча у
+ * нас и есть тема. Открывать при этом пустой редактор — значит заставить
+ * человека искать галочку «Событие» среди семи; адрес говорит, что он пришёл
+ * за встречей, и форма встречается с ним готовой.
+ *
+ * Ключ живёт рядом с фильтрами по той же причине, что и они: это часть адреса,
+ * который человек кидает в чат, и разбирать его должно то же чистое место.
+ */
+export const COMPOSE_INTENTS = ['event'];
+
+/** @param {string} search Хвост адреса после «?», без знака вопроса. */
+export function composeIntentFromSearch(search) {
+  const intent = new URLSearchParams(String(search ?? '')).get('new');
+  return COMPOSE_INTENTS.includes(intent) ? intent : '';
+}

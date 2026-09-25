@@ -3674,12 +3674,12 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /retryOnAbort = false/.test(clientJs));
   check('повтор по таймауту включён у чтения ленты',
     /retryOnAbort: true/.test(forumDbJs));
-  check('повтор по таймауту у ленты, поста, комментариев и чатов — пять мест',
-    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 5);
+  check('повтор по таймауту у ленты, поста, комментариев, чатов и календаря — шесть мест',
+    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 6);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
-  check('живые вкладки — форум, чаты и страница участника',
-    /id === 'forum' \|\| id === 'chats' \|\| \(id === 'user' && param\)/.test(mainJs));
+  check('живые вкладки — форум, чаты, календарь и страница участника',
+    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar' \|\| \(id === 'user' && param\)/.test(mainJs));
 
   /*
     ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.
@@ -6024,6 +6024,469 @@ console.log('\nX. Тишина в одном разделе');
     }).includes('закрыл раздел «Разбор VS» игроку Громкий на 3 дня'));
   check('блок панели одет своим стилем, а не скопирован с форума',
     admCssSrc.includes('.adm-section-mute'));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
+// ── Y. Календарь встреч ─────────────────────────────────────────────────────
+console.log('\nY. Календарь встреч');
+{
+  /*
+    Встреча собрана из шести мест: колонка темы, триггер даты, таблица ответов,
+    два представления, черновой адаптер и страница. Каждое само по себе выглядит
+    правильно, а ломается на стыке: «90 дней» в миграции и «месяц» в форме —
+    и база отвергает то, что форма обещает принять; текст отказа, которого в
+    базе нет, — и черновой режим воспитывает игрока по своим правилам; галочка
+    метки, живущая только на экране, — и встреча теряет дату при первой же
+    перерисовке. Поэтому здесь сравнивают места между собой, а не проверяют
+    каждое по отдельности.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260925-event-rsvp.sql', 'utf8');
+  /* Миграция, которая держала проверку kind до появления напоминаний. */
+  const notifSql = await readFile('supabase/20260916-forum-community.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const calBehSrc = await readFile('src/forum/calendar.js', 'utf8');
+  const calPageSrc = await readFile('src/pages/calendar.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/forum.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const feedUrlSrc = await readFile('src/forum/feed-url.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const mobSrc = await readFile('src/mobile.css', 'utf8');
+
+  const { EVENT_TAG_ID, EVENT_RSVP, EVENT_RSVP_IDS, needsEventDate } = await import('../src/forum/rules.js');
+  const fmt = await import('../src/forum/event-format.js');
+  const { composeIntentFromSearch } = await import('../src/forum/feed-url.js');
+  const { renderCalendar, CALENDAR_VIEWS, DEFAULT_CALENDAR_VIEW, eventBadge, eventActions } =
+    await import('../src/pages/calendar.js');
+  const { renderForum } = await import('../src/pages/forum.js');
+  const L = CONFIG.forum.limits;
+
+  /* ── Одно число на шесть мест ── */
+  check('метка одна во всех четырёх местах базы, что решают быть встрече',
+    EVENT_TAG_ID === 'event' && needsEventDate([EVENT_TAG_ID]) && !needsEventDate(['recruiting'])
+      && (sql.match(new RegExp(`'${EVENT_TAG_ID}' = any\\(`, 'g')) || []).length === 4,
+    `в базе: ${(sql.match(new RegExp(`'${EVENT_TAG_ID}' = any\\(`, 'g')) || []).length}`);
+  equal('три ответа на приглашение — те же слова, что принимает колонка status',
+    EVENT_RSVP_IDS, ['going', 'maybe', 'declined']);
+  check('база перечисляет ровно эти три слова в проверке ответа',
+    sql.includes("check (status in ('going', 'maybe', 'declined'))")
+      && sql.includes("p_status not in ('going', 'maybe', 'declined')"));
+  check('горизонт и запас встречи в базе те же, что предлагает форма',
+    sql.includes(`interval '${L.eventMinLeadMinutes} minutes'`)
+      && sql.includes(`interval '${L.eventHorizonDays} days'`)
+      && sql.includes(`between ${L.eventSeatsMin} and ${L.eventSeatsMax}`));
+  check('шаги напоминания — те же три числа в колонке, в функции и в конфиге',
+    sql.includes(`remind_minutes in (${L.eventRemindChoices.join(', ')})`)
+      && sql.includes(`p_remind_minutes not in (${L.eventRemindChoices.join(', ')})`)
+      && JSON.stringify(fmt.remindChoices()) === JSON.stringify(L.eventRemindChoices));
+  check('только «буду» занимает место — одно и то же в форме и в базе',
+    EVENT_RSVP.every((r) => r.id === 'going' ? r.seats : !r.seats)
+      && sql.includes("where post_id = p_post and status = 'going'"));
+
+  /* ── Отказ в черновике говорит словами базы ── */
+  const EVENT_REFUSALS = [
+    'У темы с меткой «Событие» должен быть момент — выберите дату и время',
+    'Отвечают одним из трёх слов: буду, возможно, не приду',
+    'Напоминание ставят на готовый срок: за 15 минут, за час или за сутки',
+    'Отвечать можно только на тему с меткой «Событие»',
+    'События уже нет: страница устарела',
+    'Событие отменено — отвечать не на что',
+    'У события нет даты — модератору или автору нужно её поставить',
+    'Событие уже началось: участие записывают до начала',
+  ];
+  check('каждый отказ написан в базе и в черновике слово в слово',
+    EVENT_REFUSALS.every((t) => sql.includes(t) && localSrc.includes(t)),
+    EVENT_REFUSALS.filter((t) => !sql.includes(t) || !localSrc.includes(t)).join(' | '));
+  check('границы момента названы числом из конфига, а не зашиты в черновик',
+    localSrc.includes('eventMinLeadMinutes') && localSrc.includes('eventHorizonDays')
+      && localSrc.includes('eventSeatsMin') && localSrc.includes('eventRemindChoices'));
+  check('отказ про занятые места начинается теми же словами, что у базы',
+    sql.includes("raise exception 'Мест больше нет: занято % из % — организатор ждёт «возможно»'")
+      && localSrc.includes('Мест больше нет: занято'));
+
+  /* ── Плавление SQL:raise exception не умеет склеивать строки ── */
+  check('ни одного raise с склейкой через || — только подстановки %',
+    !/raise exception\s+'[^']*'\s*\|\|/i.test(sql),
+    (sql.match(/raise exception[^\n]*/g) || []).filter((s) => s.includes('||')).join(' | '));
+  check('подстановки % в отказе про места — ровно два, по числу аргументов',
+    (sql.match(/raise exception 'Мест больше нет[^']*'/)[0].match(/%/g) || []).length === 2);
+
+  /* ── Где дверь ── */
+  check('у таблицы ответов нет ни одной политики записи — только чтение',
+    !/create policy[^\n]*on public\.forum_event_rsvps\s*\n\s*for (insert|update|delete)/.test(sql)
+      && sql.includes('grant select on public.forum_event_rsvps to authenticated;'));
+  check('ответ принимает функция с правами владельца, закрытая для анонима',
+    /create or replace function public\.forum_answer_event\([\s\S]{0,200}security definer/.test(sql)
+      && sql.includes('revoke all on function public.forum_answer_event(uuid, text, integer) from public, anon;')
+      && sql.includes('grant execute on function public.forum_answer_event(uuid, text, integer) to authenticated;'));
+  check('планировщик reminders недоступен браузеру вовсе',
+    sql.includes('revoke all on function public.forum_send_event_reminders() from public, anon, authenticated;'));
+  check('наружу от ответов идут только числа, и дают их функции с правами владельца',
+    /create or replace function public\.forum_event_going\(p_post uuid\)[\s\S]{0,120}security definer/.test(sql)
+      && (sql.match(/grant execute on function public\.forum_event_(going|maybe)\(uuid\) to anon, authenticated;/g) || []).length === 2);
+  check('оба представления читают под безопасностью вызывающего',
+    sql.includes('create view public.forum_event_list with (security_invoker = on)')
+      && sql.includes('create view public.forum_post_list with (security_invoker = on)'));
+  check('представление календаря берёт только темы с меткой, живой датой и без удаления',
+    /where '\w+' = any\(p\.tags\) and not p\.deleted and p\.event_at is not null/.test(sql));
+  check('момент встречи обязателен при метке и снимается вместе с ней',
+    sql.includes("new.event_at := null;")
+      && /if not \(\'\w+\' = any\(new\.tags\)\) then/.test(sql));
+  check('требование даты смотрят только когда трогали метки или дату',
+    /if \(new\.tags is distinct from old\.tags or new\.event_at is distinct from old\.event_at\)\s+and new\.event_at is null then/.test(sql));
+  check('границы момента не мешают править завершившуюся встречу',
+    /if new\.event_at is not distinct from old\.event_at then\s+return new;/.test(sql));
+  check('перенос вперёд возвращает напоминания тем, кому они ещё успят',
+    /if old\.event_at is not null and new\.event_at > old\.event_at then[\s\S]{0,320}set reminded_at = null/.test(sql));
+  check('места занимает одна операция с блокировкой темы',
+    sql.includes('perform pg_advisory_xact_lock(hashtextextended(p_post::text, 0));'));
+  check('право писать при ответе не смотрят — это правило, а не недосмотр',
+    /-- Право писать здесь не смотрим сознательно/.test(sql)
+      && !/forum_can_write\(\)/.test(sql.slice(sql.indexOf('create or replace function public.forum_answer_event'), sql.indexOf('-- ── Шаг 6'))));
+  check('вид уведомления расширен, иначе напоминание упало бы на проверке kind',
+    notifSql.includes("kind in ('mention','reply','reaction','subscription','alliance_rank','moderation','digest')")
+      && sql.includes('drop constraint if exists forum_notifications_kind_check')
+      && sql.includes("kind in ('mention','reply','reaction','subscription','alliance_rank','moderation','digest','event')"));
+  check('представление ленты тем пересоздано и знает про собственный ответ',
+    sql.includes('drop view if exists public.forum_post_list;')
+      && sql.includes(') my_rsvp,') && sql.includes(') my_remind_minutes,'));
+
+  /* ── Контракт и адаптеры ── */
+  check('контракт обещает три двери календаря',
+    /=> Promise<ForumEvent\[\]>\} listEvents/.test(contractSrc)
+      && /\(postId: string, status: 'going'\|'maybe'\|'declined', remindMinutes\?: number\|null\) => Promise<void>\} answerEvent/.test(contractSrc)
+      && /\(id: string, eventAt: string, eventCapacity\?: number\|null\) => Promise<ForumPost>\} setEventAt/.test(contractSrc));
+  check('контракт знает о собственном ответе на теме',
+    /@property \{[^\n]*\} \[myRsvp\]/.test(contractSrc) && /@property \{number\|null\} \[myRemindMinutes\]/.test(contractSrc));
+  check('supabase-адаптер читает представление и зовёт функцию с теми же параметрами',
+    supaSrc.includes("'/forum_event_list?select=*&order=event_at.asc'")
+      && supaSrc.includes("'/rpc/forum_answer_event'")
+      && /p_post: postId,[\s\S]{0,80}p_status: status,[\s\S]{0,80}p_remind_minutes: remindMinutes == null \? null : Number\(remindMinutes\)/.test(supaSrc));
+  check('перенос встречи правит две колонки темы, а не всю запись',
+    /setEventAt[\s\S]{0,400}body: \{\s*event_at: eventAt,\s*event_capacity: eventCapacity == null \? null : Number\(eventCapacity\)/.test(supaSrc));
+  check('оба адаптера отдают строке темы собственный ответ и его срок',
+    supaSrc.includes('myRsvp: row.my_rsvp || null')
+      && /myRemindMinutes: row\.my_remind_minutes == null \? null : Number\(row\.my_remind_minutes\)/.test(supaSrc)
+      && /myRsvp: myRsvpOf\(state, p\.id\)/.test(localSrc) && /myRemindMinutes: myRemindOf\(state, p\.id\)/.test(localSrc));
+  check('лента календаря повторяется при таймауте, как лента форума',
+    /listEvents\(\)[\s\S]{0,200}retryOnAbort: true/.test(supaSrc));
+
+  /* ── Чистые функции формата ── */
+  const at = new Date('2026-12-24T20:00:00');
+  equal('местное значение для поля даты не уезжает в Гринвич',
+    fmt.localInputValue(at),
+    `${at.getFullYear()}-12-24T${String(at.getHours()).padStart(2, '0')}:00`);
+  check('строка поля даты обратно читается теми же местными часами',
+    new Date(fmt.localInputValue(at)).getTime() === at.getTime());
+  equal('у пустого момента нет и строки ввода', fmt.localInputValue(null), '');
+  check('обратный отсчёт называет одну величину и умеет «назад»',
+    fmt.eventCountdown(Date.now() + 40 * 60000, Date.now()) === 'через 40 минут'
+      && fmt.eventCountdown(Date.now() + 3 * 86400000, Date.now()) === 'через 3 дня'
+      && fmt.eventCountdown(Date.now() - 2 * 86400000, Date.now()) === '2 дня назад');
+  check('начавшаяся встреча не даёт ответить и уходит в прошедшие',
+    fmt.eventIsPast(new Date(Date.now() - 1000), Date.now()) && !fmt.eventIsPast(at, Date.now())
+      && fmt.eventIsPast(null, Date.now()));
+  equal('срок напоминания назван одним словом на весь сайт',
+    L.eventRemindChoices.map((m) => fmt.remindLabel(m)), ['за 15 минут', 'за час', 'за сутки']);
+  const ics = fmt.icsFor({ id: 'p_1', title: 'Сбор, 20:00; рейд', body: 'Опоздавших не ждём', eventAt: at, authorNick: 'Ковыль' });
+  check('файл в календарь — корректный .ics с CRLF и точкой во времени',
+    ics.startsWith('BEGIN:VCALENDAR') && ics.includes('END:VCALENDAR')
+      && ics.includes('METHOD:PUBLISH') && ics.includes('DTSTART:20261224T')
+      && !ics.includes('DTEND:') && ics.includes('\r\n') && !/[^\r]\n/.test(ics));
+  const summaryLine = ics.split('\r\n').find((l) => l.startsWith('SUMMARY'));
+  check('запятые и точки с запятой в заголовке заэкранированы, а двоеточие остаётся как есть',
+    summaryLine === 'SUMMARY:Сбор\\, 20:00\\; рейд', summaryLine);
+  check('длинная строка переносится по правилам формата',
+    fmt.icsFor({ id: 'p_2', title: 'Очень длинное название встречи, которое заведомо больше семидесяти символов для проверки переноса', eventAt: at })
+      .split('\r\n').some((l) => l.startsWith(' ')));
+  const HREF_PREFIX = 'data:text/calendar;charset=utf-8,';
+  const href = fmt.icsHref({ id: 'p_1', title: 'Сбор', eventAt: at });
+  check('ссылка на файл отдаёт его data-адресом: сервера для отдачи нет',
+    href.startsWith(HREF_PREFIX)
+      && decodeURIComponent(href.slice(HREF_PREFIX.length)) === fmt.icsFor({ id: 'p_1', title: 'Сбор', eventAt: at }));
+
+  /* ── Адрес ── */
+  check('ссылка «создать встречу» понимается, а чужое намерение — нет',
+    composeIntentFromSearch('new=event') === 'event'
+      && composeIntentFromSearch('sort=fresh&new=event') === 'event'
+      && composeIntentFromSearch('new=poll') === '' && composeIntentFromSearch('') === '');
+  check('вид календаря живёт в адресе и не выдумывает четвёртого',
+    calBehSrc.includes('CALENDAR_VIEWS.some((v) => v.id === view)')
+      && DEFAULT_CALENDAR_VIEW === 'next' && !calBehSrc.includes('#/calendar?view=next')
+      && /const search = state\.view === DEFAULT_CALENDAR_VIEW \? '' : `\?view=\$\{state\.view\}`/.test(calBehSrc));
+
+  /* ── Композер: метки и раскрытая форма живут в состоянии ── */
+  check('метки набираемой темы — состояние, а не экран',
+    mountSrc.includes('composerTags: []') && /state\.composerTags = chosen;/.test(mountSrc));
+  check('под общим именем tags в снимок ввода и в черновик-восстановление не лезут',
+    mountSrc.includes("if (key === 'new:tags') return;") && mountSrc.includes("if (name === 'tags') continue;"));
+  check('черновик хранит отмеченные метки списком',
+    /if \(el\.name === 'tags'\) \{\s*if \(el\.checked\) tags\.push\(el\.value\);\s*continue;\s*\}/.test(mountSrc)
+      && mountSrc.includes('draft.tags = tags;'));
+  check('отмеченные метки возвращаются из черновика до первой отрисовки',
+    /if \(!state\.composerTags\.length\) state\.composerTags = composerTagsFromDraft\(\);/.test(mountSrc));
+  check('намерение из адреса не перетирается пустым адресом и гаснет, только когда форма показалась',
+    /state\.eventDraft = state\.eventDraft \|\| composeIntentFromSearch\(search\) === 'event';/.test(mountSrc)
+      && /if \(host\.querySelector\('\[data-forum-composer\]'\)\) state\.eventDraft = false;/.test(mountSrc));
+  check('раскрытие формы — тоже состояние, и его снимает только сам человек',
+    mountSrc.includes('composerOpen: false') && mountSrc.includes('state.composerOpen = true;')
+      && /addEventListener\('toggle',[\s\S]{0,240}data-forum-composer[\s\S]{0,200}\}, true\)/.test(mountSrc));
+  check('уход с форума сбрасывает и намерение, и метки, и раскрытую форму',
+    /state\.eventDraft = false;\s*state\.composerTags = \[\];\s*state\.composerOpen = false;/.test(mountSrc));
+  check('поля встречи не требуют заполнения молча: required у них нет',
+    !/name="event_[^"]*"[^>]*required/.test(pagesSrc) && /data-forum-event-fields/.test(pagesSrc));
+  check('и дата, и места уходят в черновик поста отдельными полями',
+    /draft\.eventAt = form\.event_at\?\.value/.test(mountSrc) && /draft\.eventCapacity = form\.event_seats\?\.value/.test(mountSrc));
+
+  /* ── Разметка: форма и карточка ── */
+  const composerHtml = renderForum({ events: [] }, {
+    ready: true, me: { nick: 'Ковыль', role: 'admin' }, composerTags: [EVENT_TAG_ID], composerOpen: true,
+  });
+  check('встреча встречает человека открытой формой с отмеченной меткой',
+    /data-forum-composer open/.test(composerHtml)
+      && /value="event" checked/.test(composerHtml));
+  check('поле момента показано, а не спрятано за спиной у человека',
+    /data-forum-event-fields(?![^>]*hidden)/.test(composerHtml));
+  const plainComposer = renderForum({ events: [] }, { ready: true, me: { nick: 'Ковыль', role: 'admin' } });
+  check('обычная тема не видит полей даты, но не теряет их из-за hidden required',
+    /data-forum-event-fields hidden/.test(plainComposer) && !/value="event" checked/.test(plainComposer));
+  const cardHtml = renderForum({ events: [] }, {
+    ready: true, loading: false, total: 1,
+    me: { nick: 'Ковыль', role: 'admin' },
+    posts: [{ id: 'p_1', authorNick: 'Ковыль', category: 'chronicle', tags: [EVENT_TAG_ID], title: 'Сбор', body: 'т', createdAt: new Date(), eventAt: at, myRsvp: 'going', myRemindMinutes: 60 }],
+  });
+  check('лента знает про встречу знаком метки и своим ответом',
+    eventBadge({ tags: [EVENT_TAG_ID], eventAt: at, deleted: false }) !== ''
+      && eventBadge({ tags: [], eventAt: at, deleted: false }) === ''
+      && cardHtml.includes('forum-post__event'));
+  check('числа участников рисует страница календаря, а лента о них не знает',
+    calPageSrc.includes('мест занято') && !pagesSrc.includes('мест занято')
+      && !pagesSrc.includes('goingCount'));
+  const actions = eventActions({ id: 'p_1', authorId: 'u_1', eventAt: at, eventCapacity: 8, goingCount: 1, maybeCount: 1, myStatus: 'going', myRemindMinutes: 60, authorNick: 'Ковыль', title: 'Сбор' },
+    { me: { id: 'u_1', role: 'member' } });
+  check('в открытой теме есть три ответа, срок напоминания и перенос',
+    actions.includes('data-evt-answer="p_1:going"') && actions.includes('data-evt-answer="p_1:declined"')
+      && actions.includes('aria-pressed="true"')
+      && actions.includes('data-evt-remind') && actions.includes('data-evt-move'));
+  check('форму переноса видят автор и модерация, а чужой теме она не положена',
+    !eventActions({ id: 'p_1', authorId: 'u_9', eventAt: at, myStatus: null }, { me: { id: 'u_1', role: 'member' } })
+      .includes('data-evt-move')
+      && eventActions({ id: 'p_1', authorId: 'u_9', eventAt: at, myStatus: null }, { me: { id: 'u_1', role: 'moderator' } })
+        .includes('data-evt-move'));
+  check('на прошедшую встречу не отвечают: кнопок нет, а объяснение остаётся',
+    !eventActions({ id: 'p_2', eventAt: new Date(Date.now() - 86400000), myStatus: null }, { me: { id: 'u_1' } })
+      .includes('data-evt-answer')
+      && eventActions({ id: 'p_2', eventAt: new Date(Date.now() - 86400000), myStatus: null }, { me: { id: 'u_1' } })
+        .includes('обсуждение и фото остаются'));
+
+  /*
+    Разметка мест собирается шаблоном с переносами и отступами, поэтому перед
+    сравнением строку сплющивают: тест сверяет слова, а не количество пробелов.
+  */
+  const squash = (h) => h.replace(/\s+/g, ' ');
+  const calState = (over = {}) => ({
+    ready: true, shared: true, sourceName: 'supabase', me: { id: 'u_1', nick: 'Ковыль', role: 'admin' },
+    loading: false, error: '', view: 'next',
+    events: [
+      { id: 'p_next', title: 'Рейд в субботу', body: 'т', category: 'chronicle', tags: [EVENT_TAG_ID], authorId: 'u_1', authorNick: 'Ковыль', createdAt: new Date(), eventAt: new Date(Date.now() + 2 * 86400000), eventCapacity: 8, goingCount: 3, maybeCount: 2, spotsLeft: 5, myStatus: 'going', myRemindMinutes: 60 },
+      { id: 'p_past', title: 'Прошлый рейд', body: 'т', category: 'chronicle', tags: [EVENT_TAG_ID], authorId: 'u_2', authorNick: 'Позывной', createdAt: new Date(), eventAt: new Date(Date.now() - 2 * 86400000), eventCapacity: null, goingCount: 1, maybeCount: 0, spotsLeft: null, myStatus: 'declined', myRemindMinutes: null },
+    ],
+    ...over,
+  });
+  const calHtml = renderCalendar(calState());
+  check('у календаря три вида, и активный ровно один',
+    CALENDAR_VIEWS.every((v) => calHtml.includes(`data-cal-view="${v.id}"`))
+      && (calHtml.match(/cal-tab is-active/g) || []).length === 1);
+  check('на «Ближайших» прошедшая встреча не показывается',
+    calHtml.includes('Рейд в субботу') && !calHtml.includes('Прошлый рейд'));
+  check('«Моё расписание» и «Прошедшие» делят список по-своему',
+    renderCalendar(calState({ view: 'past' })).includes('Прошлый рейд')
+      && renderCalendar(calState({ view: 'mine' })).includes('Прошлый рейд'));
+  const pastHtml = renderCalendar(calState({ view: 'past' }));
+  const mineHtml = renderCalendar(calState({ view: 'mine' }));
+  check('чужие ответы наружу не выходят: ни имён игроков, ни их идентификаторов',
+    [calHtml, pastHtml, mineHtml].every((h) => !h.includes('u_1') && !h.includes('u_2')));
+  check('ведущий показан — он и так публичен, а список участников скрыт за числами',
+    pastHtml.includes('ведёт @Позывной'));
+  check('места названы одной строкой со всеми тремя числами',
+    squash(calHtml).includes('<b>3/8</b> мест занято · ещё 2 человека думает · 5 мест свободно'));
+  check('без лимита места называются словом, а не выдуманным числом',
+    renderCalendar({ ...calState(), events: [{ ...calState().events[0], eventCapacity: null, spotsLeft: null, goingCount: 4 }] })
+      .includes('4 человека собирается'));
+  check('заполненная встреча говорит «свободных нет», а не «0 мест свободно»',
+    renderCalendar({ ...calState(), events: [{ ...calState().events[0], spotsLeft: 0 }] }).includes('свободных нет'));
+  check('пустой календарь говорит, как завести первую встречу',
+    renderCalendar({ ...calState(), events: [] }).includes('Создать встречу'));
+  check('ссылка «Создать встречу» ведёт на форум с намерением',
+    calHtml.includes('#/forum?new=event'));
+  check('без представления календаря страница называет файл миграции',
+    renderCalendar({ ...calState(), error: 'Could not find the view public.forum_event_list' })
+      .includes('supabase/20260925-event-rsvp.sql'));
+  check('обычную ошибку миграцией не объясняют',
+    !renderCalendar({ ...calState(), error: 'Нет сети' }).includes('SQL-редактор'));
+
+  /* ── Проводка страницы ── */
+  const previewSrc = await readFile('scripts/build-preview.mjs', 'utf8');
+  check('календарь — живая вкладка с собственным монтированием',
+    /id: 'calendar', label: 'Календарь', live: true/.test(mainSrc)
+      && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js\?v=\d+'/.test(mainSrc)
+      && /mountCalendar\(app, search\)/.test(mainSrc));
+  check('между вкладками календарь не наследует состояние: его закрывают на каждом уходе',
+    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 7
+      && (mainSrc.match(/unmountCalendar\(\);/g) || []).length === (mainSrc.match(/unmountChats\(\);/g) || []).length);
+  check('календарь стартует живым кадром, а не надписью «загружаем данные»',
+    /const liveFirst = id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'/.test(mainSrc));
+  check('вкладка есть и в адресной карте меню, и в сборке для проверки без базы',
+    previewSrc.includes('renderCalendar') && /id: 'calendar', label: 'Календарь'/.test(previewSrc));
+  check('обработчики календаря живут на обеих страницах одинаково',
+    ['data-evt-answer', 'data-evt-remind', 'data-evt-move', 'data-evt-error']
+      .every((a) => mountSrc.includes(a) && calBehSrc.includes(a)));
+  check('список календаря перерисовывает один отложенный звонок на всю страницу',
+    /let tickTimer = 0;/.test(calBehSrc)
+      && /window\.clearTimeout\(tickTimer\);[\s\S]{0,60}tickTimer = window\.setTimeout\([\s\S]{0,120}\}, 60000\);/.test(calBehSrc)
+      && !/setInterval/.test(calBehSrc));
+  check('уход со страницы гасит звонок, а слушатели остаются под guard по host',
+    (calBehSrc.match(/window\.clearTimeout\(tickTimer\)/g) || []).length === 2
+      && /export function unmountCalendar\(\)\s*\{\s*window\.clearTimeout\(tickTimer\);/.test(calBehSrc)
+      && calBehSrc.includes('if (!host || !host.contains') && calBehSrc.includes('if (wired) return;'));
+  check('отказ карточки не вешается на всю страницу',
+    /showError\(card, String\(err\?\.message \?\? err\)\)/.test(calBehSrc)
+      && /const box = card\.querySelector\('\[data-evt-error\]'\)/.test(calBehSrc));
+
+  /* ── Стиль ── */
+  check('календарь одет своим разделом стилей',
+    cssSrc.includes('.cal-tab') && cssSrc.includes('.evt-card') && cssSrc.includes('.forum-event-fields'));
+  check('на телефоне карточка встречи и кнопки перестроены',
+    mobSrc.includes('.evt-card') && mobSrc.includes('.evt-btn'));
+
+  /* ── Поведение чернового режима: та же арифметика, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const KEY = 'zr33.forum.local';
+  const raw = () => JSON.parse(store.get(KEY));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const MIN = 60000, DAY = 86400000;
+  const ahead = (ms) => new Date(Date.now() + ms).toISOString();
+
+  await local.signUp('Распорядитель');   // первый — владелец
+  const makeTopic = (over = {}) => local.createPost({
+    title: 'Сбор у портала', body: 'Приходят все, кто может.', category: 'chronicle',
+    tags: [EVENT_TAG_ID], eventAt: ahead(2 * DAY), eventCapacity: 2, ...over,
+  });
+
+  equal('без момента тема с меткой не создаётся',
+    await says(() => makeTopic({ eventAt: null })),
+    'У темы с меткой «Событие» должен быть момент — выберите дату и время');
+  equal('встреча «через пять минут» отвергнута так же, как базой',
+    await says(() => makeTopic({ eventAt: ahead(5 * MIN) })),
+    'Назначайте встречу минимум через 10 минут — иначе она родится уже прошедшей');
+  equal('горизонт планирования держит и черновик',
+    await says(() => makeTopic({ eventAt: ahead(91 * DAY) })),
+    'Не дальше 90 дней: планируют на квартал, а не на год');
+  equal('мест от двух — или без лимита',
+    await says(() => makeTopic({ eventCapacity: 1 })),
+    'Мест от 2 до 200 — или ничего, тогда без лимита');
+  const topic = await makeTopic();
+  check('созданная тема знает свой момент и лимит',
+    topic.eventAt && topic.eventCapacity === 2 && topic.tags.includes(EVENT_TAG_ID));
+
+  const events = await local.listEvents();
+  equal('календарь чернового режима отдаёт одну встречу', events.length, 1);
+  check('счётчики идут отдельными полями, а не выдумываются страницей',
+    events[0].goingCount === 0 && events[0].maybeCount === 0 && events[0].spotsLeft === 2);
+
+  await local.answerEvent(topic.id, 'going', 60);
+  const [afterGoing] = await local.listEvents();
+  check('ответ «буду» занимает место и помнит срок напоминания',
+    afterGoing.goingCount === 1 && afterGoing.spotsLeft === 1 && afterGoing.myRemindMinutes === 60);
+  equal('срок напоминания принимает только готовый',
+    await says(() => local.answerEvent(topic.id, 'going', 7)),
+    'Напоминание ставят на готовый срок: за 15 минут, за час или за сутки');
+
+  await local.signUp('Гость');
+  await local.signUp('Опоздавший');
+  await local.signIn('Гость');
+  await local.answerEvent(topic.id, 'going');
+  await local.signIn('Опоздавший');
+  equal('последнее место занято — и это говорит та же фраза, что база',
+    await says(() => local.answerEvent(topic.id, 'going')),
+    'Мест больше нет: занято 2 из 2 — организатор ждёт «возможно»');
+  await local.answerEvent(topic.id, 'maybe', 60);
+  check('«возможно» места не занимает, но будильник себе поставить можно',
+    (await local.listEvents())[0].maybeCount === 1);
+  await local.signIn('Гость');
+  equal('повторное «буду» своего ответа места не просит: человек уже в списке',
+    await says(() => local.answerEvent(topic.id, 'going', 15)), '');
+  await local.signIn('Опоздавший');
+  await local.answerEvent(topic.id, 'declined');
+  const [afterDecline] = await local.listEvents();
+  check('«не приду» освобождает место и снимает напоминание',
+    afterDecline.goingCount === 2 && afterDecline.myRemindMinutes === null
+      && afterDecline.myStatus === 'declined');
+
+  await local.signIn('Опоздавший');
+  equal('чужую встречу не перенесут',
+    await says(() => local.setEventAt(topic.id, ahead(3 * DAY), 4)),
+    'Это не ваш пост');
+  await local.signIn('Распорядитель');
+  check('свою можно перенести, и лимит правится вместе с датой',
+    (await local.setEventAt(topic.id, ahead(4 * DAY), 12)).eventCapacity === 12);
+  equal('далеко в будущее не перенесут',
+    await says(() => local.setEventAt(topic.id, ahead(120 * DAY))),
+    'Не дальше 90 дней: планируют на квартал, а не на год');
+
+  /* Напоминание догоняет тот, кто заглянул в календарь: планировщика в черновике нет. */
+  const soon = await makeTopic({ title: 'Ближний сбор', eventAt: ahead(20 * MIN), eventCapacity: null });
+  await local.answerEvent(soon.id, 'going', 60);
+  const before = (raw().notifications || []).length;
+  await local.listEvents();
+  const fired = (raw().notifications || []).slice(before);
+  check('напоминание приходит в общую лентку уведомлений',
+    fired.length === 1 && fired[0].kind === 'event' && fired[0].actorNick === 'Календарь'
+      && fired[0].preview.startsWith('Скоро: Ближний сбор'), JSON.stringify(fired));
+  await local.listEvents();
+  equal('второй заход не присылает то же напоминание ещё раз',
+    (raw().notifications || []).length, before + 1);
+
+  /* Перенесённая вперёд встреча возвращает право на будильник. */
+  const moved = await local.setEventAt(soon.id, ahead(20 * MIN + 3 * DAY));
+  check('после переноса напоминание снова возможно',
+    moved.eventAt && raw().eventRsvps.find((r) => r.postId === soon.id).remindedAt === null);
+
+  /* Начало само не переставляется: встреча, которая прошла, ответа не ждёт. */
+  const pasted = raw();
+  pasted.posts.find((p) => p.id === soon.id).eventAt = new Date(Date.now() - DAY).toISOString();
+  store.set(KEY, JSON.stringify(pasted));
+  equal('начавшуюся встречу не записывают',
+    await says(() => local.answerEvent(soon.id, 'going')),
+    'Событие уже началось: участие записывают до начала');
+
+  /* Удалённая тема уходит из плана, но ссылка из чата не бросает в пустоту. */
+  await local.deletePost(soon.id, null);
+  check('отменённая встреча исчезает из плана',
+    (await local.listEvents()).every((e) => e.id !== soon.id));
+  const stub = await local.getPost(soon.id);
+  check('тема под удалением отвечает заглушкой: название и момент при ней, флаг не спрятать',
+    Boolean(stub) && stub.deleted && stub.title === 'Ближний сбор' && Boolean(stub.eventAt));
+
+  /* Метка решает всё: без неё дата не переживает запись — тот же шаг, что в триггере. */
+  const stripped = await local.createPost({
+    title: 'Разбор пропущенного боя', body: 'Обсуждаем без приглашения.', category: 'chronicle',
+    tags: [], eventAt: ahead(2 * DAY), eventCapacity: 6,
+  });
+  check('тема без метки «Событие» не сохраняет ни момент, ни лимит',
+    stripped.eventAt === null && stripped.eventCapacity === null);
+  const strippedRaw = raw().posts.find((p) => p.id === stripped.id);
+  check('даты нет в самом черном хранилище, а не только в ответе адаптера',
+    !strippedRaw.eventAt && !strippedRaw.eventCapacity);
 }
 
 console.log(`\n${'─'.repeat(52)}`);

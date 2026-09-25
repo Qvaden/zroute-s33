@@ -24,9 +24,10 @@ import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY }
 import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
-  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry,
+  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, EVENT_TAG_ID,
+  EVENT_RSVP_IDS,
 } from './rules.js';
-import { filtersFromSearch, searchFromFilters } from './feed-url.js';
+import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
@@ -116,6 +117,29 @@ const state = {
     страница намеренно не поднимает шум — закрывает раздел всё-таки база.
   */
   sectionMutes: [],
+  /*
+    Пришли заводить встречу: `#/forum?new=event` из календаря. Флаг открывает
+    композер — и гаснет, как только форма показалась на экране, чтобы человек
+    мог её закрыть и не получать раскрытую форму при каждой перерисовке ленты.
+    До входа композера в разметку (хранилище ещё не готово, человека нет) флаг
+    держим: иначе встреча открывалась бы закрытой.
+  */
+  eventDraft: false,
+  /*
+    Отмеченные метки набираемой темы. Держим их состоянием, а не экраном:
+    у семи чекбоксов одно имя `tags`, и через снимок ввода под этим ключом
+    до человека дошло бы значение последнего. Из-за этого после любой
+    перерисовки пропадали метка «Событие», её дата и требуемый срок —
+    то есть вся встреча, собранная человеком в форме.
+  */
+  composerTags: [],
+  /*
+    Раскрыт ли композер. Тоже состоянием, а не экраном: стартовый кадр
+    пересобирается заново, когда приезжают данные сайта, и к этому моменту
+    форма уже снята с пустого контейнера — раскрытая по намерению из адреса,
+    она молча складывалась бы обратно прямо на глазах у человека.
+  */
+  composerOpen: false,
 };
 
 /**
@@ -179,15 +203,42 @@ function saveComposerDraft() {
   const form = host?.querySelector('[data-forum-new]');
   if (!form) return;
   const draft = {};
+  const tags = [];
   for (const el of form.elements) {
     if (!el.name || el.type === 'file') continue;
+    /*
+      Метки пишутся списком отмеченных, а не одним булевым значением: под общим
+      именем `tags` в черновике осталась бы только последняя галочка, и
+      отмеченное «Событие» пропало бы вместе с датой встречи.
+    */
+    if (el.name === 'tags') {
+      if (el.checked) tags.push(el.value);
+      continue;
+    }
     draft[el.name] = el.type === 'checkbox' ? el.checked : el.value;
   }
+  draft.tags = tags;
   try { localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft)); } catch { /* хранилище недоступно */ }
 }
 
 function clearComposerDraft() {
   try { localStorage.removeItem(COMPOSER_DRAFT_KEY); } catch { /* хранилище недоступно */ }
+}
+
+/**
+ * Метки из сохранённого черновика.
+ *
+ * Черновик живёт в localStorage, а состояние формы — в памяти страницы, и при
+ * возвращении на форум они обязаны сойтись: иначе недописанная встреча теряет
+ * метку «Событие», а вместе с ней и дату, и поля рядом.
+ */
+function composerTagsFromDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY) || 'null');
+    return Array.isArray(draft?.tags)
+      ? [...new Set(draft.tags.filter((tag) => TOPIC_TAG_IDS.includes(tag)))]
+      : [];
+  } catch { return []; }
 }
 
 /* ── Отрисовка ────────────────────────────────────────────────────────────── */
@@ -217,6 +268,12 @@ function captureInput() {
   const forms = {};
   host.querySelectorAll('textarea, input:not([type="radio"]):not([type="password"]), select, [data-editor]').forEach((el) => {
     const key = fieldKey(el);
+    /*
+      Метки темы в снимок не идут: они живут в state.composerTags, а под общим
+      именем `tags` в снимок попалось бы значение последнего чекбокса — и
+      отмеченное «Событие» исчезло бы после первой же перерисовки.
+    */
+    if (key === 'new:tags') return;
     // Чекбокс (например, «разрешить несколько ответов» у опроса) хранит
     // состояние в checked, а не в value: иначе после перерисовки галочка
     // пропадала бы, даже когда человек её ставил.
@@ -288,12 +345,14 @@ function restoreInput(snapshot) {
     const draft = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY) || 'null');
     if (draft && typeof draft === 'object') {
       for (const [name, value] of Object.entries(draft)) {
+        // Метки читают не отсюда: они в state.composerTags (см. state выше).
+        if (name === 'tags') continue;
         const key = `new:${name}`;
         if (!snapshot.forms[key]) snapshot.forms[key] = value;
       }
       if (!snapshot.open.includes('composer')) snapshot.open.push('composer');
     }
-  } catch { /* no saved draft */ }
+  } catch { /* нет сохранённого черновика */ }
 
   for (const [key, value] of Object.entries(snapshot.forms)) {
     if (!value) continue;
@@ -456,9 +515,34 @@ function paint() {
     подтверждение так же, как в ленте.
   */
   const dialogs = renderReportDialog() + renderDeleteDialog();
+  /*
+    Пришли за встречей — метка «Событие» должна быть отмечена до первой
+    отрисовки, а форма раскрыта: человека встречает поле с датой, а не
+    галочка, которую надо ещё искать.
+  */
+  if (state.eventDraft) {
+    if (!state.composerTags.includes(EVENT_TAG_ID)) {
+      state.composerTags = [...state.composerTags, EVENT_TAG_ID];
+    }
+    state.composerOpen = true;
+  }
   host.innerHTML = mode === 'user'
     ? renderUserPage({ ...profileState, me: state.me }) + dialogs
     : renderForum(siteView, state) + dialogs;
+
+  /*
+    Намерение из адреса гасим только тогда, когда форма действительно
+    показалась. До готовности хранилища и до входа композера в разметке нет,
+    и сжечь флаг на пустом кадре значило бы прийти за встречей, получить
+    отмеченную метку, но закрытую форму — то есть ровно то, ради чего
+    человек сюда и шёл.
+
+    Дальше право решать, открыта форма или нет, у самого человека: навязывать
+    раскрытую форму каждой следующей перерисовке значило бы спорить с тем,
+    кто её уже закрыл. Отмеченные метки при этом остаются в
+    state.composerTags — их меняет только сам человек.
+  */
+  if (host.querySelector('[data-forum-composer]')) state.eventDraft = false;
 
   /*
     Таймер Кварта в боковой колонке форума — свой интервал. При каждой
@@ -516,6 +600,18 @@ function clearError(selector) {
   if (box) box.hidden = true;
 }
 
+/*
+  Отказ, который касается одной встречи («мест больше нет», «встреча уже
+  прошла»), показываем внутри её карточки. Общий текст над лентой объяснил бы
+  человеку, что сломался форум, хотя сломалась одна кнопка в одной теме.
+*/
+function showEventError(card, message) {
+  const box = card?.querySelector('[data-evt-error]');
+  if (!box) return;
+  box.textContent = message;
+  box.hidden = false;
+}
+
 /* ── Защита от двойных нажатий ────────────────────────────────────────────── */
 
 /*
@@ -569,6 +665,19 @@ function readFilters(search) {
   Object.assign(state, filtersFromSearch(search, {
     categories: CATEGORY_IDS, tags: TOPIC_TAG_IDS, sorts: SORT_IDS,
   }));
+  /*
+    «Создать встречу» из календаря ведёт сюда же, на форум: встреча у нас и
+    есть тема. Отдельного редактора ради неё нет, поэтому адрес говорит форме,
+    кого человек пришёл писать, — и композер открывается сразу с отмеченной
+    меткой «Событие» и открытыми полями даты.
+
+    Намерение не перетираем пустым адресом: стартовая страница рисуется дважды
+    (сначала контур, потом данные сайта), и адрес к третьему кадру уже
+    чистый — фильтры переписывают его под себя. Сброс на пустом адресе
+    означал бы, что встреча открывает форму на кадре, где её ещё нет, и
+    человек остаётся с закрытым композером.
+  */
+  state.eventDraft = state.eventDraft || composeIntentFromSearch(search) === 'event';
 }
 
 function writeFilters() {
@@ -1266,6 +1375,18 @@ function wire() {
   if (wired) return;
   wired = true;
 
+  /*
+    Запоминаем, открыта ли форма. Событие `toggle` у <details> не всплывает,
+    поэтому слушаем его на document в фазе захвата — иначе выбор человека
+    «свернуть форму» терялся бы при первой же перерисовке.
+  */
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (d instanceof HTMLElement && d.hasAttribute('data-forum-composer')) {
+      state.composerOpen = d.open;
+    }
+  }, true);
+
   document.addEventListener('click', async (e) => {
     if (!host || !host.contains(e.target) || !e.target.closest) return;
     const t = e.target;
@@ -1850,6 +1971,34 @@ function wire() {
     }
 
     /*
+      Ответ на приглашение прямо в теме. На странице календаря те же кнопки
+      обслуживает forum/calendar.js; здесь они нужны потому, что человек
+      читает анонс и хочет ответить, не уходя с темы. Двойной обработки не
+      бывает: у модулей разные host'ы, и на чужой странице обработчик выходит
+      из себя первой же строкой.
+    */
+    const evtAnswer = t.closest('[data-evt-answer]');
+    if (evtAnswer && host.contains(evtAnswer)) {
+      const [id, status] = String(evtAnswer.dataset.evtAnswer).split(':');
+      if (!id || !EVENT_RSVP_IDS.includes(status)) return;
+      const card = evtAnswer.closest('[data-forum-post]');
+      const remind = card?.querySelector('[data-evt-remind]')?.value;
+      evtAnswer.disabled = true;
+      try {
+        await forum.answerEvent(id, status, remind ? Number(remind) : null);
+        /*
+          Обновляем одну карточку, а не ленту: подсветка кнопки и срок
+          напоминания живут в ответе, а порядок тем от этого не меняется.
+        */
+        await refreshOne('post', id);
+      } catch (err) {
+        evtAnswer.disabled = false;
+        showEventError(card, String(err?.message ?? err));
+      }
+      return;
+    }
+
+    /*
       Оспаривание меры: форма живёт в баннере, как правка живёт в карточке.
       Отменяем раньше, чем открываем, — кнопка «Отмена» сидит внутри той же
       формы, и порядок проверок решает, что произойдёт при двойном нажатии.
@@ -1940,6 +2089,28 @@ function wire() {
   document.addEventListener('change', async (e) => {
     if (!host || !host.contains(e.target)) return;
 
+    /*
+      Срок напоминания о встрече. Отдельно от кнопок ответа: человек мог
+      ответить вчера и прийти сегодня только за тем, чтобы будильник звонил
+      за сутки, — перезаписывать его слово ради этого нельзя.
+    */
+    const remindSelect = e.target.closest('[data-evt-remind]');
+    if (remindSelect) {
+      const [id] = String(remindSelect.dataset.evtRemind).split(':');
+      const card = remindSelect.closest('[data-forum-post]');
+      const mine = state.posts.find((p) => p.id === id)?.myRsvp;
+      if (!mine) return;
+      remindSelect.disabled = true;
+      try {
+        await forum.answerEvent(id, mine, remindSelect.value ? Number(remindSelect.value) : null);
+        await refreshOne('post', id);
+      } catch (err) {
+        remindSelect.disabled = false;
+        showEventError(card, String(err?.message ?? err));
+      }
+      return;
+    }
+
     const attachInput = e.target.closest('[data-attach-input]');
     if (attachInput) {
       const scope = attachInput.dataset.attachInput;
@@ -1970,6 +2141,8 @@ function wire() {
       const form = tagBox.closest('form');
       const select = form?.elements.expires_in;
       const chosen = [...form.querySelectorAll('input[name="tags"]:checked')].map((i) => i.value);
+      // Список меток — состояние: только так он переживает перерисовку формы.
+      state.composerTags = chosen;
       if (select && !select.value && needsExpiry(chosen)) {
         const days = CONFIG.forum.limits.expiryDefaultDays?.[tagBox.value];
         if (days && [...select.options].some((o) => o.value === String(days))) select.value = String(days);
@@ -1980,6 +2153,14 @@ function wire() {
       */
       const hint = form?.querySelector('[data-forum-expiry-hint]');
       if (hint) hint.hidden = !needsExpiry(chosen);
+      /*
+        Поля встречи прячутся вместе с меткой: без «События» дата и места не
+        имеют смысла, а оставленные на экране они обещали бы календарь, которого
+        не будет. Обязательность момента база проверит сама — подсказка здесь
+        только про то, что поле вообще существует.
+      */
+      const eventFields = form?.querySelector('[data-forum-event-fields]');
+      if (eventFields) eventFields.hidden = !needsEventDate(chosen);
       /*
         Черновик пересохраняем именно здесь: автосохранение идёт на input,
         который случился до того, как поле заполнилось, и без этого шага
@@ -2017,6 +2198,31 @@ function wire() {
   document.addEventListener('submit', async (e) => {
     if (!host || !host.contains(e.target)) return;
     const form = e.target;
+
+    /*
+      Перенос встречи из её же темы. Границы момента держит база и её текст
+      отказа идёт человеку как есть: придумывать свой на ту же ситуацию
+      значило бы иметь два разных объяснения одного правила.
+    */
+    const moveForm = form.closest('[data-evt-move]');
+    if (moveForm) {
+      e.preventDefault();
+      const id = moveForm.dataset.evtMove;
+      const card = moveForm.closest('[data-forum-post]');
+      const when = moveForm.elements.when?.value;
+      const seats = moveForm.elements.seats?.value;
+      if (!when) return;
+      const btn = moveForm.querySelector('button[type="submit"]');
+      if (btn) btn.disabled = true;
+      try {
+        await forum.setEventAt(id, new Date(when).toISOString(), seats ? Number(seats) : null);
+        await refreshOne('post', id);
+      } catch (err) {
+        if (btn) btn.disabled = false;
+        showEventError(card, String(err?.message ?? err));
+      }
+      return;
+    }
 
     /*
       Кнопка не всегда известна: Enter в поле отправляет форму, и некоторые
@@ -2090,6 +2296,15 @@ function wire() {
       */
       const days = Number(form.expires_in?.value ?? 0);
       draft.expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
+      /*
+        Момент и места встречи. Пустая строка у `datetime-local` — это null, а
+        не дата в 1970 году, поэтому обычная тема уходит без этих полей вовсе.
+        Требование «метка «Событие» ⇒ названный момент» держит база и наш
+        черновой режим одинаковыми словами; повторять отказ здесь незачем —
+        форма после отказа остаётся с набранным текстом, и поле видно сверху.
+      */
+      draft.eventAt = form.event_at?.value ? new Date(form.event_at.value).toISOString() : null;
+      draft.eventCapacity = form.event_seats?.value ? Number(form.event_seats.value) : null;
 
       await withBusy(submitter, 'Публикуем…', async () => {
         try {
@@ -2113,6 +2328,8 @@ function wire() {
           */
           resetForm(form);
           clearComposerDraft();
+          // Метки набранной темы больше не нужны: тема опубликована.
+          state.composerTags = [];
           state.category = 'all';
           state.tag = 'all';
           state.sort = 'fresh';
@@ -2433,6 +2650,12 @@ export async function mountForum(container, view, postId = null, search = '') {
     человек увидел бы подмигивание, а на медленной сети ещё и лишний запрос.
   */
   if (!postId) readFilters(search);
+  /*
+    Отмеченные метки возвращаем из черновика до первой отрисовки: человек
+    вернулся к недописанной теме, и её метки — часть начатого, а не то, что
+    можно нарисовать пустым.
+  */
+  if (!state.composerTags.length) state.composerTags = composerTagsFromDraft();
   wire();
 
   /*
@@ -2581,6 +2804,15 @@ export function unmountForum() {
   state.comments = [];
   state.query = '';
   state.tag = 'all';
+  /*
+    Намерение из адреса и отмеченные метки — состояние набираемой темы, а не
+    ленты. При уходе с форума их сбрасывают: возврат по обычной ссылке
+    «#/forum» не обязан заставлять человека снимать галочку, которую он
+    ставал в прошлый заход.
+  */
+  state.eventDraft = false;
+  state.composerTags = [];
+  state.composerOpen = false;
   state.editingPostId = null;
   // Уведомления сбрасываем вместе с остальным состоянием страницы.
   state.notifyOpen = false;

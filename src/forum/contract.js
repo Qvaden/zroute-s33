@@ -59,6 +59,14 @@
  *                                    и «Срочно» его требует база; истёкшая тема
  *                                    из ленты не исчезает, она получает метку
  *                                    «срок вышел» (см. 20260925-announcement-expiry.sql).
+ * @property {Date|null} [eventAt]    Момент встречи, если тема — событие
+ *                                    (метка «Событие»); null — обычная тема.
+ *                                    Обязательность даты при метке держит
+ *                                    триггер forum_posts_event_at, а снимается
+ *                                    она вместе с самой меткой.
+ * @property {number|null} [eventCapacity]  Сколько мест, null — без лимита.
+ *                                    Считаются ответившие «буду»; «возможно»
+ *                                    места не занимает.
  * @property {boolean} [pinned]       Держать сверху ленты.
  * @property {boolean} [deleted]
  * @property {string}  [deletedReason]
@@ -72,6 +80,15 @@
  *                                   к строке — так же, как подписку.
  * @property {Record<string, number>} reactions  Сколько каких реакций.
  * @property {string|null} myReaction  Что поставил текущий участник.
+ * @property {'going'|'maybe'|'declined'|null} [myRsvp]  Ответ на приглашение
+ *                                    той же строкой; есть только у тем с меткой
+ *                                    «Событие» (поле my_rsvp в ленте базы).
+ *                                    Своё, как my_reaction: чужие ответы ленте
+ *                                    не видны.
+ * @property {number|null} [myRemindMinutes]  Срок напоминания из того же
+ *                                    ответа (my_remind_minutes в ленте базы):
+ *                                    без него выбор «напомнить за час» в теме
+ *                                    выглядел бы снятым.
  * @property {number}  score          Согласны минус не согласны.
  */
 
@@ -174,6 +191,35 @@
  */
 
 /**
+ * Строка календаря: тема с меткой «Событие» плюс её момент и числа.
+ *
+ * Событие намеренно не отдельная сущность, а тема (см. шаг 1 миграции
+ * supabase/20260925-event-rsvp.sql), поэтому здесь нет ни «отменено», ни
+ * «перенесено»: отмена — это удаление темы, и работает тот же механизм, что у
+ * любой удалённой записи.
+ *
+ * Имён в списке участников наружу нет намеренно: «кто идёт» читается как карта
+ * составов альянса, поэтому представление отдаёт только количество.
+ *
+ * @typedef {Object} ForumEvent
+ * @property {string}  id              id темы — она же событие.
+ * @property {string}  title
+ * @property {string}  body            Анонс: тот же текст темы.
+ * @property {string}  category
+ * @property {string[]} tags
+ * @property {string}  authorId        Организатор — тот, кто завёл тему.
+ * @property {string}  authorNick
+ * @property {Date}    createdAt
+ * @property {Date}    eventAt         Момент встречи.
+ * @property {number|null} eventCapacity  Мест; null — без лимита.
+ * @property {number}  goingCount      «Буду» — занимает места.
+ * @property {number}  maybeCount      «Возможно» — мест не занимает.
+ * @property {number|null} spotsLeft   null без лимита; ноль — мест нет.
+ * @property {'going'|'maybe'|'declined'|null} myStatus  Ответ вошедшего; null — не отвечал.
+ * @property {number|null} myRemindMinutes  Срок напоминания из того же ответа.
+ */
+
+/**
  * Что умеет конкретный адаптер форума.
  *
  * Здесь абстракция протекает честно, как и у данных сайта: локальный режим
@@ -204,7 +250,7 @@
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
- * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
@@ -252,6 +298,14 @@
  * @property {(userId: string) => Promise<ForumSectionMute[]>} listSectionMutes  Игрок зовёт себя, панель — любого; без таблицы падает ошибкой, и вызывающий решает, глушить её или показать.
  * @property {(userId: string, category: string, days: number, reason: string) => Promise<void>} setSectionMute  От 1 до 30 дней и с пояснением; тексты отказа приходят из базы и показываются как есть.
  * @property {(userId: string, category: string) => Promise<void>} clearSectionMute  Снять тишину в одном разделе; общая её не трогает.
+ *
+ * Календарь встреч (см. supabase/20260925-event-rsvp.sql). Тема с меткой
+ * «Событие» и есть событие: обсуждение, реакции, жалобы и право оспорить
+ * удаление у неё общие с остальным форумом, а у календаря свои три вещи —
+ * момент, места и напоминание.
+ * @property {() => Promise<ForumEvent[]>} listEvents  Хронологический порядок, предстоящие и прошедшие вместе: делит их страница. Ошибку вызывающий не глушит — по ней видно, какой SQL-файл ещё не выполнен.
+ * @property {(postId: string, status: 'going'|'maybe'|'declined', remindMinutes?: number|null) => Promise<void>} answerEvent  Право писать здесь не нужно, как у апелляций: забаненный спорить словами не может, а прийти ему никто не мешал. Отказ «мест больше нет» считает база.
+ * @property {(id: string, eventAt: string, eventCapacity?: number|null) => Promise<ForumPost>} setEventAt  Назначить или перенести момент своей темы; границы держит база, и её текст отказа страница показывает как есть.
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
  *

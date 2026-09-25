@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, REACTION_IDS, TOPIC_TAG_IDS, needsExpiry, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -65,6 +65,7 @@ function emptyState() {
     notifications: [],
     appeals: [],
     sectionMutes: [],
+    eventRsvps: [],
     chats: [],
     chatMembers: [],
     chatMessages: [],
@@ -285,6 +286,9 @@ function postOut(state, p) {
     editedAt: toDate(p.editedAt) ?? undefined,
     // null — срок не назначен; тот же смысл, что у рабочей базы.
     expiresAt: toDate(p.expiresAt) ?? null,
+    // Момент встречи и лимит мест; оба null у обычной темы (см. шаг 1 миграции).
+    eventAt: toDate(p.eventAt),
+    eventCapacity: p.eventCapacity == null ? null : Number(p.eventCapacity),
     pinned: Boolean(p.pinned),
     deleted: Boolean(p.deleted),
     deletedReason: p.deletedReason || '',
@@ -295,8 +299,24 @@ function postOut(state, p) {
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
     ...r,
+    myRsvp: myRsvpOf(state, p.id),
+    myRemindMinutes: myRemindOf(state, p.id),
     poll: pollOut(state, p.id),
   };
+}
+
+/** Свой ответ на приглашение — та же строка, что у my_reaction: своё, не чужое. */
+function myRsvpOf(state, postId) {
+  if (!state.me) return null;
+  const row = (state.eventRsvps || []).find((r) => r.postId === postId && r.userId === state.me);
+  return row ? row.status : null;
+}
+
+/** Срок напоминания из той же строки: без него селект в теме сбрасывался бы в «не напоминать». */
+function myRemindOf(state, postId) {
+  if (!state.me) return null;
+  const row = (state.eventRsvps || []).find((r) => r.postId === postId && r.userId === state.me);
+  return row && row.remindMinutes != null ? Number(row.remindMinutes) : null;
 }
 
 function pollOut(state, postId) {
@@ -489,11 +509,64 @@ function expiryProblem(tags, when) {
   return '';
 }
 
+/**
+ * ДАТА СОБЫТИЯ В ЧЕРНОВОМ РЕЖИМЕ.
+ *
+ * Держит её база (supabase/20260925-event-rsvp.sql, триггер
+ * forum_posts_event_at), здесь проверка нужна по той же причине, что и
+ * выдержка: увидеть правило и проверить его, не подключая Supabase.
+ * Формулировки отказов совпадают со словами триггера дословно — за этим тоже
+ * следит тест.
+ *
+ * @param {string[]} tags  Метки темы.
+ * @param {string|Date|null} when  Момент встречи или null.
+ * @returns {string}  Пусто, всё в порядке; иначе — текст отказа.
+ */
+function eventWhenProblem(tags, when) {
+  const L = CONFIG.forum.limits;
+  if (needsEventDate(tags) && !when) {
+    return 'У темы с меткой «Событие» должен быть момент — выберите дату и время';
+  }
+  if (!when) return '';
+  const at = new Date(when).getTime();
+  if (at <= Date.now() + L.eventMinLeadMinutes * 60000) {
+    return `Назначайте встречу минимум через ${L.eventMinLeadMinutes} минут — иначе она родится уже прошедшей`;
+  }
+  if (at > Date.now() + L.eventHorizonDays * 86400000) {
+    return `Не дальше ${L.eventHorizonDays} дней: планируют на квартал, а не на год`;
+  }
+  return '';
+}
+
+/**
+ * Лимит мест. Проверку таблицы (от 2 до 200) держит CHECK в колонке, и она
+ * отказала бы текстом нарушения ограничения, а не словами для человека, —
+ * поэтому здесь текст свой, а числа те же, что в колонке.
+ */
+function eventSeatsProblem(capacity) {
+  const L = CONFIG.forum.limits;
+  if (capacity == null || capacity === '') return '';
+  const n = Number(capacity);
+  if (!Number.isInteger(n) || n < L.eventSeatsMin || n > L.eventSeatsMax) {
+    return `Мест от ${L.eventSeatsMin} до ${L.eventSeatsMax} — или ничего, тогда без лимита`;
+  }
+  return '';
+}
+
 export async function createPost(draft) {
   const s = read();
   const me = requireWriter(s);
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
   const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
+  /*
+    Порядок проверок повторяет алфавит триггеров на forum_posts:
+    forum_posts_event_at идёт раньше forum_posts_expiry, и тема сразу с двумя
+    метками («Событие» и «Набор») обязана получить отказ в том же порядке, в
+    каком её отвергла бы база.
+  */
+  const eventError = eventWhenProblem(tags, draft.eventAt ?? null)
+    || eventSeatsProblem(draft.eventCapacity ?? null);
+  if (eventError) throw new Error(eventError);
   const expiryError = expiryProblem(tags, draft.expiresAt ?? null);
   if (expiryError) throw new Error(expiryError);
   checkHold(s, 'post', me, `${draft.title} ${draft.body}`);
@@ -512,6 +585,11 @@ export async function createPost(draft) {
     body: draft.body,
     createdAt: new Date().toISOString(),
     expiresAt: draft.expiresAt ?? null,
+    // Без метки момента не бывает: триггер базы обнуляет event_at, и черновик
+    // обязан сохранить ту же картинку, иначе тема «почти встреча» осталась бы
+    // висеть с датой, которую игрок никогда не утверждал.
+    eventAt: needsEventDate(tags) ? (draft.eventAt ?? null) : null,
+    eventCapacity: needsEventDate(tags) ? (draft.eventCapacity ?? null) : null,
     pinned: false,
     deleted: false,
     views: 0,
@@ -644,6 +722,43 @@ export async function setExpiry(id, expiresAt) {
   if (error) throw new Error(error);
 
   post.expiresAt = when;
+  write(s);
+  return postOut(s, post);
+}
+
+/**
+ * Момент встречи: назначить или перенести.
+ *
+ * Черновик повторяет триггер forum_posts_event_at и по правилам, и по словам
+ * отказа (тест сторожит общность формулировок). Перенос вперёд возвращает
+ * напоминание тем, кому оно ещё должно сработать: иначе человек молча
+ * пропустил бы перенесённую встречу.
+ */
+export async function setEventAt(id, eventAt, eventCapacity = null) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const post = s.posts.find((p) => p.id === id);
+  if (!post) throw new Error('Пост не найден');
+  if (!isStaff(me) && post.authorId !== me.id) throw new Error('Это не ваш пост');
+
+  const error = eventWhenProblem(Array.isArray(post.tags) ? post.tags : [], eventAt ?? null)
+    || eventSeatsProblem(eventCapacity ?? null);
+  if (error) throw new Error(error);
+
+  const was = toDate(post.eventAt);
+  const now = toDate(eventAt);
+  post.eventAt = eventAt ? new Date(eventAt).toISOString() : null;
+  post.eventCapacity = eventCapacity == null ? null : Number(eventCapacity);
+
+  if (was && now && now > was) {
+    for (const r of s.eventRsvps || []) {
+      if (r.postId !== post.id || !r.remindedAt || !r.remindMinutes) continue;
+      if (now.getTime() - r.remindMinutes * 60000 > Date.now()) r.remindedAt = null;
+    }
+  }
+
   write(s);
   return postOut(s, post);
 }
@@ -1447,6 +1562,155 @@ export async function clearSectionMute(userId, category) {
     details: { category },
     createdAt: new Date().toISOString(),
   });
+
+  write(s);
+}
+
+/* ── Календарь встреч ─────────────────────────────────────────────────────── */
+
+/**
+ * Строка календаря из темы и ответов на неё.
+ *
+ * Числа считаются по месту, а не хранятся копией: в базе их даёт представление
+ * с функциями-счётчиками, и копия разошлась бы с ответами при первой же
+ * гонке. Черновику гонки нет — здесь всё читается в один проход.
+ */
+function eventOut(s, post) {
+  const rows = (s.eventRsvps || []).filter((r) => r.postId === post.id);
+  const going = rows.filter((r) => r.status === 'going').length;
+  const mine = rows.find((r) => r.userId === s.me);
+  const capacity = post.eventCapacity == null ? null : Number(post.eventCapacity);
+  return {
+    id: post.id,
+    title: post.title,
+    body: post.body,
+    category: post.category,
+    tags: Array.isArray(post.tags) ? post.tags : [],
+    authorId: post.authorId,
+    authorNick: post.authorNick,
+    createdAt: toDate(post.createdAt) ?? new Date(),
+    eventAt: toDate(post.eventAt),
+    eventCapacity: capacity,
+    goingCount: going,
+    maybeCount: rows.filter((r) => r.status === 'maybe').length,
+    spotsLeft: capacity == null ? null : Math.max(0, capacity - going),
+    myStatus: mine ? mine.status : null,
+    myRemindMinutes: mine && mine.remindMinutes != null ? Number(mine.remindMinutes) : null,
+  };
+}
+
+/**
+ * Напоминание в черновом режиме.
+ *
+ * В базе их носит планировщик (Supabase Cron, см. ЗАПУСК в миграции), а
+ * черновику неоткуда взяться задаче, которая просыпается сама: отметку догона
+ * ставит та страница, которую открыли. Разница одна — «забытый» календарь
+ * напомнит о себе в следующий заход, а не ровно в названный срок.
+ *
+ * @returns {boolean}  Появились ли новые уведомления: тогда состояние пишут.
+ */
+function sweepEventReminders(s) {
+  const now = Date.now();
+  let changed = false;
+  for (const r of s.eventRsvps || []) {
+    if (!r.remindMinutes || r.remindedAt || r.status === 'declined') continue;
+    const post = s.posts.find((p) => p.id === r.postId);
+    if (!post || post.deleted || !post.eventAt) continue;
+    const at = new Date(post.eventAt).getTime();
+    // Те же два условия, что у запроса рассылки: встреча ещё не началась,
+    // и её срок наступил.
+    if (at <= now || at - r.remindMinutes * 60000 > now) continue;
+    pushNotification(s, {
+      userId: r.userId,
+      actorId: null,
+      // Служебное слово на месте ника — тот же порядок, что у «Рейтинга»
+      // и «Дайджеста»: напоминание пишет не человек.
+      actorNick: 'Календарь',
+      kind: 'event',
+      postId: post.id,
+      preview: `Скоро: ${post.title} — через ${Math.max(1, Math.floor((at - now) / 60000))} мин`,
+    });
+    r.remindedAt = new Date().toISOString();
+    changed = true;
+  }
+  return changed;
+}
+
+export async function listEvents() {
+  const s = read();
+  if (sweepEventReminders(s)) write(s);
+  return s.posts
+    // Прошедшие остаются: страница делит ленту на «предстоящие» и «итог»,
+    // а удалённые уходят — отменённая встреча не должна числиться в плане.
+    .filter((p) => !p.deleted && needsEventDate(p.tags) && p.eventAt)
+    .map((p) => eventOut(s, p))
+    .sort((a, b) => a.eventAt - b.eventAt);
+}
+
+/**
+ * Ответ на приглашение.
+ *
+ * Право писать здесь не смотрим сознательно: забаненный не спорит словами, но
+ * прийти на встречу ему никто не мешал (правило 5 в начале миграции). Места
+ * считаются в этом же вызове — как в функции форума, где их занимает одна
+ * операция, а не две.
+ */
+export async function answerEvent(postId, status, remindMinutes = null) {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Отвечает на приглашение вошедший игрок');
+  if (!EVENT_RSVP_IDS.includes(status)) {
+    throw new Error('Отвечают одним из трёх слов: буду, возможно, не приду');
+  }
+  if (remindMinutes != null && !L.eventRemindChoices.includes(Number(remindMinutes))) {
+    throw new Error('Напоминание ставят на готовый срок: за 15 минут, за час или за сутки');
+  }
+
+  const post = s.posts.find((p) => p.id === postId);
+  if (!post) throw new Error('События уже нет: страница устарела');
+  if (!needsEventDate(post.tags)) throw new Error('Отвечать можно только на тему с меткой «Событие»');
+  if (post.deleted) throw new Error('Событие отменено — отвечать не на что');
+  if (!post.eventAt) throw new Error('У события нет даты — модератору или автору нужно её поставить');
+  if (new Date(post.eventAt).getTime() <= Date.now()) {
+    throw new Error('Событие уже началось: участие записывают до начала');
+  }
+
+  const row = (s.eventRsvps || []).find((r) => r.postId === postId && r.userId === me.id);
+  const capacity = post.eventCapacity == null ? null : Number(post.eventCapacity);
+  if (status === 'going' && capacity != null && row?.status !== 'going') {
+    const going = (s.eventRsvps || []).filter((r) => r.postId === postId && r.status === 'going').length;
+    if (going >= capacity) {
+      throw new Error(`Мест больше нет: занято ${going} из ${capacity} — организатор ждёт «возможно»`);
+    }
+  }
+
+  /*
+    Напоминание имеет смысл только там, где человек собирается: «не приду» с
+    будильником — это будильник, который звонит в пустоту. Новый срок — старое
+    напоминание сбрасывается, иначе игрок выбрал бы сутки, а ему однажды
+    пришла бы четверть часа.
+  */
+  const remind = status === 'declined' || remindMinutes == null
+    ? null
+    : Number(remindMinutes);
+
+  if (row) {
+    if (row.remindMinutes !== remind) row.remindedAt = null;
+    row.status = status;
+    row.remindMinutes = remind;
+    row.updatedAt = new Date().toISOString();
+  } else {
+    s.eventRsvps.push({
+      postId,
+      userId: me.id,
+      status,
+      remindMinutes: remind,
+      remindedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
 
   write(s);
 }

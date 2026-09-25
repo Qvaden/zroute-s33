@@ -1372,3 +1372,33 @@ body { min-height: 100svh; }
     min-height: 40px; padding: 9px 8px;
   }
 }
+
+/*
+  Карточка встречи на телефоне. Три колонки (дата · тело · ссылки) на 390px
+  сжимают заголовок темы до двух слов, а ссылка «В мой календарь» ломает
+  перенос. Колонку ссылок уводим под тело: дата и заголовок остаются читаемыми.
+*/
+@media (max-width: 560px) {
+  .evt-card {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 10px;
+    padding: 11px 12px;
+  }
+  .evt-card__side {
+    grid-column: 1 / -1;
+    justify-items: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .evt-card__side .evt-link { flex: 1 1 auto; text-align: center; }
+  .evt-card__when b { font-size: 17px; }
+  .cal-day__head { top: 0; }
+}
+
+/* Кнопки ответа и вкладки календаря — те же тач-цели, что у действий поста. */
+@media (hover: none) and (pointer: coarse) {
+  body .evt-actions .evt-btn,
+  body .cal-tab { min-height: 38px; }
+  body .evt-remind select { min-height: 36px; }
+}

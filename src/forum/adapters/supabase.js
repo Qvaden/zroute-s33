@@ -260,6 +260,14 @@ function postOut(row) {
       (триггер forum_posts_expiry), а не страница.
     */
     expiresAt: toDate(row.expires_at) ?? null,
+    /*
+      Момент встречи и лимит мест. Оба пустые у обычной темы, и это законное
+      состояние: колонки добавлены ради календаря, а живут у темы (см. шаг 1
+      supabase/20260925-event-rsvp.sql). Требование даты при метке «Событие»
+      смотрит триггер, а не эта строка.
+    */
+    eventAt: toDate(row.event_at) ?? null,
+    eventCapacity: Number(row.event_capacity ?? 0) || null,
     pinned: Boolean(row.pinned),
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
@@ -267,6 +275,17 @@ function postOut(row) {
     commentCount: Number(row.comment_count || 0),
     reactions: counts,
     myReaction: row.my_reaction || null,
+    /*
+      Свой ответ на приглашение. Лента обязана знать, что человек уже отвечал,
+      иначе кнопка «буду» на открытой теме выглядела бы нетронутой. Поля нет в
+      строке, пока миграцию не прогнали, — отсюда пустое значение, а не ошибка.
+    */
+    myRsvp: row.my_rsvp || null,
+    /*
+      Срок напоминания из той же строки ответов. Без него селект в карточке
+      темы каждый раз открывался бы с «не напоминать», хотя будильник стоит.
+    */
+    myRemindMinutes: row.my_remind_minutes == null ? null : Number(row.my_remind_minutes),
     score,
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     poll: pollOut(row.poll),
@@ -434,22 +453,40 @@ export async function createPost(draft) {
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
   const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
 
+  const payload = {
+    category: draft.category,
+    title: draft.title,
+    body: draft.body,
+    tags,
+    /*
+      Срок уезжает в базу как есть, без местной проверки: границ (от суток до
+      90 дней) и требования срока для «Набор» и «Срочно» держит триггер
+      forum_posts_expiry, и его текст человек видит целиком. Дублировать
+      отказ здесь значило бы однажды разойтись с базой формулировкой.
+    */
+    expires_at: draft.expiresAt ?? null,
+  };
+
+  /*
+    Момент встречи и места — те же колонки темы, что и срок действия: событие
+    у нас и есть тема с меткой «Событие». Границы (не меньше десяти минут
+    вперёд, не дальше 90 дней, места от 2 до 200) держит триггер
+    forum_posts_event_at, и его текст человек видит целиком.
+
+    Поля прикладываются только когда их попросили. Колонки добавлены последней
+    миграцией, а PostgREST отвергает запрос с неизвестным столбцом целиком:
+    отправляй event_at у каждой обычной темы — и до прогона
+    20260925-event-rsvp.sql встанет весь форум, а не только календарь.
+  */
+  if (draft.eventAt != null || draft.eventCapacity != null) {
+    payload.event_at = draft.eventAt ?? null;
+    if (draft.eventCapacity != null) payload.event_capacity = Number(draft.eventCapacity);
+  }
+
   const rows = await rest('/forum_posts', {
     method: 'POST',
     prefer: 'return=representation',
-    body: {
-      category: draft.category,
-      title: draft.title,
-      body: draft.body,
-      tags,
-      /*
-        Срок уезжает в базу как есть, без местной проверки: границ (от суток до
-        90 дней) и требования срока для «Набор» и «Срочно» держит триггер
-        forum_posts_expiry, и его текст человек видит целиком. Дублировать
-        отказ здесь значило бы однажды разойтись с базой формулировкой.
-      */
-      expires_at: draft.expiresAt ?? null,
-    },
+    body: payload,
   });
   const created = Array.isArray(rows) ? rows[0] : rows;
   if (!created?.id) throw new Error('Пост не создан');
@@ -949,6 +986,96 @@ export async function clearSectionMute(userId, category) {
     method: 'POST',
     body: { p_user_id: userId, p_category: category, p_days: null, p_reason: '' },
   });
+}
+
+/* ── Календарь встреч ─────────────────────────────────────────────────────── */
+
+/**
+ * Строка календаря.
+ *
+ * Числа участников приходят уже посчитанные: представление вызывает
+ * forum_event_going и forum_event_maybe, которые работают правами владельца
+ * схемы и отдают наружу только количество. Считать это в браузере нечем:
+ * список ответов модерации и самому игроку политика отдаёт целиком, а гостю
+ * не отдаёт вовсе, и без функций гость увидел бы пустой календарь.
+ */
+function eventOut(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    category: row.category,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    authorId: row.author_id,
+    authorNick: row.author_nick,
+    createdAt: toDate(row.created_at) ?? new Date(),
+    /*
+      Представление не отдаёт темы без момента: метка «Событие» старше этого
+      правила, и такие темы на форуме уже есть. null здесь — только след
+      прямой правки в SQL-редакторе, и страница обязана такую строку пропустить,
+      а не показывать ей 1970 год.
+    */
+    eventAt: toDate(row.event_at),
+    eventCapacity: row.event_capacity == null ? null : Number(row.event_capacity),
+    goingCount: Number(row.going_count || 0),
+    maybeCount: Number(row.maybe_count || 0),
+    spotsLeft: row.spots_left == null ? null : Number(row.spots_left),
+    myStatus: row.my_status || null,
+    myRemindMinutes: row.my_remind_minutes == null ? null : Number(row.my_remind_minutes),
+  };
+}
+
+/**
+ * Лента календаря: хронологический порядок, предстоящие и прошедшие вместе.
+ *
+ * Деление на «ближе» и «позади» делает страница, а не база: один и тот же
+ * запрос кормит и список, и «Моё расписание», и фильтровать его двумя
+ * условиями значило бы вычитывать второе представление.
+ *
+ * Ошибку не глушим: представление появилось последней миграцией, и по её
+ * тексту страница называет игроку файл, которого не хватает.
+ */
+export async function listEvents() {
+  const rows = await rest('/forum_event_list?select=*&order=event_at.asc', { retryOnAbort: true });
+  return (Array.isArray(rows) ? rows : []).map(eventOut);
+}
+
+/**
+ * Ответ на приглашение.
+ *
+ * Прямой записи в таблицу нет: только функция в базе умеет сказать «мест
+ * больше нет», проверяя и занимая место в одной операции. И права писать она
+ * не требует — та же логика, что у апелляций.
+ */
+export async function answerEvent(postId, status, remindMinutes = null) {
+  await rest('/rpc/forum_answer_event', {
+    method: 'POST',
+    body: {
+      p_post: postId,
+      p_status: status,
+      p_remind_minutes: remindMinutes == null ? null : Number(remindMinutes),
+    },
+  });
+}
+
+/**
+ * Назначить или перенести момент встречи.
+ *
+ * Отдельная функция, как setExpiry: перенос — это одна колонка, и открывать
+ * ради неё редактор текста значило бы давать человеку поле с чужим постом
+ * там, где ему нужны две кнопки.
+ */
+export async function setEventAt(id, eventAt, eventCapacity = null) {
+  await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: {
+      event_at: eventAt,
+      event_capacity: eventCapacity == null ? null : Number(eventCapacity),
+    },
+  });
+  const full = await getPost(id);
+  if (!full) throw new Error('Тема не найдена после переноса встречи');
+  return full;
 }
 
 /**

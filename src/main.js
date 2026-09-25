@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=58';
-import { loadAll, capabilities, db } from './data/index.js?v=58';
-import { validateDataset } from './data/contract.js?v=58';
+import { CONFIG } from '../config.js?v=59';
+import { loadAll, capabilities, db } from './data/index.js?v=59';
+import { validateDataset } from './data/contract.js?v=59';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,26 +9,27 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=58';
-import { renderHome } from './pages/home.js?v=58';
-import { renderLadder } from './pages/ladder.js?v=58';
-import { renderQuarter } from './pages/quarter-final.js?v=58';
-import { renderTimeline } from './pages/timeline.js?v=58';
-import { renderGuide } from './pages/guide.js?v=58';
-import { renderBot } from './pages/bot.js?v=58';
-import { renderAbout } from './pages/about.js?v=58';
-import { renderAlliance } from './pages/alliance.js?v=58';
-import { computeAchievements } from './logic/achievements.js?v=58';
-import { esc } from './ui/helpers.js?v=58';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=58';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=58';
+} from './logic/standings.js?v=59';
+import { renderHome } from './pages/home.js?v=59';
+import { renderLadder } from './pages/ladder.js?v=59';
+import { renderQuarter } from './pages/quarter-final.js?v=59';
+import { renderTimeline } from './pages/timeline.js?v=59';
+import { renderGuide } from './pages/guide.js?v=59';
+import { renderBot } from './pages/bot.js?v=59';
+import { renderAbout } from './pages/about.js?v=59';
+import { renderAlliance } from './pages/alliance.js?v=59';
+import { computeAchievements } from './logic/achievements.js?v=59';
+import { esc } from './ui/helpers.js?v=59';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=59';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=59';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=58';
-import './ui/timeline-controls.js?v=58';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=58';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=58';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=58';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=58';
+import './ui/ladder-controls.js?v=59';
+import './ui/timeline-controls.js?v=59';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=59';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=59';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=59';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=59';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=59';
 
 /*
   РАЗДЕЛЫ.
@@ -57,6 +58,7 @@ const ROUTES = [
   { id: 'chats', label: 'Чаты', live: true, primary: true },
   { id: 'tournaments', label: 'Турниры', live: true, primary: true },
   { id: 'guides', label: 'Гайды', live: true, primary: true },
+  { id: 'calendar', label: 'Календарь', live: true, primary: true },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -327,6 +329,7 @@ function render() {
     // откуда сюда и приходят.
     unmountForum();
     unmountChats();
+    unmountCalendar();
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
     path = `/alliance/${param}`;
@@ -342,6 +345,7 @@ function render() {
     unmountChats();
     unmountTournaments();
     unmountGuides();
+    unmountCalendar();
     renderNav('forum');
     app.innerHTML = '';
     mountUser(app, decodeURIComponent(param));
@@ -354,6 +358,7 @@ function render() {
       unmountForum();
       unmountTournaments();
       unmountGuides();
+      unmountCalendar();
       app.innerHTML = '';
       // Второй сегмент — id чата; ссылка-приглашение: #/chats/join/<код>.
       const rest = location.hash.replace(/^#\/?chats\/?/, '');
@@ -363,6 +368,7 @@ function render() {
       unmountForum();
       unmountChats();
       unmountGuides();
+      unmountCalendar();
       app.innerHTML = '';
       mountTournaments(app, view.alliances);
       path = '/tournaments';
@@ -370,15 +376,30 @@ function render() {
       unmountForum();
       unmountChats();
       unmountTournaments();
+      unmountCalendar();
       app.innerHTML = '';
       // Второй сегмент — slug гайда: #/guides/na-sklad.
       const rest = location.hash.replace(/^#\/?guides\/?/, '');
       mountGuides(app, rest ? decodeURIComponent(rest) : null);
       path = rest ? '/guides/slug' : '/guides';
+    } else if (route.id === 'calendar') {
+      unmountForum();
+      unmountChats();
+      unmountTournaments();
+      unmountGuides();
+      app.innerHTML = '';
+      /*
+        Хвост адреса хранит вид календаря (#/calendar?view=mine): ссылка на
+        «Моё расписание» должна открываться именно на нём, иначе человек
+        приходит за своими ответами, а попадает в общий список.
+      */
+      mountCalendar(app, search);
+      path = '/calendar';
     } else if (route.live) {
       unmountChats();
       unmountTournaments();
       unmountGuides();
+      unmountCalendar();
       /*
         Живому разделу нельзя просто подставить строку: он сам решает, что
         показать, потому что ждёт ответа хранилища. Второй сегмент адреса —
@@ -397,6 +418,7 @@ function render() {
       unmountChats();
       unmountTournaments();
       unmountGuides();
+      unmountCalendar();
       app.innerHTML = route.id === 'quarter'
         ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
         : route.id === 'bot'
@@ -466,7 +488,7 @@ async function boot() {
     и она допишется, когда данные приедут. А сами данные грузятся фоном.
   */
   const { id, param } = parseHash();
-  const liveFirst = id === 'forum' || id === 'chats' || (id === 'user' && param);
+  const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar' || (id === 'user' && param);
 
   app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
   if (liveFirst) {

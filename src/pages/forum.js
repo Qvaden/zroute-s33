@@ -21,8 +21,10 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel, needsExpiry } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel, needsExpiry, needsEventDate } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
+import { localInputValue } from '../forum/event-format.js';
+import { eventBadge, eventActions } from './calendar.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
 import { leaderBadge } from './chats.js';
@@ -653,7 +655,7 @@ function renderAccountBar(s) {
   ника («@Ник — ответил на вашу запись»), а значок и цвет работают там, где
   подпись не читают: в списке из десяти строк и на телефоне.
 
-  «Рейтинг», «Модерация» и «Дайджест недели» пишет база, а не человек. Автора
+  «Рейтинг», «Модерация», «Дайджест недели» и «Календарь» пишет база, а не человек. Автора
   у них нет, поэтому идут своим заголовком и без «@» — в базе на этом месте
   лежат служебные слова, и показать их как ник было бы неправдой.
 */
@@ -665,6 +667,12 @@ const NOTIFY_KINDS = {
   alliance_rank: { system: 'Рейтинг', label: 'место альянса изменилось', icon: 'rank', tone: 'var(--gold)', href: '#/ladder' },
   moderation: { system: 'Модерация', label: 'новый сигнал', icon: 'flag', tone: 'var(--loss)', href: '#/forum' },
   digest: { system: 'Дайджест недели', icon: 'digest', tone: 'var(--accent)', href: '#/home' },
+  /*
+    Напоминание о встрече ведёт не в календарь, а в тему: у такого уведомления
+    есть postId, и notifyRow всегда отдаёт приоритет ссылке на запись. Это
+    правильно — готовиться к рейду человек приходит в обсуждение, а не в список.
+  */
+  event: { system: 'Календарь', label: 'время близится', icon: 'event', tone: 'var(--gold)', href: '#/calendar' },
 };
 
 /* Значки в той же графике, что колокольчик: 24×24, штрих currentColor. */
@@ -676,6 +684,7 @@ const NOTIFY_ICONS = {
   rank: '<path d="M4 20v-9"/><path d="M10 20V4"/><path d="M16 20v-6"/><path d="M2 20h20"/>',
   flag: '<path d="M5 21V4"/><path d="M5 5h11l-1.7 3.5L16 12H5z"/>',
   digest: '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8M8 16h5"/>',
+  event: '<path d="M5 6h14v14H5z"/><path d="M5 10h14"/><path d="M9 3v4M15 3v4"/><path d="M9 15h3"/>',
 };
 
 function notifyGlyph(kind) {
@@ -1292,7 +1301,7 @@ function expiryChoices() {
  * Списком вариантов правим мы, а решают часы базы: предложение, которое она
  * отвергла бы («+200 дней»), в поле висеть не должно.
  */
-function renderExpiryField() {
+function renderExpiryField(tags) {
   const days = expiryChoices();
   const defaults = CONFIG.forum.limits.expiryDefaultDays || {};
   if (!days.length) return '';
@@ -1315,9 +1324,42 @@ function renderExpiryField() {
           )
           .join('')}
       </select>
-      <small class="muted" data-forum-expiry-hint>Теме с меткой «Набор» или «Срочно» срок нужен обязательно:
+      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор» или «Срочно» срок нужен обязательно:
         он подставится сам, но его можно выбрать другой.</small>
     </label>`;
+}
+
+/**
+ * Поля встречи в форме темы.
+ *
+ * Метка «Событие» обязывает назвать момент — это правило триггера базы, и
+ * форма предлагает ровно тот диапазон, который база примет: не раньше чем
+ * через 10 минут и не дальше 90 дней. Поля скрыты, пока метка не отмечена
+ * (см. обработчик тегов в mount.js), — иначе у обычной темы висело бы
+ * пустое поле с подписью «Когда».
+ *
+ * Мест можно не называть: тогда встреча без лимита, и «буду» скажет любое
+ * число человек. Организатор часто знает только состав, а не потолок.
+ */
+function renderEventFields(open) {
+  const L = CONFIG.forum.limits;
+  const now = Date.now();
+  return `
+    <div class="forum-event-fields" data-forum-event-fields${open ? '' : ' hidden'}>
+      <label class="forum-field">
+        <span>Когда</span>
+        <input type="datetime-local" name="event_at"
+               min="${esc(localInputValue(now + L.eventMinLeadMinutes * 60000))}"
+               max="${esc(localInputValue(now + L.eventHorizonDays * 86400000))}">
+      </label>
+      <label class="forum-field">
+        <span>Мест</span>
+        <input type="number" name="event_seats"
+               min="${L.eventSeatsMin}" max="${L.eventSeatsMax}" placeholder="без лимита">
+      </label>
+      <small class="muted">Встреча — это обычная тема с назначенным моментом: обсуждение,
+        ответы и картинки остаются в ней. Момент можно перенести потом прямо в карточке.</small>
+    </div>`;
 }
 
 /**
@@ -1377,8 +1419,21 @@ function renderComposer(s) {
   if (s.me.banned) return '';
 
   const L = CONFIG.forum.limits;
+  /*
+    Метки темы живут в состоянии (`s.composerTags`), а не в разметке: форма
+    пересобирается из строки при каждой перерисовке, и отмеченные галочки,
+    оставшиеся только на экране, пропадали бы вместе с зависимыми от них
+    полями — сроком и датой встречи.
+
+    `s.composerOpen` — раскрыта ли форма. Держим это состоянием, а не экраном:
+    при приходе данных стартовый кадр пересобирается с пустого контейнера, и
+    раскрытая по намерению из адреса форма складывалась бы обратно у человека
+    на глазах. Намерение («пришли за встречей») раскрывает форму один раз, а
+    дальше ею распоряжается сам человек — см. слушателя toggle в mount.js.
+  */
+  const tags = Array.isArray(s.composerTags) ? s.composerTags : [];
   return `
-    <details class="panel forum-composer" data-forum-composer>
+    <details class="panel forum-composer" data-forum-composer${s.composerOpen ? ' open' : ''}>
       <summary class="forum-composer__summary">
         <span class="forum-composer__plus" aria-hidden="true">+</span>
         <b>Написать пост</b>
@@ -1399,10 +1454,12 @@ function renderComposer(s) {
 
         <fieldset class="forum-topic-tags">
           <legend>Теги темы <small>до трёх</small></legend>
-          ${TOPIC_TAGS.map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"><span>${esc(tag.label)}</span></label>`).join('')}
+          ${TOPIC_TAGS.map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"${tags.includes(tag.id) ? ' checked' : ''}><span>${esc(tag.label)}</span></label>`).join('')}
         </fieldset>
 
-        ${renderExpiryField()}
+        ${renderExpiryField(tags)}
+
+        ${renderEventFields(needsEventDate(tags))}
 
         <label class="forum-field">
           <span>Заголовок</span>
@@ -1785,6 +1842,7 @@ export function renderPostCard(p, s) {
             : ''
         }
         ${expiryBadge(p)}
+        ${eventBadge(p)}
       </header>
 
       ${
@@ -1806,6 +1864,8 @@ export function renderPostCard(p, s) {
       ${p.poll ? renderPoll(p.poll, s) : ''}
 
       ${isOpen ? expiryControl(p, s) : ''}
+
+      ${isOpen && needsEventDate(p.tags) ? eventActions(p, s) : ''}
 
       ${
         // По видимому тексту, а не по HTML: жирный абзац в три слова —

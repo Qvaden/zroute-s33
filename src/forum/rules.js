@@ -153,6 +153,32 @@ export function needsExpiry(tags) {
   return (Array.isArray(tags) ? tags : []).some((tag) => EXPIRY_TAG_IDS.includes(tag));
 }
 
+/*
+  Календарь встреч. Событием тема становится по метке, а не по отдельной
+  таблице (см. рассуждение в шаге 1 той же миграции), и у метки есть своё
+  требование: без момента тема в календаре повисла бы как «когда-нибудь».
+  Тот же id стоит в триггере forum_posts_event_at и в представлении
+  forum_event_list. Расхождение сторожит тест.
+*/
+export const EVENT_TAG_ID = 'event';
+
+/** @param {string[]} tags */
+export function needsEventDate(tags) {
+  return (Array.isArray(tags) ? tags : []).includes(EVENT_TAG_ID);
+}
+
+/**
+ * Три ответа на приглашение. «Возможно» места не занимает: иначе организатор
+ * забил бы свою встречу людьми, которые могут и не прийти. Слова совпадают со
+ * CHECK'ом колонки status в supabase/20260925-event-rsvp.sql.
+ */
+export const EVENT_RSVP = [
+  { id: 'going', label: 'Буду', seats: true },
+  { id: 'maybe', label: 'Возможно', seats: false },
+  { id: 'declined', label: 'Не приду', seats: false },
+];
+export const EVENT_RSVP_IDS = EVENT_RSVP.map((r) => r.id);
+
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 
 /**
