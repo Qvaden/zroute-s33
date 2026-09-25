@@ -240,7 +240,6 @@ function postOut(row) {
     */
     authorAvatar: row.author_avatar || '',
     authorAlliance: row.author_alliance || '',
-    authorAlliance: row.author_alliance || '',
     /*
       Роль автора нужна для метки рядом с ником: читатель должен понимать,
       кто перед ним, когда речь о правилах или решении по жалобе — иначе слово
@@ -332,9 +331,29 @@ export async function listPosts(opts = {}) {
   const posts = (hasMore ? rows.slice(0, limit) : (Array.isArray(rows) ? rows : []))
     .map(postOut);
   if (currentUserId() && posts.length) {
-    const subscriptions = await rest('/forum_topic_subscriptions?select=post_id');
+    /*
+      Подписки и счётчик новых ответов — два независимых запроса, и ждут их
+      вместе: второй ничего не знает про первый.
+
+      Счётчик берётся из представления forum_topic_unread, а не из колонки
+      ленты: forum_post_list — большое представление, и каждая тема в нём
+      на счету, а поле нужно ровно одному блоку карточки. Отказ этого запроса
+      гасит только знак «новых», но не ленту: человек увидит темы без счётчика
+      там, где мог бы увидеть темы целиком.
+    */
+    const [subscriptions, unreadRows] = await Promise.all([
+      rest('/forum_topic_subscriptions?select=post_id'),
+      rest('/forum_topic_unread?select=post_id,unread').catch(() => []),
+    ]);
     const subscribed = new Set((Array.isArray(subscriptions) ? subscriptions : []).map((row) => row.post_id));
-    posts.forEach((post) => { post.subscribed = subscribed.has(post.id); });
+    const unread = new Map();
+    for (const row of Array.isArray(unreadRows) ? unreadRows : []) {
+      unread.set(row.post_id, Number(row.unread || 0));
+    }
+    posts.forEach((post) => {
+      post.subscribed = subscribed.has(post.id);
+      post.unread = unread.get(post.id) || 0;
+    });
   }
 
   return { posts, total: offset + posts.length + (hasMore ? 1 : 0) };
@@ -361,6 +380,24 @@ export async function getPost(id) {
  */
 export async function registerView(postId) {
   await rest('/rpc/forum_register_view', {
+    method: 'POST',
+    body: { target_post: postId },
+  });
+}
+
+/**
+ * Отметка «я здесь был».
+ *
+ * Ставится там же, где просмотр (см. mount.js): человек вошёл в тему — он её и
+ * прочитал. Просмотр считается у любого, отметка — только у вошедшего, потому
+ * что она привязана к человеку.
+ *
+ * Пишет её функция базы (forum_read_topic), а не запись в таблицу: по правилам
+ * строк свою строку отметки можно только добавить, а передвигать отметку
+ * при каждом входе приходится — rpc делает это одним запросом.
+ */
+export async function markRead(postId) {
+  await rest('/rpc/forum_read_topic', {
     method: 'POST',
     body: { target_post: postId },
   });

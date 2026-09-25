@@ -310,7 +310,7 @@
 @media (min-width: 1040px) {
   .brand--head { display: none; }
 }
-/* Надпись LIVE // SERVER 33 из styles-v8.css встала бы поверх статуса. */
+/* Надпись «СЕЙЧАС // СЕРВЕР 33» из styles-v8.css встала бы поверх статуса. */
 .site-head__inner::before { display: none; }
 #app::before { display: none; }
 /*
@@ -1294,6 +1294,23 @@
   font-weight: 600;
   white-space: nowrap;
 }
+/*
+  Знак «новых ответов» — тот же приём, что у «Ваш след», только цветом:
+  он зовёт войти в тему, а не описывает её.
+*/
+.forum-post__new {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--electric, var(--accent)) 55%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--electric, var(--accent)) 16%, transparent);
+  color: var(--electric, var(--accent));
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Тема с новыми ответами читается в ленте плотнее — за неё цепляется глаз. */
+.forum-post--unread .forum-post__title { font-weight: 800; }
 
 .forum-post__title { margin: 0 0 9px; font-size: clamp(16px, 2.1vw, 20px); }
 .forum-post__title a { color: inherit; text-decoration: none; }

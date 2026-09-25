@@ -59,6 +59,12 @@
  * @property {string}  [deletedReason]
  * @property {number}  commentCount
  * @property {number}  views          Сколько раз открывали тему.
+ * @property {number}  [unread]       Сколько чужих ответов появилось после
+ *                                   последнего входа этого человека. Поле есть
+ *                                   только в ленте и только для вошедшего:
+ *                                   база считает его представлением
+ *                                   forum_topic_unread, а адаптер приклеивает
+ *                                   к строке — так же, как подписку.
  * @property {Record<string, number>} reactions  Сколько каких реакций.
  * @property {string|null} myReaction  Что поставил текущий участник.
  * @property {number}  score          Согласны минус не согласны.
@@ -153,7 +159,8 @@
  * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string}) => Promise<{posts: ForumPost[], total: number}>} listPosts
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
- * @property {(draft: {title: string, body: string, category: string, tags?: string[], poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost
+ * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned

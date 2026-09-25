@@ -46,7 +46,7 @@ function renderLeadershipRoles(page) {
   return `
     <section class="roles-panel panel">
       <header class="panel__head roles-panel__head">
-        <span class="eyebrow">Alliance // Command</span>
+        <span class="eyebrow">Альянс // штаб</span>
         <h2>${esc(page.rolesTitle)}</h2>
         <p class="guide__lead">${esc(page.rolesSubtitle)}</p>
       </header>
@@ -54,7 +54,7 @@ function renderLeadershipRoles(page) {
         ${roles.map((role) => `<article class="role-card role-card--${esc(role.tone)}" style="--role-color:${colorValue(role.tone)}"><div class="role-card__top"><span class="role-card__icon" aria-hidden="true">${esc(role.icon)}</span><span class="role-card__tag">${role.title.trim().toLowerCase() === 'глава альянса' ? 'R5' : 'R4'}</span></div><h3>${esc(role.title)}</h3><p class="role-card__intro">${esc(role.intro)}</p><ul>${role.items.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>${role.assistant ? '<span class="role-card__assistant">🤝 + помощник</span>' : ''}</article>`).join('')}
       </div>
     </section>
-    <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // Balance</span><h3>${esc(page.noticeTitle)}</h3>${miniMarkdown(page.noticeBody)}</div></section>
+    <section class="roles-notice panel"><div class="roles-notice__mark">!</div><div><span class="eyebrow">Важно // баланс</span><h3>${esc(page.noticeTitle)}</h3>${miniMarkdown(page.noticeBody)}</div></section>
     <p class="roles-credit">${esc(page.credit)}</p>`;
 }
 

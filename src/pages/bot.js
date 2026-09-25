@@ -7,7 +7,7 @@ export function renderBot() {
       <div class="bot-hero__orb bot-hero__orb--two" aria-hidden="true"></div>
       <div class="bot-hero__top">
         <div>
-          <span class="eyebrow">Telegram // GUIDE SYSTEM</span>
+          <span class="eyebrow">Telegram // бот-справочник</span>
           <h1 class="tl__title">Гайд-бот,<br><em>который всегда рядом</em></h1>
           <p class="bot-hero__lead">
             <strong>@zrrguide_bot</strong> — это понятная точка входа в игру для новичков
@@ -91,7 +91,7 @@ export function renderBot() {
     </section>
 
     <section class="bot-final">
-      <span class="eyebrow">Server 33 // companion</span>
+      <span class="eyebrow">Сервер 33 // спутник</span>
       <h2>Сохрани бота.<br><em>Он ещё пригодится.</em></h2>
       <a class="bot-cta bot-cta--large" href="${BOT_URL}" target="_blank" rel="noopener noreferrer">
         Перейти к @zrrguide_bot <b>↗</b>

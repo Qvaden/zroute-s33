@@ -825,7 +825,7 @@
 .adm-photo-drop small { color: var(--mute); font-size: 11px; }
 @keyframes adm-photo-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent); } }
 
-/* ── Structured leadership guide editor ─────────────────────────────────── */
+/* ── Редактор руководства по составу: структура ──────────────────────────── */
 .guide-editor__roles { display: grid; gap: 12px; }
 .guide-editor__role { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--text) 2.5%, transparent); }
 .guide-editor__role-head { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; } .guide-editor__role-head h3 { margin: 0; flex: 1; }
@@ -836,7 +836,7 @@
 @media (max-width: 640px) { .guide-editor__role-grid { grid-template-columns: 1fr 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: 1 / -1; } .guide-editor__role-head { align-items: flex-start; } }
 @media (max-width: 430px) { .guide-editor__role-grid { grid-template-columns: 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: auto; } .guide-editor__role-head { flex-wrap: wrap; } .guide-editor__role-head h3 { min-width: 120px; } }
 
-/* ── Full guide editor: mobile-first long text and extra blocks ──────────── */
+/* ── Полный редактор руководства: длинный текст и дополнительные блоки ──── */
 .guide-editor__section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
 .guide-editor__section-head h2 { margin: 0; } .guide-editor__section-head p { margin: 5px 0 0; }
 .guide-editor__extras { display: grid; gap: 12px; margin-bottom: 8px; }
@@ -856,14 +856,14 @@
   .guide-editor .adm-publish__actions .adm-btn { min-height: 44px; width: 100%; }
 }
 
-/* Custom colour picker for the full Guide editor */
+/* Свой цвет текста в полном редакторе руководства */
 .guide-color-picker{padding:14px 16px;border:1px solid rgba(99,245,229,.2);border-radius:16px;background:linear-gradient(135deg,rgba(19,31,42,.92),rgba(8,14,24,.92));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 5%, transparent),0 10px 28px rgba(0,0,0,.12)}
 .guide-color-picker__head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;color:var(--muted,#9aa7b8);font-size:.82rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .guide-color-picker__head output{display:inline-flex;align-items:center;gap:7px;color:#f5fbff;font:700 .78rem/1 ui-monospace,SFMono-Regular,monospace;text-transform:none}
 .guide-color-picker__head output::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--picker-color);box-shadow:0 0 14px var(--picker-color),0 0 0 2px color-mix(in srgb, var(--text) 30%, transparent)}
 .guide-color-picker__hint{display:block;margin-top:9px;color:var(--muted,#9aa7b8);font-size:.75rem}
 
-/* Server 33 custom colour modal */
+/* Окно выбора своего цвета для 33 сервера */
 body.guide-color-modal-open{overflow:hidden}
 .guide-color-trigger{width:100%;display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid color-mix(in srgb,var(--picker-color) 45%,var(--line));border-radius:13px;background:linear-gradient(110deg,color-mix(in srgb,var(--picker-color) 12%,var(--raised)),var(--raised));color:var(--text);cursor:pointer;text-align:left;transition:transform .2s,border-color .2s,box-shadow .2s}
 .guide-color-trigger:hover,.guide-color-trigger:focus-visible{transform:translateY(-2px);border-color:var(--picker-color);box-shadow:0 0 24px color-mix(in srgb,var(--picker-color) 22%,transparent);outline:none}
@@ -892,15 +892,15 @@ body.guide-color-modal-open{overflow:hidden}
   .guide-color-modal__head{position:sticky;top:0;z-index:2;padding-bottom:12px;background:linear-gradient(#182531 72%,transparent);}
 }
 
-/* President board editor */
+/* Редактор панели президента */
 .adm-president-editor{max-width:980px}.adm-president-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.adm-field--wide{grid-column:1/-1}.adm-president-preview{display:flex;align-items:center;gap:12px;margin:18px 0;padding:14px 16px;border:1px solid rgba(108,246,230,.3);border-left:3px solid var(--electric);border-radius:12px;background:linear-gradient(110deg,rgba(108,246,230,.1),color-mix(in srgb, var(--text) 2.5%, transparent));color:var(--text)}.adm-president-preview .president-board__signal{width:9px;height:9px;border-radius:50%;background:var(--electric);box-shadow:0 0 14px var(--electric)}.adm-president-preview small{display:block;color:var(--electric);font-size:9px;letter-spacing:.14em;font-weight:800}.adm-president-preview strong{display:block;margin-top:4px;font-size:16px}.adm-president-preview>b{margin-left:auto;color:var(--gold);font-size:14px}.adm-president-toggle{grid-column:1/-1}
 @media(max-width:600px){.adm-president-grid{grid-template-columns:1fr}.adm-field--wide,.adm-president-toggle{grid-column:auto}.adm-president-preview{align-items:flex-start;flex-wrap:wrap}.adm-president-preview>b{width:100%;margin-left:21px}.adm-president-editor .adm-actions{display:grid;grid-template-columns:1fr}.adm-president-editor .adm-actions .adm-btn{width:100%;min-height:46px}}
 
-/* Compact timeline editor rows */
+/* Компактные строки редактора хронологии */
 .adm-ev__summary{display:-webkit-box;overflow:hidden;margin:5px 0 0;color:var(--dim);font-size:13px;line-height:1.4;-webkit-box-orient:vertical;-webkit-line-clamp:2}.adm-ev__full{display:none}.adm-publish--top{position:sticky;top:8px;z-index:10;margin-bottom:14px;backdrop-filter:blur(12px)}
 @media(max-width:600px){.adm-publish--top .adm-publish__actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.adm-publish--top .adm-publish__actions .adm-btn:first-child{grid-column:1/-1}.adm-ev__summary{font-size:14px;line-height:1.45}.adm-ev__acts{flex-wrap:wrap}}
 
-/* ── Mobile admin polish: fields, frames and touch controls ──────────────── */
+/* ── Мобильная панель: поля, рамки и нажатия ─────────────────────────────── */
 #admin, #admin *, #admin *::before, #admin *::after { box-sizing: border-box; }
 #admin input, #admin textarea, #admin select, #admin button { max-width: 100%; }
 #admin input, #admin textarea, #admin select { min-width: 0; }

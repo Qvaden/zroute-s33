@@ -51,7 +51,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         <div class="quart-hero__glow"></div>
         <div class="quart-hero__top">
           <div class="quart-hero__copy">
-            <span class="quart-kicker"><i></i> COME BACK CYCLE</span>
+            <span class="quart-kicker"><i></i> ЦИКЛ ВОЗВРАЩЕНИЯ</span>
             <h2>Кварт</h2>
             <p>Новый шанс каждые четыре недели. Текущие результаты альянса независимо от старых неудач.</p>
           </div>
@@ -71,7 +71,7 @@ export function renderQuarter({ standings, quarter } = {}) {
       <section class="quart-podium" aria-labelledby="quart-podium-title">
         <div class="quart-podium__heading">
           <div>
-            <span class="quart-section-label">CURRENT CHAMPIONS</span>
+            <span class="quart-section-label">ДЕЙСТВУЮЩИЕ ЧЕМПИОНЫ</span>
             <h3 id="quart-podium-title">Кто лидирует в этом Кварте?</h3>
           </div>
           <span class="quart-podium__note">Победители по очкам</span>
@@ -82,7 +82,7 @@ export function renderQuarter({ standings, quarter } = {}) {
       <section class="quart-board">
         <header class="quart-board__head">
           <div>
-            <span class="quart-section-label">THE COMEBACK BOARD</span>
+            <span class="quart-section-label">ДОСКА ВОЗВРАЩЕНИЯ</span>
             <h3>Все альянсы в гонке</h3>
           </div>
           <p>Очки и форма текущего периода</p>

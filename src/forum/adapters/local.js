@@ -57,6 +57,7 @@ function emptyState() {
     reactions: [],
     reports: [],
     topicSubscriptions: [],
+    topicReads: [],
     allianceSubscriptions: [],
     moderationActions: [],
     polls: [],
@@ -240,6 +241,23 @@ function reactionsFor(state, targetType, targetId) {
   return { reactions: counts, myReaction: mine ? mine.reactionId : null, score };
 }
 
+/**
+ * Сколько чужих ответов в теме появилось после последнего входа сюда.
+ *
+ * То же правило, что у представления forum_topic_unread в базе: свои ответы не
+ * считаем (человек знает, что написал сам), удалённые не считаем (заглушку
+ * читают один раз), а без отметки считаем всё — темы ведь были до первого входа.
+ */
+function unreadCount(state, postId) {
+  if (!state.me) return 0;
+  const row = state.topicReads.find((r) => r.postId === postId && r.userId === state.me);
+  const since = row ? new Date(row.lastReadAt).getTime() : 0;
+  return state.comments.filter((c) => c.postId === postId
+    && !c.deleted
+    && c.authorId !== state.me
+    && new Date(c.createdAt).getTime() > since).length;
+}
+
 function postOut(state, p) {
   const r = reactionsFor(state, 'post', p.id);
   const author = state.users.find((u) => u.id === p.authorId);
@@ -253,7 +271,6 @@ function postOut(state, p) {
       аватарка — «как человек выглядит сейчас».
     */
     authorAvatar: author?.avatarUrl || '',
-    authorAlliance: author?.allianceTag || '',
     authorAlliance: author?.allianceTag || '',
     authorRole: author?.role || 'member',
     authorIsBlogger: Boolean(author?.isBlogger),
@@ -269,6 +286,7 @@ function postOut(state, p) {
     deletedReason: p.deletedReason || '',
     views: Number(p.views || 0),
     commentCount: state.comments.filter((c) => c.postId === p.id && !c.deleted).length,
+    unread: unreadCount(state, p.id),
     subscribed: state.topicSubscriptions.some((s) => s.postId === p.id && s.userId === state.me),
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
@@ -356,6 +374,22 @@ export async function registerView(postId) {
   write(s);
 }
 
+/**
+ * Отметка «я здесь был» — то, по чему лента считает новые ответы.
+ *
+ * Ставится вместе с просмотром (см. mount.js): вошёл в тему — значит прочитал.
+ * Без отметки счётчик показал бы все ответы темы, и человек бы к ней больше
+ * не возвращался: отличить прочитанное от нового по такому счётчику нельзя.
+ */
+export async function markRead(postId) {
+  const s = read();
+  if (!s.me) return;
+  const row = s.topicReads.find((r) => r.postId === postId && r.userId === s.me);
+  if (row) row.lastReadAt = new Date().toISOString();
+  else s.topicReads.push({ postId, userId: s.me, lastReadAt: new Date().toISOString() });
+  write(s);
+}
+
 /** Кто сейчас пишет, и имеет ли он право. Общая проверка для поста и комментария. */
 function requireWriter(state) {
   const me = state.users.find((u) => u.id === state.me);
@@ -368,10 +402,65 @@ function requireWriter(state) {
   return me;
 }
 
+/**
+ * Ключ текста, как forum_body_key в базе: тот же текст в разном оформлении
+ * даёт одну строку. Регистр и лишние пробелы здесь не различаются, знаки
+ * препинания остаются как есть — правило ловит копипасту, а не слова.
+ */
+function bodyKey(text) {
+  return String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * ВЫДЕРЖКА В ЧЕРНОВОМ РЕЖИМЕ.
+ *
+ * Правило держит база (supabase/20260925-spam-hold-and-topic-reads.sql), а
+ * здесь та же проверка нужна, чтобы её можно было увидеть и проверить, не
+ * подключая Supabase, — и чтобы текст отказа был тот же. Числа берутся из
+ * CONFIG.forum.limits: тот же источник, что у подсказки под формой.
+ * Безопасности защищать нечего — запросов мимо сайта в этом режиме не бывает.
+ *
+ * @param {object} state
+ * @param {'post'|'comment'} kind
+ * @param {object} me Кто пишет (роль решает потолок: staff — втрое больше).
+ * @param {string} text Проверямый текст: у темы — название вместе с телом.
+ */
+function checkHold(state, kind, me, text) {
+  const L = CONFIG.forum.limits;
+  const staff = me.role === 'admin' || me.role === 'moderator';
+  const isPost = kind === 'post';
+  const max = (isPost ? L.postHoldMax : L.commentHoldMax) * (staff ? 3 : 1);
+  const minutes = isPost ? L.postHoldMinutes : L.commentHoldMinutes;
+  const rows = (isPost ? state.posts : state.comments)
+    .filter((r) => r.authorId === me.id)
+    .map((r) => ({
+      at: new Date(r.createdAt).getTime(),
+      key: bodyKey(isPost ? `${r.title} ${r.body}` : r.body),
+    }));
+
+  const since = Date.now() - minutes * 60 * 1000;
+  const recent = rows.filter((r) => r.at > since);
+  if (recent.length >= max) {
+    const left = Math.ceil((Math.max(...recent.map((r) => r.at)) + minutes * 60000 - Date.now()) / 60000);
+    throw new Error(isPost
+      ? `Новую тему можно создать через ${Math.max(1, left)} мин — не больше ${max} за ${minutes} минут`
+      : `Отвечать можно снова через ${Math.max(1, left)} мин — не больше ${max} за ${minutes} минуты`);
+  }
+
+  const repeatSince = Date.now() - L.repeatHoldMinutes * 60000;
+  const key = bodyKey(text);
+  if (rows.some((r) => r.at > repeatSince && r.key === key)) {
+    throw new Error(isPost
+      ? 'Такая тема у вас уже есть — правьте её, а не заводите копию'
+      : 'Вы уже писали это — скопировать один и тот же ответ в несколько тем нельзя');
+  }
+}
+
 export async function createPost(draft) {
   const s = read();
   const me = requireWriter(s);
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
+  checkHold(s, 'post', me, `${draft.title} ${draft.body}`);
   const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
 
   const post = {
@@ -530,6 +619,7 @@ export async function addComment(postId, body) {
   const post = s.posts.find((p) => p.id === postId);
   if (!post) throw new Error('Пост не найден');
   if (post.deleted) throw new Error('Пост удалён, обсуждать нечего');
+  checkHold(s, 'comment', me, body);
 
   const comment = {
     id: newId('c'),
@@ -1588,7 +1678,7 @@ export async function unpinChatMessage(chatId) {
 }
 
 export async function setTyping(chatId) {
-  /* Локальный режим: nobody else is reading, typing indicator is meaningless. */
+  /* Локальный режим: больше никого в комнате нет, поэтому индикатору набора некого показывать. */
 }
 
 export async function createDM(otherUserNick) {

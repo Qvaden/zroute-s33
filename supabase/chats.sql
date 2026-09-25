@@ -897,7 +897,7 @@ begin
     raise exception 'Сначала войдите';
   end if;
 
-  -- Look up user_id by nick
+  -- Ищем id игрока по его нику
   select id into other_user from public.forum_users where lower(nick) = lower(other_nick) limit 1;
   if other_user is null then
     raise exception 'Игрок не найден';

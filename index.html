@@ -63,7 +63,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=50">
+  <link rel="modulepreload" href="./src/main.js?v=52">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -76,7 +76,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=13">
+  <link rel="stylesheet" href="./src/forum.css?v=14">
   <!--
     Телефон — последним слоем.
 
@@ -85,7 +85,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=19">
+  <link rel="stylesheet" href="./src/mobile.css?v=20">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -103,7 +103,7 @@
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=17">
+  <link rel="stylesheet" href="./src/refine.css?v=18">
   <script>
     try {
       if (localStorage.getItem('s33-loader-seen') === '1') {
@@ -114,7 +114,7 @@
 <meta name="vapid-public-key" content="BNs8Y9a3cY8kuJ3A2RnrLjnjWpsWvazVM_QjUW0SyYFQK5Dp3rRwCRCzdASGSOa0ytAyjCE5fyN4DlDqnqMV1xg">
 </head>
 <body>
-  <div id="boot-loader" class="boot-loader" role="status" aria-live="polite" aria-label="Загрузка Server 33">
+  <div id="boot-loader" class="boot-loader" role="status" aria-live="polite" aria-label="Загрузка Сервера 33">
     <div class="boot-loader__core">
       <div class="boot-loader__mark"><span>33</span></div>
       <div class="boot-loader__brand">
@@ -122,7 +122,7 @@
         <small>Z ROUTE: REDEMPTION</small>
       </div>
       <div class="boot-loader__signal"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="boot-loader__status"><span>ИНИЦИАЛИЗАЦИЯ СЕРВЕРА</span><b>ONLINE</b></div>
+      <div class="boot-loader__status"><span>ИНИЦИАЛИЗАЦИЯ СЕРВЕРА</span><b>В СЕТИ</b></div>
     </div>
   </div>
   <header class="site-head">
@@ -200,7 +200,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=50"></script>
+  <script type="module" src="./src/main.js?v=52"></script>
 
   <script>
     /*

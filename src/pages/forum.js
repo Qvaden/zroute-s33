@@ -19,7 +19,7 @@
  * поведение — в src/forum/mount.js. Разделение то же, что у остальных
  * страниц, и по той же причине: чистую разметку можно проверить без браузера.
  */
-import { esc, plural, sparkline } from '../ui/helpers.js';
+import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
@@ -185,7 +185,7 @@ function renderChronicleBand(events) {
       <div class="forum-chron__head">
         <span class="eyebrow">Сводка сервера</span>
         <span class="forum-chron__live">
-          <i aria-hidden="true"></i>LIVE
+          <i aria-hidden="true"></i>СЕЙЧАС
         </span>
       </div>
 
@@ -1196,6 +1196,23 @@ function renderComposer(s) {
         <p class="forum-composer__rules muted">
           Публикуя пост, вы соглашаетесь с правилами выше. Нарушение —
           удаление с указанием пункта, повторное — запрет писать.
+          ${
+            /*
+              Те же числа, что держат триггеры базы: отказ приходит текстом
+              ошибки, и игроку спокойнее, когда срок назван заранее.
+            */
+            L.postHoldMax
+              ? ` Не больше ${L.postHoldMax} ${
+                  pluralWord(L.postHoldMax, 'темы', 'тем', 'тем')
+                } за ${L.postHoldMinutes} ${
+                  pluralWord(L.postHoldMinutes, 'минуту', 'минуты', 'минут')
+                } и ${L.commentHoldMax} ${
+                  pluralWord(L.commentHoldMax, 'ответ', 'ответа', 'ответов')
+                } за ${L.commentHoldMinutes} ${
+                  pluralWord(L.commentHoldMinutes, 'минуту', 'минуты', 'минут')
+                }. Повтор того же текста база не пропустит.`
+              : ''
+          }
         </p>
 
         <div class="forum-composer__actions">
@@ -1473,9 +1490,15 @@ export function renderPostCard(p, s) {
   const inTrail = Boolean(s.me) && (Boolean(isMine) || Boolean(p.myReaction) || Boolean(
     Array.isArray(p.poll?.options) && p.poll.options.some((o) => o.mine)
   ));
+  /*
+    Сколько чужих ответов появилось после последнего входа сюда. Решает
+    лента, а не карточка: адаптер присылает поле только вошедшему, поэтому
+    гость видит обычную карточку без всякой проверки здесь.
+  */
+  const unread = Number(p.unread || 0);
 
   return `
-    <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}${inTrail ? ' forum-post--trail' : ''}" data-forum-post="${esc(p.id)}">
+    <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}${inTrail ? ' forum-post--trail' : ''}${unread > 0 ? ' forum-post--unread' : ''}" data-forum-post="${esc(p.id)}">
       <header class="forum-post__head">
         ${avatarHtml(p.authorNick, p.authorAvatar)}
         <div class="forum-post__by">
@@ -1500,6 +1523,13 @@ export function renderPostCard(p, s) {
         ${
           inTrail
             ? '<span class="forum-post__trail" title="Вы участвовали: ваш пост, реакция или голос в опросе">Ваш след</span>'
+            : ''
+        }
+        ${
+          unread > 0
+            ? `<span class="forum-post__new" title="Новых ответов с вашего последнего входа">${
+                `${unread} ${pluralWord(unread, 'новый ответ', 'новых ответа', 'новых ответов')}`
+              }</span>`
             : ''
         }
       </header>

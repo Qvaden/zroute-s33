@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=50';
-import { loadAll, capabilities, db } from './data/index.js?v=50';
-import { validateDataset } from './data/contract.js?v=50';
+import { CONFIG } from '../config.js?v=52';
+import { loadAll, capabilities, db } from './data/index.js?v=52';
+import { validateDataset } from './data/contract.js?v=52';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,26 +9,26 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=50';
-import { renderHome } from './pages/home.js?v=50';
-import { renderLadder } from './pages/ladder.js?v=50';
-import { renderQuarter } from './pages/quarter-final.js?v=50';
-import { renderTimeline } from './pages/timeline.js?v=50';
-import { renderGuide } from './pages/guide.js?v=50';
-import { renderBot } from './pages/bot.js?v=50';
-import { renderAbout } from './pages/about.js?v=50';
-import { renderAlliance } from './pages/alliance.js?v=50';
-import { computeAchievements } from './logic/achievements.js?v=50';
-import { esc } from './ui/helpers.js?v=50';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=50';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=50';
+} from './logic/standings.js?v=52';
+import { renderHome } from './pages/home.js?v=52';
+import { renderLadder } from './pages/ladder.js?v=52';
+import { renderQuarter } from './pages/quarter-final.js?v=52';
+import { renderTimeline } from './pages/timeline.js?v=52';
+import { renderGuide } from './pages/guide.js?v=52';
+import { renderBot } from './pages/bot.js?v=52';
+import { renderAbout } from './pages/about.js?v=52';
+import { renderAlliance } from './pages/alliance.js?v=52';
+import { computeAchievements } from './logic/achievements.js?v=52';
+import { esc } from './ui/helpers.js?v=52';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=52';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=52';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=50';
-import './ui/timeline-controls.js?v=50';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=50';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=50';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=50';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=50';
+import './ui/ladder-controls.js?v=52';
+import './ui/timeline-controls.js?v=52';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=52';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=52';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=52';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=52';
 
 /*
   РАЗДЕЛЫ.
@@ -222,7 +222,7 @@ function renderPresidentBoard(texts = []) {
     <div class="president-board__head">
       <span class="president-board__signal" aria-hidden="true"></span>
       <span class="president-board__label">${esc(board.label)}</span>
-      <span class="president-board__live">LIVE</span>
+      <span class="president-board__live">СВЕЖИЕ</span>
     </div>
     <div class="president-board__identity">
       <strong class="president-board__name">${esc(board.name)}</strong>

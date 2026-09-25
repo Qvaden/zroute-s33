@@ -648,7 +648,7 @@ export function renderComposer(s, c) {
     return `<p class="chat-compose__locked muted">Вам запрещено писать.</p>`;
   }
 
-  // Typing indicator: other members who typed in the last 5 seconds.
+  // Индикатор набора: те, кто печатал за последние пять секунд.
   const now = Date.now();
   const typists = (s.members || [])
     .filter((m) => m.userId !== s.me?.id && m.typingAt && (now - new Date(m.typingAt).getTime()) < 5000)

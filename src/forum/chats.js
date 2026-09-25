@@ -1427,7 +1427,7 @@ function wire() {
     if (!host || !host.contains(e.target)) return;
     if (e.target.matches?.('[data-chat-input]')) {
       autosize(e.target);
-      // Typing indicator: send debounced.
+      // Индикатор набора: отправляем не на каждое нажатие, а с задержкой.
       if (state.openId) {
         clearTimeout(state._typingTimer);
         state._typingTimer = setTimeout(() => { forum.setTyping?.(state.openId); }, 800);

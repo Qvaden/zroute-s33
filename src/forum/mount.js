@@ -163,11 +163,11 @@ function saveComposerDraft() {
     if (!el.name || el.type === 'file') continue;
     draft[el.name] = el.type === 'checkbox' ? el.checked : el.value;
   }
-  try { localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft)); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft)); } catch { /* хранилище недоступно */ }
 }
 
 function clearComposerDraft() {
-  try { localStorage.removeItem(COMPOSER_DRAFT_KEY); } catch { /* storage unavailable */ }
+  try { localStorage.removeItem(COMPOSER_DRAFT_KEY); } catch { /* хранилище недоступно */ }
 }
 
 /* ── Отрисовка ────────────────────────────────────────────────────────────── */
@@ -2274,6 +2274,20 @@ export async function mountForum(container, view, postId = null) {
   */
   if (postId) {
     forum.registerView(postId).catch(() => {});
+    /*
+      Отметку прочтения ставим там же, где просмотр: вошёл в тему — значит её
+      прочитал. Только у вошедшего: отметка привязана к человеку, а гостю
+      считать нечего.
+
+      Счётчик на карточке гасим сразу, не дожидаясь ответа базы: показывать
+      «3 новых» в теме, которую человек читает сейчас, значит врать про то,
+      что у него перед глазами.
+    */
+    if (state.me) {
+      forum.markRead(postId).catch(() => {});
+      const opened = state.posts.find((p) => p.id === postId);
+      if (opened) opened.unread = 0;
+    }
     await loadThread(postId);
   } else {
     state.openPostId = null;

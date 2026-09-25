@@ -1778,8 +1778,8 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 
 /*
-  ШАПКА: стеклянная командная панель. «LIVE // SERVER 33» превращается
-  в статусный бейдж ONLINE — капсула с зелёной точкой, без неона.
+  ШАПКА: стеклянная командная панель. Надпись «СЕЙЧАС // СЕРВЕР 33»
+  превращается в статусный бейдж «В СЕТИ» — капсула с зелёной точкой, без неона.
 */
 :root[data-theme="light"] .site-head {
   border-bottom-color: rgba(217,130,43,.35);
@@ -1787,7 +1787,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 :root[data-theme="light"] .site-head:hover { box-shadow: 0 10px 26px -20px rgba(31,48,64,.3); }
 :root[data-theme="light"] .site-head__inner::before {
-  content: '● ONLINE';
+  content: '● В СЕТИ';
   top: 5px; right: 12px;
   padding: 3px 9px;
   border: 1px solid #b9dfcc;

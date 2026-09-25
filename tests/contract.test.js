@@ -4731,6 +4731,240 @@ console.log('\nR2. Главная страница');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+/* ── Выдержка на публикации и знак «не прочитано» ── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const L = CONFIG.forum.limits;
+  const holdSql = await readFile('supabase/20260925-spam-hold-and-topic-reads.sql', 'utf8');
+
+  /*
+    Числа живут в двух местах: в config.js (их называет форма) и в триггерах
+    базы (их исполняет база). Расхождение значит, что игроку пообещали одно,
+    а отказали через другой срок — поэтому совпадение проверяется здесь.
+  */
+  check('выдержка тем: один срок в подсказке и в базе',
+    holdSql.includes(`interval '${L.postHoldMinutes} minutes'`));
+  check('выдержка ответов: один срок в подсказке и в базе',
+    holdSql.includes(`interval '${L.commentHoldMinutes} minutes'`));
+  check('потолок тем: одно число в подсказке и в базе',
+    holdSql.includes(`allowed := ${L.postHoldMax} * case`));
+  check('потолок ответов: одно число в подсказке и в базе',
+    holdSql.includes(`allowed := ${L.commentHoldMax} * case`));
+  check('срок повтора текста один в подсказке и в базе',
+    holdSql.includes(`interval '${L.repeatHoldMinutes} minutes'`));
+  check('staff получает втрое больше',
+    (holdSql.match(/then 3 else 1 end/g) || []).length === 2);
+  check('выдержку держат триггеры до вставки, а не сервер сайта',
+    /create trigger forum_posts_hold[\s\S]{0,120}before insert on public\.forum_posts/.test(holdSql)
+      && /create trigger forum_comments_hold[\s\S]{0,120}before insert on public\.forum_comments/.test(holdSql));
+  check('запрос без вошедшего человека не задерживаем',
+    (holdSql.match(/if auth\.uid\(\) is null then/g) || []).length === 3);
+
+  check('отметка прочтения — одна строка на пару «человек и тема»',
+    /create table if not exists public\.forum_topic_reads \([\s\S]*?primary key \(user_id, post_id\)/.test(holdSql));
+  check('свою отметку читает и пишет только сам человек',
+    (holdSql.match(/user_id = auth\.uid\(\)/g) || []).length >= 4);
+  check('счётчик не прочитанного — отдельное представление, а не колонка ленты',
+    /create view public\.forum_topic_unread with \(security_invoker = on\) as/.test(holdSql)
+      && !/forum_topic_unread/.test(await readFile('supabase/schema.sql', 'utf8')));
+  check('в счётчике не считаем свои и стёртые ответы',
+    /c\.author_id is distinct from auth\.uid\(\)/.test(holdSql)
+      && /c\.deleted = false/.test(holdSql));
+  check('ставить отметку умеет только вошедший',
+    /revoke all on function public\.forum_read_topic\(uuid\) from public, anon;/.test(holdSql)
+      && /grant execute on function public\.forum_read_topic\(uuid\) to authenticated;/.test(holdSql));
+
+  const contract = await readFile('src/forum/contract.js', 'utf8');
+  check('контракт описывает поле unread', /@property \{number\}\s+\[unread\]/.test(contract));
+  check('контракт требует от адаптера markRead', /\[markRead\]/.test(contract) || /=> Promise<void>\} markRead/.test(contract));
+
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  check('рабочий адаптер берёт счётчик из представления, а не из ленты',
+    /forum_topic_unread\?select=post_id,unread/.test(supaSrc));
+  check('отказ представления гасит только знак, но не ленту',
+    /forum_topic_unread\?select=post_id,unread'\)\.catch\(\(\) => \[\]\)/.test(supaSrc));
+  check('отметку прочтения ставит вызов функции в базе',
+    /rpc\/forum_read_topic/.test(supaSrc));
+
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  check('вход в тему ставит отметку прочтения', /forum\.markRead\(postId\)/.test(mountSrc));
+  check('знак на открытой теме гасится сразу', /opened\.unread = 0/.test(mountSrc));
+}
+
+/* ── Черновой режим: те же правила и те же слова ── */
+{
+  const local = await import('../src/forum/adapters/local.js');
+  const L = CONFIG.forum.limits;
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+
+  await local.signUp('Хранитель');
+  await local.signUp('Автор');
+
+  const made = [];
+  for (let i = 0; i < L.postHoldMax; i++) {
+    made.push(await local.createPost({
+      title: `Тема ${i}`, body: `<p>текст номера ${i}</p>`, category: 'offtop',
+    }));
+  }
+  let held = '';
+  try {
+    await local.createPost({ title: `Тема ${L.postHoldMax}`, body: '<p>ещё одна</p>', category: 'offtop' });
+  } catch (e) { held = String(e.message); }
+  check('черновой режим держит тему так же, как база',
+    held.includes(`не больше ${L.postHoldMax} за ${L.postHoldMinutes} минут`));
+
+  let heldComment = '';
+  for (let i = 0; i <= L.commentHoldMax; i++) {
+    try {
+      await local.addComment(made[0].id, `<p>ответ номер ${i}</p>`);
+    } catch (e) { heldComment = String(e.message); break; }
+  }
+  check('черновой режим держит ответ так же, как база',
+    heldComment.includes(`не больше ${L.commentHoldMax} за ${L.commentHoldMinutes} минуты`));
+
+  await local.signUp('Повтор');
+  const copied = { title: 'Один и тот же текст', body: '<p>копия</p>', category: 'offtop' };
+  await local.createPost(copied);
+  let dup = '';
+  try { await local.createPost(copied); } catch (e) { dup = String(e.message); }
+  check('тот же текст второй раз не проходит',
+    dup === 'Такая тема у вас уже есть — правьте её, а не заводите копию');
+  let dupComment = '';
+  await local.addComment(made[1].id, '<p>один раз</p>');
+  try { await local.addComment(made[1].id, '<p>один раз</p>'); } catch (e) { dupComment = String(e.message); }
+  check('тот же ответ в другую тему не переносится',
+    dupComment === 'Вы уже писали это — скопировать один и тот же ответ в несколько тем нельзя');
+
+  /* Первый игрок в черновом режиме — владелец: ему втрое больше, чем всем. */
+  let staffErr = '';
+  try {
+    await local.signIn('Хранитель');
+    for (let i = 0; i < L.postHoldMax + 1; i++) {
+      await local.createPost({ title: `Служебная тема ${i}`, body: `<p>текст служебный ${i}</p>`, category: 'offtop' });
+    }
+  } catch (e) { staffErr = String(e.message); }
+  check('staff получает втрое больше и в черновом режиме', staffErr === '', staffErr);
+
+  /* Счётчик новых ответов — та же комната, что и выше, но с чистого листа. */
+  store.clear();
+  await local.signUp('Владелец');
+  await local.signUp('Читатель');
+  const topic = await local.createPost({
+    title: 'Тема со счётчиком', body: '<p>текст темы</p>', category: 'offtop',
+  });
+  const feedOf = async (nick) => {
+    if (nick) await local.signIn(nick);
+    const { posts } = await local.listPosts({ limit: 50 });
+    return posts.find((p) => p.id === topic.id);
+  };
+
+  check('своей темы без чужих ответов не считаем', (await feedOf('Читатель')).unread === 0);
+  await local.signIn('Владелец');
+  await local.addComment(topic.id, '<p>ответ не от автора</p>');
+  check('чужой ответ в теме виден как новый', (await feedOf('Читатель')).unread === 1);
+  await local.markRead(topic.id);
+  check('после входа в тему знак гаснет', (await feedOf('Читатель')).unread === 0);
+  // Ответ должен появиться строго позже отметки — иначе миллисекунды совпадут.
+  await new Promise((r) => setTimeout(r, 5));
+  await local.signIn('Владелец');
+  await local.addComment(topic.id, '<p>ещё один ответ не от автора</p>');
+  check('ответ после входа снова считается новым', (await feedOf('Читатель')).unread === 1);
+  await local.signIn('Читатель');
+  await local.addComment(topic.id, '<p>свой ответ</p>');
+  check('свой ответ новых не добавляет', (await feedOf()).unread === 1);
+  await local.signOut();
+  check('гостю считать нечего',
+    (await local.listPosts({ limit: 50 })).posts.every((p) => !p.unread));
+}
+
+/* ── Лента: знак новых ответов и срок под формой ── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderPostCard, renderForum } = await import('../src/pages/forum.js');
+  const L = CONFIG.forum.limits;
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const seat = { me: { id: 'u1', role: 'member' }, openPostId: null, editingPostId: null,
+    comments: [], category: 'all', sort: 'fresh', categories: {} };
+  const base = { id: 'x1', authorId: 'u2', authorNick: 'B', title: 'T', body: '<p>x</p>',
+    category: 'offtop', reactions: {}, myReaction: null, commentCount: 1, views: 0, createdAt: t0 };
+
+  const three = renderPostCard({ ...base, unread: 3 }, seat);
+  check('знак новых ответов стоит в шапке карточки',
+    /forum-post__new/.test(three) && /3 новых ответа/.test(three));
+  check('тема с новыми ответами помечена классом', /forum-post--unread/.test(three));
+  check('заголовок такой темы плотнее — правило есть в стилях',
+    /\.forum-post--unread \.forum-post__title \{ font-weight: 800; \}/.test(
+      await readFile('src/forum.css', 'utf8')));
+  check('один новый ответ — единственное число',
+    /1 новый ответ/.test(renderPostCard({ ...base, unread: 1 }, seat)));
+  check('пять новых ответов — множественное число',
+    /5 новых ответов/.test(renderPostCard({ ...base, unread: 5 }, seat)));
+  check('без новых ответов знака нет',
+    !/forum-post__new/.test(renderPostCard({ ...base, unread: 0 }, seat))
+      && !/forum-post--unread/.test(renderPostCard(base, seat)));
+  check('знак рисует поле ленты, а не догадка карточки',
+    /forum-post__new/.test(renderPostCard({ ...base, unread: 4 }, { ...seat, me: null })));
+
+  const feed = renderForum({ events: [], texts: [] }, {
+    ready: true, me: { id: 'u1', role: 'member', banned: false },
+    posts: [], hot: [], lead: [], categories: {},
+  });
+  check('под формой назван тот же потолок тем, что держит база',
+    feed.includes(`Не больше ${L.postHoldMax}`) && feed.includes(`за ${L.postHoldMinutes} минут`));
+  check('под формой назван тот же потолок ответов, что держит база',
+    feed.includes(`${L.commentHoldMax} `) && feed.includes(`за ${L.commentHoldMinutes} минуты`));
+}
+
+/* ── Русский язык во всём, что читает человек ── */
+{
+  const fsSync = await import('node:fs');
+  const skip = new Set(['node_modules', '.git', 'dist', '.qoder']);
+  const exts = new Set(['.js', '.mjs', '.cjs', '.css', '.html', '.sql']);
+  const files = [];
+  const walk = (dir) => {
+    for (const e of fsSync.readdirSync(dir, { withFileTypes: true })) {
+      if (skip.has(e.name)) continue;
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) walk(p);
+      else if (exts.has(p.slice(p.lastIndexOf('.')))) files.push(p);
+    }
+  };
+  walk('src');
+  files.push('index.html', 'admin.html', 'config.js', 'sw.js');
+
+  const latinComment = [];
+  const cjk = [];
+  for (const f of files) {
+    const text = fsSync.readFileSync(f, 'utf8');
+    if (/[　-〿぀-ヿ㐀-䶿一-鿿가-힯]/.test(text)) cjk.push(f);
+    text.split(/\r?\n/).forEach((line, i) => {
+      const t = line.trim();
+      let comment = null;
+      if (t.startsWith('//')) comment = t.slice(2);
+      else if (/^\/\*/.test(t) || /^\*/.test(t)) comment = t.replace(/^\/?\*+/, '').replace(/\*\/$/, '');
+      else if (t.startsWith('<!--')) comment = t.slice(4);
+      else if (t.startsWith('--') && f.endsWith('.sql')) comment = t.slice(2);
+      if (comment === null) return;
+      // Типы JSDoc и ссылки — не проза: их не переводим.
+      if (/@(param|property|returns|type|typedef|template|license)\b/.test(comment)) return;
+      if (/https?:/.test(comment)) return;
+      if (/[А-Яа-яЁё]/.test(comment)) return;
+      if ((comment.match(/[A-Za-z]{3,}(\s+[A-Za-z]{3,}){2,}/g) || []).length === 0) return;
+      latinComment.push(`${f}:${i + 1}`);
+    });
+  }
+  check('в комментариях нет английской прозы', latinComment.length === 0, latinComment.join(' '));
+  check('в файлах сайта нет иероглифов', cjk.length === 0, cjk.join(' '));
+  // Страж без объёма работы — не страж: проверяем, что файлы правда перебраны.
+  check('страж языка смотрит исходники сайта', files.length > 60, `файлов: ${files.length}`);
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');
 {
