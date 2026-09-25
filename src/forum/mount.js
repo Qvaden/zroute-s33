@@ -100,6 +100,16 @@ const state = {
     readyAt: null,
     error: '',
   },
+  /*
+    Оспаривание запрета писать и тишины.
+
+    list — свои заявки человека (чужих база не отдаёт), open — какую меру
+    оспаривают прямо сейчас ('' — форма закрыта), text — написанное: страница
+    перерисовывается целиком, и без этого поля текст пропал бы при первом же
+    отказе. Отказ держим в error, а не в общем state.error: спор о мере не
+    имеет отношения к ленте, и ронять её из-за него нельзя.
+  */
+  appeal: { list: [], open: '', text: '', error: '' },
 };
 
 /**
@@ -623,6 +633,18 @@ async function loadFeed({ append = false } = {}) {
       } catch {
         /* лидерборд переживает и старый */
       }
+
+      /*
+        Заявки человека на пересмотр меры — тем же порядком, что и горячие
+        темы: отдельный запрос, неудача которого не трогает ленту. Таблица
+        апелляций появилась позже форума, и без неё у баннера просто не будет
+        кнопки — база отказала бы в заявке в любом случае.
+      */
+      try {
+        state.appeal.list = await forum.listAppeals();
+      } catch {
+        state.appeal.list = [];
+      }
     }
   } catch (err) {
     state.error = String(err?.message ?? err);
@@ -1011,6 +1033,42 @@ function recoveryAgain() {
     canSet: false, readyAt: null, error: '',
   });
   paint();
+}
+
+/**
+ * Заявка на пересмотр меры.
+ *
+ * Ответ модерации игрок прочитает в уведомлениях, а не здесь: отсюда мы
+ * сообщаем только то, что заявка ушла, и перечитываем список — кнопка
+ * должна сразу смениться строкой «модератор ещё не ответил».
+ *
+ * Текст держим в состоянии до ответа: форма перерисовывается целиком, и без
+ * этого отказ базы стёр бы то, что человек уже написал.
+ */
+async function sendAppeal(form, submitter) {
+  const kind = form.dataset.forumAppealForm;
+  const message = String(form.elements.message?.value ?? '');
+  state.appeal.text = message;
+
+  await withBusy(submitter, 'Отправляем…', async () => {
+    try {
+      await forum.openAppeal(kind, message);
+      state.appeal.open = '';
+      state.appeal.text = '';
+      state.appeal.error = '';
+      try {
+        state.appeal.list = await forum.listAppeals();
+      } catch {
+        /* список останется прошлым: заявка принята, и это уже видно */
+      }
+      notice('Апелляция отправлена модерации. Запрет на время разбора остаётся.');
+    } catch (err) {
+      // Отказ говорит сам за себя: в нём и причина, и граница. Своего текста
+      // у страницы нет, чтобы два объяснения не разошлись.
+      state.appeal.error = String(err?.message ?? err);
+    }
+    paint();
+  });
 }
 
 /* ── Картинки в форме ─────────────────────────────────────────────────────── */
@@ -1774,6 +1832,29 @@ function wire() {
       return;
     }
 
+    /*
+      Оспаривание меры: форма живёт в баннере, как правка живёт в карточке.
+      Отменяем раньше, чем открываем, — кнопка «Отмена» сидит внутри той же
+      формы, и порядок проверок решает, что произойдёт при двойном нажатии.
+    */
+    if (t.closest('[data-forum-appeal-cancel]')) {
+      state.appeal.open = '';
+      state.appeal.text = '';
+      state.appeal.error = '';
+      paint();
+      return;
+    }
+
+    const appealOpen = t.closest('[data-forum-appeal]');
+    if (appealOpen && host.contains(appealOpen)) {
+      state.appeal.open = appealOpen.dataset.forumAppeal;
+      state.appeal.error = '';
+      paint();
+      // Курсор ставим сразу в поле: человек пришёл писать, а не смотреть.
+      host.querySelector('[data-forum-appeal-form] textarea')?.focus();
+      return;
+    }
+
     // Удаление.
     const delPost = t.closest('[data-forum-del-post]');
     if (delPost && host.contains(delPost)) {
@@ -1813,6 +1894,16 @@ function wire() {
 
     if (e.target.closest('[data-forum-new]')) {
       saveComposerDraft();
+      return;
+    }
+
+    /*
+      Текст заявки переживает перерисовку: лента, панель уведомлений и любое
+      другое движение красят страницу заново, и без этого поля начатое
+      предложение исчезало бы на середине слова.
+    */
+    if (e.target.closest('[data-forum-appeal-form]')) {
+      state.appeal.text = String(e.target.value ?? '');
       return;
     }
 
@@ -1927,6 +2018,13 @@ function wire() {
     if (form.matches('[data-forum-recovery-finish]')) {
       e.preventDefault();
       await recoveryFinish(form, submitter);
+      return;
+    }
+
+    // Заявка на пересмотр меры: запрет писать или тишина.
+    if (form.matches('[data-forum-appeal-form]')) {
+      e.preventDefault();
+      await sendAppeal(form, submitter);
       return;
     }
 

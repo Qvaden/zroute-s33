@@ -4,7 +4,8 @@
 `nicks-verified.sql` → `topic-subscriptions.sql` → `moderation-automation.sql` →
 `moderation-alerts.sql` → `20260916-forum-community.sql` →
 `20260925-self-recovery.sql` → `20260925-spam-hold-and-topic-reads.sql` →
-`20260925-guide-review.sql` → `20260925-announcement-expiry.sql`.
+`20260925-guide-review.sql` → `20260925-announcement-expiry.sql` →
+`20260925-sanction-appeal.sql`.
 
 `20260925-self-recovery.sql` применяется раньше, чем код попадёт на сайт:
 пока он не выполнен, очередь заявок во вкладке «Игроки» недоступна, а шаг
@@ -44,6 +45,17 @@
 пересоздаёт представление `forum_post_list`: колонки представления фиксируются
 в момент его создания, и старое `select p.*` уже никогда не увидит `expires_at`,
 если его не развернуть заново.
+
+`20260925-sanction-appeal.sql` даёт оспорить запрет писем и тишину: таблица
+`forum_appeals`, функции `forum_open_appeal` и `forum_review_appeal` и
+представление `forum_appeal_list`. У таблицы **нет политик на запись** — на
+мере игрока отказывает `forum_can_write()`, поэтому обе двери сделаны
+`security definer` функциями, а не политиками. До пуша кода миграция не
+обязательна: очередь читается отдельным запросом, и без неё работают и лента,
+и панель — панель только называет имя этого файла. Числа (20–600 на текст
+заявки, 10–600 на ответ, 7 дней между заявками по одному вопросу) продублированы
+в `config.js` (`appealMessageMin`/`Max`, `appealAnswerMin`/`Max`,
+`appealCooldownDays`); совпадение чисел и одинаковые слова отказа сторожит тест.
 
 `chats.sql`, `leaders.sql`, дневная активность и точечные `fix-*.sql` применяются
 после их зависимостей по задаче. Старые разовые файлы не запускайте повторно на

@@ -92,6 +92,12 @@ export function renderForum(view, state = {}) {
     notifyOpen: false,
     notifyList: [],
     notifyUnread: 0,
+    /*
+      Оспаривание запрета писать и тишины: list — свои заявки человека,
+      open — какую меру оспаривают сейчас ('' — форма закрыта), text —
+      написанное, error — отказ базы.
+    */
+    appeal: { list: [], open: '', text: '', error: '' },
     allianceSubscriptions: new Set(),
     ...state,
   };
@@ -803,9 +809,126 @@ function renderNotifications(s) {
     </section>`;
 }
 
+/**
+ * Меры, которые не дают писать, и право с ними не согласиться.
+ *
+ * Раньше это были две строки-баннера: человек узнавал о запрете и оставался
+ * с ним один на один. Дверь к модерации обязана быть здесь, а не ссылкой в
+ * правилах: тот, кому не дали писать, не напишет и о том, что ему не дали
+ * писать.
+ *
+ * Слово «оспорить» ничего не обещает и ничего не отменяет: тишина идёт своим
+ * чередом, бан на время разбора остаётся. Ответ обязателен — это держит база
+ * (supabase/20260925-sanction-appeal.sql), а не этот файл.
+ */
+export function renderSanctions(s) {
+  const me = s.me;
+  if (!me) return '';
+
+  const muted = me.mutedUntil && new Date(me.mutedUntil) > new Date();
+  const rows = [];
+  if (me.banned) {
+    rows.push(sanctionRow(s, 'ban', `Вам запрещено писать. Причина: ${esc(me.banReason || 'нарушение правил')}`));
+  }
+  if (muted) {
+    rows.push(sanctionRow(s, 'mute', `Писать можно снова с ${esc(fullTime(me.mutedUntil))}`));
+  }
+  return rows.join('');
+}
+
+/** Как мера называется в кнопке: «оспорить» повисает на пустом месте без того, что оспаривают. */
+const SANCTION_LABEL = { ban: 'запрет писем', mute: 'тишину' };
+
+function sanctionRow(s, kind, notice) {
+  const a = s.appeal ?? {};
+  const appeal = latestAppeal(a.list, kind);
+  const opening = a.open === kind;
+  // Открытая заявка перекрыта ответом, а ответ перекрыт выдержкой: кнопка
+  // возвращается ровно тогда, когда база снова примет заявку.
+  const canOpen = !appeal || (appeal.status !== 'open' && appealCooldownLeft(appeal) <= 0);
+
+  return `
+    <div class="forum-blocked" data-forum-sanction="${kind}">
+      <p class="forum-blocked__line">${notice}</p>
+      ${sanctionState(appeal)}
+      ${canOpen && !opening
+        ? `<button type="button" class="forum-btn forum-btn--ghost forum-appeal__open"
+                 data-forum-appeal="${kind}">Оспорить: ${esc(SANCTION_LABEL[kind])}</button>`
+        : ''}
+      ${opening ? sanctionForm(kind, a.error, a.text) : ''}
+    </div>`;
+}
+
+/**
+ * Что игрок видит про свою заявку.
+ *
+ * Строку для удовлетворённой заявки оставляем, хотя мера с ней обычно
+ * исчезает: бан могут выдать снова, и тогда человек увидит не молча
+ * пропавшую кнопку, а ответ на вопрос «почему опять нельзя».
+ */
+function sanctionState(appeal) {
+  if (!appeal) return '';
+
+  if (appeal.status === 'open') {
+    return `<p class="forum-appeal__state">Вы оспорили решение ${esc(shortDate(appeal.createdAt))} — модератор ещё не ответил.</p>`;
+  }
+
+  const left = appealCooldownLeft(appeal);
+  const wait = left > 0
+    ? `<small class="muted">По этому вопросу уже ответили: новую апелляцию можно открыть через ${plural(left, 'день', 'дня', 'дней')}.</small>`
+    : '';
+
+  if (appeal.status === 'upheld') {
+    return `<p class="forum-appeal__state">Апелляцию удовлетворили${appeal.decidedByNick ? ` — ${esc(appeal.decidedByNick)}` : ''} ${esc(shortDate(appeal.decidedAt))}.</p>${wait}`;
+  }
+
+  return `
+    <p class="forum-appeal__state forum-appeal__state--rejected">
+      Апелляция отклонена${appeal.decidedByNick ? `, ответил ${esc(appeal.decidedByNick)}` : ''}:
+      «${esc(appeal.answer)}»
+    </p>
+    ${wait}`;
+}
+
+function sanctionForm(kind, error, text = '') {
+  const L = CONFIG.forum.limits;
+  return `
+    <form class="forum-appeal" data-forum-appeal-form="${kind}">
+      <label class="forum-field">
+        <span>Что не так с решением</span>
+        <textarea name="message" rows="3" required
+                  minlength="${L.appealMessageMin}" maxlength="${L.appealMessageMax}"
+                  placeholder="что произошло и чего вы ждёте от модерации">${esc(text)}</textarea>
+        <small class="muted">От ${L.appealMessageMin} до ${L.appealMessageMax} символов. Заявку читают только модерация и вы.</small>
+      </label>
+      <div class="forum-appeal__acts">
+        <button type="submit" class="forum-btn" data-forum-appeal-send>Отправить модерации</button>
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-appeal-cancel>Отмена</button>
+      </div>
+      ${error ? `<p class="forum-error">${esc(error)}</p>` : ''}
+    </form>`;
+}
+
+/** Последняя заявка этого человека по этой мере — их может быть несколько за жизнь аккаунта. */
+function latestAppeal(list, kind) {
+  return (Array.isArray(list) ? list : [])
+    .filter((a) => a && a.kind === kind)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] ?? null;
+}
+
+/** Сколько дней осталось до права открыть новую заявку по той же мере. */
+function appealCooldownLeft(appeal) {
+  // Выдержка считается по любому решению, а не только по отказу: так же
+  // считает и база (status <> 'open'), иначе страница разрешала бы то, что
+  // потом отвергнет запрос.
+  if (!appeal || appeal.status === 'open' || !appeal.decidedAt) return 0;
+  const days = CONFIG.forum.limits.appealCooldownDays;
+  const left = new Date(appeal.decidedAt).getTime() + days * 86400000 - Date.now();
+  return left > 0 ? Math.ceil(left / 86400000) : 0;
+}
+
 function renderWhoAmI(s) {
   if (s.me) {
-    const muted = s.me.mutedUntil && s.me.mutedUntil > new Date();
     return `
       <div class="forum-me">
         ${avatarHtml(s.me.nick, s.me.avatarUrl)}
@@ -828,16 +951,7 @@ function renderWhoAmI(s) {
         <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
         <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
       </div>
-      ${
-        s.me.banned
-          ? `<p class="forum-blocked">Вам запрещено писать. Причина: ${esc(s.me.banReason || 'нарушение правил')}</p>`
-          : ''
-      }
-      ${
-        muted
-          ? `<p class="forum-blocked">Писать можно снова с ${esc(fullTime(s.me.mutedUntil))}</p>`
-          : ''
-      }
+      ${renderSanctions(s)}
 ${renderPushPrefs(s)}`;
   }
 

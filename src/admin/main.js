@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=33';
-import { esc } from '../ui/helpers.js?v=33';
-import { mapDataset } from '../data/adapters/_map.js?v=33';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=33';
-import { validateDataset } from '../data/contract.js?v=33';
+import { CONFIG } from '../../config.js?v=34';
+import { esc } from '../ui/helpers.js?v=34';
+import { mapDataset } from '../data/adapters/_map.js?v=34';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=34';
+import { validateDataset } from '../data/contract.js?v=34';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=33';
-import { renderHome } from '../pages/home.js?v=33';
+} from '../logic/standings.js?v=34';
+import { renderHome } from '../pages/home.js?v=34';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=33';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=33';
+} from '../db/account.js?v=34';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=33';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=33';
-import { roleLabel } from '../forum/roles.js?v=33';
-import { prepareImage, uploadPath } from './image.js?v=33';
+} from './store.js?v=34';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=34';
+import { roleLabel } from '../forum/roles.js?v=34';
+import { prepareImage, uploadPath } from './image.js?v=34';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=33';
+} from './edit.js?v=34';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=33';
-import { renderShell } from './shell.js?v=33';
-import { renderLogin } from './login.js?v=33';
-import { renderOverview } from './screens/overview.js?v=33';
-import { renderWeek, describe } from './screens/week.js?v=33';
-import { renderAlliances } from './screens/alliances.js?v=33';
-import { renderEvents } from './screens/events.js?v=33';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=33';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=33';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=33';
-import { renderQuarter } from './screens/quarter.js?v=33';
-import { renderPresident } from './screens/president.js?v=33';
-import { renderPlayers } from './screens/players.js?v=33';
-import { renderModeration } from './screens/moderation.js?v=33';
-import { renderChatsAdmin } from './screens/chats.js?v=33';
-import { forum } from '../forum/index.js?v=33';
-import { deletionReason } from '../forum/rules.js?v=33';
+} from './draft.js?v=34';
+import { renderShell } from './shell.js?v=34';
+import { renderLogin } from './login.js?v=34';
+import { renderOverview } from './screens/overview.js?v=34';
+import { renderWeek, describe } from './screens/week.js?v=34';
+import { renderAlliances } from './screens/alliances.js?v=34';
+import { renderEvents } from './screens/events.js?v=34';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=34';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=34';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=34';
+import { renderQuarter } from './screens/quarter.js?v=34';
+import { renderPresident } from './screens/president.js?v=34';
+import { renderPlayers } from './screens/players.js?v=34';
+import { renderModeration } from './screens/moderation.js?v=34';
+import { renderChatsAdmin } from './screens/chats.js?v=34';
+import { forum } from '../forum/index.js?v=34';
+import { deletionReason } from '../forum/rules.js?v=34';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1276,6 +1276,18 @@ async function loadForumScreen(screenId) {
         view.forum.moderationQueue = [];
         view.forum.moderationActions = [];
       }
+      /*
+        Очередь апелляций грузится своим отдельным броском и своей ошибкой не
+        роняет вкладку: разбирать жалобы можно и без неё. Но null здесь значит
+        «в базе нет таблицы», и экран владельца по этому признаку называет
+        SQL-файл, который нужно выполнить, — иначе молча пустая очередь
+        читалась бы как «игроки не недовольны».
+      */
+      try {
+        view.forum.appeals = await forum.listAppeals();
+      } catch {
+        view.forum.appeals = null;
+      }
     }
   } catch (err) {
     view.forum.error = String(err?.message ?? err);
@@ -1384,6 +1396,39 @@ async function reviewRecovery(button) {
     );
   } catch (err) {
     showPlayerActionError('[data-players-result]', err, '20260925-self-recovery.sql');
+  }
+}
+
+/**
+ * Решение по апелляции на меру.
+ *
+ * Здесь два хода, и оба требуют текста: «удовлетворить» снимает ровно
+ * оспоренную меру, «отклонить» оставляет её в силе и объясняет почему.
+ * Молчаливого отказа база не принимает, и кнопки ниже держат то же правило.
+ *
+ * Очередь перечитывается целиком и только дождавшись: карточка либо уходит из
+ * открытых, либо остаётся с текстом ошибки, и сообщение, написанное до
+ * перерисовки, пропало бы не успев появиться.
+ */
+async function reviewAppealRequest(button) {
+  const [id, decision] = String(button.dataset.appealReview).split(':');
+  // Поле с ответом ищем внутри карточки этой же заявки: uuid в селекторе
+  // потребовал бы экранирования, а соседняя карточка надёжнее любого селектора.
+  const answer = button.closest('[data-appeal-card]')?.querySelector('textarea')?.value ?? '';
+
+  try {
+    await forum.reviewAppeal(id, decision, answer);
+    view.forum.loadedFor = null;
+    await loadForumScreen('moderation');
+    showForumResult(
+      '[data-appeals-result]',
+      decision === 'upheld'
+        ? '<b>Апелляция удовлетворена.</b> Мера снята, игрок получил ответ в уведомлениях и может писать.'
+        : '<b>Апелляция отклонена.</b> Мера осталась; новую заявку по этому вопросу игрок сможет открыть через неделю.',
+      'ok'
+    );
+  } catch (err) {
+    showPlayerActionError('[data-appeals-result]', err, '20260925-sanction-appeal.sql');
   }
 }
 
@@ -1948,6 +1993,12 @@ document.addEventListener('click', async (e) => {
       render();
       showForumResult('[data-moderation-result]', '<b>Материал восстановлен.</b>', 'ok');
     } catch (err) { showForumResult('[data-moderation-result]', esc(String(err?.message ?? err)), 'err'); }
+    return;
+  }
+
+  const appealReview = e.target.closest('[data-appeal-review]');
+  if (appealReview) {
+    await reviewAppealRequest(appealReview);
     return;
   }
 

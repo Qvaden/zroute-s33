@@ -63,6 +63,7 @@ function emptyState() {
     polls: [],
     pollVotes: [],
     notifications: [],
+    appeals: [],
     chats: [],
     chatMembers: [],
     chatMessages: [],
@@ -1118,6 +1119,175 @@ export async function setBlogger(userId, isBlogger) {
   const user = s.users.find((u) => u.id === userId);
   if (!user) throw new Error('Игрок не найден');
   user.isBlogger = Boolean(isBlogger);
+  write(s);
+}
+
+/* ── Оспаривание запрета писать и тишины ─────────────────────────────────────
+ *
+ * Черновой режим повторяет базу по правилам и по словам отказа
+ * (supabase/20260925-sanction-appeal.sql): страница в разработке обязана
+ * показывать ровно тот диалог, который ждёт игрока на общем форуме.
+ *
+ * Право возразить здесь, как и в базе, НЕ проверяется через «может ли
+ * писать»: забаненный человек проходит мимо banCanWrite(). Иначе черновой
+ * режим отрабатывал бы сценарий, в котором апелляции не бывает вовсе.
+ */
+
+function appealOut(a) {
+  return {
+    id: a.id,
+    userId: a.userId,
+    userNick: a.userNick,
+    kind: a.kind,
+    sanction: a.sanction,
+    message: a.message,
+    status: a.status,
+    answer: a.answer,
+    createdAt: toDate(a.createdAt) ?? new Date(),
+    decidedAt: toDate(a.decidedAt),
+    decidedByNick: a.decidedByNick || '',
+  };
+}
+
+export async function listAppeals() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  const all = s.appeals.map(appealOut).sort((a, b) => b.createdAt - a.createdAt);
+  // Как в представлении базы: свои видит игрок, всё — модерация. Ник
+  // ответившего игроку черновик тоже прячет — в базе его не отдаёт политика
+  // forum_users, а без этой строки черновой режим показывал бы то, чего на
+  // живом форуме человек не увидит.
+  if (isStaff(me)) return all;
+  return all
+    .filter((a) => a.userId === s.me)
+    .map((a) => ({ ...a, decidedByNick: '' }));
+}
+
+export async function openAppeal(kind, message) {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Оспорить решение может только вошедший игрок');
+  if (kind !== 'ban' && kind !== 'mute') throw new Error('Оспорить можно запрет писем или тишину');
+
+  const mutedUntil = toDate(me.mutedUntil);
+  if (kind === 'ban' && !me.banned) throw new Error('Запрета писем сейчас нет — оспаривать нечего');
+  if (kind === 'mute' && (!mutedUntil || mutedUntil <= new Date())) {
+    throw new Error('Тишина уже закончилась — оспаривать нечего');
+  }
+
+  const text = String(message ?? '').trim();
+  if (text.length < L.appealMessageMin) {
+    throw new Error(`Нужно хотя бы ${L.appealMessageMin} символов: опишите, что именно не так с решением`);
+  }
+  if (text.length > L.appealMessageMax) {
+    throw new Error(`Не больше ${L.appealMessageMax} символов: важна суть, а не пересказ всей переписки`);
+  }
+  if (s.appeals.some((a) => a.userId === me.id && a.kind === kind && a.status === 'open')) {
+    throw new Error('Такая апелляция уже открыта — модератор её ещё не разобрал');
+  }
+
+  const last = s.appeals
+    .filter((a) => a.userId === me.id && a.kind === kind && a.status !== 'open')
+    .map((a) => toDate(a.decidedAt))
+    .filter(Boolean)
+    .sort((a, b) => b - a)[0];
+
+  if (last) {
+    const left = Math.ceil((last.getTime() + L.appealCooldownDays * 86400000 - Date.now()) / 86400000);
+    if (left > 0) {
+      throw new Error(`По этому вопросу уже ответили: новую апелляцию можно открыть через ${left} дн.`);
+    }
+  }
+
+  s.appeals.push({
+    id: newId('ap'),
+    userId: me.id,
+    userNick: me.nick,
+    kind,
+    sanction: me.banReason || 'причина не указана',
+    message: text.slice(0, L.appealMessageMax),
+    status: 'open',
+    answer: '',
+    createdAt: new Date().toISOString(),
+    decidedAt: null,
+    decidedBy: null,
+    decidedByNick: '',
+  });
+
+  for (const staff of s.users.filter(isStaff)) {
+    pushNotification(s, {
+      userId: staff.id,
+      actorId: null,
+      actorNick: 'Система',
+      kind: 'moderation',
+      preview: `Апелляция: ${me.nick} — ${kind === 'ban' ? 'запрет писем' : 'тишина'}`,
+    });
+  }
+
+  write(s);
+}
+
+export async function reviewAppeal(id, status, answer) {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!isStaff(me)) throw new Error('Апелляцию разбирает модерация');
+  if (status !== 'upheld' && status !== 'rejected') {
+    throw new Error(`Неизвестное решение по апелляции: ${status}`);
+  }
+
+  const appeal = s.appeals.find((a) => a.id === id);
+  if (!appeal) throw new Error('Апелляция не найдена');
+
+  const text = String(answer ?? '').trim();
+  if (text.length < L.appealAnswerMin) {
+    throw new Error(`Нужно хотя бы ${L.appealAnswerMin} символов: игрок ждёт объяснения, а не молчаливого отказа`);
+  }
+  if (text.length > L.appealAnswerMax) {
+    throw new Error(`Не больше ${L.appealAnswerMax} символов: объяснение должно читаться и с телефона`);
+  }
+
+  if (appeal.status !== 'open') {
+    throw new Error(`Эта апелляция уже разобрана: ${appeal.status === 'upheld' ? 'удовлетворена' : 'отклонена'}`);
+  }
+
+  appeal.status = status;
+  appeal.answer = text.slice(0, L.appealAnswerMax);
+  appeal.decidedAt = new Date().toISOString();
+  appeal.decidedBy = me.id;
+  appeal.decidedByNick = me.nick;
+
+  if (status === 'upheld') {
+    const user = s.users.find((u) => u.id === appeal.userId);
+    if (user) {
+      if (appeal.kind === 'ban') {
+        user.banned = false;
+        user.banReason = '';
+      } else {
+        user.mutedUntil = null;
+      }
+      s.moderationActions.unshift({
+        id: newId('ma'),
+        actorNick: me.nick,
+        targetType: 'user',
+        targetId: user.id,
+        targetNick: user.nick,
+        action: 'restriction_changed',
+        details: { banned: Boolean(user.banned), mutedUntil: user.mutedUntil, reason: user.banReason || '' },
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  pushNotification(s, {
+    userId: appeal.userId,
+    actorId: me.id,
+    actorNick: me.nick,
+    kind: 'moderation',
+    preview: `Апелация ${status === 'upheld' ? 'удовлетворена' : 'отклонена'}: ${appeal.answer}`,
+  });
+
   write(s);
 }
 

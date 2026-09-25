@@ -5446,6 +5446,314 @@ console.log('\nV. Срок действия темы');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── W. Оспаривание запрета писать и тишины ──────────────────────────────────
+console.log('\nW. Оспаривание запрета писать и тишины');
+{
+  /*
+    Правило живёт в четырёх местах: таблица и две функции в базе, два
+    адаптера, баннер страницы и очередь панели. Проверяем их друг о друга, а
+    не каждое само по себе: число в конфиге, которое разойдётся с CHECK в
+    таблице, и фраза, которая в черновом режиме звучит иначе, чем в базе, —
+    это молчаливые ошибки, которые человек заметит только отказом на запросе.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const L = CONFIG.forum.limits;
+  const sql = await readFile('supabase/20260925-sanction-appeal.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const adminSrc = await readFile('src/admin/main.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const admCssSrc = await readFile('src/admin/admin.css', 'utf8');
+
+  /* ── Числа ── */
+  check('границы текста заявки записаны в таблице теми же числами, что в конфиге',
+    sql.includes(`char_length(message) between ${L.appealMessageMin} and ${L.appealMessageMax}`));
+  check('длина ответа модерации ограничена в таблице числом из конфига',
+    sql.includes(`answer = '' or char_length(answer) between ${L.appealAnswerMin} and ${L.appealAnswerMax}`));
+  check('выдержка стоит одним числом в базе и в конфиге',
+    sql.includes(`interval '${L.appealCooldownDays} days'`)
+      && sql.includes(`v_last + interval '${L.appealCooldownDays} days'`));
+  check('текст заявки и ответ модерации обязательны и не могут быть пустыми',
+    sql.includes('message     text not null check') && sql.includes('answer      text not null default'));
+  check('числа не перепутаны местами: заявка длиннее минимального ответа',
+    L.appealMessageMin > L.appealAnswerMin && L.appealMessageMax === L.appealAnswerMax);
+
+  /* ── Двери: функции, а не политики ── */
+  const policies = sql.match(/create policy[^\n]*\n[^\n]*/g) || [];
+  check('политика на таблице одна и она только читает',
+    policies.length === 1 && /for select/.test(policies[0])
+      && /user_id = auth\.uid\(\) or public\.forum_is_staff\(\)/.test(policies[0]));
+  check('прав на запись таблица не выдаёт никому',
+    !/grant (insert|update|delete|all|all privileges) on public\.forum_appeals/.test(sql)
+      && sql.includes('grant select on public.forum_appeals to authenticated;'));
+  check('row level security включена явно',
+    sql.includes('alter table public.forum_appeals enable row level security;'));
+  check('обе двери — функции с правами владельца и своим search_path',
+    (sql.match(/language plpgsql security definer set search_path = public/g) || []).length === 2);
+  check('функции открыты для вошедших и закрыты для анонима',
+    (sql.match(/revoke all on function public\.forum_(open|review)_appeal/g) || []).length === 2
+      && (sql.match(/grant execute on function public\.forum_(open|review)_appeal[^;]*to authenticated;/g) || []).length === 2);
+  check('одна открытая заявка держится индексом, а не договорённостью',
+    sql.includes('create unique index if not exists forum_appeals_one_open')
+      && /forum_appeals_one_open[\s\S]{0,120}where status = 'open';/.test(sql));
+  check('очередь отдаёт представление, а не таблицу: ник заявителя нужен панели',
+    /create or replace view public\.forum_appeal_list\s+with \(security_invoker = on\)/.test(sql)
+      && sql.includes('grant select on public.forum_appeal_list to authenticated;'));
+  check('мера и статус замкнуты проверкой таблицы, а не фантазией браузера',
+    sql.includes("check (kind in ('ban', 'mute'))")
+      && sql.includes("check (status in ('open', 'upheld', 'rejected'))"));
+  check('заявка привязана к игроку и живёт вместе с ним: удаление профиля закрывает её',
+    sql.includes('references public.forum_users (id) on delete cascade'));
+
+  /* ── Адаптеры и контракт ── */
+  check('supabase-адаптер стучится в те же rpc с теми же именами параметров',
+    supaSrc.includes("'/rpc/forum_open_appeal'")
+      && /openAppeal[\s\S]{0,260}p_kind: kind, p_message:/.test(supaSrc)
+      && supaSrc.includes("'/rpc/forum_review_appeal'")
+      && /reviewAppeal[\s\S]{0,260}p_target: id, p_status: status, p_answer:/.test(supaSrc));
+  check('очередь панели читает представление, а не таблицу: иначе чужой ник не достать',
+    supaSrc.includes('/forum_appeal_list?select=*&order=created_at.desc'));
+  check('неудачу чтения адаптер не глушит — решает вызывающий',
+    !/listAppeals[\s\S]{0,200}catch\(\(\) => \[\]\)/.test(supaSrc));
+  check('контракт объявляет все три двери',
+    /=> Promise<ForumAppeal\[\]>\} listAppeals/.test(contractSrc)
+      && /\(kind: 'ban'\|'mute', message: string\) => Promise<void>\} openAppeal/.test(contractSrc)
+      && /\(id: string, status: 'upheld'\|'rejected', answer: string\) => Promise<void>\} reviewAppeal/.test(contractSrc));
+  check('черновой режим не проходит через «может ли писать»',
+    !/openAppeal[\s\S]{0,400}banCanWrite/.test(localSrc));
+
+  /* ── Черновой режим: те же правила и те же слова ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const KEY = 'zr33.forum.local';
+  const raw = () => JSON.parse(store.get(KEY));
+  const DAY = 86400000;
+  const inDays = (n) => new Date(Date.now() + n * DAY).toISOString();
+
+  await local.signUp('Властелин');   // первый — владелец
+  await local.signUp('Игрок');
+  const player = (await local.listUsers()).find((u) => u.nick === 'Игрок');
+  await local.signIn('Властелин');
+  await local.setRestriction(player.id, { banned: true, mutedUntil: inDays(2), reason: 'пересказ чужого конфликта' });
+  await local.signIn('Игрок');
+
+  const NEED = {
+    noLogin: 'Оспорить решение может только вошедший игрок',
+    badKind: 'Оспорить можно запрет писем или тишину',
+    noBan: 'Запрета писем сейчас нет — оспаривать нечего',
+    noMute: 'Тишина уже закончилась — оспаривать нечего',
+    short: `Нужно хотя бы ${L.appealMessageMin} символов: опишите, что именно не так с решением`,
+    long: `Не больше ${L.appealMessageMax} символов: важна суть, а не пересказ всей переписки`,
+    twice: 'Такая апелляция уже открыта — модератор её ещё не разобрал',
+    cooldown: (d) => `По этому вопросу уже ответили: новую апелляцию можно открыть через ${d} дн.`,
+  };
+  const REVIEW = {
+    staff: 'Апелляцию разбирает модерация',
+    badStatus: (s) => `Неизвестное решение по апелляции: ${s}`,
+    notFound: 'Апелляция не найдена',
+    short: `Нужно хотя бы ${L.appealAnswerMin} символов: игрок ждёт объяснения, а не молчаливого отказа`,
+    long: `Не больше ${L.appealAnswerMax} символов: объяснение должно читаться и с телефона`,
+    decided: (w) => `Эта апелляция уже разобрана: ${w}`,
+  };
+  /* Слова отказов сверяются здесь, а их поведение — тестами ниже. */
+  check('каждый отказ черновика написан в базе слово в слово',
+    [NEED.noLogin, NEED.badKind, NEED.noBan, NEED.noMute, NEED.twice]
+      .every((t) => sql.includes(t) && localSrc.includes(t))
+      && sql.includes('новую апелляцию можно открыть через % дн.')
+      && localSrc.includes('новую апелляцию можно открыть через'));
+
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const LONG = 'Прошу посмотреть переписку: я отвечал в своей теме и не трогал чужие споры.';
+
+  await local.signOut();
+  equal('без входа заявку не принимают', await says(() => local.openAppeal('ban', LONG)), NEED.noLogin);
+  await local.signIn('Игрок');
+  equal('заявку без меры не принимают', await says(() => local.openAppeal('delete', LONG)), NEED.badKind);
+  equal('короткая заявка не проходит',
+    await says(() => local.openAppeal('mute', 'верните доступ')), NEED.short);
+  equal('длинная заявка не проходит',
+    await says(() => local.openAppeal('mute', LONG.repeat(20))), NEED.long);
+  await local.openAppeal('mute', LONG);
+  equal('вторую заявку по той же мере не открывают',
+    await says(() => local.openAppeal('mute', LONG)), NEED.twice);
+  await local.openAppeal('ban', LONG);
+  check('разные меры открываются раздельно', raw().appeals.length === 2
+    && new Set(raw().appeals.map((a) => a.kind)).size === 2);
+  check('забаненный писать не может, а возразить может',
+    (await says(() => local.createPost({ title: 'Т', body: '<p>текст</p>', category: 'vs', tags: [] })))
+      .startsWith('Вам запрещено писать:') && raw().appeals.length === 2);
+  check('каждая заявка уведомляет модерацию и ничего больше',
+    raw().notifications.filter((n) => n.preview.startsWith('Апелляция:')).length === 2
+      && raw().notifications.every((n) => n.kind === 'moderation'));
+  equal('в заявке лежит снимок причины, а не выдуманная браузером',
+    raw().appeals[0].sanction, 'пересказ чужого конфликта');
+
+  const muteAppeal = raw().appeals.find((a) => a.kind === 'mute');
+  await local.signIn('Властелин');
+  check('модератор видит заявки всех игроков', (await local.listAppeals()).length === 2);
+  await local.signIn('Игрок');
+  check('игрок видит только свои заявки', (await local.listAppeals()).length === 2);
+  await local.signUp('Посторонний');
+  check('чужих апелляций не видно даже вошедшему', (await local.listAppeals()).length === 0);
+  equal('без действующего запрета оспаривать нечего',
+    await says(() => local.openAppeal('ban', LONG)), NEED.noBan);
+  await local.signIn('Игрок');
+
+  equal('игрок не разбирает заявки',
+    await says(() => local.reviewAppeal(muteAppeal.id, 'upheld', 'длинный ответ модератора из текста')), REVIEW.staff);
+  await local.signIn('Властелин');
+  equal('короткий ответ не проходит',
+    await says(() => local.reviewAppeal(muteAppeal.id, 'upheld', 'ок')), REVIEW.short);
+  equal('простыня вместо ответа не проходит',
+    await says(() => local.reviewAppeal(muteAppeal.id, 'upheld', 'объяснение'.repeat(200))), REVIEW.long);
+  equal('неизвестное решение не проходит',
+    await says(() => local.reviewAppeal(muteAppeal.id, 'maybe', 'ответ достаточной длины')), REVIEW.badStatus('maybe'));
+  equal('заявки, которой нет, не существует',
+    await says(() => local.reviewAppeal('ap_none', 'upheld', 'ответ достаточной длины')), REVIEW.notFound);
+  check('пока заявка не разобрана, мера остаётся',
+    raw().users.find((u) => u.id === player.id).banned === true
+      && raw().users.find((u) => u.id === player.id).mutedUntil !== null);
+
+  const banAppeal = raw().appeals.find((a) => a.kind === 'ban');
+  await local.reviewAppeal(muteAppeal.id, 'upheld', 'Тишину снимаю: пересказ был, но не злой.');
+  const afterMute = raw().users.find((u) => u.id === player.id);
+  check('удовлетворённая заявка снимает ровно оспоренную меру',
+    afterMute.mutedUntil === null && afterMute.banned === true);
+  equal('повторное решение по той же заявке отвергают',
+    await says(() => local.reviewAppeal(muteAppeal.id, 'rejected', 'второй модератор передумал')),
+    REVIEW.decided('удовлетворена'));
+  await local.signIn('Игрок');
+  equal('оспорить снятую тишину нельзя: оспаривать уже нечего',
+    await says(() => local.openAppeal('mute', LONG)), NEED.noMute);
+  await local.signIn('Властелин');
+  await local.reviewAppeal(banAppeal.id, 'rejected', 'Жалобы были в трёх темах подряд. Запрет остаётся.');
+  check('отказ остаётся в заявке вместе с автором решения',
+    raw().appeals.find((a) => a.id === banAppeal.id).status === 'rejected'
+      && raw().appeals.find((a) => a.id === banAppeal.id).decidedByNick === 'Властелин');
+  check('снятие меры попало в журнал модерации',
+    raw().moderationActions.some((a) => a.action === 'restriction_changed' && a.targetId === player.id));
+
+  const staffSeen = await local.listAppeals();
+  await local.signIn('Игрок');
+  const ownSeen = await local.listAppeals();
+  check('ник ответившего читает модерация, а игрок — только ответ',
+    staffSeen.some((a) => a.decidedByNick === 'Властелин')
+      && ownSeen.length === 2 && ownSeen.every((a) => a.decidedByNick === ''));
+  equal('сразу после ответа ту же меру не оспаривают',
+    await says(() => local.openAppeal('ban', LONG)), NEED.cooldown(L.appealCooldownDays));
+  const st = raw();
+  st.appeals.find((a) => a.id === banAppeal.id).decidedAt = inDays(-(L.appealCooldownDays + 1));
+  store.set(KEY, JSON.stringify(st));
+  await local.openAppeal('ban', LONG);
+  check('выдержка — окно, а не пожизненный запрет',
+    raw().appeals.filter((a) => a.kind === 'ban').length === 2);
+
+  /* ── Баннер игрока ── */
+  const { renderSanctions } = await import('../src/pages/forum.js');
+  const banned = { id: 'u1', nick: 'Игрок', role: 'member', banned: true, banReason: 'пересказ чужого конфликта', mutedUntil: null };
+  const mutedOnly = { ...banned, banned: false, banReason: '', mutedUntil: inDays(1) };
+  const seat = (over = {}) => ({ me: banned, appeal: { list: [], open: '', text: '', error: '', ...over } });
+  const ap = (over = {}) => ({
+    id: 'a1', userId: 'u1', userNick: 'Игрок', kind: 'ban', sanction: 'пересказ чужого конфликта',
+    message: LONG, status: 'open', answer: '', createdAt: new Date(), decidedAt: null,
+    decidedByNick: '', ...over,
+  });
+
+  equal('гостю баннер не положен', renderSanctions({ me: null }), '');
+  equal('здорового человека баннер не позорит',
+    renderSanctions({ me: { ...banned, banned: false, banReason: '' } }), '');
+  const fresh = renderSanctions(seat());
+  check('в баннере есть кнопка оспаривания и названа мера',
+    fresh.includes('data-forum-sanction="ban"') && /data-forum-appeal="ban"/.test(fresh)
+      && fresh.includes('Оспорить: запрет писем'));
+  const opened = renderSanctions(seat({ open: 'ban' }));
+  check('поле заявки держит границы из конфига',
+    opened.includes(`minlength="${L.appealMessageMin}"`)
+      && opened.includes(`maxlength="${L.appealMessageMax}"`));
+  check('форма живёт в том же баннере и заменяет кнопку',
+    opened.includes('data-forum-appeal-form="ban"') && !/data-forum-appeal="ban"/.test(opened)
+      && opened.includes('data-forum-appeal-cancel'));
+  check('отказ базы показан в форме и ничего не стирается',
+    renderSanctions(seat({ open: 'ban', error: NEED.short, text: 'начатое слово' })).includes(NEED.short)
+      && renderSanctions(seat({ open: 'ban', text: 'начатое слово' })).includes('начатое слово'));
+  check('открытая заявка названа ожиданием, а не кнопкой',
+    renderSanctions(seat({ list: [ap()] })).includes('модератор ещё не ответил')
+      && !/data-forum-appeal="ban"/.test(renderSanctions(seat({ list: [ap()] }))));
+  const rejectedHtml = renderSanctions(seat({
+    list: [ap({ status: 'rejected', answer: 'Жалоб было три.', decidedAt: new Date(Date.now() - 2 * DAY), decidedByNick: 'Властелин' })],
+  }));
+  check('отказ прочитан игроком: ответ, автор и срок новой заявки',
+    rejectedHtml.includes('Жалоб было три.') && rejectedHtml.includes('ответил Властелин')
+      && rejectedHtml.includes('Апелляция отклонена') && /через 5 дней/.test(rejectedHtml));
+  check('после выдержки кнопка возвращается',
+    /data-forum-appeal="ban"/.test(renderSanctions(seat({ list: [ap({ status: 'rejected', answer: 'Жалоб было три.', decidedAt: new Date(Date.now() - (L.appealCooldownDays + 1) * DAY) })] }))));
+  const upheldHtml = renderSanctions(seat({ list: [ap({ status: 'upheld', answer: 'Сняли запрет.', decidedAt: new Date() })] }));
+  check('удовлетворённую заявку видно: молчание вместо кнопки объяснено',
+    upheldHtml.includes('Апелляцию удовлетворили') && /через \d+ дней/.test(upheldHtml)
+      && !/data-forum-appeal="ban"/.test(upheldHtml));
+  check('тишина называется тишиной, а не баном',
+    renderSanctions({ me: mutedOnly, appeal: { list: [], open: '', text: '', error: '' } })
+      .includes('Оспорить: тишину'));
+  check('баннер и форма одеты стилями, а не висят голым текстом',
+    cssSrc.includes('.forum-appeal__state') && cssSrc.includes('.forum-appeal__acts'));
+
+  /* ── Поведение навески ── */
+  check('лента тянет заявки отдельным запросом и не роняет страницу',
+    /try \{\s*state\.appeal\.list = await forum\.listAppeals\(\);/.test(mountSrc)
+      && mountSrc.includes("state.appeal.list = [];"));
+  check('отправкой заявки занимается одна функция и она перекрашивает страницу',
+    mountSrc.includes('async function sendAppeal(form, submitter)')
+      && mountSrc.includes('await forum.openAppeal(kind, message)')
+      && mountSrc.includes("'Апелляция отправлена модерации. Запрет на время разбора остаётся.'"));
+
+  /* ── Очередь панели ── */
+  const { renderModeration } = await import('../src/admin/screens/moderation.js');
+  const boss = { id: 'u9', nick: 'Властелин', role: 'admin' };
+  const screen = (appeals, reports = []) => renderModeration({ forum: { configured: true, me: boss, reports, appeals, moderationQueue: [], moderationActions: [] } });
+  const row = (over = {}) => ({
+    id: 'a1', userId: 'u1', userNick: 'Игрок', kind: 'ban', sanction: 'пересказ чужого конфликта',
+    message: LONG, status: 'open', answer: '', createdAt: new Date(), decidedAt: null,
+    decidedByNick: '', ...over,
+  });
+  check('без миграции панель называет файл, а не молчит пустой очередью',
+    screen(null).includes('supabase/20260925-sanction-appeal.sql'));
+  const openCard = screen([row()]);
+  check('открытая заявка: ник, мера, снимок причины и поле ответа',
+    openCard.includes('Игрок') && openCard.includes('оспаривает: запрет писем')
+      && openCard.includes('Мера на момент заявки') && openCard.includes('пересказ чужого конфликта')
+      && openCard.includes(`data-appeal-answer="a1"`)
+      && openCard.includes(`minlength="${L.appealAnswerMin}"`)
+      && openCard.includes(`maxlength="${L.appealAnswerMax}"`));
+  check('у открытой заявки ровно две кнопки: снять меру или оставить',
+    openCard.includes('data-appeal-review="a1:upheld"') && openCard.includes('data-appeal-review="a1:rejected"'));
+  check('разобранная заявка убрана из очереди и лежит под катом без кнопок',
+    !/data-appeal-review="a2:/.test(screen([row({ id: 'a2', status: 'upheld', answer: 'Запрет снят.', decidedAt: new Date(), decidedByNick: 'Властелин' })]))
+      && screen([row({ id: 'a2', status: 'upheld', answer: 'Запрет снят.', decidedAt: new Date(), decidedByNick: 'Властелин' })]).includes('Разобрано недавно'));
+  check('пустая очередь говорит об этом прямо',
+    screen([]).includes('Открытых апелляций нет.'));
+  check('очередь стоит выше жалоб: ответа человек ждёт больше',
+    screen([row()]).indexOf('data-appeal-card') < screen([row()]).indexOf('Разбирать нечего'));
+  check('ответ панели уходит тем же rpc и перечитывает очередь',
+    adminSrc.includes('await forum.reviewAppeal(id, decision, answer)')
+      && adminSrc.includes("await loadForumScreen('moderation')")
+      && adminSrc.includes('[data-appeals-result]')
+      && adminSrc.includes("'20260925-sanction-appeal.sql'"));
+  check('заявки панели грузятся своим броском и ошибкой не роняют вкладку',
+    /try \{\s*view\.forum\.appeals = await forum\.listAppeals\(\);\s*\} catch \{\s*view\.forum\.appeals = null;/.test(adminSrc));
+  check('поле ответа ищут внутри карточки, а не селектором с uuid',
+    /data-appeal-card[\s\S]{0,160}querySelector\('textarea'\)/.test(adminSrc));
+  check('карточки панели одеты стилями',
+    admCssSrc.includes('.adm-appeal__sanction') && admCssSrc.includes('.adm-appeals__done'));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');
 {

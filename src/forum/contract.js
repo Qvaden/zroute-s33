@@ -135,6 +135,30 @@
  */
 
 /**
+ * Апелляция на запрет писать или на тишину.
+ *
+ * Причина меры лежит здесь снимком (`sanction`), а не читается из профиля:
+ * меру могут снять или изменить, а разбираемая заявка обязана остаться тем
+ * вопросом, которым она была.
+ *
+ * Чужие заявки не видны никому, кроме модерации, — список «кого забанили и
+ * кто спорит» читается как карта конфликтов.
+ *
+ * @typedef {Object} ForumAppeal
+ * @property {string} id
+ * @property {string} userId
+ * @property {string} userNick
+ * @property {'ban'|'mute'} kind      Какую меру оспаривают.
+ * @property {string} sanction        Причина меры на момент заявки.
+ * @property {string} message         Что говорит игрок.
+ * @property {'open'|'upheld'|'rejected'} status
+ * @property {string} answer          Ответ модерации; пусто, пока заявка открыта.
+ * @property {Date}   createdAt
+ * @property {Date|null} decidedAt
+ * @property {string}  decidedByNick  Кто ответил; пустой — ещё никто.
+ */
+
+/**
  * Что умеет конкретный адаптер форума.
  *
  * Здесь абстракция протекает честно, как и у данных сайта: локальный режим
@@ -198,6 +222,13 @@
  * @property {() => Promise<ForumRecoveryRequest[]>} listRecoveryRequests  Очередь для владельца; отпечатков ключей в ней нет.
  * @property {(id: string, approve: boolean) => Promise<void>} reviewRecovery  Впустить досрочно или отклонить; права проверяет база.
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
+ *
+ * Оспаривание меры (см. supabase/20260925-sanction-appeal.sql). Забаненный
+ * игрок проходит здесь, хотя писать ему нельзя: право возразить против
+ * запрета не является правом писать.
+ * @property {() => Promise<ForumAppeal[]>} listAppeals  Себя видит игрок, всё — модерация; без таблицы падает ошибкой, и вызывающий решает, глушить её или показать.
+ * @property {(kind: 'ban'|'mute', message: string) => Promise<void>} openAppeal  Одна открытая заявка на вид меры; тексты отказа приходят из базы и показываются как есть.
+ * @property {(id: string, status: 'upheld'|'rejected', answer: string) => Promise<void>} reviewAppeal  Только модерация; «upheld» снимает ровно оспоренную меру и отвечает игроку текстом.
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
  *

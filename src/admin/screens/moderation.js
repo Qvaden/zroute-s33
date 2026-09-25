@@ -1,6 +1,7 @@
 import { esc } from '../../ui/helpers.js';
 import { RULES } from '../../forum/rules.js';
 import { postBody } from '../../forum/format.js';
+import { CONFIG } from '../../../config.js';
 
 /**
  * ЭКРАН «ЖАЛОБЫ» — разбор нарушений на форуме.
@@ -84,9 +85,16 @@ export function renderModeration(view) {
 
   const queue = f.moderationQueue ?? [];
   const actions = f.moderationActions ?? [];
+  /*
+    Очередь заявок — первым блоком и на обоих исходах ниже. Жалоба говорит
+    «посмотри, там нарушили», апелляция говорит «посмотри, тут решили про
+    тебя». Второе человек ждёт, поэтому оно и стоит выше.
+  */
+  const appeals = renderAppeals(f.appeals);
 
   if (!f.reports.length) {
     return `
+      ${appeals}
       <section class="panel">
         <header class="panel__head">
           <span class="eyebrow">Форум · модерация</span>
@@ -101,6 +109,7 @@ export function renderModeration(view) {
   }
 
   return `
+    ${appeals}
     <section class="panel">
       <header class="panel__head">
         <span class="eyebrow">Форум · модерация</span>
@@ -121,6 +130,100 @@ export function renderModeration(view) {
 
       ${renderActionLog(actions)}
     </section>`;
+}
+
+/* ── Оспаривание запрета писать и тишины ─────────────────────────────────────
+ *
+ * Заявка — это вопрос «правильно ли вы решили про меня», и отвечать на неё
+ * обязан живой человек. Ответа без текста не бывает: база не примет короткое
+ * «отклонено», и кнопки ниже держат то же правило, что и проверка в
+ * supabase/20260925-sanction-appeal.sql.
+ */
+
+/** Как мера называется в очереди: «ban» и «mute» игроку ничего не скажут. */
+const APPEAL_KIND = { ban: 'запрет писем', mute: 'тишина до даты' };
+
+function renderAppeals(appeals) {
+  if (!Array.isArray(appeals)) {
+    return `
+      <section class="panel adm-appeals">
+        <header class="panel__head">
+          <span class="eyebrow">Форум · модерация</span>
+          <h1 class="adm-h1">Апелляции</h1>
+        </header>
+        <p class="adm-lead">
+          Очередь заявок недоступна: в базе ещё нет таблицы
+          <code>forum_appeals</code>. Выполните
+          <code>supabase/20260925-sanction-appeal.sql</code> — без неё игроки
+          не могут оспорить запрет, и жаловаться им некуда.
+        </p>
+      </section>`;
+  }
+
+  const open = appeals.filter((a) => a.status === 'open');
+  const decided = appeals.filter((a) => a.status !== 'open').slice(0, 5);
+
+  return `
+    <section class="panel adm-appeals">
+      <header class="panel__head">
+        <span class="eyebrow">Форум · модерация</span>
+        <h1 class="adm-h1">Апелляции</h1>
+        <p class="adm-lead">
+          Игрок не согласен с мерой, которая не даёт ему писать. Разбирает
+          модерация; «удовлетворить» снимает ровно оспоренную меру и ничего
+          больше. Ответ уходит игроку в уведомления и без него не остаётся.
+        </p>
+      </header>
+
+      <div class="adm-result" data-appeals-result hidden></div>
+
+      ${open.length
+        ? open.map(renderAppealCard).join('')
+        : '<p class="adm-appeals__empty">Открытых апелляций нет.</p>'}
+
+      ${decided.length ? `
+        <details class="adm-appeals__done">
+          <summary>Разобрано недавно: ${esc(String(decided.length))}</summary>
+          ${decided.map(renderAppealCard).join('')}
+        </details>` : ''}
+    </section>`;
+}
+
+function renderAppealCard(a) {
+  const isOpen = a.status === 'open';
+  const L = CONFIG.forum.limits;
+
+  return `
+    <article class="adm-appeal" data-appeal-card="${esc(a.id)}">
+      <header class="adm-appeal__head">
+        <b>${esc(a.userNick || 'игрок')}</b>
+        <span class="adm-appeal__kind">оспаривает: ${esc(APPEAL_KIND[a.kind] ?? a.kind)}</span>
+        <time>${esc(shortTime(a.createdAt))}</time>
+      </header>
+
+      <p class="adm-appeal__sanction">Мера на момент заявки: «${esc(a.sanction || 'причина не указана')}»</p>
+      <p class="adm-appeal__message">${esc(a.message)}</p>
+
+      ${isOpen ? `
+        <label class="adm-field">
+          <span>Ответ игроку (${L.appealAnswerMin}–${L.appealAnswerMax} символов)</span>
+          <textarea name="answer" rows="2" data-appeal-answer="${esc(a.id)}"
+                    minlength="${L.appealAnswerMin}" maxlength="${L.appealAnswerMax}"
+                    placeholder="что именно вы увидели и почему решение остаётся (или что исправили)"></textarea>
+        </label>
+        <div class="adm-actions">
+          <button type="button" class="adm-btn adm-btn--primary"
+                  data-appeal-review="${esc(a.id)}:upheld">Удовлетворить</button>
+          <button type="button" class="adm-btn"
+                  data-appeal-review="${esc(a.id)}:rejected">Отклонить</button>
+        </div>
+      ` : `
+        <p class="adm-appeal__answer">
+          ${a.status === 'upheld' ? 'Удовлетворено' : 'Отклонено'}: «${esc(a.answer)}»
+          ${a.decidedByNick ? `<span class="muted">— ${esc(a.decidedByNick)}, ${esc(shortTime(a.decidedAt))}</span>` : ''}
+        </p>
+      `}
+    </article>`;
 }
 
 function renderPriorityQueue(queue) {

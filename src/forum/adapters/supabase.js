@@ -845,6 +845,62 @@ export async function setRestriction(userId, opts) {
   await rest(`/forum_users?id=eq.${encodeURIComponent(userId)}`, { method: 'PATCH', body });
 }
 
+/* ── Оспаривание запрета писать и тишины ───────────────────────────────────── */
+
+function appealOut(row) {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id),
+    userNick: row.user_nick || '',
+    kind: row.kind,
+    sanction: row.sanction || '',
+    message: row.message || '',
+    status: row.status,
+    answer: row.answer || '',
+    createdAt: toDate(row.created_at) ?? new Date(),
+    decidedAt: toDate(row.decided_at),
+    decidedByNick: row.decided_by_nick || '',
+  };
+}
+
+/**
+ * Заявки на пересмотр меры.
+ *
+ * Читаем представление, а не таблицу: модератору нужен ник заявителя, а
+ * вытягивать его пришлось бы вторым запросом, который к тому же разбился бы
+ * о политику forum_users (чужие профили участнику не отдают).
+ *
+ * Ошибку не глушим: таблица появилась позже всего остального, и вызывающий
+ * сам решает, что ей делать. Ленте без очереди жить как жила, а панели
+ * владельца по ней видно, какой SQL-файл ещё не выполнен.
+ */
+export async function listAppeals() {
+  const rows = await rest('/forum_appeal_list?select=*&order=created_at.desc');
+  return (Array.isArray(rows) ? rows : []).map(appealOut);
+}
+
+/**
+ * Заявка игрока.
+ *
+ * Права на запись у таблицы нет ни у кого: инициатор — функция в базе,
+ * иначе забаненный человек не прошёл бы через forum_can_write() и не мог бы
+ * возразить именно против того запрета, который его и закрыл.
+ */
+export async function openAppeal(kind, message) {
+  await rest('/rpc/forum_open_appeal', {
+    method: 'POST',
+    body: { p_kind: kind, p_message: String(message ?? '') },
+  });
+}
+
+/** Решение модерации: «upheld» снимает ровно оспоренную меру. */
+export async function reviewAppeal(id, status, answer) {
+  await rest('/rpc/forum_review_appeal', {
+    method: 'POST',
+    body: { p_target: id, p_status: status, p_answer: String(answer ?? '') },
+  });
+}
+
 /**
  * Отметка блогера.
  *
