@@ -901,6 +901,56 @@ export async function reviewAppeal(id, status, answer) {
   });
 }
 
+/* ── Тишина в одном разделе ────────────────────────────────────────────────── */
+
+function sectionMuteOut(row) {
+  return {
+    userId: String(row.user_id),
+    category: row.category,
+    mutedUntil: toDate(row.muted_until) ?? new Date(),
+    reason: row.reason || '',
+  };
+}
+
+/**
+ * Тишины по разделам.
+ *
+ * Таблица читается напрямую, без представления, как forum_topic_reads: в ней
+ * нет чужих имён — только пары «человек и раздел», и ник наложившего панели
+ * не нужен (есть журнал модерации). Политика отдаёт игроку его строки, а
+ * модерации — все.
+ *
+ * Ошибку не глушим: по ней панель видит, какой SQL-файл ещё не выполнен,
+ * а лента решает сама, жить ей без этой подсказки или нет.
+ */
+export async function listSectionMutes(userId) {
+  const rows = await rest(
+    `/forum_section_mutes?select=*&user_id=eq.${encodeURIComponent(userId)}&order=muted_until.asc`
+  );
+  return (Array.isArray(rows) ? rows : []).map(sectionMuteOut);
+}
+
+/** Тишина в одном разделе; срок и право налагает база. */
+export async function setSectionMute(userId, category, days, reason) {
+  await rest('/rpc/forum_set_section_mute', {
+    method: 'POST',
+    body: {
+      p_user_id: userId,
+      p_category: category,
+      p_days: Number(days),
+      p_reason: String(reason ?? ''),
+    },
+  });
+}
+
+/** Снятие: та же функция, только без срока. */
+export async function clearSectionMute(userId, category) {
+  await rest('/rpc/forum_set_section_mute', {
+    method: 'POST',
+    body: { p_user_id: userId, p_category: category, p_days: null, p_reason: '' },
+  });
+}
+
 /**
  * Отметка блогера.
  *

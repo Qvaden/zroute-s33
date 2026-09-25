@@ -159,6 +159,21 @@
  */
 
 /**
+ * Тишина в одном разделе: писать сюда нельзя, остальной форум открыт.
+ *
+ * Пары «человек и раздел» уникальны, поэтому продление — это та же запись,
+ * а не вторая строка. Просроченная тишина ничем не отличается от снятой:
+ * живёт она до тех пор, пока `mutedUntil` в будущем, и чистить её фоном
+ * незачем.
+ *
+ * @typedef {Object} ForumSectionMute
+ * @property {string} userId
+ * @property {string} category   id раздела из CATEGORIES — тот же, что в теме.
+ * @property {Date}   mutedUntil До когда здесь нельзя писать.
+ * @property {string} reason     Пояснение, которое видит игрок.
+ */
+
+/**
  * Что умеет конкретный адаптер форума.
  *
  * Здесь абстракция протекает честно, как и у данных сайта: локальный режим
@@ -229,6 +244,14 @@
  * @property {() => Promise<ForumAppeal[]>} listAppeals  Себя видит игрок, всё — модерация; без таблицы падает ошибкой, и вызывающий решает, глушить её или показать.
  * @property {(kind: 'ban'|'mute', message: string) => Promise<void>} openAppeal  Одна открытая заявка на вид меры; тексты отказа приходят из базы и показываются как есть.
  * @property {(id: string, status: 'upheld'|'rejected', answer: string) => Promise<void>} reviewAppeal  Только модерация; «upheld» снимает ровно оспоренную меру и отвечает игроку текстом.
+ *
+ * Тишина в одном разделе (см. supabase/20260925-section-mute.sql). Она
+ * закрывает текст в этом разделе — темы и ответы; реакции, жалобы и правка
+ * своего старого поста остаются открыты. Закрыть последний раздел нельзя:
+ * это общий запрет, а общий запрет обязан быть оспоримым.
+ * @property {(userId: string) => Promise<ForumSectionMute[]>} listSectionMutes  Игрок зовёт себя, панель — любого; без таблицы падает ошибкой, и вызывающий решает, глушить её или показать.
+ * @property {(userId: string, category: string, days: number, reason: string) => Promise<void>} setSectionMute  От 1 до 30 дней и с пояснением; тексты отказа приходят из базы и показываются как есть.
+ * @property {(userId: string, category: string) => Promise<void>} clearSectionMute  Снять тишину в одном разделе; общая её не трогает.
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
  *

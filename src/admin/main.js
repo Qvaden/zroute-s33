@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=34';
-import { esc } from '../ui/helpers.js?v=34';
-import { mapDataset } from '../data/adapters/_map.js?v=34';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=34';
-import { validateDataset } from '../data/contract.js?v=34';
+import { CONFIG } from '../../config.js?v=35';
+import { esc, plural } from '../ui/helpers.js?v=35';
+import { mapDataset } from '../data/adapters/_map.js?v=35';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=35';
+import { validateDataset } from '../data/contract.js?v=35';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=34';
-import { renderHome } from '../pages/home.js?v=34';
+} from '../logic/standings.js?v=35';
+import { renderHome } from '../pages/home.js?v=35';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=34';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=34';
+} from '../db/account.js?v=35';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=34';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=34';
-import { roleLabel } from '../forum/roles.js?v=34';
-import { prepareImage, uploadPath } from './image.js?v=34';
+} from './store.js?v=35';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=35';
+import { roleLabel } from '../forum/roles.js?v=35';
+import { prepareImage, uploadPath } from './image.js?v=35';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=34';
+} from './edit.js?v=35';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=34';
-import { renderShell } from './shell.js?v=34';
-import { renderLogin } from './login.js?v=34';
-import { renderOverview } from './screens/overview.js?v=34';
-import { renderWeek, describe } from './screens/week.js?v=34';
-import { renderAlliances } from './screens/alliances.js?v=34';
-import { renderEvents } from './screens/events.js?v=34';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=34';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=34';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=34';
-import { renderQuarter } from './screens/quarter.js?v=34';
-import { renderPresident } from './screens/president.js?v=34';
-import { renderPlayers } from './screens/players.js?v=34';
-import { renderModeration } from './screens/moderation.js?v=34';
-import { renderChatsAdmin } from './screens/chats.js?v=34';
-import { forum } from '../forum/index.js?v=34';
-import { deletionReason } from '../forum/rules.js?v=34';
+} from './draft.js?v=35';
+import { renderShell } from './shell.js?v=35';
+import { renderLogin } from './login.js?v=35';
+import { renderOverview } from './screens/overview.js?v=35';
+import { renderWeek, describe } from './screens/week.js?v=35';
+import { renderAlliances } from './screens/alliances.js?v=35';
+import { renderEvents } from './screens/events.js?v=35';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=35';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=35';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=35';
+import { renderQuarter } from './screens/quarter.js?v=35';
+import { renderPresident } from './screens/president.js?v=35';
+import { renderPlayers, renderSectionMuteRows } from './screens/players.js?v=35';
+import { renderModeration } from './screens/moderation.js?v=35';
+import { renderChatsAdmin } from './screens/chats.js?v=35';
+import { forum } from '../forum/index.js?v=35';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=35';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1341,8 +1341,30 @@ function closePlayerModal(selector) {
   const modal = root.querySelector(selector);
   if (!modal) return;
   modal.hidden = true;
-  modal.querySelector('form')?.reset();
+  modal.querySelectorAll('form').forEach((form) => form.reset());
   modal.querySelectorAll('.adm-result').forEach((b) => { b.hidden = true; });
+}
+
+/*
+  Тишины игрока по разделам читаются отдельно от общей меры и по требованию.
+
+  ПОЧЕМУ ПО РАЗВОРОТУ, А НЕ ПРИ ОТКРЫТИИ ОКНА: окно «Запретить писать» открывают
+  ради общей меры, и гонять туда запрос к таблице, которой может оказаться не
+  применено, значило бы шуметь отказом там, где о частной мере никто не думал.
+
+  ПОЧЕМУ ПЕРЕЧИТЫВАНИЕ, А НЕ ПРАВКА НА МЕСТЕ: срок считает база, и «до»,
+  придуманное панелью, разошлось бы с тем, что видит игрок в своём баннере.
+*/
+async function loadSectionMutes(userId) {
+  const box = root.querySelector('[data-section-mutes]');
+  if (!box || !userId) return;
+  box.innerHTML = '<li class="muted">Загружаем…</li>';
+  try {
+    box.innerHTML = renderSectionMuteRows(await forum.listSectionMutes(userId));
+  } catch (err) {
+    box.innerHTML = '<li class="muted">Список не прочитан — см. сообщение ниже.</li>';
+    showPlayerActionError('[data-section-mute-error]', err, '20260925-section-mute.sql');
+  }
 }
 
 /** Жалоба разобрана: пометить и убрать из списка. */
@@ -1496,6 +1518,32 @@ document.addEventListener('submit', async (e) => {
       render();
     } catch (err) {
       showPlayerActionError('[data-restrict-error]', err, 'schema.sql');
+    }
+    return;
+  }
+
+  /* ── Форум: тишина в одном разделе ── */
+  const sectionMuteForm = e.target.closest('[data-section-mute-form]');
+  if (sectionMuteForm) {
+    e.preventDefault();
+    const modal = sectionMuteForm.closest('[data-restrict-modal]');
+    const userId = modal?.dataset.playerId;
+    const category = String(sectionMuteForm.elements.category.value);
+    const days = Number(sectionMuteForm.elements.days.value);
+    const reason = String(sectionMuteForm.elements.reason.value ?? '');
+
+    try {
+      await forum.setSectionMute(userId, category, days, reason);
+      // Окно держим открытым: частную меру накладывают по несколько штук за раз,
+      // и закрывать его после каждой значило бы тыкать в «⋯» заново.
+      await loadSectionMutes(userId);
+      showForumResult(
+        '[data-section-mute-error]',
+        `<b>Раздел «${esc(categoryLabel(category))}» закрыт на ${esc(plural(days, 'день', 'дня', 'дней'))}.</b> Остальной форум открыт; игрок увидит причину в своём баннере.`,
+        'ok'
+      );
+    } catch (err) {
+      showPlayerActionError('[data-section-mute-error]', err, '20260925-section-mute.sql');
     }
     return;
   }
@@ -1682,6 +1730,32 @@ document.addEventListener('click', async (e) => {
   }
   if (e.target.closest('[data-restrict-cancel]')) {
     closePlayerModal('[data-restrict-modal]');
+    return;
+  }
+
+  /*
+    Снятие частной тишины — без подтверждения, как отметка блогера: мера
+    обратима тем же окном в одну секунду, а вот наложение её подтверждения не
+    просит сознательно, потому что и оно снимается здесь же.
+  */
+  const muteClear = e.target.closest('[data-section-mute-clear]');
+  if (muteClear) {
+    const modal = muteClear.closest('[data-restrict-modal]');
+    const userId = modal?.dataset.playerId;
+    const category = String(muteClear.dataset.sectionMuteClear);
+    muteClear.disabled = true;
+    try {
+      await forum.clearSectionMute(userId, category);
+      await loadSectionMutes(userId);
+      showForumResult(
+        '[data-section-mute-error]',
+        `<b>Раздел «${esc(categoryLabel(category))}» снова открыт.</b> Ограничения игрока при этом не менялись.`,
+        'ok'
+      );
+    } catch (err) {
+      if (muteClear.isConnected) muteClear.disabled = false;
+      showPlayerActionError('[data-section-mute-error]', err, '20260925-section-mute.sql');
+    }
     return;
   }
 
@@ -2232,6 +2306,17 @@ document.addEventListener('click', async (e) => {
     return;
   }
 });
+
+/*
+  Событие toggle не всплывает, поэтому слушатель ставится на фазе захвата:
+  иначе он сработал бы только для того <details>, который висит прямо на
+  document, а блок частной тишины живёт в глубине окна.
+*/
+document.addEventListener('toggle', (e) => {
+  const panel = e.target?.closest?.('[data-section-mute-panel]');
+  if (!panel || !panel.open) return;
+  loadSectionMutes(panel.closest('[data-restrict-modal]')?.dataset.playerId);
+}, true);
 
 /*
   Номер сервера пишут руками, поэтому слушаем input, а не change: иначе

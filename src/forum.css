@@ -557,6 +557,16 @@
 */
 .forum-blocked > * + * { margin-top: 8px; }
 .forum-blocked__line { margin: 0; }
+/*
+  Тишина в одном разделе — не авария. Краска бана кричала бы там, где закрыта
+  одна комната из восьми, и человек прочитал бы это как полную блокировку.
+  Тот же золотой, что у отметки «гайд устарел»: предупреждение, а не поломка.
+*/
+.forum-blocked--section {
+  border-color: color-mix(in srgb, var(--gold) 32%, var(--line));
+  background: color-mix(in srgb, var(--gold) 8%, transparent);
+  color: var(--text);
+}
 .forum-appeal__state { margin: 0; color: var(--mute); font-size: 12px; }
 .forum-appeal__state--rejected { color: var(--soft-bad); }
 .forum-appeal {

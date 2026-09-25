@@ -1,5 +1,5 @@
-import { esc } from '../../ui/helpers.js';
-import { RULES } from '../../forum/rules.js';
+import { esc, plural } from '../../ui/helpers.js';
+import { RULES, categoryLabel } from '../../forum/rules.js';
 import { postBody } from '../../forum/format.js';
 import { CONFIG } from '../../../config.js';
 
@@ -250,9 +250,17 @@ function renderActionLog(actions) {
   </section>`;
 }
 
+/*
+  Формулировка вида «разобрал жалобу» остаётся последней ветвью: у неизвестного
+  действия не должно быть красивой фразы, иначе журнал начнёт врать о том, чего
+  не понимает. Частные тишины подписаны явно — иначе «закрыл раздел» и «снял
+  запрет» читались бы одним и тем же «изменил ограничение».
+*/
 function actionLabel(item) {
   if (item.action === 'content_removed') return `удалил ${item.targetType === 'post' ? 'пост' : 'комментарий'} ${item.targetNick ? `игрока ${item.targetNick}` : ''}`;
   if (item.action === 'restriction_changed') return `изменил ограничение для ${item.targetNick || 'игрока'}`;
+  if (item.action === 'section_mute') return `закрыл раздел «${categoryLabel(item.details?.category)}» игроку ${item.targetNick || ''} на ${plural(Number(item.details?.days) || 0, 'день', 'дня', 'дней')}`;
+  if (item.action === 'section_mute_removed') return `открыл раздел «${categoryLabel(item.details?.category)}» для ${item.targetNick || 'игрока'}`;
   return 'разобрал жалобу';
 }
 

@@ -5754,6 +5754,279 @@ console.log('\nW. Оспаривание запрета писать и тиши
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── X. Тишина в одном разделе ───────────────────────────────────────────────
+console.log('\nX. Тишина в одном разделе');
+{
+  /*
+    Мера живёт в пяти местах — таблица, перегруженное право писать, триггер
+    со словами, черновой адаптер и окно панели. Разойтись они могут молча:
+    CHECK с опечаткой не закроет ни одного раздела, а лишняя фраза в черновике
+    даст игроку причину, которой база не говорила. Поэтому здесь сравниваются
+    именно места, а не проверяется каждое само по себе.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260925-section-mute.sql', 'utf8');
+  const schemaSql = await readFile('supabase/schema.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/forum.js', 'utf8');
+  const adminSrc = await readFile('src/admin/main.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const admCssSrc = await readFile('src/admin/admin.css', 'utf8');
+  const { CATEGORY_IDS, CATEGORIES } = await import('../src/forum/rules.js');
+
+  const quoted = (s) => [...s.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const tableList = (sql.match(/check \(category in \(([^)]*)\)\)/) || [])[1] || '';
+  const fnList = (sql.match(/v_all\s+text\[\] := array\[([^\]]*)\]/) || [])[1] || '';
+
+  /* ── Один список разделов на три места ── */
+  check('разделы таблицы — ровно те же id, что у CATEGORIES, в том же порядке',
+    JSON.stringify(quoted(tableList)) === JSON.stringify(CATEGORY_IDS));
+  check('список внутри функции совпадает со списком таблицы',
+    JSON.stringify(quoted(fnList)) === JSON.stringify(CATEGORY_IDS));
+  check('ни раздела, которого нет в схеме: id таблицы вписаны и в forum_posts',
+    CATEGORY_IDS.every((id) => schemaSql.includes(`'${id}'`)));
+
+  /* ── Таблица и её права ── */
+  check('тишина привязана к паре «игрок и раздел» и живёт вместе с игроком',
+    sql.includes('primary key (user_id, category)')
+      && sql.includes('references public.forum_users (id) on delete cascade'));
+  check('пояснение короткое или длинное отвергает сама таблица, а не только функция',
+    sql.includes('reason      text not null check (char_length(reason) between 5 and 200)'));
+  check('политика на таблице одна и только читает: свои строки либо модерация',
+    (sql.match(/create policy/g) || []).length === 3
+      && /create policy forum_section_mutes_read[\s\S]{0,160}for select using \(user_id = auth\.uid\(\) or public\.forum_is_staff\(\)\)/.test(sql));
+  check('на таблицу тишин нет ни одной политики записи — только функция',
+    !/create policy[^\n]*on public\.forum_section_mutes\s*\n\s*for (insert|update|delete)/.test(sql)
+      && sql.includes('grant select on public.forum_section_mutes to authenticated;'));
+  check('срок всегда сравнивается с now(): просроченная запись не мешает и не чистится',
+    (sql.match(/muted_until > now\(\)/g) || []).length >= 3);
+
+  /* ── Право писать ── */
+  check('перегруженная функция спрашивает общий запрет, а не заменяет его',
+    /create or replace function public\.forum_can_write\(p_category text\)[\s\S]{0,420}select public\.forum_can_write\(\)\s+and not exists/.test(sql));
+  check('у темы раздел берётся из строки, у комментария — из темы',
+    /create policy forum_posts_insert[\s\S]{0,300}public\.forum_can_write\(category\)/.test(sql)
+      && /create policy forum_comments_insert[\s\S]{0,300}public\.forum_can_write\(\(select p\.category from public\.forum_posts p where p\.id = post_id\)\)/.test(sql));
+  check('слова отказа отдаёт триггер, и он висит на обеих таблицах',
+    (sql.match(/create trigger forum_section_mute_insert\s+before insert on public\.forum_(posts|comments)/g) || []).length === 2
+      && sql.includes("raise exception 'Вам нельзя писать в этот раздел: %', v_reason;"));
+  check('модерации и служебным вызовам триггер не мешает',
+    /if auth\.uid\(\) is null then\s+return new;/.test(sql)
+      && /if public\.forum_is_staff\(\) then\s+return new;/.test(sql));
+  check('дверь модерации — функция с правами владельца, закрытая для анонима',
+    sql.includes('language plpgsql security definer set search_path = public')
+      && sql.includes('revoke all on function public.forum_set_section_mute(uuid, text, integer, text) from public, anon;')
+      && sql.includes('grant execute on function public.forum_set_section_mute(uuid, text, integer, text) to authenticated;'));
+  check('срок считает база, а панель лишь называет число',
+    sql.includes('now() + make_interval(days => p_days)')
+      && /if p_days is null then\s+delete from public\.forum_section_mutes/.test(sql));
+  check('оба решения попадают в журнал модерации',
+    sql.includes("'section_mute_removed',") && sql.includes("'section_mute',")
+      && (sql.match(/perform public\.forum_write_moderation_action\(/g) || []).length === 2);
+
+  /* ── Черновик говорит словами базы ── */
+  const REFUSALS = [
+    'Тишину в разделе налагает и снимает модерация',
+    'Неизвестный раздел',
+    'Игрок не найден',
+    'Администратора тишине не подвергают',
+    'Тишина в разделе — от 1 до 30 дней: дольше держит общий запрет',
+    'Нужно пояснение от 5 до 200 символов: игрок видит причину',
+    'Это уже общий запрет: наложите тишину целиком — тогда игрок сможет её оспорить',
+  ];
+  check('каждый отказ написан в базе и в черновике слово в слово',
+    REFUSALS.every((t) => sql.includes(t) && localSrc.includes(t)));
+  check('границы срока и пояснения в черновике — те же числа, что в базе',
+    /vDays < 1 \|\| vDays > 30/.test(localSrc) && /vReason\.length < 5 \|\| vReason\.length > 200/.test(localSrc));
+  check('контракт обещает три двери меры',
+    /=> Promise<ForumSectionMute\[\]>\} listSectionMutes/.test(contractSrc)
+      && /\(userId: string, category: string, days: number, reason: string\) => Promise<void>\} setSectionMute/.test(contractSrc)
+      && /\(userId: string, category: string\) => Promise<void>\} clearSectionMute/.test(contractSrc));
+  check('supabase-адаптер зовёт ту же функцию с теми же параметрами',
+    supaSrc.includes("'/rpc/forum_set_section_mute'")
+      && /p_user_id: userId,[\s\S]{0,160}p_category: category,[\s\S]{0,160}p_days: Number\(days\),[\s\S]{0,160}p_reason: String\(reason \?\? ''\)/.test(supaSrc)
+      && /clearSectionMute[\s\S]{0,300}p_days: null/.test(supaSrc));
+  check('черновик проверяет раздел после выдержки: порядок триггеров базы сохранён',
+    /checkHold\(s, 'post'[\s\S]{0,400}requireSectionOpen\(s, me, draft\.category\)/.test(localSrc)
+      && /checkHold\(s, 'comment'[\s\S]{0,400}requireSectionOpen\(s, me, post\.category\)/.test(localSrc));
+
+  /* ── Поведение черновика ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const KEY = 'zr33.forum.local';
+  const raw = () => JSON.parse(store.get(KEY));
+  const DAY = 86400000;
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const REASON = 'спор перешёл на личности';
+
+  await local.signUp('Миротворец');   // первый — владелец
+  await local.signUp('Громкий');
+  const loud = (await local.listUsers()).find((u) => u.nick === 'Громкий');
+  const owner = (await local.listUsers()).find((u) => u.nick === 'Миротворец');
+  await local.signIn('Миротворец');
+
+  equal('тишину накладывают на игрока, а не на владельца',
+    await says(() => local.setSectionMute(owner.id, 'vs', 3, REASON)), REFUSALS[3]);
+  equal('раздела с таким id не бывает',
+    await says(() => local.setSectionMute(loud.id, 'secret', 3, REASON)), REFUSALS[1]);
+  equal('срок вне границ отвергают',
+    await says(() => local.setSectionMute(loud.id, 'vs', 31, REASON)), REFUSALS[4]);
+  equal('пояснение короче пяти символов не мера',
+    await says(() => local.setSectionMute(loud.id, 'vs', 3, 'нет')), REFUSALS[5]);
+  equal('несуществующего игрока не закрывают',
+    await says(() => local.setSectionMute('u-net', 'vs', 3, REASON)), REFUSALS[2]);
+  await local.signIn('Громкий');
+  equal('участник меру ни налагает, ни снимает',
+    await says(() => local.setSectionMute(loud.id, 'vs', 3, REASON)), REFUSALS[0]);
+  equal('чужую тишину участник не читает: пустой список, а не отказ',
+    (await local.listSectionMutes(owner.id)).length, 0);
+  await local.signIn('Миротворец');
+
+  await local.setSectionMute(loud.id, 'vs', 3, REASON);
+  const muted = await local.listSectionMutes(loud.id);
+  check('тишина записана одной строкой со сроком и причиной',
+    muted.length === 1 && muted[0].category === 'vs' && muted[0].reason === REASON
+      && muted[0].mutedUntil.getTime() > Date.now() + 2 * DAY);
+  const LONG_REASON = 'срок продлён после разговора';
+  await local.setSectionMute(loud.id, 'vs', 7, LONG_REASON);
+  check('повторная тишина того же раздела — продление, а не вторая строка',
+    (await local.listSectionMutes(loud.id)).length === 1
+      && raw().sectionMutes.length === 1
+      && raw().sectionMutes[0].reason === LONG_REASON);
+  check('решение попало в журнал вместе со сроком',
+    raw().moderationActions.some((a) => a.action === 'section_mute' && a.details.days === 7));
+  check('игрок уведомлён той же мерой, что и в базе',
+    raw().notifications.some((n) => n.userId === loud.id && n.preview.startsWith('Тишина в разделе: ')));
+
+  const vsPost = await local.createPost({ title: 'Разбор последнего боя', body: '<p>по полочкам</p>', category: 'vs' });
+  await local.signIn('Громкий');
+  equal('тема в закрытый раздел не проходит — словами базы',
+    await says(() => local.createPost({ title: 'Второй разбор', body: '<p>и у меня есть</p>', category: 'vs' })),
+    `Вам нельзя писать в этот раздел: ${LONG_REASON}`);
+  equal('ответ в закрытом разделе не проходит — той же фразой',
+    await says(() => local.addComment(vsPost.id, '<p>а я возмущён</p>')),
+    `Вам нельзя писать в этот раздел: ${LONG_REASON}`);
+  check('остальной форум открыт: другая тема проходит',
+    (await local.createPost({ title: 'Вопрос по базе', body: '<p>как настроить</p>', category: 'help' })) !== null);
+  await local.signIn('Миротворец');
+  await local.clearSectionMute(loud.id, 'vs');
+  check('снятая тишина удалена и отмечена в журнале',
+    (await local.listSectionMutes(loud.id)).length === 0
+      && raw().moderationActions.some((a) => a.action === 'section_mute_removed'));
+  await local.clearSectionMute(loud.id, 'vs');
+  check('второе снятие молча ничего не делает: база ведёт себя так же',
+    raw().moderationActions.filter((a) => a.action === 'section_mute_removed').length === 1);
+
+  await local.setSectionMute(loud.id, 'offtop', 3, 'проверка последнего раздела');
+  const stale = raw();
+  stale.sectionMutes[0].mutedUntil = new Date(Date.now() - DAY).toISOString();
+  store.set(KEY, JSON.stringify(stale));
+  await local.signIn('Громкий');
+  check('просроченная тишина не закрывает раздел',
+    (await says(() => local.createPost({ title: 'Разное после срока', body: '<p>уже можно</p>', category: 'offtop' }))) === '');
+  await local.signIn('Миротворец');
+  check('истёкшая тишина остаётся в списке: строка читается, а не стирается',
+    (await local.listSectionMutes(loud.id)).length === 1);
+
+  for (const id of CATEGORY_IDS.filter((c) => c !== 'blog')) {
+    await local.setSectionMute(loud.id, id, 2, 'закрываем разделы по одному');
+  }
+  equal('последний открытый раздел не закрывают: это уже общий запрет',
+    await says(() => local.setSectionMute(loud.id, 'blog', 2, 'и этот тоже')), REFUSALS[6]);
+  check('частных тишин ровно на один раздел меньше, чем существует',
+    raw().sectionMutes.length === CATEGORY_IDS.length - 1);
+  await local.signIn('Громкий');
+  check('свои тишины участник видит все до единого',
+    (await local.listSectionMutes(loud.id)).length === CATEGORY_IDS.length - 1);
+  await local.signIn('Миротворец');
+  check('модерация видит тишины любого игрока в порядке срока',
+    (await local.listSectionMutes(loud.id)).every((m, i, arr) => i === 0 || arr[i - 1].mutedUntil <= m.mutedUntil));
+
+  /* ── Игрок видит закрытый раздел до отказа ── */
+  const { renderSectionMutes, sectionMuteOf } = await import('../src/pages/forum.js');
+  equal('без тишин блок пустой: здоровому игроку не о чём сообщать',
+    renderSectionMutes({ sectionMutes: [] }), '');
+  const seat = { sectionMutes: [{ category: 'vs', mutedUntil: new Date(Date.now() + 2 * DAY), reason: REASON }] };
+  const noteHtml = renderSectionMutes(seat);
+  check('блок называет раздел, срок и причину и отличён от общей блокировки',
+    noteHtml.includes('forum-blocked--section') && noteHtml.includes('Раздел «Разбор VS» закрыт для вас до')
+      && noteHtml.includes(REASON) && noteHtml.includes('Остальной форум открыт'));
+  equal('истёкшую тишину страница не показывает',
+    renderSectionMutes({ sectionMutes: [{ category: 'vs', mutedUntil: new Date(Date.now() - DAY), reason: REASON }] }), '');
+  check('срок ищут по той же паре, что и форма',
+    sectionMuteOf(seat, 'vs') !== null && sectionMuteOf(seat, 'help') === null);
+  check('в списке разделов формы закрытый помечен, а не спрятан',
+    /sectionMuteOf\(s, c\.id\)[\s\S]{0,160}вам здесь нельзя/.test(pagesSrc));
+  check('лента читает тишины вместе с собой и ошибкой не роняет страницу',
+    /state\.sectionMutes = state\.me \? await forum\.listSectionMutes\(state\.me\.id\) : \[\]/.test(mountSrc)
+      && mountSrc.includes('state.sectionMutes = [];'));
+  check('блок одет своим стилем, а не красной полосой общего бана',
+    cssSrc.includes('.forum-blocked--section'));
+
+  /* ── Панель ── */
+  const { renderPlayers, renderSectionMuteRows } = await import('../src/admin/screens/players.js');
+  const panel = renderPlayers({
+    forum: {
+      configured: true, me: owner, users: [loud, owner], appeals: [], recovery: [],
+      reports: [], moderationQueue: [], moderationActions: [], result: null,
+    },
+  });
+  check('окно общей меры держит рядом частную: своя форма и свой вывод',
+    panel.includes('data-section-mute-form') && panel.includes('data-section-mutes')
+      && panel.includes('data-section-mute-error'));
+  /* HTML вложенности не знает, поэтому форму проверяют по позициям тегов. */
+  const openGeneral = panel.indexOf('<form data-restrict-form>');
+  const closeBeforePrivate = panel.lastIndexOf('</form>', panel.indexOf('<form data-section-mute-form>'));
+  check('формы не вложены: общая мера закрыта до того, как началась частная',
+    openGeneral >= 0 && closeBeforePrivate > openGeneral);
+  check('в списке только настоящие разделы',
+    CATEGORIES.every((c) => panel.includes(`<option value="${c.id}">`))
+      && !panel.includes('<option value="secret">'));
+  check('срок выбирается из четырёх готовых, а пояснение ограничено длиной базы',
+    ['1', '3', '7', '30'].every((d) => new RegExp(`name="days"[\\s\\S]{0,240}value="${d}"`).test(panel))
+      && panel.includes('maxlength="200"') && panel.includes('minlength="5"'));
+  check('пустой список сказан прямо, а не молчанием',
+    renderSectionMuteRows([]).includes('Ни один раздел этому игроку не закрыт.'));
+  const rows = renderSectionMuteRows([{ category: 'vs', mutedUntil: new Date(Date.now() + 2 * DAY), reason: REASON }]);
+  check('тишина в списке названа разделом и снимается одной кнопкой',
+    rows.includes('Разбор VS') && rows.includes(REASON) && rows.includes('data-section-mute-clear="vs"'));
+  check('истёкшую тишину панель молча не предлагает снимать: меры уже нет',
+    renderSectionMuteRows([{ category: 'vs', mutedUntil: new Date(Date.now() - DAY), reason: REASON }])
+      .includes('Ни один раздел этому игроку не закрыт.'));
+  check('панель зовёт те же методы и называет недостающую миграцию',
+    adminSrc.includes('await forum.setSectionMute(userId, category, days, reason)')
+      && adminSrc.includes('await forum.clearSectionMute(userId, category)')
+      && (adminSrc.match(/'20260925-section-mute\.sql'/g) || []).length === 3);
+  check('список перечитывают после каждого решения, а не правят на месте',
+    (adminSrc.match(/await loadSectionMutes\(userId\);/g) || []).length === 2
+      && /async function loadSectionMutes\(userId\)/.test(adminSrc));
+  check('блок свёрнут и грузится по раскрытию, а не при каждом открытии окна',
+    /addEventListener\('toggle',[\s\S]{0,240}data-section-mute-panel[\s\S]{0,200}\}, true\)/.test(adminSrc));
+  check('окно закрывается с обеими формами',
+    /modal\.querySelectorAll\('form'\)\.forEach\(\(form\) => form\.reset\(\)\)/.test(adminSrc));
+  check('журнал различает частную и общую меру',
+    (await import('../src/admin/screens/moderation.js')).renderModeration({
+      forum: {
+        configured: true, me: owner, reports: [], appeals: [], moderationQueue: [],
+        moderationActions: [
+          { id: 'm1', actorNick: 'Миротворец', targetType: 'user', targetId: loud.id, targetNick: 'Громкий', action: 'section_mute', details: { category: 'vs', days: 3 }, createdAt: new Date() },
+          { id: 'm2', actorNick: 'Миротворец', targetType: 'user', targetId: loud.id, targetNick: 'Громкий', action: 'section_mute_removed', details: { category: 'blog' }, createdAt: new Date() },
+        ],
+      },
+    }).includes('закрыл раздел «Разбор VS» игроку Громкий на 3 дня'));
+  check('блок панели одет своим стилем, а не скопирован с форума',
+    admCssSrc.includes('.adm-section-mute'));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');
 {

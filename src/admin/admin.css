@@ -1447,6 +1447,32 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-rename-history h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .adm-rename-history .adm-reserved__item code { color: var(--dim); }
 
+/*
+  Тишина в одном разделе — свёрнутый блок в окне общей меры.
+
+  Он не оформлен тревогой: закрытый один раздел — не бан, и красная рамка
+  рядом с «Запретить писать» сравняла бы две меры, которые различаются как
+  раз степенью. Серая полоса сверху — та же граница, что у пояснения ниже.
+*/
+.adm-section-mute {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft, color-mix(in srgb, var(--text) 6%, transparent));
+}
+.adm-section-mute > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dim);
+  list-style: none;
+}
+.adm-section-mute > summary::-webkit-details-marker { display: none; }
+.adm-section-mute > summary::before { content: '▸ '; color: var(--mute); }
+.adm-section-mute[open] > summary::before { content: '▾ '; }
+.adm-section-mute > summary:hover { color: var(--text); }
+.adm-section-mute p { margin: 8px 0 10px; font-size: 11.5px; line-height: 1.55; }
+.adm-section-mute form { display: grid; gap: 10px; margin-top: 12px; }
+
 /* ── Светлая тема «Arctic Command» ──────────────────────────────────────────
    Фон холодный светлый, панели — белое стекло (токены в styles-v8.css),
    поэтому шапка, подвал и заголовки экранов работают на дефолтных токенах.

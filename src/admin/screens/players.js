@@ -1,5 +1,5 @@
 ﻿import { esc } from '../../ui/helpers.js';
-import { RULES } from '../../forum/rules.js';
+import { CATEGORIES, RULES, categoryLabel } from '../../forum/rules.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../../forum/roles.js';
 import { formatHoldLeft } from '../../forum/recovery.js';
 import { CONFIG } from '../../../config.js';
@@ -478,6 +478,11 @@ function renderRenameModal() {
  * показан игрокам: «запрещено» без причины выглядит произволом и ничему
  * не учит. Тишина на срок стоит впереди вечного запрета намеренно —
  * так первая мера оказывается соразмерной.
+ *
+ * РЯДОМ ЖИВЁТ ЧАСТНАЯ МЕРА — тишина в одном разделе. Общая мера и частная
+ * отвечают за разное, поэтому у них две разные формы и две кнопки: одно
+ * нажатие не должно решать и то и другое. Формы нельзя гнездить, так что
+ * вторая стоит не внутри первой, а следующим блоком того же окна.
  */
 function renderRestrictModal() {
   const DURATIONS = [
@@ -543,8 +548,99 @@ function renderRestrictModal() {
           <br>
           <b>Запрет</b> — то же самое, но без срока: снимать только вручную.
         </p>
+
+        ${renderSectionMuteBlock(DURATIONS)}
       </div>
     </div>`;
+}
+
+/*
+  Тишина в одном разделе: закрывает один раздел, остальной форум остаётся
+  открытым. Мера живёт рядом с общей, потому что выбирается в тот же момент —
+  когда модератор уже смотрит на нарушителя и решает, насколько он нарушил.
+
+  Срок здесь не свободный, а из четырёх готовых: те же сутки-неделя-месяц, что
+  у общей тишины. Число 1–30 проверяет база, и панель его не дублирует —
+  она даёт выбрать, а не позволяет написать что угодно.
+
+  Список действующих тишин грузится при открытии окна (см. loadSectionMutes в
+  main.js), а не печатается здесь: экран перерисовывается целиком, и срок,
+  записанный в разметку, устарел бы при первом же снятии.
+*/
+function renderSectionMuteBlock(durations) {
+  return `
+    <details class="adm-section-mute" data-section-mute-panel>
+      <summary>Тишина в одном разделе</summary>
+
+      <p class="muted">
+        Закрывает игроку один раздел, остальной форум остаётся открытым. Снимается
+        сама по истечении срока. Последний открытый раздел не закрывается: сумма
+        частных тишин стала бы общим запретом, а общий запрет игрок может оспорить,
+        и у молчания по разделам такой двери нет.
+      </p>
+
+      <ul class="adm-reserved__list" data-section-mutes><li class="muted">Загружаем…</li></ul>
+
+      <form data-section-mute-form>
+        <label class="adm-field">
+          <span>Раздел</span>
+          <select name="category">
+            ${CATEGORIES.map((c) => `<option value="${esc(c.id)}">${esc(c.label)} — ${esc(c.hint)}</option>`).join('')}
+          </select>
+        </label>
+
+        <label class="adm-field">
+          <span>Срок</span>
+          <select name="days">
+            ${durations.map((d) => `<option value="${esc(d.id)}">${esc(d.label)}</option>`).join('')}
+          </select>
+        </label>
+
+        <label class="adm-field">
+          <span>Пояснение (увидит игрок)</span>
+          <input type="text" name="reason" minlength="5" maxlength="200" required autocomplete="off"
+                 placeholder="За что раздел закрыт именно ему">
+        </label>
+
+        <div class="adm-actions">
+          <button type="submit" class="adm-btn adm-btn--primary">Закрыть раздел</button>
+        </div>
+        <div class="adm-result" data-section-mute-error hidden></div>
+      </form>
+    </details>`;
+}
+
+/**
+ * Действующие тишины игрока — строками того же списка, что и история
+ * переименований.
+ *
+ * Истёкшие строки здесь отбрасываются, хотя читались целиком: предложение
+ * «снять» с той, что уже снялась сама, было бы обманом — модератор нажал бы
+ * и получил запись в журнале про меру, которой нет.
+ *
+ * Пустой список и отказ — разные ответы, и панель их не смешивает: «ни один
+ * раздел не закрыт» говорит база, а не панель на глаз, поэтому молча подменять
+ * одно другим нельзя (отказ показывается своим сообщением в main.js).
+ */
+export function renderSectionMuteRows(mutes) {
+  const now = Date.now();
+  const live = (mutes || []).filter((m) => new Date(m.mutedUntil) > now);
+  if (!live.length) {
+    return '<li class="muted">Ни один раздел этому игроку не закрыт.</li>';
+  }
+  return live
+    .map((m) => {
+      const until = new Date(m.mutedUntil);
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${pad(until.getDate())}.${pad(until.getMonth() + 1)}.${until.getFullYear()} ${pad(until.getHours())}:${pad(until.getMinutes())}`;
+      return `<li class="adm-reserved__item">
+        <b>${esc(categoryLabel(m.category))}</b>
+        <span class="muted">до ${esc(stamp)} · ${esc(m.reason || 'без пояснения')}</span>
+        <button type="button" class="adm-btn"
+                data-section-mute-clear="${esc(m.category)}">Снять</button>
+      </li>`;
+    })
+    .join('');
 }
 
 /**

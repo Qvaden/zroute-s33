@@ -64,6 +64,7 @@ function emptyState() {
     pollVotes: [],
     notifications: [],
     appeals: [],
+    sectionMutes: [],
     chats: [],
     chatMembers: [],
     chatMessages: [],
@@ -496,6 +497,10 @@ export async function createPost(draft) {
   const expiryError = expiryProblem(tags, draft.expiresAt ?? null);
   if (expiryError) throw new Error(expiryError);
   checkHold(s, 'post', me, `${draft.title} ${draft.body}`);
+  // Раздел закрыт для этого игрока — последняя проверка перед вставкой: в
+  // базе триггеры перед insert идут по алфавиту, и forum_section_mute_insert
+  // среди них последний.
+  requireSectionOpen(s, me, draft.category);
 
   const post = {
     id: newId('p'),
@@ -681,6 +686,7 @@ export async function addComment(postId, body) {
   if (!post) throw new Error('Пост не найден');
   if (post.deleted) throw new Error('Пост удалён, обсуждать нечего');
   checkHold(s, 'comment', me, body);
+  requireSectionOpen(s, me, post.category);
 
   const comment = {
     id: newId('c'),
@@ -1280,12 +1286,166 @@ export async function reviewAppeal(id, status, answer) {
     }
   }
 
+  /*
+    Молчать об исходе нельзя: игрок узнаёт о решении из уведомления, а не из
+    очереди панели, которую он может и не открыть.
+  */
   pushNotification(s, {
     userId: appeal.userId,
     actorId: me.id,
     actorNick: me.nick,
     kind: 'moderation',
     preview: `Апелация ${status === 'upheld' ? 'удовлетворена' : 'отклонена'}: ${appeal.answer}`,
+  });
+
+  write(s);
+}
+
+/* ── Тишина в одном разделе ──────────────────────────────────────────────────
+ *
+ * Черновик повторяет supabase/20260925-section-mute.sql и по правилам, и по
+ * словам отказа: где человеку нельзя писать, страница обязана отказать теми же
+ * словами, что скажет база, — иначе он узнает про меру только в момент, когда
+ * та уже отказала.
+ *
+ * Границы срока (1–30 дней) и длины пояснения (5–200) здесь повторяют числа
+ * функции, а не лежат в config.js: клиент ничего не проверяет на глаз, он
+ * пересказывает то, что сказала база. Совпадение сторожит тест.
+ */
+
+/** Действующая тишина игрока в разделе; null — раздел открыт. */
+function sectionMuteOf(state, userId, category) {
+  const now = Date.now();
+  return (state.sectionMutes || []).find((m) => {
+    if (m.userId !== userId || m.category !== category) return false;
+    const until = toDate(m.mutedUntil);
+    return until !== null && until.getTime() > now;
+  }) || null;
+}
+
+/** Отказ тому, кто пишет в закрытый для него раздел. */
+function requireSectionOpen(state, me, category) {
+  const mute = sectionMuteOf(state, me.id, category);
+  if (mute) throw new Error(`Вам нельзя писать в этот раздел: ${mute.reason}`);
+}
+
+/** Свои тишины — игроку, любые — модерации; как политика чтения в базе. */
+export async function listSectionMutes(userId) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  const id = String(userId || '');
+  // Чужую тишину участника политика не отдала бы: пустой список, а не ошибка.
+  if (id !== s.me && !isStaff(me)) return [];
+  return (s.sectionMutes || [])
+    .filter((m) => m.userId === id)
+    .map((m) => ({
+      userId: m.userId,
+      category: m.category,
+      mutedUntil: toDate(m.mutedUntil) ?? new Date(),
+      reason: m.reason || '',
+    }))
+    .sort((a, b) => a.mutedUntil - b.mutedUntil);
+}
+
+export async function setSectionMute(userId, category, days, reason) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!isStaff(me)) throw new Error('Тишину в разделе налагает и снимает модерация');
+  if (!CATEGORY_IDS.includes(category)) throw new Error('Неизвестный раздел');
+
+  const user = s.users.find((u) => u.id === userId);
+  if (!user) throw new Error('Игрок не найден');
+  if (user.role === 'admin') throw new Error('Администратора тишине не подвергают');
+
+  const vDays = Number(days);
+  if (!Number.isInteger(vDays) || vDays < 1 || vDays > 30) {
+    throw new Error('Тишина в разделе — от 1 до 30 дней: дольше держит общий запрет');
+  }
+
+  const vReason = String(reason ?? '').trim();
+  if (vReason.length < 5 || vReason.length > 200) {
+    throw new Error('Нужно пояснение от 5 до 200 символов: игрок видит причину');
+  }
+
+  /*
+    Разделов, которые останутся открытыми. Закрыть последний нельзя: мера
+    станет общей, а у общей меры есть дверь апелляции — у суммы частных её нет.
+  */
+  const free = CATEGORY_IDS.filter(
+    (c) => c !== category && !sectionMuteOf(s, user.id, c)
+  ).length;
+  if (free === 0) {
+    throw new Error('Это уже общий запрет: наложите тишину целиком — тогда игрок сможет её оспорить');
+  }
+
+  const until = new Date(Date.now() + vDays * 86400000).toISOString();
+  const row = (s.sectionMutes || []).find(
+    (m) => m.userId === user.id && m.category === category
+  );
+  if (row) {
+    row.mutedUntil = until;
+    row.reason = vReason;
+    row.setBy = me.id;
+  } else {
+    s.sectionMutes.push({
+      userId: user.id,
+      category,
+      mutedUntil: until,
+      reason: vReason,
+      setBy: me.id,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  s.moderationActions.unshift({
+    id: newId('ma'),
+    actorNick: me.nick,
+    targetType: 'user',
+    targetId: user.id,
+    targetNick: user.nick,
+    action: 'section_mute',
+    details: { category, days: vDays, reason: vReason },
+    createdAt: new Date().toISOString(),
+  });
+
+  pushNotification(s, {
+    userId: user.id,
+    actorId: me.id,
+    actorNick: me.nick,
+    kind: 'moderation',
+    preview: `Тишина в разделе: ${vReason}`,
+  });
+
+  write(s);
+}
+
+export async function clearSectionMute(userId, category) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!isStaff(me)) throw new Error('Тишину в разделе налагает и снимает модерация');
+  if (!CATEGORY_IDS.includes(category)) throw new Error('Неизвестный раздел');
+
+  const user = s.users.find((u) => u.id === userId);
+  if (!user) throw new Error('Игрок не найден');
+
+  const before = (s.sectionMutes || []).length;
+  s.sectionMutes = (s.sectionMutes || []).filter(
+    (m) => !(m.userId === user.id && m.category === category)
+  );
+  if (s.sectionMutes.length === before) {
+    // В базе снятие несуществующей тишины молча ничего не делает.
+    return;
+  }
+
+  s.moderationActions.unshift({
+    id: newId('ma'),
+    actorNick: me.nick,
+    targetType: 'user',
+    targetId: user.id,
+    targetNick: user.nick,
+    action: 'section_mute_removed',
+    details: { category },
+    createdAt: new Date().toISOString(),
   });
 
   write(s);

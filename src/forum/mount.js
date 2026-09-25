@@ -110,6 +110,12 @@ const state = {
     имеет отношения к ленте, и ронять её из-за него нельзя.
   */
   appeal: { list: [], open: '', text: '', error: '' },
+  /*
+    Тишины по разделам этого человека (список ForumSectionMute). Пусто — не
+    значит «тишины есть»: пустой список и отказ чтения выглядят одинаково, и
+    страница намеренно не поднимает шум — закрывает раздел всё-таки база.
+  */
+  sectionMutes: [],
 };
 
 /**
@@ -644,6 +650,17 @@ async function loadFeed({ append = false } = {}) {
         state.appeal.list = await forum.listAppeals();
       } catch {
         state.appeal.list = [];
+      }
+
+      /*
+        Тишины по разделам — той же ценой, что и заявки: отдельный запрос и
+        неудача, которая не трогает ленту. Без них форма не предупредит
+        человека, и отказ дойдёт до него только тогда, когда текст уже набран.
+      */
+      try {
+        state.sectionMutes = state.me ? await forum.listSectionMutes(state.me.id) : [];
+      } catch {
+        state.sectionMutes = [];
       }
     }
   } catch (err) {

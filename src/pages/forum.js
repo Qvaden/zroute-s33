@@ -927,6 +927,41 @@ function appealCooldownLeft(appeal) {
   return left > 0 ? Math.ceil(left / 86400000) : 0;
 }
 
+/**
+ * Тишина этого игрока в разделе; null — раздел открыт.
+ *
+ * Страница берёт те же строки, по которым отказывает база
+ * (supabase/20260925-section-mute.sql), и по той же причине: форма, которая
+ * молчит о закрытом разделе, разрешает то, что через минуту отвергнет запрос.
+ */
+export function sectionMuteOf(s, category) {
+  const now = Date.now();
+  return (Array.isArray(s.sectionMutes) ? s.sectionMutes : [])
+    .find((m) => m && m.category === category && new Date(m.mutedUntil) > now) ?? null;
+}
+
+/**
+ * «Здесь нельзя» вместо «нигде нельзя».
+ *
+ * Меры выше отнимают слово на всём форуме, эта закрывает один раздел, и
+ * поэтому она не рядом с баннером бана, а списком: человеку важно, что
+ * остальное открыто, иначе тишина в разделе читается как полная блокировка.
+ */
+export function renderSectionMutes(s) {
+  const now = Date.now();
+  const live = (Array.isArray(s.sectionMutes) ? s.sectionMutes : [])
+    .filter((m) => m && new Date(m.mutedUntil) > now)
+    .sort((a, b) => new Date(a.mutedUntil) - new Date(b.mutedUntil));
+  if (!live.length) return '';
+
+  return `
+    <div class="forum-blocked forum-blocked--section" data-forum-section-mutes>
+      ${live.map((m) => `
+        <p class="forum-blocked__line">Раздел «${esc(categoryLabel(m.category))}» закрыт для вас до ${esc(shortDate(m.mutedUntil))}: ${esc(m.reason)}</p>`).join('')}
+      <p class="forum-blocked__line muted">Остальной форум открыт; снимает модерация.</p>
+    </div>`;
+}
+
 function renderWhoAmI(s) {
   if (s.me) {
     return `
@@ -952,6 +987,7 @@ function renderWhoAmI(s) {
         <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
       </div>
       ${renderSanctions(s)}
+      ${renderSectionMutes(s)}
 ${renderPushPrefs(s)}`;
   }
 
@@ -1352,9 +1388,12 @@ function renderComposer(s) {
         <label class="forum-field">
           <span>Раздел</span>
           <select name="category" required>
-            ${CATEGORIES.map(
-              (c) => `<option value="${esc(c.id)}">${esc(c.label)} — ${esc(c.hint)}</option>`
-            ).join('')}
+            ${CATEGORIES.map((c) => {
+              // Закрытый раздел не прячем: игрок видит его список и пометку
+              // рядом, а не гадает, почему пропала привычная строка.
+              const mute = sectionMuteOf(s, c.id);
+              return `<option value="${esc(c.id)}">${esc(c.label)} — ${esc(c.hint)}${mute ? ' · вам здесь нельзя' : ''}</option>`;
+            }).join('')}
           </select>
         </label>
 
