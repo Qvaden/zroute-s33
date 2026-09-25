@@ -37,6 +37,11 @@ const toDate = (v) => (v ? new Date(v) : null);
  * @property {number} likesReceived
  * @property {boolean} [isVerified]  Ник подтверждён лидером/модерацией.
  * @property {Date|null} [verifiedAt]
+ * @property {number} [thanksReceived]  Сколько благодарностей собрали записи.
+ * @property {number} [verifiedGuides]  Разборов, проверенных модерацией.
+ * @property {number} [eventsHeld]      Встреч, которые человек провёл.
+ * @property {number} [repGrantPoints]  Сумма наград владельца, в очках.
+ * @property {number} [repGrantCount]   Сколько наград выдали.
  */
 
 /** @param {any} row */
@@ -63,6 +68,17 @@ function profileFrom(row) {
     iLiked: Boolean(row.i_liked),
     isVerified: Boolean(row.is_verified),
     verifiedAt: toDate(row.verified_at),
+    /*
+      Откуда берётся репутация. Все пять чисел считает представление
+      forum_profiles (supabase/20260926-author-thanks.sql), здесь они только
+      переименовываются. Пустые значения до миграции — норма: страница
+      показывает ноль, а не падает.
+    */
+    thanksReceived: Number(row.thanks_received || 0),
+    verifiedGuides: Number(row.verified_guides || 0),
+    eventsHeld: Number(row.events_held || 0),
+    repGrantPoints: Number(row.rep_grants || 0),
+    repGrantCount: Number(row.rep_grant_count || 0),
   };
 }
 

@@ -89,6 +89,13 @@
  *                                    ответа (my_remind_minutes в ленте базы):
  *                                    без него выбор «напомнить за час» в теме
  *                                    выглядел бы снятым.
+ * @property {number}  [thanksCount]  Сколько человек поблагодарили автора этой
+ *                                    записи (thanks_count в ленте базы).
+ *                                    Число, а не список имён: связи «кто кого»
+ *                                    лента не показывает никому.
+ * @property {boolean} [iThanked]     Благодарил ли здесь сам вошедший. Своё,
+ *                                    как my_reaction; снятой благодарность не
+ *                                    бывает никогда, поэтому и метка одна.
  * @property {number}  score          Согласны минус не согласны.
  */
 
@@ -112,6 +119,8 @@
  * @property {string}  [deletedReason]
  * @property {Record<string, number>} reactions
  * @property {string|null} myReaction
+ * @property {number}  [thanksCount]  Сколько благодарностей автору ответа.
+ * @property {boolean} [iThanked]     Своя отметка — та же граница, что у поста.
  */
 
 /**
@@ -127,7 +136,7 @@
  * @property {string}  userId        Кому.
  * @property {string|null} [actorId]    От кого; пусто, если аккаунт удалили.
  * @property {string}  actorNick     Копией, как ник автора у поста.
- * @property {'mention'|'reply'|'reaction'|'subscription'|'alliance_rank'|'moderation'|'digest'} kind
+ * @property {'mention'|'reply'|'reaction'|'subscription'|'alliance_rank'|'moderation'|'digest'|'event'|'thanks'} kind
  * @property {string}  [postId]      На какой пост ведёт уведомление.
  * @property {string}  [commentId]   Для реакции на комментарий.
  * @property {string}  preview       Кусок текста, чтобы читалось без перехода.
@@ -259,6 +268,19 @@
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment
  * @property {(id: string, reason: string) => Promise<void>} deleteComment
  * @property {(targetType: 'post'|'comment', targetId: string, reactionId: string|null) => Promise<void>} setReaction
+ * @property {(targetType: 'post'|'comment', targetId: string) => Promise<void>} giveThanks
+ *                                    Поблагодарить автора. Отдельная сущность,
+ *                                    а не реакция: согласия снимаются,
+ *                                    благодарность — никогда. Отказывает база
+ *                                    (forum_give_thank) своими словами, и
+ *                                    локальный режим повторяет их дословно.
+ * @property {(userId: string, delta: number, reason: string) => Promise<void>} [grantReputation]
+ *                                    Награда владельца: одно неизменяемое
+ *                                    начисление очков репутации.
+ * @property {(userId: string|null) => Promise<Array<{ id: string, userId: string, nick: string, delta: number,
+ *                                    reason: string, grantedByNick: string, createdAt: Date }>>} [listReputationGrants]
+ *                                    История начислений: свою видит игрок,
+ *                                    всю — модерация; причины наружу не идут.
  * @property {(report: {targetType: 'post'|'comment', targetId: string, ruleId: string, note?: string}) => Promise<void>} report
  * @property {() => Promise<ForumReport[]>} listReports
  * @property {(reportId: string) => Promise<void>} resolveReport

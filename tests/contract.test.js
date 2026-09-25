@@ -3884,14 +3884,25 @@ console.log('\nS. Чистые функции');
 }
 
 {
-  /* ── Уровни и достижения форума (rank.js) ── */
-  const { pointsOf, levelOf, progressOf, achievementsOf, doneCount, LEVELS } = await import('../src/forum/rank.js');
+  /* ── Уровни, достижения и репутация форума (rank.js) ── */
+  const {
+    pointsOf, levelOf, progressOf, achievementsOf, doneCount, LEVELS,
+    POINTS, REP_POINTS, reputationOf, reputationSourcesOf,
+  } = await import('../src/forum/rank.js');
 
   equal('points: пустой профиль даёт ноль', pointsOf({}), 0);
   equal('points: пост = 10', pointsOf({ postCount: 1 }), 10);
   equal('points: ответ = 3', pointsOf({ commentCount: 2 }), 6);
   equal('points: согласие = 2', pointsOf({ likesReceived: 3 }), 6);
   equal('points: всё вместе', pointsOf({ postCount: 2, commentCount: 1, likesReceived: 5 }), 33);
+  /*
+    Благодарность дороже согласия: её не снять, и частоту держит база.
+    Число названо здесь два раза осознанно — тест обязан заметить, если вес
+    поедет вместе с объяснением в комментарии.
+  */
+  equal('points: благодарность = 5', pointsOf({ thanksReceived: 4 }), 20);
+  check('points: благодарность стоит дороже согласия', POINTS.thanks > POINTS.like);
+  check('points: благодарность дешевле поста', POINTS.thanks < POINTS.post);
 
   equal('level: новичок с нуля', levelOf({}).title, 'Новичок');
   equal('level: порог 20 поднимает до Писаря', levelOf({ likesReceived: 10 }).title, 'Писарь');
@@ -3926,7 +3937,53 @@ console.log('\nS. Чистые функции');
   const notOld = achievementsOf({ createdAt: new Date(Date.now() - 1000) });
   check('achievements: свежий человек не получает значок месяца', !notOld.find((a) => a.id === 'month_old').done);
 
-  check('achievements: набор значков полный', (await import('../src/forum/rank.js')).achievementsOf({}).length === 6);
+  check('achievements: набор значков полный', achievementsOf({}).length === 9);
+
+  /*
+    Три новых значка подтверждены со стороны — их нельзя выдать себе количеством
+    сообщений, и страница помечает их иначе. Проверка держит именно это: без
+    флага confirmed различие на экране пропало бы.
+  */
+  const confirmedIds = achievementsOf({}).filter((a) => a.confirmed).map((a) => a.id);
+  check('achievements: подтверждённых значка три',
+    confirmedIds.join(',') === 'thanked_five,verified_guide,event_held');
+  check('achievements: активность сама себе флаг не ставит',
+    achievementsOf({ postCount: 99, commentCount: 99, likesReceived: 99 })
+      .every((a) => !a.confirmed || !['first_post', 'ten_posts'].includes(a.id)));
+
+  const thanked = achievementsOf({ thanksReceived: 5 });
+  check('achievements: пять благодарностей дают значок',
+    thanked.find((a) => a.id === 'thanked_five').done);
+  check('achievements: четырёх благодарностей мало',
+    !achievementsOf({ thanksReceived: 4 }).find((a) => a.id === 'thanked_five').done);
+  check('achievements: проверенный разбор даёт значок',
+    achievementsOf({ verifiedGuides: 1 }).find((a) => a.id === 'verified_guide').done);
+  check('achievements: состоявшаяся встреча даёт значок',
+    achievementsOf({ eventsHeld: 1 }).find((a) => a.id === 'event_held').done);
+  check('achievements: пустой профиль не получает подтверждённых значков',
+    achievementsOf({}).filter((a) => a.done && a.confirmed).length === 0);
+
+  /* ── Репутация: отдельная лестница, и её не купить благодарностями ── */
+  equal('rep: пустой профиль без очков', reputationOf({}), 0);
+  equal('rep: проверенный разбор стоит 25', reputationOf({ verifiedGuides: 2 }), 50);
+  equal('rep: награда владельца складывается', reputationOf({ repGrantPoints: -15 }), -15);
+  equal('rep: оба источника вместе', reputationOf({ verifiedGuides: 1, repGrantPoints: 10 }), 35);
+  /*
+    Главное правило раздела: сколько человек собрал благодарностей, не влияет
+    на репутацию ни на очко. Точка, ради которой две лестницы держат раздельно.
+  */
+  equal('rep: благодарность очков не даёт', reputationOf({ thanksReceived: 500 }), 0);
+  equal('rep: активность очков не даёт', reputationOf({ postCount: 90, commentCount: 90 }), 0);
+  check('rep: очко за разбор названо и в правиле, и в числе', REP_POINTS.verifiedGuide === 25);
+
+  const sources = reputationSourcesOf({ verifiedGuides: 2, repGrantPoints: 10, repGrantCount: 3 });
+  equal('rep: источников два', sources.length, 2);
+  equal('rep: разборы посчитаны очками', sources[0].points, 50);
+  equal('rep: у наград своя сумма', sources[1].points, 10);
+  equal('rep: наград ровно столько, сколько выдали', sources[1].count, 3);
+  check('rep: пустой профиль без источника', reputationSourcesOf({}).length === 0);
+  check('rep: одних благодарностей в списке источников нет',
+    reputationSourcesOf({ thanksReceived: 7 }).length === 0);
 
   /* ── «Самое обсуждаемое» и приветствие на странице форума ── */
   const { renderForum } = await import('../src/pages/forum.js');
@@ -3982,9 +4039,33 @@ console.log('\nS. Чистые функции');
     /Летописец/.test(userHtml)); // 3*10+8*3+5*2=64 → уровень 3
   check('профиль: прогресс до следующего уровня считается',
     /до следующего уровня/.test(userHtml));
-  check('профиль: значки рисуются все шесть',
-    (userHtml.match(/<span class="forum-rank__ach\b/g) ?? []).length === 6);
-  check('профиль: подпись «X из 6» есть', /из 6 достижений/.test(userHtml));
+  check('профиль: значки рисуются все девять',
+    (userHtml.match(/<span class="forum-rank__ach\b/g) ?? []).length === 9);
+  check('профиль: подпись «X из 9» есть', /из 9 достижений/.test(userHtml));
+  /*
+    Гость видит само число репутации, но не видит, из чего оно сложилось:
+    причины наград читает тот, кому они написаны, и модерация.
+  */
+  check('профиль: гостю список причин наград не показывают', !/forum-rep__sources/.test(userHtml));
+
+  const mine = { ...profile, thanksReceived: 6, verifiedGuides: 2, repGrantPoints: 10, repGrantCount: 1 };
+  const own = renderUserPage({ profile: mine, posts, me: { id: 'u', nick: 'Кто-то' }, nick: 'Кто-то' });
+  check('профиль: благодарности посчитаны в очках уровня',
+    /Уровень \d/.test(own) && pointsOf(mine) === 64 + 6 * POINTS.thanks);
+  check('профиль: хозяину показывают очки репутации',
+    /forum-rep__points">60</.test(own)); // 2 × 25 + 10
+  check('профиль: число благодарностей стоит рядом', /6 благодарност/.test(own));
+  check('профиль: источники очков перечислены своему игроку', /forum-rep__sources/.test(own));
+  check('профиль: источник назван словами с окончанием, а не ключом',
+    /2 проверенных гайда/.test(own) && /1 награда от владельца/.test(own) && !/source:/.test(own));
+  check('профиль: подтверждённый значок помечен классом', /forum-rank__ach--confirmed/.test(own));
+  /*
+    Слово «репутация» освобождено: ♡ на карточке — это симпатия к человеку,
+    а не очки. Если подпись уедет обратно, две лестницы снова начнут
+    называться одним словом.
+  */
+  check('профиль: ♥ назван симпатией, а не репутацией',
+    /симпат/i.test(own) && !/♥ репутаци/i.test(own));
 
   // Значение достижения экранируется — иначе накрученный ник открыл бы атрибут.
   const evil = achievementsOf({ postCount: 1, commentCount: 0, likesReceived: 0 }).find((a) => a.id === 'first_post');
@@ -6487,6 +6568,401 @@ console.log('\nY. Календарь встреч');
   const strippedRaw = raw().posts.find((p) => p.id === stripped.id);
   check('даты нет в самом черном хранилище, а не только в ответе адаптера',
     !strippedRaw.eventAt && !strippedRaw.eventCapacity);
+}
+
+console.log(`\n${'─'.repeat(52)}`);
+// ── Z. Благодарности автора и репутация ─────────────────────────────────────
+console.log('\nZ. Благодарности автора и репутация');
+{
+  /*
+    Правило держат семь мест: две таблицы, три функции, два представления,
+    черновой адаптер, кнопка, страница и панель. Опасность здесь не в том,
+    что какое-то из них забудут, — опасны места, где одно и то же сказано
+    двумя словами: отказ, которого нет в базе, число, уехавшее в браузер,
+    имя благодарившего там, где обещано только число, и слово «репутация»
+    для счётчика, который репутацией не был. Поэтому тесты ниже сравнивают
+    места между собой.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-author-thanks.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/forum.js', 'utf8');
+  const userPageSrc = await readFile('src/pages/user.js', 'utf8');
+  const profileSrc = await readFile('src/forum/profile.js', 'utf8');
+  const adminSrc = await readFile('src/admin/main.js', 'utf8');
+  const admPlayersSrc = await readFile('src/admin/screens/players.js', 'utf8');
+  const rankSrc = await readFile('src/forum/rank.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const admCssSrc = await readFile('src/admin/admin.css', 'utf8');
+  const L = CONFIG.forum.limits;
+
+  /* ── Одно число на два места ── */
+  const WINDOW = `Не больше ${L.thanksPerWindow} благодарностей за ${L.thanksWindowMinutes} минут — спасибо говорят за дело, а не подряд`;
+  check('частоту благодарностей база и черновик называют одним числом',
+    sql.includes(WINDOW)
+      && sql.includes(`interval '${L.thanksWindowMinutes} minutes'`)
+      && sql.includes(`v_recent >= ${L.thanksPerWindow}`)
+      && localSrc.includes('Не больше'),
+    WINDOW);
+  check('границы награды в проверке таблицы и в полях панели — одни и те же',
+    sql.includes(`check (delta <> 0 and abs(delta) <= ${L.repGrantMax})`)
+      && sql.includes(`char_length(reason) between ${L.repReasonMin} and ${L.repReasonMax}`)
+      && localSrc.includes('L.repGrantMax') && localSrc.includes('L.repReasonMin'));
+  check('пояснение награды ограничено и в форме панели теми же числами',
+    admPlayersSrc.includes('const REP = CONFIG.forum.limits;')
+      && admPlayersSrc.includes('minlength="${REP.repReasonMin}"')
+      && admPlayersSrc.includes('maxlength="${REP.repReasonMax}"')
+      && admPlayersSrc.includes('min="${-REP.repGrantMax}"')
+      && admPlayersSrc.includes('max="${REP.repGrantMax}"'));
+  /*
+    Цену проверенного разбора база не хранит: представление отдаёт ЧИСЛО
+    проверенных разборов, а сколько они стоят — правило страницы. Если
+    множитель появится в SQL, здесь окажется два места, и тест это заметит.
+  */
+  check('цена разбора в очках живёт на странице, а не в базе',
+    rankSrc.includes('REP_POINTS = { verifiedGuide: 25 }')
+      && sql.includes(') as verified_guides,') && !/verified_guides\s*\*\s*\d/.test(sql));
+
+  /* ── Слова отказа: база и черновик говорят одно и то же ── */
+  const THANK_REFUSALS = [
+    'Благодарность пишет вошедший игрок',
+    'Благодарят за тему или за ответ',
+    'Записи уже нет: страница устарела',
+    'Эту запись удалили — благодарить не за что',
+    'Свой текст не благодарят',
+    'Вы уже благодарили автора этой записи',
+  ];
+  const GRANT_REFUSALS = [
+    'Награду выдаёт вошедший владелец',
+    'Репутацию меняет только владелец',
+    'Ноль ничего не меняет — нужна дельта от −100 до 100',
+    'Дельта награды умещается в сто очков',
+    'Пояснение короче 8 символов — награду нужно описать словами',
+    'Пояснение длиннее 500 символов',
+    'Такого игрока нет: страница устарела',
+    'Себе награду не выдают',
+    'Историю читает вошедший игрок',
+    'Чужая история начислений закрыта',
+    'Без указания игрока историю читает только модерация',
+  ];
+  /*
+    Черновик подставляет числа из конфига, поэтому его строка выглядит как
+    шаблон, а не как готовый текст. Сравнение возвращает шаблону его числа —
+    и всё равно сверяет слова, а не только цифры.
+  */
+  const asDraft = (t) => t
+    .replace(String(L.repReasonMin), '${L.repReasonMin}')
+    .replace(String(L.repReasonMax), '${L.repReasonMax}');
+
+  for (const group of [['благодарность', THANK_REFUSALS], ['награда', GRANT_REFUSALS]]) {
+    const [name, list] = group;
+    check(`каждый отказ «${name}» написан в базе и в черновике слово в слово`,
+      list.every((t) => sql.includes(t) && localSrc.includes(asDraft(t))),
+      list.filter((t) => !sql.includes(t) || !localSrc.includes(asDraft(t))).join(' | '));
+  }
+  check('число в отказе про окно черновик берёт из конфига, а не зашивает',
+    localSrc.includes('`Не больше ${L.thanksPerWindow} благодарностей за ${L.thanksWindowMinutes} минут')
+      && localSrc.includes('`Пояснение короче ${L.repReasonMin} символов')
+      && localSrc.includes('`Пояснение длиннее ${L.repReasonMax} символов`'));
+  check('ни одного raise с склейкой строк через || — база так не умеет',
+    !/raise exception\s+'[^']*'\s*\|\|/i.test(sql),
+    (sql.match(/raise exception[^\n]*/g) || []).filter((s) => s.includes('||')).join(' | '));
+
+  /* ── Где дверь ── */
+  check('у таблицы благодарностей нет ни одной политики записи',
+    !/create policy[^\n]*on public\.forum_thanks[\s\S]{0,120}?for (insert|update|delete)/.test(sql)
+      && sql.includes('for select using (giver_id = auth.uid());'));
+  check('журнал наград читают свой и модерация, и тоже без политик записи',
+    !/create policy[^\n]*on public\.forum_rep_grants[\s\S]{0,160}?for (insert|update|delete)/.test(sql)
+      && sql.includes('for select using (user_id = auth.uid() or public.forum_is_staff());'));
+  check('благодарность принимает функция с правами владельца, закрытая для анонима',
+    /create or replace function public\.forum_give_thank\(p_target_type text, p_target_id uuid\)[\s\S]{0,120}security definer/.test(sql)
+      && sql.includes('revoke all on function public.forum_give_thank(text, uuid) from public, anon;')
+      && sql.includes('grant execute on function public.forum_give_thank(text, uuid) to authenticated;'));
+  check('награду выдаёт отдельная дверь, и она названа владельцем, а не модератором',
+    /create or replace function public\.forum_grant_reputation\([\s\S]{0,160}security definer/.test(sql)
+      && sql.includes('forum_is_admin()')
+      && !/forum_is_staff\(\)[\s\S]{0,60}then\s*\n?\s*raise exception 'Репутацию меняет/.test(sql));
+  check('историю начислений читает функция, а не таблица напрямую',
+    /create or replace function public\.forum_reputation_grant_list\(/.test(sql)
+      && sql.includes('revoke all on function public.forum_reputation_grant_list(uuid) from public, anon;'));
+  check('пары «кто и за что» достаточно как ключа: повтор физически не влезает',
+    sql.includes('primary key (target_type, target_id, giver_id)'));
+  check('автор записан копией, а не читается по ссылке при выдаче',
+    sql.includes('author_id   uuid not null references public.forum_users (id) on delete cascade'));
+
+  /* ── Приватность: наружу выходит число, а не связи ── */
+  check('счётчик благодарностей — definer-функция, открытая на чтение всем',
+    /create or replace function public\.forum_thanks_count\(p_target_type text, p_target_id uuid\)[\s\S]{0,120}security definer/.test(sql)
+      && sql.includes('grant execute on function public.forum_thanks_count(text, uuid) to anon, authenticated;'));
+  check('в ленту и в комментарии вышли только число и своё состояние',
+    (sql.match(/public\.forum_thanks_count\('(post|comment)', p?\w*\.id\) as thanks_count/g) || []).length === 2
+      && (sql.match(/t\.giver_id=auth\.uid\(\)\) i_thanked/g) || []).length === 2
+      && !/forum_thanks[\s\S]{0,200}?giver_nick/i.test(sql));
+  check('кнопка не знает имён благодаривших: в разметке только число',
+    /class="forum-react__btn forum-thank/.test(pagesSrc)
+      && !/thanksBy|thankers|blagodari/i.test(pagesSrc)
+      && pagesSrc.includes('наружу выходит только число'));
+  check('связь «кто кого поблагодарил» не показывает и страница профиля',
+    !/whoThanks|thanksFrom/i.test(userPageSrc) && /thanksReceived/.test(userPageSrc));
+  check('историю наград гостю не выдают: список причин видит только свой игрок',
+    /isMe && sources\.length/.test(userPageSrc) && /forum-rep__sources/.test(userPageSrc));
+  check('число наград и их причины разведены: наружу идёт сумма из представления',
+    sql.includes(') as rep_grants,') && sql.includes(') as rep_grant_count')
+      && !/reason/.test(sql.slice(sql.indexOf('as rep_grants'), sql.indexOf('from public.forum_users u'))));
+
+  /* ── Уведомление ── */
+  check('вид уведомления о благодарности разрешён базой и подписан на странице',
+    sql.includes("'digest','event','thanks'")
+      && /thanks: \{ label: '[^']+', icon: 'thanks'/.test(pagesSrc));
+  check('подпись уведомления называет человека, а не службу',
+    !/system:/.test(pagesSrc.match(/thanks: \{[^}]*\}/)?.[0] ?? ''));
+  check('значок благодарности нарисован в той же графике, что и остальные',
+    /thanks: '<path/.test(pagesSrc) && pagesSrc.includes('NOTIFY_ICONS'));
+
+  /* ── Контракт и адаптеры ── */
+  check('контракт обещает три двери благодарности и награды',
+    /\(targetType: 'post'\|'comment', targetId: string\) => Promise<void>\} giveThanks/.test(contractSrc)
+      && /\(userId: string, delta: number, reason: string\) => Promise<void>\} \[grantReputation\]/.test(contractSrc)
+      && />>\} \[listReputationGrants\]/.test(contractSrc));
+  check('контракт знает о числе и своём состоянии у записей',
+    (contractSrc.match(/@property \{number\}\s+\[thanksCount\]/g) || []).length >= 2
+      && (contractSrc.match(/@property \{boolean\}\s+\[iThanked\]/g) || []).length >= 2);
+  check('supabase-адаптер зовёт функции базы, а не пишет в таблицы',
+    supaSrc.includes("'/rpc/forum_give_thank'")
+      && /p_target_type: targetType, p_target_id: targetId/.test(supaSrc)
+      && supaSrc.includes("'/rpc/forum_grant_reputation'")
+      && supaSrc.includes("'/rpc/forum_reputation_grant_list'")
+      && !/\/forum_thanks['"?]/.test(supaSrc) && !/\/forum_rep_grants['"?]/.test(supaSrc));
+  check('оба адаптера отдают строке число и отметку «уже благодарил»',
+    supaSrc.includes('thanksCount: Number(row.thanks_count || 0)')
+      && supaSrc.includes('iThanked: Boolean(row.i_thanked)')
+      && localSrc.includes('...thanksFor(state,'));
+  check('до миграции лента не падает: колонок нет — поле пустое',
+    /колку нет[\s\S]{0,120}не ошибка|Колонок нет[\s\S]{0,160}не ошибка/i.test(supaSrc)
+      || supaSrc.includes('Миграция 20260926-author-thanks.sql'));
+  check('профиль берёт пять новых чисел из одного представления',
+    profileSrc.includes('thanksReceived: Number(row.thanks_received || 0)')
+      && profileSrc.includes('verifiedGuides: Number(row.verified_guides || 0)')
+      && profileSrc.includes('eventsHeld: Number(row.events_held || 0)')
+      && profileSrc.includes('repGrantPoints: Number(row.rep_grants || 0)')
+      && profileSrc.includes('repGrantCount: Number(row.rep_grant_count || 0)'));
+
+  /* ── Кнопка: разметка и поведение ── */
+  const { renderForum } = await import('../src/pages/forum.js');
+  const feedState = (post, over = {}) => ({
+    ready: true, loading: false, total: 1, sourceName: 's', shared: true,
+    posts: [{
+      id: 'p_1', authorId: 'u_2', authorNick: 'Ковыль', category: 'chronicle',
+      title: 'Разбор боя', body: 'текст', createdAt: new Date(), reactions: {}, myReaction: null,
+      thanksCount: 3, iThanked: false, ...post,
+    }],
+    me: { id: 'u_1', nick: 'Благодарный', role: 'member' }, ...over,
+  });
+  const thankHtml = renderForum({ events: [] }, feedState({}));
+  check('у темы есть кнопка с адресатом, числом и состоянием',
+    /data-forum-thank="post:p_1"/.test(thankHtml)
+      && /forum-thank /.test(thankHtml) && /aria-pressed="false"/.test(thankHtml));
+  check('число благодарностей стоит на кнопке', /forum-thank[\s\S]{0,220}<b class="num">3<\/b>/.test(thankHtml));
+  check('сказано, чем кнопка отличается от реакции', /не оценка/.test(thankHtml));
+  const thankedHtml = renderForum({ events: [] }, feedState({ iThanked: true, thanksCount: 4 }));
+  check('поблагодаривший видит нажатую кнопку без возможности второго нажатия',
+    /forum-thank is-on/.test(thankedHtml) && /aria-pressed="true"/.test(thankedHtml)
+      && /disabled/.test(thankedHtml.match(/data-forum-thank="post:p_1"[\s\S]{0,200}/)?.[0] ?? '')
+      && /не отзывают/.test(thankedHtml));
+  const guestHtml = renderForum({ events: [] }, feedState({}, { me: null }));
+  check('гость кнопку видит, но нажать не может', /data-forum-thank="post:p_1"/.test(guestHtml)
+    && /disabled/.test(guestHtml.match(/data-forum-thank="post:p_1"[\s\S]{0,200}/)?.[0] ?? ''));
+  const ownHtml = renderForum({ events: [] }, feedState({ authorId: 'u_1' }));
+  check('свою тему не благодарят и подсказкой о том же слове',
+    /Свой текст не благодарят/.test(sql) && /data-forum-thank="post:p_1"/.test(ownHtml));
+  check('кнопка живёт рядом с реакциями, но не внутри их списка',
+    pagesSrc.indexOf('forum-emoji__pop') < pagesSrc.indexOf('renderThanks(targetType, item, s)'));
+  check('кнопка одета своим стилем, а не чужим классом реакции',
+    cssSrc.includes('.forum-thank') && cssSrc.includes('.forum-thank.is-on'));
+  check('нажатие правит число локально и ждёт ответа базы',
+    /item\.thanksCount = Number\(item\.thanksCount \|\| 0\) \+ 1;/.test(mountSrc)
+      && mountSrc.includes('await forum.giveThanks(targetType, targetId)'));
+  check('повторное нажатие не отправляет ничего: благодарность не отзывают',
+    /if \(!item \|\| item\.iThanked\) return;/.test(mountSrc));
+  check('отказ базы человек слышит словами базы, а не молчанием',
+    /notice\(err\?\.message \|\| 'База не приняла благодарность'\)/.test(mountSrc)
+      && /await refreshOne\(targetType, targetId\);/.test(mountSrc));
+
+  /* ── Панель владельца ── */
+  const { renderPlayers, renderRepGrantRows } = await import('../src/admin/screens/players.js');
+  const owner = { id: 'u_1', nick: 'Распорядитель', role: 'admin', createdAt: new Date(), isVerified: true };
+  const member = { id: 'u_2', nick: 'Ковыль', role: 'member', createdAt: new Date(), isVerified: false };
+  const playersHtml = renderPlayers({
+    forum: { configured: true, me: owner, users: [owner, member], recoveries: [], appeals: [] },
+  });
+  check('награда спрятана под «⋯»: рядом с обратимыми чипами ей не место',
+    /data-player-rep="u_2"/.test(playersHtml)
+      && playersHtml.indexOf('data-player-rep') > playersHtml.indexOf('adm-menu__list'));
+  check('окно награды просит две вещи и не принимает пустую причину',
+    /data-rep-form/.test(playersHtml) && /name="delta"/.test(playersHtml)
+      && /name="reason"[^>]*required/.test(playersHtml));
+  check('поле очков не пускает ноль за границами конфига',
+    /min="-100" max="100"/.test(playersHtml));
+  check('окно объясняет, что запись необратима', /обратной записью/.test(playersHtml));
+  check('история наград названа своим списком', /data-rep-history/.test(playersHtml));
+  const rowsHtml = renderRepGrantRows([
+    { id: 'g1', delta: 20, reason: 'Разобрал чужой бой по кадрам', grantedByNick: 'Распорядитель', createdAt: new Date() },
+    { id: 'g2', delta: -5, reason: 'Награда снята по апелляции', grantedByNick: '', createdAt: new Date() },
+  ]);
+  check('строка истории показывает знак, причину и кто выдал',
+    rowsHtml.includes('+20') && rowsHtml.includes('-5')
+      && rowsHtml.includes('Разобрал чужой бой по кадрам') && rowsHtml.includes('Распорядитель'));
+  check('ушедший владелец назван ушедшим, а не выдуманным ником',
+    rowsHtml.includes('владелец ушёл'));
+  check('пустая история и непрочитанная — разные слова',
+    renderRepGrantRows([]).includes('ещё не выдавали'));
+  check('историю читает панель, а не печатает из разметки',
+    /loadRepHistory/.test(adminSrc) && /forum\.listReputationGrants\(userId\)/.test(adminSrc));
+  check('панель называет файл миграции, если база ещё не перестроена',
+    (adminSrc.match(/'20260926-author-thanks\.sql'/g) || []).length === 2);
+  check('ничего не проверяя, панель не спорит с базой: границ в её коде нет',
+    !/if \(delta === 0\)/.test(adminSrc) && !/delta > 100/.test(adminSrc));
+  check('блок панели одет своим стилем', admCssSrc.includes('.adm-rep-history'));
+  check('на экране игрока репутация объяснена как отдельная лестница',
+    /Репутация<\/b>/.test(playersHtml) && !/репутация.*активность/.test(playersHtml));
+
+  /* ── Живой черновой прогон: те же правила, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const KEY = 'zr33.forum.local';
+  const raw = () => JSON.parse(store.get(KEY));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+
+  await local.signUp('Распорядитель');   // первый — владелец
+  const authorId = raw().me;
+  await local.signUp('Ковыль');
+  const giverRow = raw().users.find((u) => u.nick === 'Ковыль');
+  await local.signIn('Распорядитель');
+
+  const topic = await local.createPost({
+    title: 'Как держать фронт в неравном бою', body: 'Разбор по кадрам.', category: 'vs',
+  });
+  const answer = await local.addComment(topic.id, 'Плюс к третьему кадру: ещё фланг.');
+
+  await local.signIn('Ковыль');
+  check('свежая тема выходит уже с числом благодарностей и своим состоянием',
+    'thanksCount' in topic && 'iThanked' in topic);
+  await local.giveThanks('post', topic.id);
+  const afterPost = (await local.getPost(topic.id));
+  check('тема после благодарности знает своё число', afterPost.thanksCount === 1 && afterPost.iThanked === true);
+  await local.giveThanks('comment', answer.id);
+  const afterAnswer = (await local.listComments(topic.id)).find((c) => c.id === answer.id);
+  check('ответ читают с тем же числом и отметкой, что и тему',
+    afterAnswer.thanksCount === 1 && afterAnswer.iThanked === true);
+  equal('ответ благодарён отдельно от темы', raw().thanks.filter((t) => t.targetType === 'comment').length, 1);
+  equal('повтор той же записью не проходит',
+    await says(() => local.giveThanks('post', topic.id)), 'Вы уже благодарили автора этой записи');
+  await local.signIn('Распорядитель');
+  equal('свой текст не благодарят',
+    await says(() => local.giveThanks('post', topic.id)), 'Свой текст не благодарят');
+  await local.signIn('Ковыль');
+  equal('не того типа цели не принимают',
+    await says(() => local.giveThanks('poll', topic.id)), 'Благодарят за тему или за ответ');
+  equal('несуществующей записи нет',
+    await says(() => local.giveThanks('post', 'p_missing')), 'Записи уже нет: страница устарела');
+  const goneTopic = await local.createPost({ title: 'Черновик, который снимут', body: 'Пусто.', category: 'vs' });
+  await local.deletePost(goneTopic.id, null);
+  equal('удалённую тему благодарить не за что — это другой отказ, чем «нет записи»',
+    await says(() => local.giveThanks('post', goneTopic.id)), 'Эту запись удалили — благодарить не за что');
+
+  /* Предел частоты: пять «спасибо» подряд — уже не благодарность. */
+  await local.signIn('Распорядитель');
+  const many = [];
+  for (let i = 0; i < 6; i += 1) {
+    many.push(await local.createPost({
+      title: `Разбор боя, выпуск ${i}`, body: `Текст разбора ${i}.`, category: 'vs',
+    }));
+  }
+  await local.signIn('Ковыль');
+  let refused = '';
+  for (const t of many) {
+    const err = await says(() => local.giveThanks('post', t.id));
+    if (err) { refused = err; break; }
+  }
+  equal('шестая подряд благодарность отвергнута словами базы', refused,
+    `Не больше ${L.thanksPerWindow} благодарностей за ${L.thanksWindowMinutes} минут — спасибо говорят за дело, а не подряд`);
+  equal('пяти удалось: строк ровно на одну меньше предела',
+    raw().thanks.length, L.thanksPerWindow);
+
+  /* Уведомление автору — с ником, потому что это его личный ящик. */
+  const notif = raw().notifications.find((n) => n.kind === 'thanks');
+  check('автору пришло уведомление о благодарности', Boolean(notif) && notif.userId === authorId);
+  check('в уведомлении назван благодаривший — только для получателя',
+    notif.actorNick === 'Ковыль' && notif.postId && Boolean(notif.preview));
+  await local.signIn('Распорядитель');
+  check('лента уведомлений автора помнит, кто сказал спасибо',
+    (await local.listNotifications()).some((n) => n.kind === 'thanks' && n.actorNick === 'Ковыль'));
+
+  /* Профиль: число благодарностей и ни одной фамилии благодаривших. */
+  const authorProfile = await local.getProfile('Распорядитель');
+  equal('профиль автора считает благодарности', authorProfile.thanksReceived, L.thanksPerWindow);
+  check('в профиле нет ни идентификатора, ни ника благодарившего',
+    !JSON.stringify(authorProfile).includes(giverRow.id) && !JSON.stringify(authorProfile).includes('Ковыль'));
+  check('без наград репутация автора пока нулевая, хотя благодарности есть',
+    authorProfile.repGrantPoints === 0 && authorProfile.repGrantCount === 0);
+
+  /* Награды владельца. */
+  await local.signIn('Ковыль');
+  equal('награду выдаёт только владелец',
+    await says(() => local.grantReputation(authorId, 20, 'Провёл разбор для новичков')),
+    'Репутацию меняет только владелец');
+  await local.signIn('Распорядитель');
+  equal('себе награду не выдают',
+    await says(() => local.grantReputation(authorId, 20, 'За труд на форуме')),
+    'Себе награду не выдают');
+  equal('ноль — не награда',
+    await says(() => local.grantReputation(giverRow.id, 0, 'Ни о чём не говорит')),
+    'Ноль ничего не меняет — нужна дельта от −100 до 100');
+  equal('за границами ста очков не выходят',
+    await says(() => local.grantReputation(giverRow.id, 101, 'Сверх награды не бывает')),
+    'Дельта награды умещается в сто очков');
+  equal('короткая причина не принимается',
+    await says(() => local.grantReputation(giverRow.id, 20, 'молодец')),
+    `Пояснение короче ${L.repReasonMin} символов — награду нужно описать словами`);
+  equal('причина длиннее пятисот символов не пишется',
+    await says(() => local.grantReputation(giverRow.id, 20, 'а'.repeat(L.repReasonMax + 1))),
+    `Пояснение длиннее ${L.repReasonMax} символов`);
+  equal('несуществующему игроку награду не выдают',
+    await says(() => local.grantReputation('u_missing', 20, 'За очень полезное дело')),
+    'Такого игрока нет: страница устарела');
+
+  await local.grantReputation(giverRow.id, 20, 'Перевёл правила форума для новичков');
+  await local.grantReputation(giverRow.id, -5, 'Ошибка в прошлой записи, снято частично');
+  const history = await local.listReputationGrants(giverRow.id);
+  equal('награда не правит прежнюю, а добавляется строкой', history.length, 2);
+  check('история идёт от поздней к ранней и знает, кто выдал',
+    history[0].delta === -5 && history[0].grantedByNick === 'Распорядитель');
+  const given = await local.getProfile('Ковыль');
+  equal('сумма наград считается из строк, а не хранится числом', given.repGrantPoints, 15);
+  equal('число наград известно отдельно от суммы', given.repGrantCount, 2);
+  await local.signIn('Ковыль');
+  check('свою историю человек читает целиком',
+    (await local.listReputationGrants(giverRow.id)).length === 2);
+  equal('без указания игрока историю читает только модерация',
+    await says(() => local.listReputationGrants()), 'Без указания игрока историю читает только модерация');
+  await local.signIn('Распорядитель');
+  check('владелец читает историю любого игрока',
+    (await local.listReputationGrants(null)).length === 2);
+  check('ни одна награда не меняет уровень: две лестницы не перетекают',
+    (await local.getProfile('Ковыль')).postCount === given.postCount);
+
+  /* Черновик не оставляет после себя ни паролей, ни ключей в открытом виде. */
+  check('в чёрном хранилище благодарности лежат связкой идентификаторов, а не текстом',
+    raw().thanks.every((t) => t.giverId && t.authorId && t.targetId && !t.giverNick));
 }
 
 console.log(`\n${'─'.repeat(52)}`);

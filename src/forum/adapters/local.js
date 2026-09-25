@@ -55,6 +55,8 @@ function emptyState() {
     posts: [],
     comments: [],
     reactions: [],
+    thanks: [],
+    repGrants: [],
     reports: [],
     topicSubscriptions: [],
     topicReads: [],
@@ -245,6 +247,21 @@ function reactionsFor(state, targetType, targetId) {
 }
 
 /**
+ * Благодарности этой строки: сколько их и была ли своя.
+ *
+ * Число, а не список имён — тот же порядок, что в базе: строки чужих
+ * благодарностей локальному «профилю» недоступны по смыслу, наружу выходит
+ * только счётчик и собственная отметка кнопки.
+ */
+function thanksFor(state, targetType, targetId) {
+  const rows = (state.thanks || []).filter((t) => t.targetType === targetType && t.targetId === targetId);
+  return {
+    thanksCount: rows.length,
+    iThanked: Boolean(state.me && rows.some((t) => t.giverId === state.me)),
+  };
+}
+
+/**
  * Сколько чужих ответов в теме появилось после последнего входа сюда.
  *
  * То же правило, что у представления forum_topic_unread в базе: свои ответы не
@@ -299,6 +316,7 @@ function postOut(state, p) {
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
     ...r,
+    ...thanksFor(state, 'post', p.id),
     myRsvp: myRsvpOf(state, p.id),
     myRemindMinutes: myRemindOf(state, p.id),
     poll: pollOut(state, p.id),
@@ -783,6 +801,7 @@ function commentOut(state, c) {
     deletedReason: c.deletedReason || '',
     attachments: [],
     ...r,
+    ...thanksFor(state, 'comment', c.id),
   };
 }
 
@@ -914,6 +933,169 @@ export async function setReaction(targetType, targetId, reactionId) {
   }
 
   write(s);
+}
+
+/* ── Благодарности и репутация ────────────────────────────────────────────── */
+
+/**
+ * Кого и за что благодарят: автор, тема-контекст и кусок текста для
+ * уведомления. Отказ «нет записи» отличается от «запись удалили» тем же
+ * словом, что и в функции базы, поэтому состояние возвращается меткой,
+ * а не просто null.
+ *
+ * Удалённая тема уносит с собой и ответ: благодарность висит на конкретной
+ * строке, а показать её после удаления темы негде — тот же порядок, что
+ * в функции forum_give_thank.
+ */
+function thankTarget(s, targetType, targetId) {
+  const miss = () => ({ code: 'missing' });
+  const gone = (authorId, postId, snippet) => ({ code: 'deleted', authorId, postId, snippet });
+
+  if (targetType === 'post') {
+    const p = s.posts.find((x) => x.id === targetId);
+    if (!p) return miss();
+    if (p.deleted) return gone(p.authorId, p.id, p.title);
+    return { code: 'ok', authorId: p.authorId, postId: p.id, snippet: p.title };
+  }
+
+  const c = s.comments.find((x) => x.id === targetId);
+  if (!c) return miss();
+  const post = s.posts.find((p) => p.id === c.postId);
+  if (c.deleted || !post || post.deleted) return gone(c.authorId, c.postId, c.body);
+  return { code: 'ok', authorId: c.authorId, postId: c.postId, snippet: c.body };
+}
+
+/**
+ * Благодарность автору записи.
+ *
+ * Одно нажатие — одна строка, и строка остаётся навсегда: снять благодарность
+ * нельзя ни здесь, ни в базе (политик на изменение и удаление у таблицы нет).
+ * Слова отказа совпадают с базой дословно — следит за этим тест.
+ */
+export async function giveThanks(targetType, targetId) {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Благодарность пишет вошедший игрок');
+  if (targetType !== 'post' && targetType !== 'comment') {
+    throw new Error('Благодарят за тему или за ответ');
+  }
+
+  const target = thankTarget(s, targetType, targetId);
+  if (target.code === 'missing') throw new Error('Записи уже нет: страница устарела');
+  if (target.code === 'deleted') throw new Error('Эту запись удалили — благодарить не за что');
+  if (target.authorId === me.id) throw new Error('Свой текст не благодарят');
+
+  if (!s.thanks) s.thanks = [];
+  const rows = s.thanks.filter((t) => t.targetType === targetType && t.targetId === targetId);
+  if (rows.some((t) => t.giverId === me.id)) {
+    throw new Error('Вы уже благодарили автора этой записи');
+  }
+
+  /*
+    Час браузера в черновом режиме — тот же час, что и у записи, поэтому
+    окно считается просто по метке времени. В базе оно держится на now(),
+    и перенос стрелок на компьютере limits не обходят: там отказ придёт
+    от функции.
+  */
+  const since = Date.now() - L.thanksWindowMinutes * 60000;
+  if (s.thanks.filter((t) => t.giverId === me.id && new Date(t.createdAt).getTime() > since).length
+      >= L.thanksPerWindow) {
+    throw new Error(`Не больше ${L.thanksPerWindow} благодарностей за ${L.thanksWindowMinutes} минут — спасибо говорят за дело, а не подряд`);
+  }
+
+  s.thanks.push({
+    targetType,
+    targetId,
+    giverId: me.id,
+    // Автор записан копией: факт «поблагодарили вот этого человека» не должен
+    // поехать, если позже изменится профиль или сама запись.
+    authorId: target.authorId,
+    createdAt: new Date().toISOString(),
+  });
+
+  pushNotification(s, {
+    userId: target.authorId,
+    actorId: me.id,
+    actorNick: me.nick,
+    kind: 'thanks',
+    postId: target.postId,
+    commentId: targetType === 'comment' ? targetId : null,
+    preview: target.snippet,
+  });
+
+  write(s);
+}
+
+/** Начисление репутации владельцем: только добавляет строку, ничего не правит. */
+export async function grantReputation(userId, delta, reason) {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Награду выдаёт вошедший владелец');
+  if (me.role !== 'admin') throw new Error('Репутацию меняет только владелец');
+  if (!delta || Number(delta) === 0) {
+    throw new Error('Ноль ничего не меняет — нужна дельта от −100 до 100');
+  }
+  if (Math.abs(Number(delta)) > L.repGrantMax) {
+    throw new Error('Дельта награды умещается в сто очков');
+  }
+  const note = String(reason ?? '').trim();
+  if (note.length < L.repReasonMin) {
+    throw new Error(`Пояснение короче ${L.repReasonMin} символов — награду нужно описать словами`);
+  }
+  if (note.length > L.repReasonMax) {
+    throw new Error(`Пояснение длиннее ${L.repReasonMax} символов`);
+  }
+  if (!s.users.some((u) => u.id === userId)) throw new Error('Такого игрока нет: страница устарела');
+  if (userId === me.id) throw new Error('Себе награду не выдают');
+
+  if (!s.repGrants) s.repGrants = [];
+  s.repGrants.push({
+    id: `rg_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+    userId,
+    delta: Number(delta),
+    reason: note,
+    grantedBy: me.id,
+    grantedByNick: me.nick,
+    createdAt: new Date().toISOString(),
+  });
+  write(s);
+}
+
+/**
+ * История начислений. Свою видит сам игрок, всю — модерация; чужая закрыта
+ * и здесь, и в базе (forum_reputation_grant_list).
+ */
+export async function listReputationGrants(userId = null) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Историю читает вошедший игрок');
+  const staff = me.role === 'admin' || me.role === 'moderator';
+  if (userId && userId !== me.id && !staff) throw new Error('Чужая история начислений закрыта');
+  if (!userId && !staff) throw new Error('Без указания игрока историю читает только модерация');
+
+  // Разворот перед сортировкой — не украшение: метка времени ставится в
+  // миллисекундах, и две награды за одну секунду равны для сравнения.
+  // Сортировка устойчива, поэтому равные строки остаются в порядке «поздняя
+  // впереди», как и делает база с точностью до микросекунд.
+  return (s.repGrants || [])
+    .filter((g) => !userId || g.userId === userId)
+    .reverse()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 100)
+    .map((g) => {
+      const owner = s.users.find((u) => u.id === g.userId);
+      return {
+        id: g.id,
+        userId: g.userId,
+        nick: owner?.nick || '',
+        delta: Number(g.delta),
+        reason: g.reason,
+        grantedByNick: g.grantedByNick || 'владелец ушёл',
+        createdAt: toDate(g.createdAt) ?? new Date(),
+      };
+    });
 }
 
 /* ── Уведомления ──────────────────────────────────────────────────────────── */
@@ -1133,6 +1315,22 @@ export async function getProfile(nick) {
   const likes = s.reactions.filter((r) => r.reactionId === 'like' && ids.has(r.targetId)).length;
   const blog = mine.filter((p) => p.category === 'blog');
 
+  /*
+    Профиль по колонкам совпадает с представлением forum_profiles: те же
+    благодарности, те же проверенные разборы и те же состоявшиеся встречи.
+    Считается по строкам, а не по счётчику — иначе черновик показывал бы то,
+    чего рабочая база уже не скажет.
+  */
+  const thanked = (s.thanks || []).filter((t) => t.authorId === u.id).length;
+  const guides = (s.guides || []).filter(
+    (g) => g.authorId === u.id && (g.status || 'published') === 'published' && g.reviewStatus === 'verified'
+  ).length;
+  const grants = (s.repGrants || []).filter((g) => g.userId === u.id);
+  const held = mine.filter((p) => {
+    if (!needsEventDate(p.tags) || !p.eventAt || new Date(p.eventAt).getTime() > Date.now()) return false;
+    return (s.eventRsvps || []).some((r) => r.postId === p.id && r.status === 'going' && r.userId !== u.id);
+  }).length;
+
   return {
     ...userOut(u),
     postCount: mine.length,
@@ -1140,6 +1338,11 @@ export async function getProfile(nick) {
     likesReceived: likes,
     blogViews: blog.reduce((sum, p) => sum + Number(p.views || 0), 0),
     blogPostCount: blog.length,
+    thanksReceived: thanked,
+    verifiedGuides: guides,
+    eventsHeld: held,
+    repGrantPoints: grants.reduce((sum, g) => sum + Number(g.delta || 0), 0),
+    repGrantCount: grants.length,
   };
 }
 

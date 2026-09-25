@@ -7,6 +7,9 @@ import { CONFIG } from '../../../config.js';
 /** Те же 12 часов, что держит база: панель обещает срок, а не выдумывает его. */
 const HOLD_HOURS = CONFIG.forum.limits.recoveryHoldHours;
 
+/* Границы награды очками — те же числа, что проверяет forum_grant_reputation. */
+const REP = CONFIG.forum.limits;
+
 /**
  * ЭКРАН «ИГРОКИ» — учётные записи форума.
  *
@@ -116,9 +119,9 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь назначают модераторов, подтверждают ники, решают заявки на
-          восстановление доступа, закрывают возможность писать и удаляют чужие
-          аккаунты.
+          Здесь назначают модераторов, подтверждают ники, выдают награды
+          репутацией, решают заявки на восстановление доступа, закрывают
+          возможность писать и удаляют чужие аккаунты.
         </p>
       </header>
 
@@ -176,6 +179,15 @@ export function renderPlayers(view) {
           прежний ник резервируется навсегда и не может быть перехвачен.
         </p>
         <p class="muted">
+          <b>Репутация</b> — очки за признанную пользу, а не за количество
+          сообщений. Их приносят проверенный модерацией разбор и ваша награда,
+          и только они: благодарность игрока очок не стоит, иначе репутация
+          оказалась бы счётчиком симпатий, который перекупается за вечер.
+          Уровень человека при этом считается отдельно и по своему — награда
+          его не меняет. Снять очки задним числом нельзя: история растёт
+          обратной записью, и игрок видит в ней и причину, и дату.
+        </p>
+        <p class="muted">
           <b>Паролей вы не видите ни у кого</b> — и это не вежливость, а
           устройство входа: база держит необратимый отпечаток, и новый пароль
           игрок придумывает сам, в своём браузере. Через ${HOLD_HOURS} ч заявка
@@ -187,6 +199,7 @@ export function renderPlayers(view) {
 
     ${renderLeaderModal()}
     ${renderRenameModal()}
+    ${renderRepModal()}
     ${renderRestrictModal()}
     ${renderDeleteModal()}`;
 }
@@ -387,6 +400,8 @@ function renderRow(user, me) {
                     <button type="button" class="adm-menu__item"
                             data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Переименовать</button>
                     <button type="button" class="adm-menu__item"
+                            data-player-rep="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Награда репутацией</button>
+                    <button type="button" class="adm-menu__item"
                             data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}">${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}</button>
                     <button type="button" class="adm-menu__item adm-menu__item--danger"
                             data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Удалить навсегда</button>
@@ -469,6 +484,89 @@ function renderRenameModal() {
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * Окно награды репутацией.
+ *
+ * ПОЧЕМУ НЕ В ЧИПЕ НАСТРОЕНИЯ («Модератор», «Блогер»). Те четыре отметки
+ * обратны одним нажатием того же места, и в этом их смысл: ошибся — снял.
+ * Награда очками не снимается тем же нажатием, потому что её не пересчитывают,
+ * а дополняют обратной записью, и причина у записи обязательна. Значит
+ * здесь всегда два поля и окно, а не кнопка.
+ *
+ * ИСТОРИЯ ГРУЗИТСЯ ПРИ ОТКРЫТИИ, а не печатается в разметку: экран
+ * перерисовывается целиком, и список, записанный в строку, устарел бы после
+ * первой же выдачи — тот же порядок, что у истории переименований и частных
+ * тишин.
+ *
+ * ГДЕ ГРАНИЦЫ. Число и длины полей держит база (forum_grant_reputation и
+ * проверки таблицы forum_rep_grants); сюда они взяты из config.js только
+ * затем, чтобы поле не предлагало то, что база отвергнет. Ограничение «только
+ * владелец» с этой формы не снимается: панель показывает кнопку, а решает
+ * функция, и отказ придёт из базы тем же текстом и для модератора.
+ */
+function renderRepModal() {
+  return `
+    <div class="adm-modal" data-rep-modal hidden>
+      <div class="adm-modal__box" role="dialog" aria-modal="true" aria-label="Награда репутацией">
+        <h3>Награда для <b data-rep-nick></b></h3>
+        <p class="muted">
+          Репутация — не активность и не уровень: её не нарабатывают текстами,
+          её выдают за то, что сочли полезным. Запись остаётся в истории
+          навсегда и видна самому игроку, поэтому пояснение обязательно.
+          Отнять очки можно только обратной записью с той же причиной.
+        </p>
+        <form data-rep-form>
+          <label class="adm-field">
+            <span>Очки (от −${REP.repGrantMax} до ${REP.repGrantMax}, ноль не принимается)</span>
+            <input type="number" name="delta" inputmode="numeric"
+                   min="${-REP.repGrantMax}" max="${REP.repGrantMax}" step="1" required
+                   placeholder="Например: 20" autocomplete="off">
+          </label>
+          <label class="adm-field">
+            <span>Пояснение (от ${REP.repReasonMin} символов, увидит игрок)</span>
+            <input type="text" name="reason" minlength="${REP.repReasonMin}" maxlength="${REP.repReasonMax}" required autocomplete="off"
+                   placeholder="За что именно: офлайн-дело, а не «молодец»">
+          </label>
+          <div class="adm-actions">
+            <button type="submit" class="adm-btn adm-btn--primary">Выдать награду</button>
+            <button type="button" class="adm-btn" data-rep-cancel>Отмена</button>
+          </div>
+          <div class="adm-result" data-rep-error hidden></div>
+        </form>
+        <div class="adm-rep-history">
+          <h4 class="muted">Что уже выдано этому игроку</h4>
+          <ul data-rep-history class="adm-reserved__list"><li class="muted">Загружаем…</li></ul>
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * Строки истории наград — как renderSectionMuteRows: список рисует экран,
+ * данные приносит вызов, а «пусто» и «не прочиталось» остаются разными
+ * сообщениями, потому что для владельца это разные новости.
+ *
+ * Кто выдал, говорит база (grantedByNick), а не панель: владелец мог
+ * переехать в другой аккаунт, и «владелец ушёл» честнее выдуманного ника.
+ */
+export function renderRepGrantRows(grants) {
+  const rows = grants || [];
+  if (!rows.length) {
+    return '<li class="muted">Наград этому игроку ещё не выдавали.</li>';
+  }
+  return rows
+    .map((g) => {
+      const when = g.createdAt instanceof Date ? g.createdAt : new Date(g.createdAt);
+      const points = Number(g.delta) > 0 ? `+${Number(g.delta)}` : String(Number(g.delta));
+      return `<li class="adm-reserved__item">
+        <b class="adm-rep__delta${Number(g.delta) < 0 ? ' adm-rep__delta--minus' : ''}">${esc(points)}</b>
+        <span class="muted">${esc(shortTime(when))} · ${esc(g.grantedByNick || 'владелец ушёл')}</span>
+        <span class="adm-rep__reason">${esc(g.reason || '')}</span>
+      </li>`;
+    })
+    .join('');
 }
 
 /**

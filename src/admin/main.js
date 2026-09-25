@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=35';
-import { esc, plural } from '../ui/helpers.js?v=35';
-import { mapDataset } from '../data/adapters/_map.js?v=35';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=35';
-import { validateDataset } from '../data/contract.js?v=35';
+import { CONFIG } from '../../config.js?v=36';
+import { esc, plural } from '../ui/helpers.js?v=36';
+import { mapDataset } from '../data/adapters/_map.js?v=36';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=36';
+import { validateDataset } from '../data/contract.js?v=36';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=35';
-import { renderHome } from '../pages/home.js?v=35';
+} from '../logic/standings.js?v=36';
+import { renderHome } from '../pages/home.js?v=36';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=35';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=35';
+} from '../db/account.js?v=36';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=35';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=35';
-import { roleLabel } from '../forum/roles.js?v=35';
-import { prepareImage, uploadPath } from './image.js?v=35';
+} from './store.js?v=36';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=36';
+import { roleLabel } from '../forum/roles.js?v=36';
+import { prepareImage, uploadPath } from './image.js?v=36';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=35';
+} from './edit.js?v=36';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=35';
-import { renderShell } from './shell.js?v=35';
-import { renderLogin } from './login.js?v=35';
-import { renderOverview } from './screens/overview.js?v=35';
-import { renderWeek, describe } from './screens/week.js?v=35';
-import { renderAlliances } from './screens/alliances.js?v=35';
-import { renderEvents } from './screens/events.js?v=35';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=35';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=35';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=35';
-import { renderQuarter } from './screens/quarter.js?v=35';
-import { renderPresident } from './screens/president.js?v=35';
-import { renderPlayers, renderSectionMuteRows } from './screens/players.js?v=35';
-import { renderModeration } from './screens/moderation.js?v=35';
-import { renderChatsAdmin } from './screens/chats.js?v=35';
-import { forum } from '../forum/index.js?v=35';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=35';
+} from './draft.js?v=36';
+import { renderShell } from './shell.js?v=36';
+import { renderLogin } from './login.js?v=36';
+import { renderOverview } from './screens/overview.js?v=36';
+import { renderWeek, describe } from './screens/week.js?v=36';
+import { renderAlliances } from './screens/alliances.js?v=36';
+import { renderEvents } from './screens/events.js?v=36';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=36';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=36';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=36';
+import { renderQuarter } from './screens/quarter.js?v=36';
+import { renderPresident } from './screens/president.js?v=36';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=36';
+import { renderModeration } from './screens/moderation.js?v=36';
+import { renderChatsAdmin } from './screens/chats.js?v=36';
+import { forum } from '../forum/index.js?v=36';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=36';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1327,7 +1327,7 @@ function openPlayerModal(selector, nick, targetId, extra = {}) {
   modal.dataset.playerId = targetId;
   /* Меню «⋯» закрываем: иначе оно останется висеть за окном. */
   for (const menu of root.querySelectorAll('details[data-player-menu][open]')) menu.open = false;
-  const nickBox = modal.querySelector('[data-restrict-nick], [data-delete-nick], [data-rename-nick], [data-leader-nick]');
+  const nickBox = modal.querySelector('[data-restrict-nick], [data-delete-nick], [data-rename-nick], [data-leader-nick], [data-rep-nick]');
   if (nickBox) nickBox.textContent = nick;
 
   const leaderTag = modal.querySelector('input[name="leaderOf"]');
@@ -1364,6 +1364,26 @@ async function loadSectionMutes(userId) {
   } catch (err) {
     box.innerHTML = '<li class="muted">Список не прочитан — см. сообщение ниже.</li>';
     showPlayerActionError('[data-section-mute-error]', err, '20260925-section-mute.sql');
+  }
+}
+
+/*
+  История наград читается так же, как частные тишины: по развороту окна, а не
+  при открытии вкладки. Причин две, и обе практические. Запрос к
+  forum_reputation_grant_list на базе без миграции отвечает отказом, и показывать
+  его владельцу, который просто listнул игроков, не за чем. А список,
+  напечатанный в разметку, устарел бы после первой же выдачи: очок там меньше,
+  чем их показал игрок на своей странице.
+*/
+async function loadRepHistory(userId) {
+  const box = root.querySelector('[data-rep-history]');
+  if (!box || !userId) return;
+  box.innerHTML = '<li class="muted">Загружаем…</li>';
+  try {
+    box.innerHTML = renderRepGrantRows(await forum.listReputationGrants(userId));
+  } catch (err) {
+    box.innerHTML = '<li class="muted">Список не прочитан — см. сообщение ниже.</li>';
+    showPlayerActionError('[data-rep-error]', err, '20260926-author-thanks.sql');
   }
 }
 
@@ -1636,6 +1656,40 @@ document.addEventListener('submit', async (e) => {
       );
     } catch (err) {
       showPlayerActionError('[data-rename-error]', err, 'nicks-verified.sql');
+    }
+    return;
+  }
+
+  /* ── Форум: награда репутацией ── */
+  const repForm = e.target.closest('[data-rep-form]');
+  if (repForm) {
+    e.preventDefault();
+    const modal = repForm.closest('[data-rep-modal]');
+    const userId = modal?.dataset.playerId;
+    const nick = modal?.querySelector('[data-rep-nick]')?.textContent ?? '';
+    const delta = Number(repForm.elements.delta?.value);
+    const reason = String(repForm.elements.reason?.value ?? '').trim();
+
+    try {
+      /*
+        Ни диапазона, ни длины здесь не проверяют: границы держит база, и
+        панель повторяет их только атрибутами поля. Проверить дважды — значит
+        однажды разойтись словами, а отказ должен приходить тем же текстом,
+        который игрок потом увидит в своей истории.
+      */
+      await forum.grantReputation(userId, delta, reason);
+      repForm.reset();
+      // Окно не закрываем: награды выдают по несколько за раз, и перетыкать
+      // «⋯» ради второй строки истории никто не будет.
+      await loadRepHistory(userId);
+      showForumResult(
+        '[data-rep-error]',
+        `<b>${esc(nick)}: ${delta > 0 ? '+' : ''}${delta} очков.</b> Запись видна игроку и осталась
+         в истории навсегда; убрать очки можно только обратной записью с своей причиной.`,
+        'ok'
+      );
+    } catch (err) {
+      showPlayerActionError('[data-rep-error]', err, '20260926-author-thanks.sql');
     }
     return;
   }
@@ -1940,6 +1994,23 @@ document.addEventListener('click', async (e) => {
   }
   if (e.target.closest('[data-rename-cancel]')) {
     closePlayerModal('[data-rename-modal]');
+    return;
+  }
+
+  /*
+    Награда репутацией. Кнопка стоит под «⋯» не от экономии места: действие
+    необратимо по смыслу (история дополняется, а не правится), и держать его
+    рядом с обратимыми чипами roles нельзя — промах по ним не требует причины.
+  */
+  const repBtn = e.target.closest('[data-player-rep]');
+  if (repBtn) {
+    const userId = repBtn.dataset.playerRep;
+    openPlayerModal('[data-rep-modal]', repBtn.dataset.playerNick, userId);
+    await loadRepHistory(userId);
+    return;
+  }
+  if (e.target.closest('[data-rep-cancel]')) {
+    closePlayerModal('[data-rep-modal]');
     return;
   }
 

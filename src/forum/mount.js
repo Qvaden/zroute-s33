@@ -1851,6 +1851,42 @@ function wire() {
       return;
     }
 
+    // Благодарность автору.
+    const thank = t.closest('[data-forum-thank]');
+    if (thank && host.contains(thank)) {
+      const [targetType, targetId] = thank.dataset.forumThank.split(':');
+      const item = targetType === 'post'
+        ? state.posts.find((p) => p.id === targetId)
+        : state.comments.find((c) => c.id === targetId);
+
+      /*
+        Нажатая кнопка не действует: благодарность не отзывается, и второй
+        клик не «отменяет», а был бы попыткой снять сказанное. Кнопка уже
+        выглядит нажатой, и это не украшение — так человек понимает, что
+        сказать «спасибо» второй раз нельзя.
+      */
+      if (!item || item.iThanked) return;
+
+      item.thanksCount = Number(item.thanksCount || 0) + 1;
+      item.iThanked = true;
+      paint();
+
+      try {
+        await forum.giveThanks(targetType, targetId);
+      } catch (err) {
+        /*
+          Здесь откат молча не уместен, в отличие от реакции: отказ базы
+          объясняет («свой текст не благодарят», «не больше пяти за пять
+          минут») — это ответ на действие человека, а не сбой сети. Без
+          слова он увидел бы только вернувшуюся кнопку.
+        */
+        console.error('благодарность не сохранена:', err?.message ?? err);
+        notice(err?.message || 'База не приняла благодарность');
+        await refreshOne(targetType, targetId);
+      }
+      return;
+    }
+
     // Смайлики: открыть и закрыть список.
     const emojiOpen = t.closest('[data-forum-emoji-open]');
     if (emojiOpen && host.contains(emojiOpen)) {

@@ -673,6 +673,12 @@ const NOTIFY_KINDS = {
     правильно — готовиться к рейду человек приходит в обсуждение, а не в список.
   */
   event: { system: 'Календарь', label: 'время близится', icon: 'event', tone: 'var(--gold)', href: '#/calendar' },
+  /*
+    Благодарность — единственное уведомление, где ник благодарившего есть
+    и где он уместен: это его личный входящий ящик. Публично (в ленте и на
+    профиле) наружу выходит только число.
+  */
+  thanks: { label: 'поблагодарил вас за запись', icon: 'thanks', tone: 'var(--win)' },
 };
 
 /* Значки в той же графике, что колокольчик: 24×24, штрих currentColor. */
@@ -681,6 +687,7 @@ const NOTIFY_ICONS = {
   mention: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
   reaction: '<path d="M7 21V10"/><path d="M7 10l4.5-7a2.2 2.2 0 0 1 3.2 2.7L13.2 9H19a2 2 0 0 1 2 2.4l-1.5 7.8A2 2 0 0 1 17.5 21z"/>',
   subscription: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  thanks: '<path d="M11 19.5c-3.2-2.3-6-4.6-6-7.7A3.3 3.3 0 0 1 8.3 8.5c1.2 0 2.1.6 2.7 1.5"/><path d="M13 19.5c3.2-2.3 6-4.6 6-7.7A3.3 3.3 0 0 0 15.7 8.5c-1.2 0-2.1.6-2.7 1.5"/><path d="M12 21V11"/>',
   rank: '<path d="M4 20v-9"/><path d="M10 20V4"/><path d="M16 20v-6"/><path d="M2 20h20"/>',
   flag: '<path d="M5 21V4"/><path d="M5 5h11l-1.7 3.5L16 12H5z"/>',
   digest: '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8M8 16h5"/>',
@@ -1999,7 +2006,39 @@ function renderReactions(targetType, item, s) {
             .join('')}
         </div>
       </div>
+
+      ${renderThanks(targetType, item, s)}
     </div>`;
+}
+
+/**
+ * Кнопка «спасибо автору» — рядом с реакциями, но не среди них.
+ *
+ * Рядом положено, а внутри списка: у реакций общее свойство — их снимают и
+ * перевешивают, а благодарность нет. См. правило 3 в
+ * supabase/20260926-author-thanks.sql.
+ *
+ * Имен благодаривших здесь нет нарочно: наружу выходит только число. Автору
+ * приходит уведомление с ником — это его личный ящик, а не публичный список.
+ */
+function renderThanks(targetType, item, s) {
+  const can = Boolean(s.me);
+  const done = Boolean(item.iThanked);
+  const count = Number(item.thanksCount || 0);
+  const title = done
+    ? 'Вы уже благодарили автора. Благодарность не отзывают'
+    : 'Сказать, что текст помог — отдельное слово, не оценка';
+
+  return `
+    <button type="button"
+            class="forum-react__btn forum-thank ${done ? 'is-on' : ''}"
+            data-forum-thank="${esc(`${targetType}:${item.id}`)}"
+            aria-pressed="${done ? 'true' : 'false'}"
+            title="${esc(title)}"
+            ${can && !done ? '' : 'disabled'}>
+      <span aria-hidden="true">🙏</span>
+      <b class="num">${count}</b>
+    </button>`;
 }
 
 /* ── Опросы ───────────────────────────────────────────────────────────────── */

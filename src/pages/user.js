@@ -12,7 +12,7 @@
  * Функции чистые: получают данные, возвращают строку. Живое поведение —
  * в forum/mount.js, как и у ленты.
  */
-import { esc, pluralWord } from '../ui/helpers.js';
+import { esc, pluralWord, plural } from '../ui/helpers.js';
 import { excerpt, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 
@@ -21,7 +21,7 @@ function isOnline(lastSeen) {
   const d = lastSeen instanceof Date ? lastSeen : new Date(lastSeen);
   return Date.now() - d.getTime() < 5 * 60 * 1000;
 }
-import { levelOf, progressOf, achievementsOf, doneCount } from '../forum/rank.js';
+import { levelOf, progressOf, achievementsOf, doneCount, reputationOf, reputationSourcesOf } from '../forum/rank.js';
 
 /**
  * @param {{
@@ -76,7 +76,7 @@ export function renderUserPage(state = {}) {
     ${renderStats(profile)}
     ${renderActivity(activity, isMe)}
     ${profile.isBlogger ? renderBlog(profile, posts) : ''}
-    ${renderRank(profile)}
+    ${renderRank(profile, isMe)}
     ${renderPosts(profile, posts)}`;
 }
 
@@ -104,7 +104,7 @@ function renderCard(p, isMe, editing) {
           isMe
             ? `<button type="button" class="forum-btn forum-btn--ghost forum-profile__edit"
                        data-profile-edit>${editing ? 'Свернуть' : 'Изменить профиль'}</button>`
-            : `<button type="button" class="forum-btn forum-btn--ghost${p.iLiked ? ' is-liked' : ''}" data-profile-like data-user-id="${esc(p.id)}" title="Репутация">
+            : `<button type="button" class="forum-btn forum-btn--ghost${p.iLiked ? ' is-liked' : ''}" data-profile-like data-user-id="${esc(p.id)}" title="Симпатия к участнику">
                  <span class="forum-like-icon">${p.iLiked ? '♥' : '♡'}</span> <span class="forum-like-count">${p.profileLikes ?? 0}</span>
                </button>`
         }
@@ -320,7 +320,17 @@ function renderStats(p) {
     { value: p.postCount, label: pluralWord(p.postCount, 'пост', 'поста', 'постов') },
     { value: p.commentCount, label: pluralWord(p.commentCount, 'ответ', 'ответа', 'ответов') },
     { value: p.likesReceived, label: pluralWord(p.likesReceived, 'согласие', 'согласия', 'согласий') },
-    { value: p.profileLikes ?? 0, label: '♡ репутация' },
+    {
+      value: p.thanksReceived ?? 0,
+      label: pluralWord(p.thanksReceived ?? 0, 'благодарность', 'благодарности', 'благодарностей'),
+    },
+    /*
+      Прежняя подпись звала этот счётчик «репутацией», и с приходом
+      настоящего числа слово освободилось: ♥ здесь — просто симпатия к
+      человеку, её ставят в один клик и не за конкретный текст. Репутация
+      живёт ниже, в блоке «Репутация».
+    */
+    { value: p.profileLikes ?? 0, label: '♥ симпатия' },
   ];
 
   return `
@@ -392,12 +402,15 @@ function renderActivity(activity, isMe) {
 
 /* ── Уровень и достижения ────────────────────────────────────────────────── */
 
-function renderRank(p) {
+function renderRank(p, isMe) {
   const cur = levelOf(p);
   const prog = progressOf(p);
   const achs = achievementsOf(p);
   const done = doneCount(p);
   const total = achs.length;
+  const rep = reputationOf(p);
+  const sources = reputationSourcesOf(p);
+  const thanks = Number(p.thanksReceived ?? 0);
 
   return `
     <section class="panel forum-rank">
@@ -413,16 +426,52 @@ function renderRank(p) {
         </div>`
         : `<p class="forum-rank__label forum-rank__label--top">Максимальный уровень</p>`}
 
+      ${renderReputation(rep, thanks, sources, isMe)}
+
       <div class="forum-rank__achs">
         ${achs
           .map(
-            (a) => `<span class="forum-rank__ach ${a.done ? 'forum-rank__ach--done' : ''}"
-                           title="${esc(a.hint)}">${esc(a.title)}</span>`
+            (a) => `<span class="forum-rank__ach ${a.done ? 'forum-rank__ach--done' : ''} ${a.done && a.confirmed ? 'forum-rank__ach--confirmed' : ''}"
+                           title="${esc(a.confirmed ? `${a.hint} — подтверждено со стороны` : a.hint)}">${a.confirmed && a.done ? '🏅 ' : ''}${esc(a.title)}</span>`
           )
           .join('')}
       </div>
       <p class="forum-rank__sum muted">${done} из ${total} достижений</p>
     </section>`;
+}
+
+/**
+ * Репутация — число, которое нельзя купить количеством сообщений.
+ *
+ * Гостю видно само число и сколько раз тебя благодарили; список «откуда
+ * очки» показан только хозяину профиля: в нём причины наград, а их читают
+ * тот, кому они написаны, и модерация.
+ */
+function renderReputation(rep, thanks, sources, isMe) {
+  return `
+    <div class="forum-rep">
+      <div class="forum-rep__row">
+        <span class="forum-rep__points">${rep}</span>
+        <span class="forum-rep__label">очков репутации · ${plural(thanks, 'благодарность', 'благодарности', 'благодарностей')}</span>
+      </div>
+      <p class="forum-rep__hint muted">
+        Очки дают проверенные модерацией разборы и награды владельца.
+        Благодарности репутацию не покупают — их видно числом и значком.
+      </p>
+      ${isMe && sources.length
+        ? `<ul class="forum-rep__sources">
+          ${sources
+            .map(
+              (s) => `<li>${
+                s.source === 'guide'
+                  ? plural(s.count, 'проверенный гайд', 'проверенных гайда', 'проверенных гайдов')
+                  : plural(s.count, 'награда от владельца', 'награды от владельца', 'наград от владельца')
+              } <b class="num">${s.points > 0 ? '+' : ''}${s.points}</b></li>`
+            )
+            .join('')}
+        </ul>`
+        : ''}
+    </div>`;
 }
 
 /* ── Посты участника ──────────────────────────────────────────────────────── */

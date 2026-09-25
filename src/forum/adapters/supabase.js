@@ -286,6 +286,14 @@ function postOut(row) {
       темы каждый раз открывался бы с «не напоминать», хотя будильник стоит.
     */
     myRemindMinutes: row.my_remind_minutes == null ? null : Number(row.my_remind_minutes),
+    /*
+      Благодарности. Число — общее, отметка — своя (та же граница приватности,
+      что у my_reaction: ленте нужно знать себя, а не то, кто кого благодарил).
+      Колонок нет, пока не прогнана 20260926-author-thanks.sql, поэтому пусто,
+      а не ошибка.
+    */
+    thanksCount: Number(row.thanks_count || 0),
+    iThanked: Boolean(row.i_thanked),
     score,
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     poll: pollOut(row.poll),
@@ -611,6 +619,8 @@ function commentOut(row) {
     deletedReason: row.deleted_reason || '',
     reactions: counts,
     myReaction: row.my_reaction || null,
+    thanksCount: Number(row.thanks_count || 0),
+    iThanked: Boolean(row.i_thanked),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
   };
 }
@@ -674,6 +684,56 @@ export async function setReaction(targetType, targetId, reactionId) {
     prefer: 'resolution=merge-duplicates',
     body: { target_type: targetType, target_id: targetId, reaction: reactionId },
   });
+}
+
+/* ── Благодарности и репутация ────────────────────────────────────────────── */
+
+/**
+ * Поблагодарить автора темы или ответа.
+ *
+ * Одна строка на функцию базы (forum_give_thank), и сама функция решает всё:
+ * своего автора, удалённую запись, повтор и частоту. Таблица при этом закрыта
+ * от записи политикой — иначе отказ базового ограничения («нарушена политика
+ * доступа») заменил бы человеку причину, по которой не вышло.
+ *
+ * @param {'post'|'comment'} targetType
+ * @param {string} targetId
+ */
+export async function giveThanks(targetType, targetId) {
+  await rest('/rpc/forum_give_thank', {
+    method: 'POST',
+    body: { p_target_type: targetType, p_target_id: targetId },
+  });
+}
+
+/**
+ * Награда владельца: начисление очков репутации с обязательным пояснением.
+ * Строка неизменяема — ни правки, ни удаления, поэтому «исправить» означает
+ * вторую запись с обратным знаком, и обе остаются в истории.
+ */
+export async function grantReputation(userId, delta, reason) {
+  await rest('/rpc/forum_grant_reputation', {
+    method: 'POST',
+    body: { p_user: userId, p_delta: Number(delta), p_reason: String(reason ?? '') },
+  });
+}
+
+/** История начислений: своя — игроку, вся — модерации (аргумент пуст). */
+export async function listReputationGrants(userId = null) {
+  const rows = await rest('/rpc/forum_reputation_grant_list', {
+    method: 'POST',
+    body: { p_user: userId || null },
+  });
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => ({
+    id: r.id,
+    userId: r.user_id,
+    nick: r.nick || '',
+    delta: Number(r.delta || 0),
+    reason: r.reason || '',
+    grantedByNick: r.granted_by_nick || 'владелец ушёл',
+    createdAt: toDate(r.created_at) ?? new Date(),
+  }));
 }
 
 /* ── Жалобы и модерация ───────────────────────────────────────────────────── */
