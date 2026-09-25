@@ -254,6 +254,12 @@ function postOut(row) {
     body: row.body,
     createdAt: toDate(row.created_at) ?? new Date(),
     editedAt: toDate(row.edited_at) ?? undefined,
+    /*
+      Срок действия темы. null означает «срок не назначен» и это законное
+      состояние для любой метки, кроме «Набор» и «Срочно»: их проверяет база
+      (триггер forum_posts_expiry), а не страница.
+    */
+    expiresAt: toDate(row.expires_at) ?? null,
     pinned: Boolean(row.pinned),
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
@@ -431,7 +437,19 @@ export async function createPost(draft) {
   const rows = await rest('/forum_posts', {
     method: 'POST',
     prefer: 'return=representation',
-    body: { category: draft.category, title: draft.title, body: draft.body, tags },
+    body: {
+      category: draft.category,
+      title: draft.title,
+      body: draft.body,
+      tags,
+      /*
+        Срок уезжает в базу как есть, без местной проверки: границ (от суток до
+        90 дней) и требования срока для «Набор» и «Срочно» держит триггер
+        forum_posts_expiry, и его текст человек видит целиком. Дублировать
+        отказ здесь значило бы однажды разойтись с базой формулировкой.
+      */
+      expires_at: draft.expiresAt ?? null,
+    },
   });
   const created = Array.isArray(rows) ? rows[0] : rows;
   if (!created?.id) throw new Error('Пост не создан');
@@ -512,6 +530,28 @@ export async function setPinned(id, pinned) {
   await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { pinned } });
   const full = await getPost(id);
   if (!full) throw new Error('Пост не найден после закрепления');
+  return full;
+}
+
+/**
+ * Срок действия темы: продлить, назначить заново или снять.
+ *
+ * Право на это решает RLS: строку правит автор, а модерация — любую. Границы
+ * срока проверяет база (триггер forum_posts_expiry), и её текст отказа
+ * страница показывает как есть — человек видит названный срок, а не «операция
+ * не выполнена».
+ *
+ * Отдельная функция, а не patch внутри editPost: продление — это одно поле, и
+ * открывать ради него правку текста значило бы давать человеку редактор
+ * там, где ему нужны три кнопки.
+ */
+export async function setExpiry(id, expiresAt) {
+  await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: { expires_at: expiresAt ?? null },
+  });
+  const full = await getPost(id);
+  if (!full) throw new Error('Пост не найден после продления');
   return full;
 }
 

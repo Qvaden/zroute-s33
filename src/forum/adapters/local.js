@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, REACTION_IDS, TOPIC_TAG_IDS, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, REACTION_IDS, TOPIC_TAG_IDS, needsExpiry, reactionMeta } from '../rules.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -281,6 +281,8 @@ function postOut(state, p) {
     body: p.body,
     createdAt: toDate(p.createdAt) ?? new Date(),
     editedAt: toDate(p.editedAt) ?? undefined,
+    // null — срок не назначен; тот же смысл, что у рабочей базы.
+    expiresAt: toDate(p.expiresAt) ?? null,
     pinned: Boolean(p.pinned),
     deleted: Boolean(p.deleted),
     deletedReason: p.deletedReason || '',
@@ -456,12 +458,43 @@ function checkHold(state, kind, me, text) {
   }
 }
 
+/**
+ * СРОК ДЕЙСТВИЯ ТЕМЫ В ЧЕРНОВОМ РЕЖИМЕ.
+ *
+ * Держит его база (supabase/20260925-announcement-expiry.sql, триггер
+ * forum_posts_expiry), здесь проверка нужна по той же причине, что и выдержка:
+ * увидеть правило и проверить его, не подключая Supabase. Формулировки отказов
+ * совпадают со словами триггера дословно — за этим тоже следит тест.
+ *
+ * @param {string[]} tags  Метки темы.
+ * @param {string|Date|null} when  Назначенный срок или null.
+ * @returns {string}  Пусто, всё в порядке; иначе — текст отказа.
+ */
+function expiryProblem(tags, when) {
+  const L = CONFIG.forum.limits;
+  if (needsExpiry(tags) && !when) {
+    return 'У темы с меткой «Набор» или «Срочно» должен быть срок действия — выберите, сколько дней она висит';
+  }
+  if (!when) return '';
+  const at = new Date(when).getTime();
+  const day = 86400000;
+  if (at <= Date.now() + L.expiryDaysMin * day) {
+    return 'Срок должен быть хотя бы на сутки впереди — вчерашнее объявление актуальным не станет';
+  }
+  if (at > Date.now() + L.expiryDaysMax * day) {
+    return `Срок не дальше ${L.expiryDaysMax} дней — иначе тема зависнет в ленте навсегда`;
+  }
+  return '';
+}
+
 export async function createPost(draft) {
   const s = read();
   const me = requireWriter(s);
   if (!CATEGORY_IDS.includes(draft.category)) throw new Error('Неизвестный раздел');
-  checkHold(s, 'post', me, `${draft.title} ${draft.body}`);
   const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
+  const expiryError = expiryProblem(tags, draft.expiresAt ?? null);
+  if (expiryError) throw new Error(expiryError);
+  checkHold(s, 'post', me, `${draft.title} ${draft.body}`);
 
   const post = {
     id: newId('p'),
@@ -472,6 +505,7 @@ export async function createPost(draft) {
     title: draft.title,
     body: draft.body,
     createdAt: new Date().toISOString(),
+    expiresAt: draft.expiresAt ?? null,
     pinned: false,
     deleted: false,
     views: 0,
@@ -578,6 +612,32 @@ export async function setPinned(id, pinned) {
     }
   }
   post.pinned = pinned;
+  write(s);
+  return postOut(s, post);
+}
+
+/**
+ * Срок действия темы: продлить, назначить или снять.
+ *
+ * В базе это право отдаёт RLS — строку правит автор, а модерация любую. Здесь
+ * то же разделение, иначе черновой режим показывал бы то, чего настоящий
+ * игроку откажет.
+ */
+export async function setExpiry(id, expiresAt) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const post = s.posts.find((p) => p.id === id);
+  if (!post) throw new Error('Пост не найден');
+  const isStaff = me.role === 'admin' || me.role === 'moderator';
+  if (!isStaff && post.authorId !== me.id) throw new Error('Это не ваш пост');
+
+  const when = expiresAt ?? null;
+  const error = expiryProblem(Array.isArray(post.tags) ? post.tags : [], when);
+  if (error) throw new Error(error);
+
+  post.expiresAt = when;
   write(s);
   return postOut(s, post);
 }

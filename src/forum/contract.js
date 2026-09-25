@@ -54,6 +54,11 @@
  * @property {string}  body
  * @property {Date}    createdAt
  * @property {Date}    [editedAt]
+ * @property {Date|null} [expiresAt]  До какого числа тема считается актуальной.
+ *                                    null — срок не назначен. Для меток «Набор»
+ *                                    и «Срочно» его требует база; истёкшая тема
+ *                                    из ленты не исчезает, она получает метку
+ *                                    «срок вышел» (см. 20260925-announcement-expiry.sql).
  * @property {boolean} [pinned]       Держать сверху ленты.
  * @property {boolean} [deleted]
  * @property {string}  [deletedReason]
@@ -160,10 +165,11 @@
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
- * @property {(draft: {title: string, body: string, category: string, tags?: string[], poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
+ * @property {(id: string, expiresAt: string|null) => Promise<ForumPost>} setExpiry  Продлить срок или снять его; база считает границы, страница показывает отказ как есть.
  * @property {(postId: string) => Promise<ForumComment[]>} listComments
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment
  * @property {(id: string, reason: string) => Promise<void>} deleteComment

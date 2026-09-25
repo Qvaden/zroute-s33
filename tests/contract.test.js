@@ -5248,6 +5248,203 @@ console.log('\nU. Гайды: отметка и сигнал');
     !/data-guide-stale/.test(guestHtml) && !/data-guide-review=/.test(guestHtml));
 }
 
+// ── V. Срок действия темы ───────────────────────────────────────────────────
+console.log('\nV. Срок действия темы');
+{
+  /*
+    Правило размазано по пяти местам: колонка и триггер в базе, метка в
+    правилах, числа в конфиге, два адаптера и разметка. Расхождение любого из
+    них невидимо: тема без срока просто висит вечно, а игрок не узнает, что
+    правило есть.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const L = CONFIG.forum.limits;
+  const sql = await readFile('supabase/20260925-announcement-expiry.sql', 'utf8');
+  const oldSql = await readFile('supabase/20260916-forum-community.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const rules = await import('../src/forum/rules.js');
+
+  /* Метка «Срочно» должна доехать до списка, который принимает база. */
+  const listOf = (s) => (s ?? '').split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean).sort().join('/');
+  equal('метки темы: база и правила называют одно и то же',
+    listOf(sql.match(/tags <@ array\[([^\]]*)\]::text\[\]/)?.[1]),
+    listOf(rules.TOPIC_TAG_IDS.join(',')));
+  check('метка «Срочно» названа по-русски и есть в списке',
+    rules.TOPIC_TAGS.some((tag) => tag.id === 'sos' && tag.label === 'Срочно'));
+
+  /*
+    Список меток, требующих срока, живёт в SQL-функции и в rules.js. Совпадать
+    они обязаны буквально: база отвергнет тему, которой форма обещала прощение.
+  */
+  equal('требовать срок база и страница договариваются об одних метках',
+    listOf(sql.match(/&& array\[([^\]]*)\]::text\[\];/)?.[1]),
+    listOf(rules.EXPIRY_TAG_IDS.join(',')));
+  check('нужен срок или нет — решает одна функция, а не два списка',
+    rules.needsExpiry(['recruiting']) && rules.needsExpiry(['sos', 'vs'])
+      && !rules.needsExpiry(['vs']) && !rules.needsExpiry(undefined));
+
+  /* Числа: их два места, и третье не придумает своё. */
+  check('границы срока — одни в конфиге и в триггере',
+    sql.includes(`interval '${L.expiryDaysMin} day'`)
+      && sql.includes(`interval '${L.expiryDaysMax} days'`));
+  check('варианты в форме не выходят за границы, которые принимает база',
+    L.expiryChoices.every((d) => d > L.expiryDaysMin && d <= L.expiryDaysMax)
+      && L.expiryChoices.length > 0);
+  check('срок по умолчанию есть у каждой требующей метки и он из списка',
+    rules.EXPIRY_TAG_IDS.every((tag) => L.expiryChoices.includes(L.expiryDefaultDays[tag])));
+
+  /* Проверка висит на записи и на правке, иначе её можно перешагнуть PATCH. */
+  check('срок проверяется при создании и при продлении',
+    /create trigger forum_posts_expiry[\s\S]{0,140}before insert or update on public\.forum_posts/.test(sql));
+  const need = 'У темы с меткой «Набор» или «Срочно» должен быть срок действия — выберите, сколько дней она висит';
+  check('отказ про срок назван одинаково в базе и в черновом режиме',
+    (sql.match(new RegExp(need, 'g')) || []).length === 1 && localSrc.includes(need));
+  check('требование срока не мешает правкам, которые его не касаются',
+    sql.includes('new.tags is distinct from old.tags or new.expires_at is distinct from old.expires_at'));
+  check('функцию списка меток нельзя позвать из браузера',
+    sql.includes('revoke all on function public.forum_expiry_required(text[]) from public, anon;'));
+
+  /*
+    Колонки представления фиксируются при его создании: select p.* из старой
+    миграции никогда не увидит expires_at. Шаг 4 пересоздаёт ленту копией —
+    и копия обязана быть дословной, иначе лента потеряет какую-нибудь колонку.
+  */
+  const viewOf = (src) => (src.match(/create view public\.forum_post_list[\s\S]*?author_id;/)?.[0] ?? '')
+    .replace(/\s+/g, ' ').trim();
+  check('лента пересоздана копией прежнего определения',
+    viewOf(sql).length > 200 && viewOf(sql) === viewOf(oldSql));
+  check('срок уезжает в ленту представлением, а не новой колонкой вручную',
+    viewOf(sql).startsWith('create view public.forum_post_list with (security_invoker = on) as select p.*'));
+
+  check('создание поста передаёт срок, а продление правит его PATCH-ем',
+    supaSrc.includes('expires_at: draft.expiresAt ?? null')
+      && /setExpiry[\s\S]{0,260}method: 'PATCH'[\s\S]{0,80}expires_at/.test(supaSrc));
+  check('контракт объявляет срок и продление',
+    /@property \{Date\|null\} \[expiresAt\]/.test(contractSrc)
+      && /\(id: string, expiresAt: string\|null\) => Promise<ForumPost>\} setExpiry/.test(contractSrc));
+  const pageSrc = await readFile('src/pages/forum.js', 'utf8');
+  check('страница спрашивает срок и знает кнопку продления',
+    /name="expires_in"/.test(pageSrc) && mountSrc.includes('data-forum-extend') && mountSrc.includes('draft.expiresAt'));
+  check('подсказка обязательности молчит, пока её не вызвала метка',
+    pageSrc.includes('data-forum-expiry-hint') && mountSrc.includes('hint.hidden = !needsExpiry(chosen)'));
+  check('срок, который подставляет форма, помечен в списке как обязательный',
+    /required\.includes\(d\)/.test(pageSrc) && pageSrc.includes('нужен для набора'));
+  check('при выборе метки срок подставляется сам',
+    /expiryDefaultDays\?\.\[tagBox\.value\]/.test(mountSrc) && mountSrc.includes('needsExpiry(chosen)'));
+
+  /* ── Черновой режим: те же отказы, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  await local.signUp('Автор');
+  await local.signUp('Посторонний');
+  /* Регистрация входит сама, поэтому автора тем называем явно. */
+  await local.signIn('Автор');
+  const DAY = 86400000;
+  const inDays = (n) => new Date(Date.now() + n * DAY).toISOString();
+
+  let refusal = '';
+  try {
+    await local.createPost({ title: 'Набор без срока', body: '<p>пишитесь</p>', category: 'ally', tags: ['recruiting'] });
+  } catch (e) { refusal = String(e.message); }
+  equal('тема «Набор» без срока не создаётся', refusal, need);
+
+  refusal = '';
+  try {
+    await local.createPost({ title: 'Срочно без срока', body: '<p>помогите</p>', category: 'vs', tags: ['sos'] });
+  } catch (e) { refusal = String(e.message); }
+  equal('срочный сигнал без срока тоже', refusal, need);
+
+  const calm = await local.createPost({ title: 'Обычная тема', body: '<p>разбор</p>', category: 'vs', tags: ['vs'] });
+  equal('теме без требующей метки срок не навязывают', calm.expiresAt, null);
+
+  const soon = await local.createPost({
+    title: 'Набор', body: '<p>открыт</p>', category: 'ally', tags: ['recruiting'], expiresAt: inDays(14),
+  });
+  check('срок доехал до темы датой', soon.expiresAt instanceof Date
+    && soon.expiresAt - Date.now() > 13 * DAY && soon.expiresAt - Date.now() <= 14 * DAY);
+
+  refusal = '';
+  try {
+    await local.createPost({ title: 'Набор', body: '<p>ещё</p>', category: 'ally', tags: ['recruiting'], expiresAt: inDays(365) });
+  } catch (e) { refusal = String(e.message); }
+  equal('срок дальше границы база с собой не берёт',
+    refusal, `Срок не дальше ${L.expiryDaysMax} дней — иначе тема зависнет в ленте навсегда`);
+
+  refusal = '';
+  try {
+    await local.createPost({ title: 'Набор', body: '<p>вчера</p>', category: 'ally', tags: ['recruiting'], expiresAt: inDays(0.1) });
+  } catch (e) { refusal = String(e.message); }
+  equal('вчерашний срок не проходит', refusal,
+    'Срок должен быть хотя бы на сутки впереди — вчерашнее объявление актуальным не станет');
+
+  await local.signIn('Посторонний');
+  refusal = '';
+  try { await local.setExpiry(soon.id, inDays(7)); } catch (e) { refusal = String(e.message); }
+  equal('чужой срок посторонний не двигает', refusal, 'Это не ваш пост');
+
+  const before = new Date(soon.expiresAt).getTime();
+  await local.signIn('Автор');
+  const grown = await local.setExpiry(soon.id, inDays(30));
+  check('автор продливает свою тему', new Date(grown.expiresAt).getTime() > before);
+
+  refusal = '';
+  try { await local.setExpiry(soon.id, null); } catch (e) { refusal = String(e.message); }
+  equal('снять срок с темы набора нельзя', refusal, need);
+
+  await local.setExpiry(calm.id, inDays(3));
+  equal('у обычной темы срок снимается', (await local.setExpiry(calm.id, null)).expiresAt, null);
+
+  /* Лента обязана нести срок: карточка рисует метку именно по нему. */
+  const feed = await local.listPosts({ category: 'all' });
+  check('лента приносит срок вместе с темой',
+    feed.posts.some((p) => p.id === soon.id && p.expiresAt instanceof Date));
+
+  /* ── Разметка ── */
+  const { renderPostCard } = await import('../src/pages/forum.js');
+  const seat = { me: null, openPostId: null, editingPostId: null, comments: [], categories: {} };
+  const member = { ...seat, me: { id: 'u1', role: 'member' } };
+  const open = { ...member, openPostId: 'x1' };
+  const live = {
+    id: 'x1', authorId: 'u1', authorNick: 'A', title: 'Т', body: '<p>x</p>', category: 'ally',
+    tags: ['recruiting'], reactions: {}, myReaction: null, commentCount: 0, views: 0,
+    createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date(Date.now() + 5 * DAY),
+  };
+  const dead = { ...live, expiresAt: new Date(Date.now() - 2 * DAY) };
+  const plainPost = { ...live, tags: ['vs'], expiresAt: null };
+
+  const liveHtml = renderPostCard(live, member);
+  check('живая тема носит срок в шапке карточки',
+    /forum-post__expiry"/.test(liveHtml) && /до \d+ [а-я]/.test(liveHtml) && !/Срок вышел/.test(liveHtml));
+  check('истёкшая тема говорит об этом прямо',
+    /forum-post__expiry--over/.test(renderPostCard(dead, member)) && /Срок вышел/.test(renderPostCard(dead, member)));
+  check('тема без срока не носит пустой метки', !/forum-post__expiry/.test(renderPostCard(plainPost, member)));
+  check('истёкшую тему не прячут: карточка остаётся в ленте',
+    renderPostCard(dead, member).includes('data-forum-post="x1"'));
+
+  const barHtml = renderPostCard(live, open);
+  check('в открытой теме автору видны кнопки продления',
+    /data-forum-extend="x1:7"/.test(barHtml) && /Актуально до/.test(barHtml));
+  check('кнопки продления нет в свёрнутой карточке и у чужого человека',
+    !/data-forum-extend/.test(liveHtml) && !/data-forum-extend/.test(renderPostCard({ ...live, authorId: 'u9' }, open)));
+  check('гостю кнопки не показывают: база всё равно откажет',
+    !/data-forum-extend/.test(renderPostCard(live, { ...seat, openPostId: 'x1' })));
+  check('у требующей метки срока «без срока» не предлагают',
+    !/Бессрочно/.test(barHtml));
+  check('у обычной темы срок можно снять',
+    /Бессрочно/.test(renderPostCard({ ...live, tags: ['vs'] }, open)));
+  check('истёкшая тема в открытом виде названа вышедшей',
+    /Срок вышел \d+/.test(renderPostCard(dead, open))
+      && /forum-expiry__state--over/.test(renderPostCard(dead, open)));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');

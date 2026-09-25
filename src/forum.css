@@ -2258,3 +2258,45 @@
 .guide-review__staff input { width: 100%; }
 .guide-review__stale .forum-field,
 .guide-review__staff .forum-field { display: grid; gap: 4px; font-size: 12.5px; }
+
+/* ── Срок действия темы ─────────────────────────────────────────────────────
+   Значок живёт в шапке карточки рядом со «свежими ответами»: он про состояние
+   темы, а не про её содержимое. Истёкший срок красный — это не украшение, а
+   единственное, что отличает «набор открыт» от «набор был открыт». */
+.forum-post__expiry {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--win) 45%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--win) 12%, transparent);
+  color: var(--win);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.forum-post__expiry--over {
+  border-color: color-mix(in srgb, var(--loss) 55%, var(--line));
+  background: color-mix(in srgb, var(--loss) 14%, transparent);
+  color: var(--loss);
+}
+
+/* Строка продления — только в открытой теме: в ленте таких кнопок на каждый
+   пост не напасёшься, и карточка превратилась бы в панель управления. */
+.forum-expiry {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-left-color: var(--dim);
+  border-radius: 10px;
+  background: var(--raised);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.forum-expiry__state { font-weight: 700; color: var(--text); }
+.forum-expiry__state--over { color: var(--loss); }
+.forum-expiry__btns { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.forum-expiry__btns button[disabled] { opacity: .55; }

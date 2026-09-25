@@ -21,7 +21,7 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel, needsExpiry } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
@@ -1119,6 +1119,109 @@ export function renderMdBar() {
     </div>`;
 }
 
+/** Дата коротко: «12 окт». Тот же формат, что у дат в хронике сверху. */
+function shortDate(when) {
+  const d = new Date(when);
+  return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+/** Варианты срока из config'а — те же числа держит триггер базы. */
+function expiryChoices() {
+  return (CONFIG.forum.limits.expiryChoices || []).map(Number).filter((d) => d > 0);
+}
+
+/**
+ * ПОЛЕ СРОКА В ФОРМЕ.
+ *
+ * Срок можно назначить любой теме, а не только набору: «разбор актуален до
+ * патча» стареет по тем же часам. Пустое значение — «бессрочно», и база
+ * прощает его всем меткам, кроме «Набор» и «Срочно»: там откажет триггер, а
+ * форма заранее подставит срок при выборе метки (см. mount.js) — иначе
+ * человек узнавал бы о требовании уже после того, как написал текст.
+ *
+ * Списком вариантов правим мы, а решают часы базы: предложение, которое она
+ * отвергла бы («+200 дней»), в поле висеть не должно.
+ */
+function renderExpiryField() {
+  const days = expiryChoices();
+  const defaults = CONFIG.forum.limits.expiryDefaultDays || {};
+  if (!days.length) return '';
+  const now = Date.now();
+  /*
+    Метка «нужен» стоит у тех вариантов, которые база примет при метке «Набор»
+    или «Срочно»: автоподстановка подставляет ровно такой вариант, и человеку
+    видно, что выбор честный, а не случайный.
+  */
+  const required = [...new Set(Object.values(defaults).map(Number))]
+    .filter((d) => days.includes(d));
+  return `
+    <label class="forum-field">
+      <span>Актуально до</span>
+      <select name="expires_in" data-forum-expiry>
+        <option value="">Бессрочно</option>
+        ${days
+          .map(
+            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора и срочных тем)' : ''}</option>`
+          )
+          .join('')}
+      </select>
+      <small class="muted" data-forum-expiry-hint>Теме с меткой «Набор» или «Срочно» срок нужен обязательно:
+        он подставится сам, но его можно выбрать другой.</small>
+    </label>`;
+}
+
+/**
+ * Значок срока в шапке карточки.
+ *
+ * Истёкшую тему не прячем: под ней обсуждение, и вместе с объявлением
+ * пропали бы ответы людей (рассуждение — в шапке
+ * supabase/20260925-announcement-expiry.sql). Тема остаётся на месте и честно
+ * говорит, что призыв уже не действует.
+ */
+function expiryBadge(p) {
+  if (!p.expiresAt) return '';
+  const at = new Date(p.expiresAt);
+  return at.getTime() <= Date.now()
+    ? '<span class="forum-post__expiry forum-post__expiry--over" title="Объявление устарело — срок действия вышел">Срок вышел</span>'
+    : `<span class="forum-post__expiry" title="Тема считается актуальной до ${esc(shortDate(at))}">до ${esc(shortDate(at))}</span>`;
+}
+
+/**
+ * Продление срока: кнопки автора и модерации.
+ *
+ * Отсчёт идёт от сегодняшнего дня, а не от прежней даты: продление темы,
+ * проспавшей месяц, дало бы пару дней вместо месяца. То же правило записано
+ * в триггере базы, и её отказ страница показывает как есть.
+ */
+function expiryControl(p, s) {
+  const days = expiryChoices();
+  if (!s.me || !days.length) return '';
+  if (s.me.id !== p.authorId && s.me.role !== 'admin' && s.me.role !== 'moderator') return '';
+
+  const dead = Boolean(p.expiresAt) && new Date(p.expiresAt).getTime() <= Date.now();
+  const state = !p.expiresAt
+    ? needsExpiry(p.tags)
+      ? 'Срок действия обязателен для этой метки'
+      : 'Срок действия не назначен'
+    : dead
+      ? `Срок вышел ${esc(shortDate(p.expiresAt))}`
+      : `Актуально до ${esc(shortDate(p.expiresAt))}`;
+
+  return `
+    <div class="forum-expiry">
+      <span class="forum-expiry__state${dead || !p.expiresAt ? ' forum-expiry__state--over' : ''}">${state}</span>
+      <span class="forum-expiry__btns">
+        ${days
+          .map(
+            (d) => `<button type="button" class="forum-act" data-forum-extend="${esc(p.id)}:${d}"
+                       title="Отсчёт от сегодняшнего дня">+${d} ${pluralWord(d, 'день', 'дня', 'дней')}</button>`
+          )
+          .join('')}
+        ${p.expiresAt && !needsExpiry(p.tags) ? `<button type="button" class="forum-act" data-forum-extend="${esc(p.id)}:0">Бессрочно</button>` : ''}
+      </span>
+    </div>`;
+}
+
 function renderComposer(s) {
   if (!s.ready || !s.me) return '';
   if (s.me.banned) return '';
@@ -1145,6 +1248,8 @@ function renderComposer(s) {
           <legend>Теги темы <small>до трёх</small></legend>
           ${TOPIC_TAGS.map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"><span>${esc(tag.label)}</span></label>`).join('')}
         </fieldset>
+
+        ${renderExpiryField()}
 
         <label class="forum-field">
           <span>Заголовок</span>
@@ -1526,6 +1631,7 @@ export function renderPostCard(p, s) {
               }</span>`
             : ''
         }
+        ${expiryBadge(p)}
       </header>
 
       ${
@@ -1545,6 +1651,8 @@ export function renderPostCard(p, s) {
       ${renderShots(p)}
 
       ${p.poll ? renderPoll(p.poll, s) : ''}
+
+      ${isOpen ? expiryControl(p, s) : ''}
 
       ${
         // По видимому тексту, а не по HTML: жирный абзац в три слова —

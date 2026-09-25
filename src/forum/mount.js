@@ -24,7 +24,7 @@ import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY }
 import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
-  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS,
+  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry,
 } from './rules.js';
 import { filtersFromSearch, searchFromFilters } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
@@ -1747,6 +1747,33 @@ function wire() {
       return;
     }
 
+    // Срок действия темы: продлить или снять.
+    const extendBtn = t.closest('[data-forum-extend]');
+    if (extendBtn && host.contains(extendBtn)) {
+      const [id, days] = String(extendBtn.dataset.forumExtend).split(':');
+      const n = Number(days);
+      const when = n > 0 ? new Date(Date.now() + n * 86400000).toISOString() : null;
+      extendBtn.disabled = true;
+      try {
+        const updated = await forum.setExpiry(id, when);
+        /*
+          Карточку правим тем, что вернул адаптер, а не тем, что просили:
+          база считает срок по своим часам, и показывать надо её ответ.
+          Ленту целиком перезапрашивать незачем — порядок от срока не зависит.
+        */
+        if (updated) {
+          const i = state.posts.findIndex((p) => p.id === id);
+          if (i >= 0) state.posts[i] = updated;
+          else state.posts = [updated, ...state.posts];
+        }
+        paint();
+      } catch (err) {
+        notice(String(err?.message ?? err));
+        extendBtn.disabled = false;
+      }
+      return;
+    }
+
     // Удаление.
     const delPost = t.closest('[data-forum-del-post]');
     if (delPost && host.contains(delPost)) {
@@ -1821,6 +1848,36 @@ function wire() {
         и человек решит, что кнопка перестала работать.
       */
       attachInput.value = '';
+      return;
+    }
+
+    /*
+      Метки «Набор» и «Срочно» без срока база не примет, а узнавать об этом
+      после того, как человек написал текст, — значит выдать ему отказ вместо
+      подсказки. Поэтому срок подставляется сам в момент выбора метки: поле
+      остаётся на виду, и его можно переставить на другой.
+    */
+    const tagBox = e.target.closest('[data-forum-new] input[name="tags"]');
+    if (tagBox) {
+      const form = tagBox.closest('form');
+      const select = form?.elements.expires_in;
+      const chosen = [...form.querySelectorAll('input[name="tags"]:checked')].map((i) => i.value);
+      if (select && !select.value && needsExpiry(chosen)) {
+        const days = CONFIG.forum.limits.expiryDefaultDays?.[tagBox.value];
+        if (days && [...select.options].some((o) => o.value === String(days))) select.value = String(days);
+      }
+      /*
+        Подсказка живёт рядом с полем и молчит, пока срок не требуется:
+        вечная заметка «обязательно» рядом с необязательным полем — это шум.
+      */
+      const hint = form?.querySelector('[data-forum-expiry-hint]');
+      if (hint) hint.hidden = !needsExpiry(chosen);
+      /*
+        Черновик пересохраняем именно здесь: автосохранение идёт на input,
+        который случился до того, как поле заполнилось, и без этого шага
+        перерисовка вернула бы пустой срок.
+      */
+      saveComposerDraft();
       return;
     }
 
@@ -1911,6 +1968,13 @@ function wire() {
 
       const draft = { ...checked.value, poll };
       draft.tags = [...form.querySelectorAll('input[name="tags"]:checked')].map((input) => input.value);
+      /*
+        Дата считается от «сейчас», а не от выбранной человеком строки
+        календаря: человек выбирает сколько дней объявление проживёт. Границы
+        (сутки — 90 дней) проверяет база, и её отказ показывается как есть.
+      */
+      const days = Number(form.expires_in?.value ?? 0);
+      draft.expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
 
       await withBusy(submitter, 'Публикуем…', async () => {
         try {

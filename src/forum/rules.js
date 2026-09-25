@@ -127,12 +127,31 @@ export const CATEGORIES = [
 export const TOPIC_TAGS = [
   { id: 'vs', label: 'VS' },
   { id: 'recruiting', label: 'Набор' },
+  { id: 'sos', label: 'Срочно' },
   { id: 'diplomacy', label: 'Дипломатия' },
   { id: 'guide', label: 'Гайд' },
   { id: 'question', label: 'Вопрос' },
   { id: 'event', label: 'Событие' },
 ];
 export const TOPIC_TAG_IDS = TOPIC_TAGS.map((tag) => tag.id);
+
+/**
+ * Метки, которым нужен срок действия.
+ *
+ * «Набор открыт» и «помогите со столицей» — это обещания, у которых срок
+ * жизни короче, чем у обсуждения. Через месяц такая тема уже не приглашение,
+ * а мусор, и читатель, пришедший по ней в закрытый набор, делает вывод, что
+ * форуму верить нельзя. Поэтому форма обязана спросить дату, а база —
+ * проверить ответ: числа лежат в CONFIG.forum.limits, а те же два id стоят
+ * в функции forum_expiry_required (supabase/20260925-announcement-expiry.sql).
+ * Расхождение сторожит тест.
+ */
+export const EXPIRY_TAG_IDS = ['recruiting', 'sos'];
+
+/** @param {string[]} tags */
+export function needsExpiry(tags) {
+  return (Array.isArray(tags) ? tags : []).some((tag) => EXPIRY_TAG_IDS.includes(tag));
+}
 
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 
