@@ -22,7 +22,11 @@
 import { forum } from './index.js';
 import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY } from '../pages/forum.js';
 import { renderUserPage } from '../pages/user.js';
-import { validateNick, validatePassword, validatePost, validateComment, deletionReason } from './rules.js';
+import {
+  validateNick, validatePassword, validatePost, validateComment, deletionReason,
+  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS,
+} from './rules.js';
+import { filtersFromSearch, searchFromFilters } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
@@ -532,6 +536,32 @@ async function withBusy(button, label, action) {
   }
 }
 
+/* ── Фильтры в адресе страницы ────────────────────────────────────────────── */
+
+/*
+  Разбор адреса и его сборка — в feed-url.js, рядом со словарём разделов и
+  тегов: там чистые функции, и проверить их можно без браузера. Здесь только
+  склейка с состоянием ленты.
+
+  Адрес меняем через replaceState, а не через location.hash: смена хэша
+  подняла бы hashchange, страница пересобралась бы заново — и человек,
+  выбравший раздел, потерял бы прокрутку и набранный в поиске текст.
+*/
+
+/** @param {string} search Хвост адреса после «?», без знака вопроса. */
+function readFilters(search) {
+  Object.assign(state, filtersFromSearch(search, {
+    categories: CATEGORY_IDS, tags: TOPIC_TAG_IDS, sorts: SORT_IDS,
+  }));
+}
+
+function writeFilters() {
+  if (state.openPostId) return;
+  const search = searchFromFilters(state);
+  const hash = `#/forum${search ? `?${search}` : ''}`;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+}
+
 /* ── Загрузка ─────────────────────────────────────────────────────────────── */
 
 async function loadFeed({ append = false } = {}) {
@@ -541,6 +571,13 @@ async function loadFeed({ append = false } = {}) {
   // Любое движение по ленте закрывает открытую правку: форма живёт в карточке.
   if (!append) state.editingPostId = null;
   if (!append) paint();
+  /*
+    Адрес подписываем здесь, а не в каждом обработчике фильтров: их пять,
+    и у любого из них лента перезапрашивается одним этим вызовом. Так адрес
+    не может разойтись с тем, что человек видит на экране, — он описывает
+    ровно тот запрос, который ушёл в хранилище.
+  */
+  if (!append) writeFilters();
 
   try {
     const { posts, total } = await forum.listPosts({
@@ -2205,12 +2242,18 @@ function cssEscape(value) {
  * @param {any} view              Данные сайта — для полосы хроники.
  * @param {string|null} postId    Открытая тема из адреса.
  */
-export async function mountForum(container, view, postId = null) {
+export async function mountForum(container, view, postId = null, search = '') {
   host = container;
   siteView = view;
   state.alliances = Array.isArray(view?.alliances) ? view.alliances : [];
   mode = 'feed';
   mountToken++;
+  /*
+    Фильтры читаем из адреса до первой отрисовки: иначе первый кадр покажет
+    пустую ленту «Все разделы», и через секунду она сменилась бы нужной —
+    человек увидел бы подмигивание, а на медленной сети ещё и лишний запрос.
+  */
+  if (!postId) readFilters(search);
   wire();
 
   /*

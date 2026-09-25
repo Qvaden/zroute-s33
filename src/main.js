@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=52';
-import { loadAll, capabilities, db } from './data/index.js?v=52';
-import { validateDataset } from './data/contract.js?v=52';
+import { CONFIG } from '../config.js?v=53';
+import { loadAll, capabilities, db } from './data/index.js?v=53';
+import { validateDataset } from './data/contract.js?v=53';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,26 +9,26 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=52';
-import { renderHome } from './pages/home.js?v=52';
-import { renderLadder } from './pages/ladder.js?v=52';
-import { renderQuarter } from './pages/quarter-final.js?v=52';
-import { renderTimeline } from './pages/timeline.js?v=52';
-import { renderGuide } from './pages/guide.js?v=52';
-import { renderBot } from './pages/bot.js?v=52';
-import { renderAbout } from './pages/about.js?v=52';
-import { renderAlliance } from './pages/alliance.js?v=52';
-import { computeAchievements } from './logic/achievements.js?v=52';
-import { esc } from './ui/helpers.js?v=52';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=52';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=52';
+} from './logic/standings.js?v=53';
+import { renderHome } from './pages/home.js?v=53';
+import { renderLadder } from './pages/ladder.js?v=53';
+import { renderQuarter } from './pages/quarter-final.js?v=53';
+import { renderTimeline } from './pages/timeline.js?v=53';
+import { renderGuide } from './pages/guide.js?v=53';
+import { renderBot } from './pages/bot.js?v=53';
+import { renderAbout } from './pages/about.js?v=53';
+import { renderAlliance } from './pages/alliance.js?v=53';
+import { computeAchievements } from './logic/achievements.js?v=53';
+import { esc } from './ui/helpers.js?v=53';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=53';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=53';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=52';
-import './ui/timeline-controls.js?v=52';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=52';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=52';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=52';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=52';
+import './ui/ladder-controls.js?v=53';
+import './ui/timeline-controls.js?v=53';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=53';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=53';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=53';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=53';
 
 /*
   РАЗДЕЛЫ.
@@ -110,10 +110,16 @@ let view = null;
 /**
  * Адрес вида #/ladder или #/alliance/a05.
  * Второй сегмент — параметр страницы.
+ *
+ * Хвост после «?» — фильтры живой страницы (#/forum?cat=vs&sort=top); его
+ * разбирает сама страница, здесь он только не должен попасть в id:
+ * «forum?cat=vs» среди вкладок не числится, и без этого разделения пункт меню
+ * подсвечивался бы наугад, а параметром страницы считался бы «vs».
  */
 function parseHash() {
-  const [id, param] = location.hash.replace(/^#\/?/, '').split('/');
-  return { id: id || 'forum', param: param || null };
+  const [path, search] = location.hash.replace(/^#\/?/, '').split('?');
+  const [id, param] = path.split('/');
+  return { id: id || 'forum', param: param || null, search: search || '' };
 }
 
 function renderNav(activeId) {
@@ -312,7 +318,7 @@ function trackPageview(path) {
 
 function render() {
   if (!view) return;
-  const { id, param } = parseHash();
+  const { id, param, search } = parseHash();
   renderPresidentBoard(view.texts);
 
   let path;
@@ -384,7 +390,7 @@ function render() {
         посещения на время запроса к базе.
       */
       app.innerHTML = '';
-      mountForum(app, view, param);
+      mountForum(app, view, param, search);
       path = param ? `/forum/${param}` : '/forum';
     } else {
       unmountForum();

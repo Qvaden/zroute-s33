@@ -4964,6 +4964,96 @@ console.log(`\n${'─'.repeat(52)}`);
   check('страж языка смотрит исходники сайта', files.length > 60, `файлов: ${files.length}`);
 }
 
+// ── T. Фильтры ленты в адресе страницы ─────────────────────────────────────
+console.log('\nT. Фильтры в адресе');
+{
+  /*
+    Адрес — единственное место форума, где одна строка обязана дважды дать
+    один и тот же результат: первый раз когда человек пришёл по ссылке,
+    второй — когда состояние ленты записывают обратно в адрес. Раз эти две
+    половины должны совпадать, их проверяют здесь, а не глазами в браузере.
+  */
+  const { filtersFromSearch, searchFromFilters, QUERY_MAX, DEFAULT_SECTION, DEFAULT_SORT } =
+    await import('../src/forum/feed-url.js');
+  const { CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS } = await import('../src/forum/rules.js');
+  const known = { categories: CATEGORY_IDS, tags: TOPIC_TAG_IDS, sorts: SORT_IDS };
+
+  const empty = filtersFromSearch('', known);
+  equal('пустой адрес — обычная лента',
+    `${empty.category}/${empty.tag}/${empty.sort}/${empty.query}`,
+    `${DEFAULT_SECTION}/${DEFAULT_SECTION}/${DEFAULT_SORT}/`);
+
+  const vs = filtersFromSearch('cat=vs&sort=top&q=%D0%B3%D0%B2%D0%B0%D1%80%D0%B4', known);
+  equal('адрес читают целиком', `${vs.category}/${vs.sort}/${vs.query}`, 'vs/top/гвард');
+
+  /*
+    Ссылка не должна устаревать молча. Если id раздела или тега убрали,
+    адрес с ним открывает общую ленту, а не пустой экран и не ошибку:
+    человек, перешедший по старой ссылке, хотя бы увидит форум.
+  */
+  const stale = filtersFromSearch('cat=legions&tag=arena&sort=money', known);
+  equal('несуществующий id в адресе не поломка, а обычная лента',
+    `${stale.category}/${stale.tag}/${stale.sort}`,
+    `${DEFAULT_SECTION}/${DEFAULT_SECTION}/${DEFAULT_SORT}`);
+
+  equal('длинный запрос в адресе обрезают',
+    filtersFromSearch(`q=${'а'.repeat(QUERY_MAX + 40)}`, known).query.length, QUERY_MAX);
+
+  /*
+    Обратная дорога. Дефолт в адрес не пишем иначе каждая ссылка обрастает
+    хвостом из четырёх параметров, и «просто форум» перестаёт быть коротким.
+  */
+  equal('обычная лента — адрес без хвоста',
+    searchFromFilters({ category: DEFAULT_SECTION, tag: DEFAULT_SECTION, sort: DEFAULT_SORT, query: '' }), '');
+
+  /*
+    Пробел. URLSearchParams пишет его как «+», и в адресе, который человек
+    видит в строке браузера, «+» посреди русского слова выглядит поломкой.
+  */
+  const spaced = searchFromFilters({ category: 'help', tag: DEFAULT_SECTION, sort: DEFAULT_SORT, query: 'обзор базы' });
+  check('пробел в адресе выглядит как пробел', spaced.includes('%20') && !spaced.includes('+'), spaced);
+  equal('запрос с пробелом возвращается из адреса тем же словом',
+    filtersFromSearch(spaced, known).query, 'обзор базы');
+
+  /*
+    Главный смысл: адрес, записанный состоянием, читается обратно тем же
+    состоянием — для каждого раздела, каждого тега и каждого порядка.
+    Пропавший id здесь виден сразу, а не тогда, когда кто-то скинул ссылку.
+  */
+  const broken = [];
+  for (const category of CATEGORY_IDS) {
+    for (const sort of SORT_IDS) {
+      const f = { category, tag: DEFAULT_SECTION, sort, query: '' };
+      const back = filtersFromSearch(searchFromFilters(f), known);
+      if (back.category !== category || back.sort !== sort) broken.push(`${category}/${sort}`);
+    }
+  }
+  for (const tag of TOPIC_TAG_IDS) {
+    const f = { category: DEFAULT_SECTION, tag, sort: DEFAULT_SORT, query: '' };
+    if (filtersFromSearch(searchFromFilters(f), known).tag !== tag) broken.push(`tag:${tag}`);
+  }
+  equal('каждый раздел, тег и порядок возвращаются из адреса', broken.join(', '), '');
+
+  /*
+    Дальше — что адресом действительно пользуются, а не только умеют строить.
+    Проверяем по исходнику три вещи, каждая из которых иначе превращается
+    в тихое расхождение: адрес есть, а страницу он не описывает.
+  */
+  const fsSync = await import('node:fs');
+  const mountSrc = fsSync.readFileSync('src/forum/mount.js', 'utf8');
+  check('фильтры читают из адреса до первой отрисовки ленты',
+    /if \(!postId\) readFilters\(search\);/.test(mountSrc));
+  check('лента подписывает адрес одним местом, а не каждым обработчиком',
+    /if \(!append\) writeFilters\(\);/.test(mountSrc));
+  check('адрес меняют без перезагрузки страницы',
+    mountSrc.includes('history.replaceState') && !/location\.hash = `#\/forum\$\{/.test(mountSrc));
+
+  const mainSrc = fsSync.readFileSync('src/main.js', 'utf8');
+  check('маршрутизатор отделяет хвост адреса от вкладки',
+    /const \[path, search\] = location\.hash/.test(mainSrc) && /search: search \|\| ''/.test(mainSrc));
+  check('хвост адреса доходит до форума', /mountForum\(app, view, param, search\)/.test(mainSrc));
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');

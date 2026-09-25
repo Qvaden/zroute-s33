@@ -21,7 +21,7 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
@@ -1304,12 +1304,6 @@ function renderEditForm(p) {
 
 function renderFeedControls(s) {
   if (!s.ready) return '';
-
-  const SORTS = [
-    { id: 'fresh', label: 'Свежее' },
-    { id: 'top', label: 'Лучшее' },
-    { id: 'talked', label: 'Обсуждаемое' },
-  ];
 
   // Текущий раздел для подписи выпадающего списка на телефоне.
   const currentCat = [{ id: 'all', label: 'Все' }, ...CATEGORIES]

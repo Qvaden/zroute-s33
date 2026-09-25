@@ -136,6 +136,18 @@ export const TOPIC_TAG_IDS = TOPIC_TAGS.map((tag) => tag.id);
 
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 
+/**
+ * Порядок ленты. Ключи, как и разделы, попадают в адрес страницы
+ * (`#/forum?sort=top`), поэтому переименованию не подлежат: старая ссылка
+ * на «Лучшее» обязана открываться и через год.
+ */
+export const SORTS = [
+  { id: 'fresh', label: 'Свежее' },
+  { id: 'top', label: 'Лучшее' },
+  { id: 'talked', label: 'Обсуждаемое' },
+];
+export const SORT_IDS = SORTS.map((s) => s.id);
+
 /** @param {string} id */
 export function categoryLabel(id) {
   return CATEGORIES.find((c) => c.id === id)?.label ?? 'Разное';
