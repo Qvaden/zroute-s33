@@ -244,7 +244,7 @@ declare
   v_status text;
 begin
   if not public.forum_is_admin() then
-    raise exception 'Подтверждать заявки может только владелец';
+    raise exception 'Отклонять и впускать заявки может только владелец';
   end if;
 
   select status into v_status from public.forum_recoveries where id = p_id;
@@ -253,7 +253,7 @@ begin
   end if;
 
   if v_status <> 'pending' then
-    raise exception 'Эта заявка уже разобрана: ' || v_status;
+    raise exception 'Эта заявка уже разобрана: %', v_status;
   end if;
 
   /*
@@ -397,7 +397,7 @@ begin
         ceiling(extract(epoch from (v_row.created_at + interval '12 hours' - now())) / 60);
     end if;
   elsif v_row.status <> 'approved' then
-    raise exception 'Заявка закрыта (' || v_row.status || ') — начните восстановление заново';
+    raise exception 'Заявка закрыта (%) — начните восстановление заново', v_row.status;
   end if;
 
   if v_row.expires_at < now() then

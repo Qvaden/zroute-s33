@@ -2772,6 +2772,15 @@ console.log('\nQ. Форум');
   check('миграция восстановления: dollar-скобки закрыты',
     (recoverySql.match(/\$\$/g) || []).length % 2 === 0);
 
+  /*
+    RAISE не терпит склейки: `'текст' || переменная` — это синтаксическая ошибка,
+    которую база показывает только в момент create function. На месте промаха
+    не виден: миграция выполняется до конца файла, и падает ровно там, где её
+    уже начали применять. Правильная форма — `'текст %', переменная`.
+  */
+  check('миграция восстановления: в raise нет склейки через ||',
+    !/raise (exception|notice|warning)[^;]*\|\|/.test(recoverySql));
+
   for (const fn of ['forum_begin_recovery', 'forum_review_recovery', 'forum_recovery_status', 'forum_finish_recovery']) {
     check(`${fn}: существует в миграции и защищена правами вызывающего`,
       new RegExp(`create or replace function public\\.${fn}\\b[\\s\\S]*?security definer set search_path`).test(recoverySql));
