@@ -16,6 +16,7 @@ const state = {
   query: '',
   selected: null,
   composing: false,
+  staleOpen: false,
   loading: true,
 };
 
@@ -56,12 +57,38 @@ function filtered() {
 }
 
 async function openBySlug(slug) {
+  state.staleOpen = false;
   try {
     state.selected = (await forum.getGuide?.(slug)) ?? null;
   } catch {
     state.selected = null;
   }
   paint();
+}
+
+/*
+  Отметка и сигналы живут в той же строке, что и открытый гайд, поэтому после
+  решения перечитываем и список (знак у строки), и страницу (дата, очередь).
+  Один общий перезаезд вместо пяти правок состояния: так труднее забыть,
+  какая из полок устарела.
+*/
+async function refreshGuides() {
+  try {
+    state.guides = (await forum.listGuides?.()) ?? [];
+  } catch { /* прежний список лучше пустого */ }
+  if (state.selected?.slug) await openBySlug(state.selected.slug);
+  else paint();
+}
+
+async function runGuideAction(btn, fn) {
+  if (btn) btn.disabled = true;
+  try {
+    await fn();
+    await refreshGuides();
+  } catch (err) {
+    showError('[data-guide-error]', String(err?.message ?? err));
+    if (btn) btn.disabled = false;
+  }
 }
 
 function wire() {
@@ -125,6 +152,33 @@ function wire() {
       } catch (err) {
         showError(`[data-guide-error]`, String(err?.message ?? err));
       }
+      return;
+    }
+
+    /* Отметка модерации: три кнопки делят одно поле комментария. */
+    const review = t.closest('[data-guide-review]');
+    if (review && forum.reviewGuide && state.selected) {
+      const note = host.querySelector('[data-guide-review-note]')?.value ?? '';
+      await runGuideAction(review, () => forum.reviewGuide(state.selected.id, review.dataset.guideReview, note));
+      return;
+    }
+
+    if (t.closest('[data-guide-stale-open]')) {
+      state.staleOpen = true;
+      paint();
+      return;
+    }
+
+    if (t.closest('[data-guide-stale-cancel]')) {
+      state.staleOpen = false;
+      paint();
+      return;
+    }
+
+    const send = t.closest('[data-guide-stale-send]');
+    if (send && forum.reportGuideStale && state.selected) {
+      const note = host.querySelector('[data-guide-stale-note]')?.value ?? '';
+      await runGuideAction(send, () => forum.reportGuideStale(state.selected.id, note));
       return;
     }
   });
@@ -196,5 +250,6 @@ export function unmountGuides() {
   state.guides = [];
   state.selected = null;
   state.composing = false;
+  state.staleOpen = false;
   state.query = '';
 }

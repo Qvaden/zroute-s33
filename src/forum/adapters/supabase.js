@@ -1386,7 +1386,7 @@ export async function addTournamentRound(tournamentId, winnerId = null, notes = 
 
 /* ── Гайды (wiki) ─────────────────────────────────────────────────────────── */
 
-function guideOut(row) {
+function guideOut(row, signals = []) {
   return {
     id: row.id,
     slug: row.slug,
@@ -1396,20 +1396,50 @@ function guideOut(row) {
     authorId: row.author_id,
     authorNick: row.author_nick || '',
     status: row.status || 'published',
+    reviewStatus: row.review_status || 'none',
+    reviewNote: row.review_note || '',
+    reviewedAt: toDate(row.reviewed_at),
+    signals,
     createdAt: toDate(row.created_at) ?? new Date(),
     updatedAt: toDate(row.updated_at) ?? new Date(),
   };
 }
 
+/*
+  Сигналы игроков тянем отдельным запросом рядом со списком гайдов — тем же
+  способом, каким лента склеивает подписки и счётчик непрочитанного. Причина
+  здесь не размер, а живучесть: колонки обзора и таблица сигналов появились
+  позже гайдов, и если миграция не выполнена, страница гайдов обязана открыться
+  без знаков, а не ошибкой на весь экран. RLS сама решает, что увидит человек:
+  модератору — все открытые сигналы, остальному — только свои.
+*/
+async function guideSignals() {
+  const rows = await rest('/forum_guide_signals?select=guide_id,user_id,note,created_at&resolved=eq.false');
+  return Array.isArray(rows) ? rows : [];
+}
+
+function signalsFor(rows, guideId) {
+  return rows.filter((r) => r.guide_id === guideId)
+    .map((r) => ({ note: r.note, createdAt: toDate(r.created_at) ?? new Date(), userId: r.user_id }));
+}
+
 export async function listGuides() {
-  const rows = await rest('/forum_guides?select=*&status=eq.published&order=published_at.desc');
-  return (Array.isArray(rows) ? rows : []).map(guideOut);
+  const [rows, sigs] = await Promise.all([
+    rest('/forum_guides?select=*&status=eq.published&order=published_at.desc'),
+    guideSignals().catch(() => []),
+  ]);
+  const list = Array.isArray(rows) ? rows : [];
+  return list.map((row) => guideOut(row, signalsFor(sigs, row.id)));
 }
 
 export async function getGuide(slug) {
-  const rows = await rest(`/forum_guides?select=*&slug=eq.${encodeURIComponent(slug)}&limit=1`);
+  const [rows, sigs] = await Promise.all([
+    rest(`/forum_guides?select=*&slug=eq.${encodeURIComponent(slug)}&limit=1`),
+    guideSignals().catch(() => []),
+  ]);
   const row = Array.isArray(rows) ? rows[0] : null;
-  return row ? guideOut(row) : null;
+  if (!row) return null;
+  return guideOut(row, signalsFor(sigs, row.id));
 }
 
 export async function createGuide(draft) {
@@ -1444,6 +1474,28 @@ export async function updateGuide(id, patch) {
 
 export async function deleteGuide(id) {
   await rest(`/forum_guides?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/*
+  Оба действия идут через функции базы, а не прямым запросом к таблице.
+  Отметку модерации нельзя доверить политике RLS: автор гайда вправе править
+  свою строку, и вместе с текстом он унёс бы review_status. Решает триггер
+  forum_guide_review_guard, а функция добавляет внятный отказ и дату решения.
+  Сигнал игрока — про то же: повтор не должен плодить строки и должен
+  объяснять, почему пять символов мало.
+*/
+export async function reviewGuide(id, status, note = '') {
+  await rest('/rpc/forum_review_guide', {
+    method: 'POST',
+    body: { target: id, status: String(status), note: String(note ?? '') },
+  });
+}
+
+export async function reportGuideStale(id, note) {
+  await rest('/rpc/forum_report_guide_stale', {
+    method: 'POST',
+    body: { target: id, note: String(note ?? '') },
+  });
 }
 
 /* ── Push-настройки (посты форума) ────────────────────────────────────────── */

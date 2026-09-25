@@ -2210,3 +2210,51 @@
 }
 .guide-content code { font-family: var(--mono, monospace); font-size: 13px; }
 .guide-detail__acts { margin-top: 20px; }
+
+/* ── Отметка модерации и сигналы об устаревании ───────────────────────────── */
+
+.guide-card__marks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.guide-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  background: var(--raised-2);
+}
+.guide-badge--verified { color: var(--win); border-color: var(--win); }
+.guide-badge--outdated { color: var(--gold); border-color: var(--gold); }
+.guide-badge--signal { color: var(--loss); border-color: var(--loss); }
+
+.guide-review {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  background: var(--raised);
+}
+.guide-review--verified { border-left-color: var(--win); }
+.guide-review--outdated { border-left-color: var(--gold); }
+.guide-review__title { margin: 0; font-size: 13px; font-weight: 700; }
+.guide-review__note { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; }
+.guide-review__why { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
+
+.guide-review-box {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+}
+.guide-review__rule { margin: 0; font-size: 12px; line-height: 1.5; color: var(--mute); }
+.guide-review__own { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.guide-review__own button { margin-left: 6px; }
+.guide-review__queue { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.guide-review__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.guide-review__stale textarea,
+.guide-review__staff input { width: 100%; }
+.guide-review__stale .forum-field,
+.guide-review__staff .forum-field { display: grid; gap: 4px; font-size: 12.5px; }

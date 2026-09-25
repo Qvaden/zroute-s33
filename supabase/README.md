@@ -3,7 +3,8 @@
 Новая база: `schema.sql` → `rich-forum.sql` → `site-data.sql` → `profiles.sql` →
 `nicks-verified.sql` → `topic-subscriptions.sql` → `moderation-automation.sql` →
 `moderation-alerts.sql` → `20260916-forum-community.sql` →
-`20260925-self-recovery.sql` → `20260925-spam-hold-and-topic-reads.sql`.
+`20260925-self-recovery.sql` → `20260925-spam-hold-and-topic-reads.sql` →
+`20260925-guide-review.sql`.
 
 `20260925-self-recovery.sql` применяется раньше, чем код попадёт на сайт:
 пока он не выполнен, очередь заявок во вкладке «Игроки» недоступна, а шаг
@@ -23,6 +24,16 @@
 Числа выдержки (3 темы за 20 минут, 8 ответов за 2 минуты, повтор текста —
 10 минут, владельцу и модератору втрое больше) продублированы в `config.js`
 ради надписей на форме; совпадение сторожит тест.
+
+`20260925-guide-review.sql` добавляет гайдам отметку модерации
+(`review_status`, `review_note`, `reviewed_at`, `reviewed_by` в `forum_guides`)
+и таблицу сигналов `forum_guide_signals`. Её тоже нужно выполнить до пуша, но
+она не блокирует страницу: список гайдов читает сигналы отдельным запросом, и
+без таблицы гайды выйдут без отметок. Правку защищают две вещи — триггер
+`forum_guide_review_guard` (автор не унесёт отметку в свой PATCH) и функции
+`forum_review_guide` / `forum_report_guide_stale`, которые отказывают словами,
+а не текстом нарушения ограничения. Длина записи (5–280) продублирована в
+`config.js` (`guideNoteMin`, `guideNoteMax`); совпадение сторожит тест.
 
 `chats.sql`, `leaders.sql`, дневная активность и точечные `fix-*.sql` применяются
 после их зависимостей по задаче. Старые разовые файлы не запускайте повторно на

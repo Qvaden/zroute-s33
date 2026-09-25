@@ -5055,6 +5055,200 @@ console.log('\nT. Фильтры в адресе');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── U. Гайды: отметка модерации и сигнал об устаревании ─────────────────────
+console.log('\nU. Гайды: отметка и сигнал');
+{
+  /*
+    Отметка «проверен / устарел» живёт в четырёх местах: колонка и две функции
+    в базе, два адаптера и разметка страницы. Договорённость между ними стоит
+    проверить здесь, потому что ошибка невидима: страница продолжит показывать
+    «Проверено модерацией», которую на этот раз поставил кто-то другой.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const L = CONFIG.forum.limits;
+  const sql = await readFile('supabase/20260925-guide-review.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const pageSrc = await readFile('src/pages/guides.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+
+  /*
+    Три состояния и ни одного лишнего. Расхождение в любую сторону ломает
+    молча: статус, которого нет в подсказке страницы, игрок увидит как пустое
+    место, а removed из списка базы уронит PATCH тупым «violates check».
+  */
+  const sqlStatuses = (sql.match(/check \(review_status in \(([^)]*)\)\)/)?.[1] ?? '')
+    .split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean);
+  const adapterStatuses = (localSrc.match(/\['none', 'verified', 'outdated'\]/)?.[0] ?? '')
+    .match(/'[a-z]+'/g)?.map((x) => x.replace(/'/g, '')) ?? [];
+  const labelSrc = pageSrc.match(/const REVIEW_LABEL = \{([^}]*)\}/)?.[1] ?? '';
+  const pageStatuses = ['none', ...(labelSrc.match(/(\w+):/g) || []).map((x) => x.slice(0, -1))];
+  equal('отметка принимает ровно три значения — и в базе, и в коде',
+    [sqlStatuses.join('/'), adapterStatuses.join('/'), pageStatuses.join('/')].join(' | '),
+    'none/verified/outdated | none/verified/outdated | none/verified/outdated');
+
+  /*
+    Длина записи об устаревании — те же два места, что и у всех прочих лимитов:
+    числа в config.js называет форма, проверка в базе их исполняет.
+  */
+  check('границы записи об устаревании — одни в форме и в базе',
+    sql.includes(`char_length(note) between ${L.guideNoteMin} and ${L.guideNoteMax}`)
+      && localSrc.includes(`CONFIG.forum.limits.guideNoteMin`)
+      && localSrc.includes(`CONFIG.forum.limits.guideNoteMax`));
+  check('длинную запись база обрезает, а не отвергает',
+    sql.includes(`left(btrim(coalesce(note, '')), ${L.guideNoteMax})`));
+
+  check('один человек — один сигнал по ключу таблицы',
+    /create table if not exists public\.forum_guide_signals \([\s\S]*?primary key \(guide_id, user_id\)/.test(sql));
+  check('игроку видно своё, модерации — всё',
+    /create policy forum_guide_signals_read[\s\S]*?using \(user_id = auth\.uid\(\) or public\.forum_is_staff\(\)\)/.test(sql));
+  check('сигнал вносит сам человек, правит его только модерация',
+    /create policy forum_guide_signals_write[\s\S]*?with check \(user_id = auth\.uid\(\) and public\.forum_can_write\(\)\)/.test(sql)
+      && /create policy forum_guide_signals_update[\s\S]*?using \(public\.forum_is_staff\(\)\)/.test(sql));
+
+  /*
+    Автор гайда имеет право его править — и вместе с текстом унёс бы в PATCH
+    чужие колонки, поэтому страж висит на same UPDATE, а не на политике.
+  */
+  check('отметку нельзя унести вместе с правкой текста',
+    /create trigger forum_guide_review_guard[\s\S]{0,120}before update on public\.forum_guides/.test(sql));
+  const refusal = 'Отметку «проверен / устарел» ставит модерация';
+  check('отказ назван одинаково в базе, в черновом режиме и в адаптере',
+    (sql.match(new RegExp(refusal, 'g')) || []).length === 2
+      && localSrc.includes(refusal));
+  check('у страницы и базы один список статусов: неизвестный статус отвергает база',
+    sql.includes(`if status not in ('none', 'verified', 'outdated') then`)
+      && localSrc.includes('Неизвестный статус проверки'));
+
+  /* Обе двери — функции, а не прямые запросы к таблице. */
+  check('отметка и сигнал идут вызовами, а не записью в колонки',
+    supaSrc.includes("'/rpc/forum_review_guide'") && supaSrc.includes("'/rpc/forum_report_guide_stale'")
+      && !/forum_guide_signals[^']*(method: 'POST'|method: 'PATCH')/.test(supaSrc));
+  check('чужие и анонимные вызовы функций не работают',
+    sql.includes(`revoke all on function public.forum_review_guide(uuid, text, text) from public, anon;`)
+      && sql.includes(`revoke all on function public.forum_report_guide_stale(uuid, text) from public, anon;`));
+  check('контракт объявляет обе новые возможности',
+    /reviewGuide/.test(contractSrc) && /reportGuideStale/.test(contractSrc));
+
+  /* ── Черновой режим: та же развилка прав и те же слова ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+
+  await local.signUp('Хранитель');             // первый — админ
+  await local.signUp('Читатель');
+  await local.signUp('Недоверенный');
+
+  await local.signIn('Хранитель');
+  const guide = await local.createGuide({
+    slug: 'baza-tya', title: 'Боевая тётя', category: 'strategy', body: '<p>сначала влево</p>',
+  });
+  equal('новый гайд не имеет отметки', `${guide.reviewStatus}/${guide.reviewNote}`, 'none/');
+
+  await local.signIn('Читатель');
+  let denied = '';
+  try { await local.reviewGuide(guide.id, 'verified', ''); } catch (e) { denied = String(e.message); }
+  equal('игрок отметку не поставит', denied, refusal);
+
+  let short = '';
+  try { await local.reportGuideStale(guide.id, 'да'); } catch (e) { short = String(e.message); }
+  check('короткий сигнал отклонён словами базы',
+    short === 'Нужно хотя бы пять символов: что именно перестало работать', short);
+
+  await local.reportGuideStale(guide.id, 'после обновления сменились цены');
+  let asReader = (await local.listGuides()).find((x) => x.id === guide.id);
+  equal('свой сигнал читателю виден', asReader.signals.length, 1);
+
+  await local.signIn('Недоверенный');
+  asReader = (await local.listGuides()).find((x) => x.id === guide.id);
+  equal('чужой сигнал другому игроку не показывают', asReader.signals.length, 0);
+
+  await local.reportGuideStale(guide.id, 'разбор не сходится с патчем');
+  equal('своё видно даже рядом с чужим',
+    (await local.listGuides()).find((x) => x.id === guide.id).signals.length, 1);
+
+  await local.signIn('Хранитель');
+  const asStaff = (await local.listGuides()).find((x) => x.id === guide.id);
+  equal('модератор видит все открытые сигналы', asStaff.signals.length, 2);
+
+  await local.reportGuideStale(guide.id, 'первый текст сигнала');
+  await local.reportGuideStale(guide.id, 'уточняю: цены подняли вдвое');
+  const afterRepeat = (await local.listGuides()).find((x) => x.id === guide.id);
+  equal('повтор уточняет сигнал, а не плодит строку',
+    `${afterRepeat.signals.length}/${afterRepeat.signals.filter((x) => x.note === 'уточняю: цены подняли вдвое').length}`,
+    '3/1');
+
+  await local.reviewGuide(guide.id, 'outdated', 'перестал работать после патча 12');
+  const reviewed = await local.getGuide('baza-tya');
+  equal('отметка названа, датирована и пояснена',
+    `${reviewed.reviewStatus}/${reviewed.reviewNote}/${reviewed.reviewedAt instanceof Date}`,
+    'outdated/перестал работать после патча 12/true');
+  equal('решение модератора закрывает очередь сигналов', reviewed.signals.length, 0);
+
+  await local.reviewGuide(guide.id, 'none', '');
+  const cleared = await local.getGuide('baza-tya');
+  equal('отметку можно снять вместе с датой',
+    `${cleared.reviewStatus}/${cleared.reviewedAt}`, 'none/null');
+
+  let badStatus = '';
+  try { await local.reviewGuide(guide.id, 'needs_update', ''); } catch (e) { badStatus = String(e.message); }
+  equal('неизвестный статус черновой режим не принимает',
+    badStatus, 'Неизвестный статус проверки: needs_update');
+
+  /* ── Разметка: что человек реально видит ── */
+  const { renderGuides } = await import('../src/pages/guides.js');
+  /*
+    Гайд с отметкой и одним открытым сигналом: разметку проверяем на состоянии,
+    которое адаптер реально отдаёт модератору, а не на выдуманном наборе полей.
+  */
+  const marked = {
+    ...cleared,
+    reviewStatus: 'outdated',
+    reviewNote: 'перестал работать после патча 12',
+    reviewedAt: new Date('2026-09-20T10:00:00Z'),
+    signals: [{ userId: 'u2', note: 'после обновления сменились цены', createdAt: new Date('2026-09-19T10:00:00Z') }],
+  };
+  const base = { guides: [marked], category: 'all', query: '', composing: false, loading: false };
+  const staffState = { ...base, me: { id: 'u1', nick: 'Хранитель', role: 'admin' }, selected: marked };
+  const playerState = { ...base, me: { id: 'u2', nick: 'Читатель', role: 'member' }, selected: marked };
+  const guestState = { ...base, me: null, selected: marked };
+
+  const staffList = renderGuides({ ...base, me: staffState.me, selected: null });
+  const playerList = renderGuides({ ...base, me: playerState.me, selected: null });
+  check('в списке у гайда стоит знак отметки', staffList.includes('guide-badge--outdated'));
+  check('знак «устарел» называется по-русски', staffList.includes('Устарел'));
+  check('счётчик сигналов видит только модерация',
+    staffList.includes('guide-badge--signal') && !playerList.includes('guide-badge--signal'));
+
+  const staffHtml = renderGuides(staffState);
+  const playerHtml = renderGuides(playerState);
+  const guestHtml = renderGuides(guestState);
+
+  const noticeAt = staffHtml.indexOf('guide-review guide-review--outdated');
+  const bodyAt = staffHtml.indexOf('guide-content');
+  check('вердикт показан до текста гайда', noticeAt >= 0 && bodyAt > noticeAt);
+  check('под отметкой названо решение, а не молчание',
+    staffHtml.includes('перестал работать после патча 12'));
+  check('отметка названа датой, а не просто словом «проверено»',
+    /Устарел · \d{2}\.\d{2}\.\d{4}/.test(staffHtml));
+  check('страница объясняет, что отметку ставит человек',
+    /не просмотры, не реакции/.test(staffHtml));
+  check('кнопки отметки — только у модерации',
+    /data-guide-review="verified"/.test(staffHtml) && !/data-guide-review=/.test(playerHtml));
+  check('очередь сигналов перечислена модератору и спрятана от игрока',
+    /guide-review__queue[\s\S]{0,200}после обновления сменились цены/.test(staffHtml)
+      && !playerHtml.includes('guide-review__queue'));
+  check('игрок видит свой сигнал и может его уточнить',
+    playerHtml.includes('Вы сообщили') && /data-guide-stale-open/.test(playerHtml));
+  check('невошедшему человеку не показывают кнопок, которым база откажет',
+    !/data-guide-stale/.test(guestHtml) && !/data-guide-review=/.test(guestHtml));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');
 {

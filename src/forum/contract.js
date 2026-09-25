@@ -251,6 +251,8 @@
  * @property {(draft: {slug: string, title: string, category?: string, body: string}) => Promise<ForumGuide>} [createGuide]
  * @property {(id: string, patch: {title?: string, category?: string, body?: string, status?: string}) => Promise<ForumGuide>} [updateGuide]
  * @property {(id: string) => Promise<void>} [deleteGuide]
+ * @property {(id: string, status: 'none'|'verified'|'outdated', note?: string) => Promise<void>} [reviewGuide]  Ставит отметку модерации; для игрока — отказ.
+ * @property {(id: string, note: string) => Promise<void>} [reportGuideStale]  Сигнал «гайд устарел», один на человека.
  * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean}>} [getPushPrefs]
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
  * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
@@ -274,6 +276,10 @@
  */
 
 /**
+ * Гайд. Отметка «проверен / устарел» ставится только живым человеком:
+ * дата публикации ничего не говорит о том, работает ли совет сегодня, а
+ * автоматический срок превратил бы «проверено» в простую надпись.
+ *
  * @typedef {Object} ForumGuide
  * @property {string} id
  * @property {string} slug
@@ -285,6 +291,17 @@
  * @property {'draft'|'published'|'archived'} status
  * @property {Date} createdAt
  * @property {Date} updatedAt
+ * @property {'none'|'verified'|'outdated'} reviewStatus  Отметка модерации; 'none' — никто не смотрел.
+ * @property {string} reviewNote  Что именно поправили или почему гайд устарел.
+ * @property {Date|null} reviewedAt
+ * @property {ForumGuideSignal[]} signals  Открытые сигналы об устаревании: свои, а модерации — все.
+ */
+
+/**
+ * @typedef {Object} ForumGuideSignal
+ * @property {string} userId   Кому принадлежит сигнал.
+ * @property {string} note
+ * @property {Date} createdAt
  */
 
 /**

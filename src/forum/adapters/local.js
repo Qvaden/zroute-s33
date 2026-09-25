@@ -1850,7 +1850,11 @@ export async function addTournamentRound(tournamentId, winnerId = null, notes = 
 
 /* ── Гайды (wiki) в локальном режиме ─────────────────────────────────────── */
 
-function guideOut(row) {
+/* Те же границы, что у проверки в базе; числа лежат в config.js. */
+const NOTE_MIN = CONFIG.forum.limits.guideNoteMin;
+const NOTE_MAX = CONFIG.forum.limits.guideNoteMax;
+
+function guideOut(row, signals = []) {
   return {
     id: row.id,
     slug: row.slug,
@@ -1860,20 +1864,42 @@ function guideOut(row) {
     authorId: row.authorId,
     authorNick: row.authorNick || '',
     status: row.status || 'published',
+    reviewStatus: row.reviewStatus || 'none',
+    reviewNote: row.reviewNote || '',
+    reviewedAt: row.reviewedAt ? new Date(row.reviewedAt) : null,
+    signals,
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
   };
 }
 
+/*
+  Кому какие сигналы видно — ровно как в базе: модератору все открытые,
+  остальному только свои. Черновой режим нужен ещё и для того, чтобы это
+  можно было пощупать без Supabase, поэтому здесь та же развилка, а не
+  «показываем всё».
+*/
+function guideSignalsFor(s, guideId, me) {
+  const open = (s.guideSignals || []).filter((x) => x.guideId === guideId && !x.resolved);
+  const staff = isStaff(me);
+  return open
+    .filter((x) => staff || x.userId === (me && me.id))
+    .map((x) => ({ note: x.note, createdAt: new Date(x.createdAt), userId: x.userId }));
+}
+
 export async function listGuides() {
   const s = read();
-  return (s.guides || []).filter((g) => g.status === 'published').map(guideOut);
+  const me = s.users.find((u) => u.id === s.me) || null;
+  return (s.guides || [])
+    .filter((g) => g.status === 'published')
+    .map((g) => guideOut(g, guideSignalsFor(s, g.id, me)));
 }
 
 export async function getGuide(slug) {
   const s = read();
+  const me = s.users.find((u) => u.id === s.me) || null;
   const g = (s.guides || []).find((x) => x.slug === slug);
-  return g ? guideOut(g) : null;
+  return g ? guideOut(g, guideSignalsFor(s, g.id, me)) : null;
 }
 
 export async function createGuide(draft) {
@@ -1912,7 +1938,7 @@ export async function updateGuide(id, patch) {
   if (patch.status != null) g.status = String(patch.status);
   g.updatedAt = new Date().toISOString();
   write(s);
-  return guideOut(g);
+  return guideOut(g, guideSignalsFor(s, id, me));
 }
 
 export async function deleteGuide(id) {
@@ -1922,6 +1948,61 @@ export async function deleteGuide(id) {
   if (!g) return;
   if (g.authorId !== me.id && !isStaff(me)) throw new Error('Недостаточно прав');
   s.guides = s.guides.filter((x) => x.id !== id);
+  write(s);
+}
+
+/*
+  ОТМЕТКА МОДЕРАЦИИ И СИГНАЛ ИГРОКА В ЧЕРНОВОМ РЕЖИМЕ.
+
+  Держатся здесь не для красоты списка: это единственный способ увидеть, как
+  страница ведёт себя без отметки, с отметкой «устарело» и с сигналом игрока, —
+  и проверить, что отказ звучит теми же словами, что в базе
+  (supabase/20260925-guide-review.sql). Безопасности защищать нечего, запросов
+  мимо сайта в этом режиме не бывает.
+*/
+export async function reviewGuide(id, status, note = '') {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!isStaff(me)) throw new Error('Отметку «проверен / устарел» ставит модерация');
+  if (!['none', 'verified', 'outdated'].includes(status)) {
+    throw new Error(`Неизвестный статус проверки: ${status}`);
+  }
+  const g = (s.guides || []).find((x) => x.id === id);
+  if (!g) throw new Error('Гайд не найден');
+
+  g.reviewStatus = status;
+  g.reviewNote = String(note).trim().slice(0, NOTE_MAX);
+  g.reviewedAt = status === 'none' ? null : new Date().toISOString();
+  g.reviewedBy = status === 'none' ? null : me.id;
+
+  // Решение модератора закрывает сигналы: разобранный вопрос не должен
+  // висеть в очереди вечно.
+  (s.guideSignals || []).forEach((x) => { if (x.guideId === id && !x.resolved) x.resolved = true; });
+  write(s);
+}
+
+export async function reportGuideStale(id, note) {
+  const s = read();
+  const me = requireWriter(s);
+  const text = String(note ?? '').trim();
+  if (text.length < NOTE_MIN) {
+    throw new Error('Нужно хотя бы пять символов: что именно перестало работать');
+  }
+  if (!(s.guides || []).some((x) => x.id === id)) throw new Error('Гайд не найден');
+
+  if (!s.guideSignals) s.guideSignals = [];
+  const row = s.guideSignals.find((x) => x.guideId === id && x.userId === me.id);
+  if (row) {
+    // Повтор уточняет прошлый сигнал и открывает вопрос заново.
+    row.note = text.slice(0, NOTE_MAX);
+    row.createdAt = new Date().toISOString();
+    row.resolved = false;
+  } else {
+    s.guideSignals.push({
+      guideId: id, userId: me.id, note: text.slice(0, NOTE_MAX),
+      createdAt: new Date().toISOString(), resolved: false,
+    });
+  }
   write(s);
 }
 
