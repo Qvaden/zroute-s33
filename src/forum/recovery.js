@@ -13,8 +13,8 @@
  *
  * ПОЧЕМУ КЛЮЧ НЕ В ПАРОЛЕ И НЕ В НИКЕ. Он должен переживать перезагрузку
  * страницы на том же устройстве и не должен зависеть от того, что человек
- * забыл. Отсюда localStorage: его хватает ровно на один перерыв — дождаться
- * подтверждения.
+ * забыл. Отсюда localStorage: его хватает ровно на один перерыв — дождаться,
+ * пока заявка примет пароль сама.
  */
 
 /** Куда кладём ключ, чтобы пережить перезагрузку. */
@@ -84,6 +84,29 @@ export function normalizeRecoveryKey(value) {
 export function looksLikeRecoveryKey(value) {
   const clean = String(value || '').replace(/\s+/g, '');
   return clean.length === KEY_BYTES * 2 && /^[0-9a-fA-F]+$/.test(clean);
+}
+
+/**
+ * Сколько осталось до самоприёма заявки — «4 ч 12 мин», «9 мин», '' если срок
+ * уже прошёл.
+ *
+ * Час считаем по readyAt из базы, а не по «плюс 12 часов от того, что я вижу»:
+ * заявка могла быть заведена вчера с другого устройства, и обещать ей новый
+ * срок было бы враньём.
+ *
+ * Пустая строка — не ошибка, а нормальный ответ для заявки, которая уже
+ * открыта: показывать «осталось 0 мин» под полем для пароля значит напоминать
+ * человеку о времени, которое он не ждал.
+ */
+export function formatHoldLeft(readyAt, now = new Date()) {
+  if (!(readyAt instanceof Date) || Number.isNaN(readyAt.getTime())) return '';
+  const ms = readyAt.getTime() - now.getTime();
+  if (ms <= 0) return '';
+  const minutes = Math.ceil(ms / 60000);
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
 }
 
 /**

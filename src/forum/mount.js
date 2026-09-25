@@ -79,6 +79,11 @@ const state = {
 
     available — ложь в черновом режиме, где паролей нет вовсе; там весь блок
     не рисуется, а не отказывает по нажатию.
+
+    canSet и readyAt приходят из базы и отвечают на разные вопросы. canSet —
+    «поле для пароля показывать?» (срок вышел или владелец впустил). readyAt —
+    «сколько ещё ждать», то есть строка под этим вопросом. Держать их двумя
+    полями нужно потому, что часы игрока врут, а права от этого не меняются.
   */
   recovery: {
     available: false,
@@ -87,6 +92,8 @@ const state = {
     nick: '',
     key: '',
     status: 'pending',
+    canSet: false,
+    readyAt: null,
     error: '',
   },
 };
@@ -800,6 +807,8 @@ function initRecovery() {
     r.open = false;
     r.phase = 'begin';
     r.status = 'pending';
+    r.canSet = false;
+    r.readyAt = null;
     r.key = '';
     return;
   }
@@ -834,17 +843,25 @@ async function recoveryCheck() {
   const token = mountToken;
 
   try {
-    const status = await forum.recoveryStatus(r.nick, r.key);
+    const info = await forum.recoveryStatus(r.nick, r.key);
     if (token !== mountToken) return;
 
-    r.status = status;
+    r.status = info.status;
+    r.canSet = info.canSet === true;
+    r.readyAt = info.readyAt ?? null;
     r.error = '';
-    if (status === 'used') {
+    if (info.status === 'used') {
       clearRecovery();
       r.key = '';
       r.phase = 'done';
     } else {
-      r.phase = status === 'approved' ? 'set' : 'wait';
+      /*
+        Шаг выбирается по canSet, а не по часам этого устройства. Смысл у
+        поля один: показать форму тогда, когда база пустит пароль. Если часы
+        игрока спешат, он увидит форму на минуту раньше и получит отказ от
+        базы с настоящим остатком; если отстают — нажмёт «Проверить».
+      */
+      r.phase = r.canSet ? 'set' : 'wait';
     }
     paint();
   } catch (err) {
@@ -887,6 +904,8 @@ async function recoveryBegin(form, submitter) {
   r.nick = nick.value;
   r.key = key;
   r.status = 'pending';
+  r.canSet = false;
+  r.readyAt = null;
   r.phase = 'wait';
   r.open = true;
 
@@ -951,7 +970,8 @@ async function recoveryFinish(form, submitter) {
 function recoveryAgain() {
   clearRecovery();
   Object.assign(state.recovery, {
-    open: true, phase: 'begin', nick: '', key: '', status: 'pending', error: '',
+    open: true, phase: 'begin', nick: '', key: '', status: 'pending',
+    canSet: false, readyAt: null, error: '',
   });
   paint();
 }

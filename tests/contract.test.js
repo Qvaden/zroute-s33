@@ -2672,6 +2672,22 @@ console.log('\nQ. Форум');
     /const token = mountToken;[\s\S]{0,300}?if \(token !== mountToken\) return;/.test(mountSource));
 
   /*
+    Шаг «можно ставить пароль» выбирает база. Свои часы на странице оставили бы
+    поле у человека с неправильным временем — и он бы бился в отказ, которого
+    страница ему не обещала.
+  */
+  check('шаг выбирается по canSet из ответа базы',
+    /r\.canSet = info\.canSet === true;/.test(mountSource)
+    && /r\.phase = r\.canSet \? 'set' : 'wait';/.test(mountSource));
+  check('срок до самоприёма доезжает до состояния страницы',
+    /r\.readyAt = info\.readyAt \?\? null;/.test(mountSource));
+  check('и старое значение не переживает перезапуск шага',
+    (mountSource.match(/canSet: false/g) || []).length >= 2
+    && (mountSource.match(/r\.canSet = false;/g) || []).length >= 1);
+  check('адаптер не додумывает статус, когда база ответила пустотой',
+    /if \(!row \|\| typeof row\.status !== 'string'\) return \{ status: 'none', canSet: false, readyAt: null \};/.test(supabaseSource));
+
+  /*
     Панель форматирования: кнопки дёргают document.execCommand — жирный, цвет
     и прочее видно в редакторе сразу, разметка при показе не собирается.
     Сами команды переехали в общий модуль редактора (forum/editor.js),
@@ -2788,6 +2804,35 @@ console.log('\nQ. Форум');
     /create or replace view public\.forum_recovery_requests\s+with \(security_invoker = true\)/.test(recoverySql));
   check('функция финала ничего не возвращает — показывать пароль нечем',
     /create or replace function public\.forum_finish_recovery\([\s\S]*?\)\s*returns void/.test(recoverySql));
+
+  /*
+    САМОПРИЁМ ЗАЯВКИ. Главный смысл новых правил: игрока впускает срок, а не
+    живое человек, и держится это базой. Страница может что угодно показать —
+    пустит её только проверка ниже, поэтому проверяем именно её.
+  */
+  check('отсчёт идёт от создания заявки, а не от чьего-либо решения',
+    /v_row\.created_at \+ interval '12 hours'/.test(recoverySql));
+  check('pending после выдержки пропускается, до выдержки — нет',
+    /if v_row\.status = 'pending' then\s+if v_row\.created_at \+ interval '12 hours' > now\(\) then/.test(recoverySql));
+  check('ранний приход получает отказ с настоящим остатком',
+    /Заявка примет пароль через % минут/.test(recoverySql)
+    && /extract\(epoch from \(v_row\.created_at \+ interval '12 hours' - now\(\)\)/.test(recoverySql));
+  check('выдержка не оживляет отказ, used и просроченную заявку',
+    /elsif v_row\.status <> 'approved' then\s+raise exception 'Заявка закрыта/.test(recoverySql));
+  check('перезаявка обнуляет и срок: старый ключ не держит дверь открытой',
+    /status     = 'pending',\s*\n\s*created_at = now\(\)/.test(recoverySql));
+  check('статус отдаёт jsonb и снимает старую сигнатуру — тип результата не заменить',
+    /drop function if exists public\.forum_recovery_status\(text, text\);[\s\S]*?create or replace function public\.forum_recovery_status\([\s\S]*?\)\s*returns jsonb/.test(recoverySql));
+  check('право ставить пароль считает база, а не часы игрока',
+    /'canSet', v_row\.status = 'approved'\s*\n\s*or v_row\.created_at \+ interval '12 hours' <= now\(\)/.test(recoverySql));
+  check('и остаток до самоприёма уходит на страницу',
+    /'readyAt', v_row\.created_at \+ interval '12 hours'/.test(recoverySql));
+  check('закрытая заявка не получает ни права, ни срока',
+    (/return jsonb_build_object\('status', v_row\.status, 'canSet', false, 'readyAt', null\);/.test(recoverySql)));
+  check('панель видит тот же час самоприёма из представления',
+    /r\.created_at \+ interval '12 hours' as ready_at/.test(recoverySql));
+  check('число выдержки на сайте и в базе одно',
+    recoverySql.includes(`interval '${CONFIG.forum.limits.recoveryHoldHours} hours'`));
 
   /*
     Одна открытая заявка на игрока и срок у каждой. Без частичного уникального
@@ -3150,17 +3195,24 @@ console.log('\nQ. Форум');
   /*
     САМОВОССТАНОВЛЕНИЕ ДОСТУПА СО СТОРОНЫ ИГРОКА.
 
-    Держим главное обещание новых правил: пароль вводит сам человек. Пока он не
-    назвал ник, на странице нечего копировать и негде набрать пароль, а форма
-    восстановления — сосед формы входа: вложенные формы браузер расколол бы
-    так, что кнопка «войти» начала отправлять заявку.
+    Держим главное обещание новых правил: пароль вводит сам человек, и ему не
+    нужен живой свидетель. Пока он не назвал ник, на странице нечего копировать
+    и негде набрать пароль, а форма восстановления — сосед формы входа: вложенные
+    формы браузер расколол бы так, что кнопка «войти» начала отправлять заявку.
   */
+  const HOLD_HOURS = CONFIG.forum.limits.recoveryHoldHours;
+  const inFourHours = new Date(Date.now() + 4 * 3600000 + 12 * 60000);
   const recHtml = (over) => renderForum({ events: eventsSample }, {
     ready: true, shared: true, loading: false, posts: [], me: null,
-    recovery: { available: true, open: true, phase: 'begin', nick: 'Игрок', key: '0123456789abcdef0123456789abcdef', status: 'pending', error: '', ...over },
+    recovery: {
+      available: true, open: true, phase: 'begin', nick: 'Игрок',
+      key: '0123456789abcdef0123456789abcdef', status: 'pending',
+      canSet: false, readyAt: null, error: '', ...over,
+    },
   });
   const begin = recHtml({ phase: 'begin' });
-  const wait = recHtml({ phase: 'wait' });
+  const wait = recHtml({ phase: 'wait', readyAt: inFourHours });
+  const ready = recHtml({ phase: 'set', canSet: true });
   const set = recHtml({ phase: 'set', status: 'approved' });
 
   check('без доступного входа шага восстановления нет',
@@ -3171,7 +3223,22 @@ console.log('\nQ. Форум');
   check('на шаге ника есть форма заявки', begin.includes('<form data-forum-recovery-begin'));
   check('ключа ещё нет — придумывать его рано', !begin.includes('data-forum-recovery-key'));
   check('и поля для пароля на первом шаге нет', !begin.includes('data-forum-recovery-finish'));
-  check('ожидание показывает ключ и статус', wait.includes('data-forum-recovery-key') && /Ждёт подтверждения/.test(wait));
+  check('ожидание показывает ключ', wait.includes('data-forum-recovery-key'));
+  check('и срок до самоприёма — часами, а не датой в календаре',
+    /Откроется сама через 4 ч 12 мин/.test(wait));
+  check('срок назван тот же, что держит база',
+    wait.includes(`${HOLD_HOURS} ч после создания`)
+    && recoverySql.includes(`interval '${HOLD_HOURS} hours'`));
+  check('никого не нужно уговаривать: это сказано игроку прямо',
+    /без чьего-либо подтверждения/.test(wait));
+  check('и право владельца возразить не спрятано', /отклонить/.test(wait));
+  check('шаги подписаны ожиданием, а не решением владельца',
+    new RegExp(`Ожидание ${HOLD_HOURS} ч`).test(wait));
+  check('истёкшая выдержка зовёт ставить пароль', /Время вышло — ставьте пароль/.test(ready));
+  check('и на этом шаге есть форма пароля', ready.includes('<form data-forum-recovery-finish'));
+  check('никто не опоздал: обещано, что вход остаётся за игроком',
+    /возражений не было/.test(ready));
+  check('досрочное подтверждение названо досрочным', /Владелец впустил досрочно/.test(set));
   check('после подтверждения появляется поле нового пароля', set.includes('<form data-forum-recovery-finish'));
   check('пароль вводится дважды и не подставляется браузером',
     (set.match(/autocomplete="new-password"/g) || []).length === 2);
@@ -3182,6 +3249,8 @@ console.log('\nQ. Форум');
     shownKey === '0123456789abcdef\n0123456789abcdef');
   check('ошибку адаптера показывают рядом, а не молчат',
     /forum-error/.test(recHtml({ error: 'Заявок на этот ник уже достаточно' })));
+  check('без срока в ответе базы страница не врет про «через 0 ч»',
+    /Заявка ждёт свой срок/.test(recHtml({ phase: 'wait' })));
 
   const me = { id: 'u1', nick: 'Qvaden', role: 'admin', createdAt: new Date(), banned: false, mutedUntil: null };
   const post = {
@@ -3362,9 +3431,10 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
       me,
       users: [me, { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null }],
       recoveries: [
-        { id: 'r1', userId: 'u2', nick: 'Игрок', status: 'pending', createdAt: new Date(), decidedAt: null, expiresAt: new Date(Date.now() + 6 * 864e5), decidedByNick: '' },
-        { id: 'r2', userId: 'u8', nick: 'Тихон', status: 'approved', createdAt: new Date(), decidedAt: new Date(), expiresAt: new Date(Date.now() + 40 * 6e4), decidedByNick: 'Владелец' },
-        { id: 'r3', userId: 'u9', nick: 'Отказан', status: 'rejected', createdAt: new Date(), decidedAt: new Date(), expiresAt: new Date(Date.now() - 6e4), decidedByNick: 'Владелец' },
+        { id: 'r1', userId: 'u2', nick: 'Игрок', status: 'pending', createdAt: new Date(), readyAt: new Date(Date.now() + 3 * 3600000), decidedAt: null, expiresAt: new Date(Date.now() + 6 * 864e5), decidedByNick: '' },
+        { id: 'r4', userId: 'u3', nick: 'Срочный', status: 'pending', createdAt: new Date(), readyAt: new Date(Date.now() - 3600000), decidedAt: null, expiresAt: new Date(Date.now() + 5 * 864e5), decidedByNick: '' },
+        { id: 'r2', userId: 'u8', nick: 'Тихон', status: 'approved', createdAt: new Date(), readyAt: new Date(Date.now() + 3600000), decidedAt: new Date(), expiresAt: new Date(Date.now() + 40 * 6e4), decidedByNick: 'Владелец' },
+        { id: 'r3', userId: 'u9', nick: 'Отказан', status: 'rejected', createdAt: new Date(), readyAt: new Date(Date.now() + 3600000), decidedAt: new Date(), expiresAt: new Date(Date.now() - 6e4), decidedByNick: 'Владелец' },
       ],
     },
   });
@@ -3372,9 +3442,20 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   check('у заявки есть обе кнопки решения',
     /data-recovery-review="r1"[\s\S]*?data-recovery-approve="1"/.test(recoveryHtml)
     && /data-recovery-review="r1"[\s\S]*?data-recovery-approve="0"/.test(recoveryHtml));
-  check('срок заявки показан остатком, а не датой создания', /осталось \d+ дн/.test(recoveryHtml));
-  check('подтверждённая заявка упоминается отдельно',
-    /Подтверждено и ждёт/.test(recoveryHtml) && /Тихон/.test(recoveryHtml));
+  check('впустить досрочно названо досрочно, а не «решением»',
+    /Впустить сейчас/.test(recoveryHtml));
+  check('срок до самоприёма показан остатком, а не датой создания',
+    /откроется через 3 ч/.test(recoveryHtml));
+  check('заявка, дожившая до своего часа, помечена открытой',
+    /открыта — ждёт пароль/.test(recoveryHtml));
+  check('досрочно впущенная не просит решить её ещё раз',
+    !recoveryHtml.includes('data-recovery-review="r2"'));
+  check('панель называет тот же срок, что держит база',
+    new RegExp(`через\\s+${CONFIG.forum.limits.recoveryHoldHours}\\s+ч`).test(recoveryHtml));
+  check('и объясняет владельцу, что его дело — возразить',
+    /успеть отклонить чужую заявку/.test(recoveryHtml));
+  check('впущенная досрочно упоминается отдельно',
+    /Впущены досрочно и ждут/.test(recoveryHtml) && /Тихон/.test(recoveryHtml));
   check('разобранная заявка не висит в очереди', !/Отказан/.test(recoveryHtml));
   check('очередь не показывает отпечаток ключа', !/code_hash|codeHash/i.test(recoveryHtml));
   check('и в очереди нет поля пароля', !/type="password"/.test(recoveryHtml));

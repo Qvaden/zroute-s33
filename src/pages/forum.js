@@ -24,7 +24,7 @@ import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-
 import { RULES, SANCTIONS, CATEGORIES, REACTIONS, TOPIC_TAGS, categoryLabel } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
-import { formatRecoveryKey } from '../forum/recovery.js';
+import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
 import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
@@ -883,8 +883,9 @@ ${renderPushPrefs(s)}`;
  * а не тот, кто его впускает.
  *
  *   1. Ник. Браузер придумывает ключ и показывает его только здесь.
- *   2. Ожидание. Владелец видит в панели ник и время — этого хватает, чтобы
- *      спросить «это ты?» в игре, и этого не хватает, чтобы войти в аккаунт.
+ *   2. Ожидание. Через 12 часов заявка откроется сама. Владелец видит её в
+ *      панели ровно это время и может отклонить — его слово по-прежнему
+ *      решает исход, просто теперь оно нужно, чтобы НЕ пустить.
  *   3. Новый пароль. Вводится дважды и уходит прямо в базу.
  *
  * Шаг 2 может растянуться на часы, поэтому состояние живёт в state.recovery, а
@@ -922,7 +923,7 @@ function renderRecovery(s) {
   const steps = `
     <ol class="forum-recovery__steps">
       <li${r.phase === 'begin' ? ' class="is-now"' : ' class="is-done"'}>Заявка</li>
-      <li${r.phase === 'begin' ? '' : r.phase === 'wait' ? ' class="is-now"' : ' class="is-done"'}>Подтверждение владельца</li>
+      <li${r.phase === 'begin' ? '' : r.phase === 'wait' ? ' class="is-now"' : ' class="is-done"'}>Ожидание ${L.recoveryHoldHours} ч</li>
       <li${r.phase === 'set' ? ' class="is-now"' : ''}>Ваш новый пароль</li>
     </ol>`;
 
@@ -949,14 +950,32 @@ function renderRecovery(s) {
       </div>`;
   }
 
+  const HOLD = L.recoveryHoldHours;
+  const left = formatHoldLeft(r.readyAt);
+
   const STATUS = {
-    pending: ['Ждёт подтверждения владельца', 'Как только он подтвердит — здесь появится поле для нового пароля.'],
-    approved: ['Подтверждено', 'Придумайте новый пароль. Старый перестанет работать сразу.'],
+    approved: ['Владелец впустил досрочно', 'Придумайте новый пароль. Старый перестанет работать сразу.'],
     rejected: ['Владелец отклонил заявку', 'Если это ошибка — поговорите с ним в игре и создайте заявку заново.'],
-    expired: ['Срок заявки вышел', 'Подтверждение живёт сутки. Создайте новую заявку.'],
+    expired: ['Срок заявки вышел', 'Заявка живёт неделю. Создайте новую.'],
     none: ['Заявка не найдена', 'Проверьте ник: ключ привязан к тому нику, который вы указали.'],
   };
-  const [statusLine, statusHint] = STATUS[r.status] || STATUS.pending;
+  let [statusLine, statusHint] = STATUS[r.status] || STATUS.none;
+
+  /*
+    pending — единственный статус, у которого два лица, и различает их срок:
+    «ждать» и «уже можно» написаны в таблице одинаково. Поэтому canSet читается
+    из ответа базы, а local time сюда не лезет: страница не вправе решать за
+    базу, кому ставить пароль.
+  */
+  if (r.status === 'pending') {
+    if (r.canSet) {
+      statusLine = 'Время вышло — ставьте пароль';
+      statusHint = `С момента заявки прошло ${HOLD} ч, и возражений не было. Вход ваш: придумайте пароль, его не узнает никто, даже владелец.`;
+    } else {
+      statusLine = left ? `Откроется сама через ${left}` : 'Заявка ждёт свой срок';
+      statusHint = `Через ${HOLD} ч после создания она откроется сама, без чьего-либо подтверждения. За это время владелец может её отклонить — тогда не откроется никогда.`;
+    }
+  }
 
   return `
     <div class="forum-recovery">

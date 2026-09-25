@@ -668,13 +668,14 @@ export async function listUsers() {
 /**
  * ВОССТАНОВЛЕНИЕ ДОСТУПА.
  *
- * Пароль придумывает сам игрок, а владелец только подтверждает, что это он.
- * Порядок и причины — в supabase/20260925-self-recovery.sql; здесь только пять
- * вызовов, которые этот порядок обслуживают.
+ * Пароль придумывает сам игрок, а владелец может лишь возразить: заявка
+ * принимает пароль через 12 часов сама, если её никто не отклонил. Порядок и
+ * причины — в supabase/20260925-self-recovery.sql; здесь только пять вызовов,
+ * которые этот порядок обслуживают.
  *
  * ВСЕ ОНИ ЖИВУТ ФУНКЦИЯМИ В БАЗЕ, и не из вежливости: сменить чужой пароль
  * напрямую может только служебный ключ, а его на сайте нет и быть не должно.
- * наружу уходит право «создать заявку» и право «подтвердить», но не право «всё».
+ * наружу уходит право «создать заявку» и право «отклонить», но не право «всё».
  *
  * КЛЮЧ НЕ ПОКИДАЕТ БРАУЗЕР ИГРОКА. В базу уходит SHA-256 от него, а обратно —
  * сам ключ: база сворачивает его ещё раз и сравнивает с тем, что лежит.
@@ -691,8 +692,15 @@ export async function beginRecovery(nick, keyHash) {
 }
 
 /**
- * Шаг 1.5: на каком она этапе. Возвращает 'none' | 'pending' | 'approved' |
- * 'rejected' | 'used' | 'expired'.
+ * Шаг 1.5: на каком она этапе.
+ *
+ * Возвращает `{ status, canSet, readyAt }`:
+ *   status  — 'none' | 'pending' | 'approved' | 'rejected' | 'used' | 'expired';
+ *   canSet  — можно ли уже ставить пароль;
+ *   readyAt — когда заявка откроется сама, если владелец не вмешался.
+ *
+ * canSet считает база, поэтому страницу не обманет неправильное время на
+ * устройстве игрока: она покажет поле ровно тогда, когда его пустит функция.
  *
  * Ответ 'none' база даёт и когда ника нет, и когда ключ не подходит, и когда
  * заявка уже закрыта: различать эти случаи наружу незачем, а смешивать удобно —
@@ -704,7 +712,13 @@ export async function recoveryStatus(nick, key) {
     method: 'POST',
     body: { p_nick: String(nick).trim(), p_code: key },
   });
-  return typeof rows === 'string' ? rows : 'none';
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  if (!row || typeof row.status !== 'string') return { status: 'none', canSet: false, readyAt: null };
+  return {
+    status: row.status,
+    canSet: row.canSet === true,
+    readyAt: toDate(row.readyAt) ?? null,
+  };
 }
 
 /** Шаг 3: игрок ставит новый пароль. Отсюда наружу не возвращается ничего. */
@@ -728,13 +742,14 @@ export async function listRecoveryRequests() {
     nick: row.nick || '',
     status: row.status,
     createdAt: toDate(row.created_at) ?? new Date(),
+    readyAt: toDate(row.ready_at),
     decidedAt: toDate(row.decided_at),
     expiresAt: toDate(row.expires_at),
     decidedByNick: row.decided_by_nick || '',
   }));
 }
 
-/** Подтвердить или отклонить заявку. Право проверяет база. */
+/** Впустить досрочно или отклонить заявку. Право проверяет база. */
 export async function reviewRecovery(id, approve) {
   await rest('/rpc/forum_review_recovery', {
     method: 'POST',

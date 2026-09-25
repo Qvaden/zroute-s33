@@ -176,13 +176,14 @@
  * @property {() => Promise<ForumUser[]>} listUsers
  *
  * Восстановление доступа (см. supabase/20260925-self-recovery.sql). Пароль
- * придумывает игрок, владелец только подтверждает заявку, поэтому ни один из
- * этих вызовов не несёт пароль через панель.
+ * придумывает игрок, а заявка открывает ему дверь сама через 12 часов —
+ * владелец за это время может только возразить, поэтому ни один из этих
+ * вызовов не несёт пароль через панель.
  * @property {(nick: string, keyHash: string) => Promise<void>} beginRecovery  Заявка; keyHash — SHA-256 ключа из браузера игрока.
- * @property {(nick: string, key: string) => Promise<'none'|'pending'|'approved'|'rejected'|'used'|'expired'>} recoveryStatus
+ * @property {(nick: string, key: string) => Promise<{status: 'none'|'pending'|'approved'|'rejected'|'used'|'expired', canSet: boolean, readyAt: Date|null}>} recoveryStatus  canSet считает база: на него смотрит страница, прежде чем показать поле нового пароля.
  * @property {(nick: string, key: string, password: string) => Promise<void>} finishRecovery  Ставит пароль; наружу не возвращает ничего.
  * @property {() => Promise<ForumRecoveryRequest[]>} listRecoveryRequests  Очередь для владельца; отпечатков ключей в ней нет.
- * @property {(id: string, approve: boolean) => Promise<void>} reviewRecovery
+ * @property {(id: string, approve: boolean) => Promise<void>} reviewRecovery  Впустить досрочно или отклонить; права проверяет база.
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
@@ -259,9 +260,10 @@
  * @property {string} nick
  * @property {'pending'|'approved'|'rejected'|'used'|'expired'} status
  * @property {Date} createdAt
+ * @property {Date|null} readyAt  Час, когда заявка примет пароль без владельца.
  * @property {Date|null} decidedAt
  * @property {Date} expiresAt
- * @property {string} decidedByNick  Кто подтвердил; пустой — ещё никто.
+ * @property {string} decidedByNick  Кто впустил досрочно; пустой — никто.
  */
 
 /**

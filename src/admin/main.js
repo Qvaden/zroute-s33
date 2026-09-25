@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=31';
-import { esc } from '../ui/helpers.js?v=31';
-import { mapDataset } from '../data/adapters/_map.js?v=31';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=31';
-import { validateDataset } from '../data/contract.js?v=31';
+import { CONFIG } from '../../config.js?v=32';
+import { esc } from '../ui/helpers.js?v=32';
+import { mapDataset } from '../data/adapters/_map.js?v=32';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=32';
+import { validateDataset } from '../data/contract.js?v=32';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=31';
-import { renderHome } from '../pages/home.js?v=31';
+} from '../logic/standings.js?v=32';
+import { renderHome } from '../pages/home.js?v=32';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=31';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=31';
+} from '../db/account.js?v=32';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=31';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=31';
-import { roleLabel } from '../forum/roles.js?v=31';
-import { prepareImage, uploadPath } from './image.js?v=31';
+} from './store.js?v=32';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=32';
+import { roleLabel } from '../forum/roles.js?v=32';
+import { prepareImage, uploadPath } from './image.js?v=32';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=31';
+} from './edit.js?v=32';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=31';
-import { renderShell } from './shell.js?v=31';
-import { renderLogin } from './login.js?v=31';
-import { renderOverview } from './screens/overview.js?v=31';
-import { renderWeek, describe } from './screens/week.js?v=31';
-import { renderAlliances } from './screens/alliances.js?v=31';
-import { renderEvents } from './screens/events.js?v=31';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=31';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=31';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=31';
-import { renderQuarter } from './screens/quarter.js?v=31';
-import { renderPresident } from './screens/president.js?v=31';
-import { renderPlayers } from './screens/players.js?v=31';
-import { renderModeration } from './screens/moderation.js?v=31';
-import { renderChatsAdmin } from './screens/chats.js?v=31';
-import { forum } from '../forum/index.js?v=31';
-import { deletionReason } from '../forum/rules.js?v=31';
+} from './draft.js?v=32';
+import { renderShell } from './shell.js?v=32';
+import { renderLogin } from './login.js?v=32';
+import { renderOverview } from './screens/overview.js?v=32';
+import { renderWeek, describe } from './screens/week.js?v=32';
+import { renderAlliances } from './screens/alliances.js?v=32';
+import { renderEvents } from './screens/events.js?v=32';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=32';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=32';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=32';
+import { renderQuarter } from './screens/quarter.js?v=32';
+import { renderPresident } from './screens/president.js?v=32';
+import { renderPlayers } from './screens/players.js?v=32';
+import { renderModeration } from './screens/moderation.js?v=32';
+import { renderChatsAdmin } from './screens/chats.js?v=32';
+import { forum } from '../forum/index.js?v=32';
+import { deletionReason } from '../forum/rules.js?v=32';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1347,6 +1347,11 @@ async function resolveReport(reportId) {
 /**
  * Решение по заявке на восстановление доступа.
  *
+ * Из панели здесь два хода, и они не одинаковые: «впустить сейчас» отменяет
+ * ожидание, «отклонить» закрывает заявку навсегда. Правильным по умолчанию
+ * считается молчание — через свой час заявка примет пароль сама, поэтому
+ * бездействие владельца не задерживает игрока.
+ *
  * После нажатия очередь перечитывается целиком, а не правится на месте:
  * заявка либо уходит из ожидающих, либо остаётся с текстом отказа рядом.
  * Молча она исчезнуть не должна — владелец обязан видеть, что именно он
@@ -1356,8 +1361,8 @@ async function resolveReport(reportId) {
  * перерисовывает вкладку в конце, и сообщение, написанное до неё, пропало бы
  * не успев появиться.
  *
- * Подтверждение выдаётся конкретному ключу, который лежит в браузере игрока,
- * поэтому отсюда не видно ни пароля, ни самого ключа — только ник и срок.
+ * Ни пароля, ни ключа отсюда не видно при любом исходе: решение относится к
+ * заявке, а не к секрету, который лежит в браузере игрока.
  */
 async function reviewRecovery(button) {
   const id = button.dataset.recoveryReview;
@@ -1371,11 +1376,10 @@ async function reviewRecovery(button) {
     showForumResult(
       '[data-players-result]',
       approve
-        ? `Заявка <b>${esc(nick)}</b> подтверждена. Теперь человек сам придумывает
-           пароль — сутки с момента подтверждения. Передайте ему: «заявку видел,
-           заходи на сайт».`
-        : `Заявка <b>${esc(nick)}</b> отклонена. Если игрок передумал или это
-           не он — пусть заведёт новую.`,
+        ? `Заявка <b>${esc(nick)}</b> впущена досрочно: человек ставит пароль сейчас,
+           не дожидаясь своего часа. Передайте ему: «заявку видел, заходи на сайт».`
+        : `Заявка <b>${esc(nick)}</b> отклонена. Теперь она уже не откроется —
+           сама точно, а новой придётся заводить заново.`,
       'ok'
     );
   } catch (err) {
