@@ -1270,6 +1270,10 @@ export async function report({ targetType, targetId, ruleId, note = '' }) {
   if (reports.length >= 5 && target && !target.deleted) {
     target.deleted = true;
     target.autoHidden = true;
+    // Дата скрытия нужна сигналу «материалы скрыты после пяти жалоб»: база
+    // ставит deleted_at в том же update (20260916-forum-community.sql), и без
+    // неё черновой режим не отличил бы свежее скрытие от недельного.
+    target.deletedAt = new Date().toISOString();
     target.deletedReason = 'Скрыто автоматически после пяти жалоб: материал проверяет модератор.';
   }
   write(s);
@@ -1394,6 +1398,141 @@ export async function listModerationActions() {
 export async function listUsers() {
   const s = read();
   return s.users.map(userOut).sort((a, b) => a.nick.localeCompare(b.nick, 'ru'));
+}
+
+/* ── Сигналы о спаме ───────────────────────────────────────────────────────── */
+
+/*
+  Причины названы теми же словами, что в функции базы
+  (supabase/20260926-spam-signals.sql). Список читает модератор, и одна
+  формулировка на два режима дешевле, чем две, которые через месяц разойдутся:
+  панель показывает то, что человек и так увидит на рабочем сайте.
+*/
+const SIGNAL_PACE_POSTS = 'темы на пределе выдержки';
+const SIGNAL_PACE_COMMENTS = 'ответы на пределе выдержки';
+const SIGNAL_REPORTS = 'открытые жалобы на его материалах';
+const SIGNAL_HIDDEN = 'материалы скрыты после пяти жалоб';
+
+/**
+ * Сигналы о спаме в черновом режиме.
+ *
+ * Считается заново на каждый вызов — ровно как в базе, где список нигде не
+ * лежит. Поэтому здесь нельзя увидеть вчерашний состав и нельзя поймать
+ * сигнал, которого уже нет: окно живёт столько, сколько ему положено.
+ *
+ * Числа берутся из config.js, а не из памяти про миграцию: пределы выдержки,
+ * multiplied для модерации втрое, срок свежести жалоб и скрытого. Совпадение
+ * этих чисел с текстом триггеров сторожит тест.
+ */
+export async function listSpamSignals() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!isStaff(me)) throw new Error('Сигналы о спаме видит модерация');
+
+  const L = CONFIG.forum.limits;
+  const now = Date.now();
+  const minutes = (n) => now - n * 60000;
+  const dayMs = minutes(24 * 60);
+  const weekMs = minutes(L.spamSignalWindowDays * 24 * 60);
+
+  /** Автор материала по его id: жалоба висит на теме или ответе, а не на человеке. */
+  const materialAuthor = new Map();
+  for (const p of s.posts) materialAuthor.set(p.id, p.authorId);
+  for (const c of s.comments) materialAuthor.set(c.id, c.authorId);
+
+  const rows = new Map();
+  const lastSeen = new Map();
+  const row = (userId) => {
+    if (!rows.has(userId)) {
+      rows.set(userId, {
+        userId,
+        nick: '',
+        role: 'member',
+        posts20m: 0,
+        comments2m: 0,
+        posts24h: 0,
+        comments24h: 0,
+        openReports: 0,
+        autoHidden: 0,
+        sectionMutes: 0,
+        banned: false,
+        mutedUntil: null,
+        lastActivity: null,
+        signals: [],
+      });
+    }
+    return rows.get(userId);
+  };
+  const touched = (userId, at) => {
+    const ms = new Date(at).getTime();
+    if (Number.isFinite(ms) && ms > (lastSeen.get(userId) ?? 0)) lastSeen.set(userId, ms);
+  };
+
+  const pace = (list, shortMinutes, shortKey, dayKey) => {
+    for (const r of list) {
+      if (!r.authorId) continue;
+      const ms = new Date(r.createdAt).getTime();
+      if (!Number.isFinite(ms) || ms < dayMs) continue;
+      const acc = row(r.authorId);
+      acc[dayKey] += 1;
+      if (ms > minutes(shortMinutes)) acc[shortKey] += 1;
+      touched(r.authorId, ms);
+    }
+  };
+  pace(s.posts, L.postHoldMinutes, 'posts20m', 'posts24h');
+  pace(s.comments, L.commentHoldMinutes, 'comments2m', 'comments24h');
+
+  for (const rep of s.reports) {
+    if (rep.resolved) continue;
+    const ms = new Date(rep.createdAt).getTime();
+    if (!Number.isFinite(ms) || ms < weekMs) continue;
+    const author = materialAuthor.get(rep.targetId);
+    if (author) row(author).openReports += 1;
+  }
+
+  for (const r of [...s.posts, ...s.comments]) {
+    if (!r.autoHidden || !r.authorId) continue;
+    const ms = new Date(r.deletedAt ?? r.createdAt).getTime();
+    if (!Number.isFinite(ms) || ms < weekMs) continue;
+    row(r.authorId).autoHidden += 1;
+  }
+
+  for (const m of s.sectionMutes || []) {
+    const until = toDate(m.mutedUntil);
+    if (!until || until.getTime() <= now) continue;
+    row(m.userId).sectionMutes += 1;
+  }
+
+  for (const u of s.users) {
+    const r = rows.get(u.id);
+    if (!r) continue;
+    r.nick = u.nick || '';
+    r.role = u.role || 'member';
+    r.banned = Boolean(u.banned);
+    r.mutedUntil = toDate(u.mutedUntil);
+    r.lastActivity = lastSeen.has(u.id) ? new Date(lastSeen.get(u.id)) : null;
+    const staff = u.role === 'admin' || u.role === 'moderator';
+    /*
+      «Предел рядом» = разрешено минус одна запись: человек ещё пишет, но
+      следующий шаг упрётся в отказ. У модерации тот же тройной запас, что у
+      триггера выдержки, — иначе сигнал ловил бы модератора за его работу.
+    */
+    if (r.posts20m >= L.postHoldMax * (staff ? 3 : 1) - 1) r.signals.push(SIGNAL_PACE_POSTS);
+    if (r.comments2m >= L.commentHoldMax * (staff ? 3 : 1) - 1) r.signals.push(SIGNAL_PACE_COMMENTS);
+    if (r.openReports >= L.spamSignalReportMin) r.signals.push(SIGNAL_REPORTS);
+    if (r.autoHidden >= 1) r.signals.push(SIGNAL_HIDDEN);
+  }
+
+  /*
+    Две границы, как в запросе базы: без причин строки не бывает, и без тем и
+    ответов за сутки тоже — жалобу, висящую на материале месячной давности,
+    разбирают в очереди жалоб.
+  */
+  return [...rows.values()]
+    .filter((r) => r.signals.length && r.posts24h + r.comments24h > 0)
+    .sort((a, b) => b.signals.length - a.signals.length
+      || (b.posts24h + b.comments24h) - (a.posts24h + a.comments24h)
+      || a.nick.localeCompare(b.nick, 'ru'));
 }
 
 /* ── Страница участника ───────────────────────────────────────────────────── */

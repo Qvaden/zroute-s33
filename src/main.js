@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=63';
-import { loadAll, capabilities, db } from './data/index.js?v=63';
-import { validateDataset } from './data/contract.js?v=63';
+import { CONFIG } from '../config.js?v=64';
+import { loadAll, capabilities, db } from './data/index.js?v=64';
+import { validateDataset } from './data/contract.js?v=64';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,27 +9,27 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=63';
-import { renderHome } from './pages/home.js?v=63';
-import { renderLadder } from './pages/ladder.js?v=63';
-import { renderQuarter } from './pages/quarter-final.js?v=63';
-import { renderTimeline } from './pages/timeline.js?v=63';
-import { renderGuide } from './pages/guide.js?v=63';
-import { renderBot } from './pages/bot.js?v=63';
-import { renderAbout } from './pages/about.js?v=63';
-import { renderAlliance } from './pages/alliance.js?v=63';
-import { computeAchievements } from './logic/achievements.js?v=63';
-import { esc } from './ui/helpers.js?v=63';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=63';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=63';
+} from './logic/standings.js?v=64';
+import { renderHome } from './pages/home.js?v=64';
+import { renderLadder } from './pages/ladder.js?v=64';
+import { renderQuarter } from './pages/quarter-final.js?v=64';
+import { renderTimeline } from './pages/timeline.js?v=64';
+import { renderGuide } from './pages/guide.js?v=64';
+import { renderBot } from './pages/bot.js?v=64';
+import { renderAbout } from './pages/about.js?v=64';
+import { renderAlliance } from './pages/alliance.js?v=64';
+import { computeAchievements } from './logic/achievements.js?v=64';
+import { esc } from './ui/helpers.js?v=64';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=64';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=64';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=63';
-import './ui/timeline-controls.js?v=63';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=63';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=63';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=63';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=63';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=63';
+import './ui/ladder-controls.js?v=64';
+import './ui/timeline-controls.js?v=64';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=64';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=64';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=64';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=64';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=64';
 
 /*
   РАЗДЕЛЫ.

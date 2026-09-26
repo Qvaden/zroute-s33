@@ -7743,9 +7743,214 @@ console.log('\nAC. Заявки на гайды');
     raw().guideRequests.some((r) => r.id === first.id && r.status === 'cancelled'));
 }
 
+// ── AD. Сигналы о спаме ──────────────────────────────────────────────────────
+
+console.log('\nAD. Сигналы о спаме');
+{
+  /*
+    Пункт перенесён с форума сообщества, но не дословно. У донора это таблица,
+    которую сервер пишет перед тем, как бросить отказ «выдержка». Сервера у нас
+    нет, а Postgres откатывает любую строку, вставленную в том же вызове до
+    raise exception, — журнал отказов был бы всегда пуст, а пустой список
+    читается как «спама нет». Поэтому список считается заново по тем записям,
+    которые человек реально оставил, и тесты сверяют не наличие журнала, а то,
+    что база, черновой режим и панель говорят одними числами и одними словами.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-spam-signals.sql', 'utf8');
+  const holdSrc = await readFile('supabase/20260925-spam-hold-and-topic-reads.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const screenSrc = await readFile('src/admin/screens/moderation.js', 'utf8');
+  const loaderSrc = await readFile('src/admin/main.js', 'utf8');
+  const cssSrc = await readFile('src/admin/admin.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const L = CONFIG.forum.limits;
+  const flat = sql.replace(/\s+/g, ' ');
+  const SEE = 'Сигналы о спаме видит модерация';
+  const REASONS = [
+    'темы на пределе выдержки',
+    'ответы на пределе выдержки',
+    'открытые жалобы на его материалах',
+    'материалы скрыты после пяти жалоб',
+  ];
+
+  /* ── Форма правила: список вычисляется, а не копится ── */
+  check('ни таблицы, ни колонок, ни индексов: сигнал — это запрос, а не запись',
+    !/create (table|index)|add column/i.test(sql));
+  check('функция ничего не пишет и ничего не меняет в чужих строках',
+    !/insert into|update public\.|delete from/i.test(sql));
+  check('вход один — функция, и роль проверяет она, а не политика таблицы',
+    flat.includes('create or replace function public.forum_spam_signals() returns table')
+      && flat.includes('if not public.forum_is_staff() then')
+      && !/create policy/.test(sql));
+  check('отказ назван причиной, а не пустотой: «пусто» и «не видно» — разные новости',
+    sql.includes(`raise exception '${SEE}'`) && flat.includes("errcode = 'insufficient_privilege'"));
+  check('право исполнения только у вошедших: гостю смотреть не на что',
+    flat.includes(`revoke all on function public.forum_spam_signals() from public, anon;`)
+      && flat.includes('grant execute on function public.forum_spam_signals() to authenticated;'));
+
+  /* ── Числа: выдержка, сигнал и черновик обязаны сходиться ── */
+  check('окна выдержки в сигнале — те же строки, что в триггерах отказа',
+    holdSrc.includes(`interval '${L.postHoldMinutes} minutes'`)
+      && holdSrc.includes(`interval '${L.commentHoldMinutes} minutes'`)
+      && sql.includes(`interval '${L.postHoldMinutes} minutes'`)
+      && sql.includes(`interval '${L.commentHoldMinutes} minutes'`));
+  check('предел рядом = разрешено минус одна, и модерации положено втрое больше',
+    flat.includes(`then ${L.postHoldMax * 3} else ${L.postHoldMax} end as posts_allowed`)
+      && flat.includes(`then ${L.commentHoldMax * 3} else ${L.commentHoldMax} end as comments_allowed`)
+      && flat.includes('b.posts_20m >= b.posts_allowed - 1')
+      && flat.includes('b.comments_2m >= b.comments_allowed - 1'));
+  check('неделя свежести — одно окно для жалоб и для скрытого, и оно из конфига',
+    sql.split(`interval '${L.spamSignalWindowDays} days'`).length - 1 === 4
+      && flat.includes(`case when b.open_reports >= ${L.spamSignalReportMin}`));
+  check('причин ровно четыре, и среди них нет ни баллов, ни ключевых слов',
+    REASONS.every((r) => flat.includes(`then '${r}'`))
+      && !/score|keyword/i.test(sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')));
+  for (const reason of REASONS) {
+    check(`причина «${reason}» названа одинаково в базе и в черновом режиме`,
+      sql.includes(reason) && localSrc.includes(`'${reason}'`));
+  }
+  check('правило «нет активности за сутки — нет строки» живёт в обоих режимах',
+    flat.includes('where cardinality(m.sigs) > 0 and m.posts_24h + m.comments_24h > 0')
+      && localSrc.includes('r.signals.length && r.posts24h + r.comments24h > 0'));
+  check('попадание в список не прячет материал и не трогает права автора',
+    !/set banned|muted_until =|deleted = true/i.test(sql)
+      && screenSrc.includes('Ни одно действие отсюда не')
+      && !/<button|<form|<input|<textarea/.test(
+        screenSrc.slice(screenSrc.indexOf('function renderSpamSignals'),
+          screenSrc.indexOf('function renderPriorityQueue'))));
+
+  /* ── Контракт и оба адаптера ── */
+  check('контракт объявляет форму строки и её чтение',
+    contractSrc.includes('@typedef {Object} ForumSpamSignal')
+      && contractSrc.includes('() => Promise<ForumSpamSignal[]>} listSpamSignals'));
+  check('рабочий режим спрашивает функцию базы, а не читает таблицы напрямую',
+    supaSrc.includes("'/rpc/forum_spam_signals', { method: 'POST'")
+      && !/rest\('\/forum_posts\?[\s\S]{0,200}signal/i.test(supaSrc));
+  check('оба адаптера отдают строку одними полями',
+    /function spamSignalOut\(row\)[\s\S]{0,800}posts20m: Number\(row\.posts_20m\)[\s\S]{0,800}signals: Array\.isArray\(row\.signals\)/.test(supaSrc)
+      && ['userId', 'nick', 'role', 'posts20m', 'comments2m', 'posts24h', 'comments24h',
+        'openReports', 'autoHidden', 'sectionMutes', 'banned', 'mutedUntil', 'lastActivity', 'signals']
+        .every((k) => localSrc.slice(localSrc.indexOf('export async function listSpamSignals')).includes(`${k}:`)));
+  check('черновой режим берёт пределы из конфига, а не переписывает их руками',
+    localSrc.includes('L.postHoldMax * (staff ? 3 : 1) - 1')
+      && localSrc.includes('L.commentHoldMax * (staff ? 3 : 1) - 1')
+      && localSrc.includes('r.openReports >= L.spamSignalReportMin')
+      && localSrc.includes('L.spamSignalWindowDays * 24 * 60'));
+  check('отказ черновика — слово в слово отказ базы',
+    localSrc.includes(`throw new Error('${SEE}')`));
+
+  /* ── Панель ── */
+  check('панель читает сигналы своим броском: без функции остальной экран живёт',
+    loaderSrc.includes('view.forum.spamSignals = await forum.listSpamSignals();')
+      && loaderSrc.includes('view.forum.spamSignals = null;'));
+  check('без миграции блок называет файл, а не объявляет форум чистым',
+    screenSrc.includes('Список недоступен')
+      && screenSrc.includes('supabase/20260926-spam-signals.sql'));
+  check('пустой список объясняет, что показывает только живое окно',
+    /if \(!signals\.length\) \{[\s\S]{0,900}Пусто — не значит «чисто»/.test(screenSrc));
+  check('строка показывает числа, а не вывод: колонки выдержки, жалоб и скрытого',
+    screenSrc.includes('posts20m') && screenSrc.includes('openReports')
+      && screenSrc.includes('autoHidden') && screenSrc.includes('sectionMutes'));
+  check('и прямо говорит, что игрок про себя не узнаёт',
+    screenSrc.includes('сам человек про себя ничего не узнаёт'));
+  check('блок одет своим стилем',
+    cssSrc.includes('.adm-signal-list {') && cssSrc.includes('.adm-signal__nums {'));
+  check('правило описано в документах и стоит в списке миграций',
+    docsSrc.includes('## Сигналы о спаме') && docsSrc.includes('20260926-spam-signals.sql')
+      && readmeSrc.includes('20260926-spam-signals.sql'));
+
+  /* ── Живой черновой прогон: тот же список, что посчитала бы база ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const state = () => JSON.parse(store.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const topic = (title, body) => local.createPost({ category: 'help', title, body });
+
+  await local.signUp('Мерцатель');            // первый — админ, он же модерация
+  await local.signUp('Торопыга');
+  await local.signUp('Ревизор');
+
+  await local.signOut();
+  equal('гостю список не показан, и отказ называет причину',
+    await says(() => local.listSpamSignals()), SEE);
+  await local.signIn('Торопыга');
+  equal('участник не видит списка про себя',
+    await says(() => local.listSpamSignals()), SEE);
+  await local.signOut();
+  equal('и своё же право прочитать не обходит выходом',
+    await says(() => local.listSpamSignals()), SEE);
+
+  await local.signIn('Мерцатель');
+  equal('пока никто не писал, строк нет', (await local.listSpamSignals()).length, 0);
+
+  await local.signIn('Торопыга');
+  const caught = await topic('Как пройти блокпост без каравана', 'нужен маршрут и порядок действий');
+  await topic('Что делать при засаде на дороге', 'разворачиваемся или идём дальше');
+  await local.signIn('Мерцатель');
+  const rows = await local.listSpamSignals();
+  equal('две темы из трёх за окно — одна строка в списке', rows.length, 1);
+  check('строка названа человеком, а не его текстом',
+    rows[0].nick === 'Торопыга' && rows[0].role === 'member' && rows[0].posts20m === 2);
+  check('причина прочитывается словами, а не баллом',
+    rows[0].signals.length === 1 && rows[0].signals[0] === REASONS[0]);
+  check('суточный масштаб показан рядом с коротким окном',
+    rows[0].posts24h === 2 && rows[0].comments24h === 0 && rows[0].openReports === 0);
+  check('и время последней активности есть — без него строка ни о чём',
+    rows[0].lastActivity instanceof Date && !Number.isNaN(rows[0].lastActivity.getTime()));
+
+  /* Жалобы считаются по материалу автора, а не по тому, кто нажал «жаловаться». */
+  await local.report({ targetType: 'post', targetId: caught.id, ruleId: 'spam', note: 'одно и то же в трёх темах' });
+  await local.signIn('Ревизор');
+  await local.report({ targetType: 'post', targetId: caught.id, ruleId: 'spam', note: 'копия прошлого поста' });
+  await local.signIn('Мерцатель');
+  const reported = (await local.listSpamSignals())[0];
+  check('две открытые жалобы — вторая причина той же строки',
+    reported.openReports === 2 && reported.signals.includes(REASONS[2]));
+  check('жалобщик сам в список не попал: он свидетель, а не подозреваемый',
+    (await local.listSpamSignals()).every((r) => r.nick !== 'Ревизор'));
+
+  /* Модерации позволено втрое больше — её работа не должна сигналить. */
+  await topic('Сводка за неделю по фронту', 'пишет модерация, ей нужно втрое больше');
+  await topic('Объявление о наборе в альянс', 'тоже модерация, тоже сегодня');
+  const afterStaff = await local.listSpamSignals();
+  check('две темы модерации сигналом не стали',
+    afterStaff.length === 1 && afterStaff[0].nick === 'Торопыга');
+
+  /* Пять жалоб прячут материал — и это третий факт про того же автора. */
+  for (const nick of ['Дозорный', 'Гляделка', 'Пришелец']) {
+    await local.signUp(nick);                 // signUp входит новым игроком
+    await local.report({ targetType: 'post', targetId: caught.id, ruleId: 'spam', note: 'спам' });
+  }
+  await local.signIn('Мерцатель');
+  const hidden = (await local.listSpamSignals())[0];
+  check('скрытое после пяти жалоб стало фактом в хранилище',
+    state().posts.find((p) => p.id === caught.id).autoHidden === true);
+  check('и третьей причиной строки автора, а не жалобщиков',
+    hidden.autoHidden === 1 && hidden.signals.includes(REASONS[3]));
+
+  /* Правило 6: без тем и ответов за сутки строки нет, даже с жалобами. */
+  const snapshot = state();
+  const yesterday = new Date(Date.now() - 25 * 3600 * 1000).toISOString();
+  for (const p of snapshot.posts) {
+    if (p.authorNick === 'Торопыга') p.createdAt = yesterday;
+    if (p.autoHidden) p.deletedAt = yesterday;
+  }
+  store.set('zr33.forum.local', JSON.stringify(snapshot));
+  equal('вчерашний автор из списка уходит: список показывает живое',
+    (await local.listSpamSignals()).length, 0);
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
-
 console.log('\nR3. Ключ восстановления');
 {
   const rec = await import('../src/forum/recovery.js');

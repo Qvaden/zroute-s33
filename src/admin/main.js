@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=37';
-import { esc, plural } from '../ui/helpers.js?v=37';
-import { mapDataset } from '../data/adapters/_map.js?v=37';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=37';
-import { validateDataset } from '../data/contract.js?v=37';
+import { CONFIG } from '../../config.js?v=38';
+import { esc, plural } from '../ui/helpers.js?v=38';
+import { mapDataset } from '../data/adapters/_map.js?v=38';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=38';
+import { validateDataset } from '../data/contract.js?v=38';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=37';
-import { renderHome } from '../pages/home.js?v=37';
+} from '../logic/standings.js?v=38';
+import { renderHome } from '../pages/home.js?v=38';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=37';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=37';
+} from '../db/account.js?v=38';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=37';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=37';
-import { roleLabel } from '../forum/roles.js?v=37';
-import { prepareImage, uploadPath } from './image.js?v=37';
+} from './store.js?v=38';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=38';
+import { roleLabel } from '../forum/roles.js?v=38';
+import { prepareImage, uploadPath } from './image.js?v=38';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=37';
+} from './edit.js?v=38';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=37';
-import { renderShell } from './shell.js?v=37';
-import { renderLogin } from './login.js?v=37';
-import { renderOverview } from './screens/overview.js?v=37';
-import { renderWeek, describe } from './screens/week.js?v=37';
-import { renderAlliances } from './screens/alliances.js?v=37';
-import { renderEvents } from './screens/events.js?v=37';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=37';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=37';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=37';
-import { renderQuarter } from './screens/quarter.js?v=37';
-import { renderPresident } from './screens/president.js?v=37';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=37';
-import { renderModeration } from './screens/moderation.js?v=37';
-import { renderChatsAdmin } from './screens/chats.js?v=37';
-import { forum } from '../forum/index.js?v=37';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=37';
+} from './draft.js?v=38';
+import { renderShell } from './shell.js?v=38';
+import { renderLogin } from './login.js?v=38';
+import { renderOverview } from './screens/overview.js?v=38';
+import { renderWeek, describe } from './screens/week.js?v=38';
+import { renderAlliances } from './screens/alliances.js?v=38';
+import { renderEvents } from './screens/events.js?v=38';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=38';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=38';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=38';
+import { renderQuarter } from './screens/quarter.js?v=38';
+import { renderPresident } from './screens/president.js?v=38';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=38';
+import { renderModeration } from './screens/moderation.js?v=38';
+import { renderChatsAdmin } from './screens/chats.js?v=38';
+import { forum } from '../forum/index.js?v=38';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=38';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1287,6 +1287,17 @@ async function loadForumScreen(screenId) {
         view.forum.appeals = await forum.listAppeals();
       } catch {
         view.forum.appeals = null;
+      }
+      /*
+        Сигналы о спаме — третьим броском и тоже своей ценой. Пустой список и
+        «в базе нет функции» — разные вещи, а читаются они одинаково, если не
+        различать: модератор решит, что форум чист, и перестанет смотреть.
+        Поэтому null здесь значит «недоступно», и экран называет SQL-файл.
+      */
+      try {
+        view.forum.spamSignals = await forum.listSpamSignals();
+      } catch {
+        view.forum.spamSignals = null;
       }
     }
   } catch (err) {

@@ -198,6 +198,35 @@
  */
 
 /**
+ * Строка модераторского списка «на этого стоит посмотреть».
+ *
+ * Ничего не хранится: строку считает база по темам, ответам, жалобам и
+ * скрытому материалу за короткое окно (см. supabase/20260926-spam-signals.sql).
+ * Поэтому у строки нет ни id, ни статуса — вчерашнего списка не существует, и
+ * спорить о том, кто в него вчера попадал, не по чему.
+ *
+ * Балльной оценки здесь нет намеренно: «шесть сигналов» и «шесть жалоб» —
+ * разные истории, а в одном числе они неразличимы. Модератор видит отдельные
+ * числа и отдельный список причин.
+ *
+ * @typedef {Object} ForumSpamSignal
+ * @property {string} userId
+ * @property {string} nick
+ * @property {'member'|'moderator'|'admin'} role
+ * @property {number} posts20m      Темы за окно выдержки тем.
+ * @property {number} comments2m    Ответы за окно выдержки ответов.
+ * @property {number} posts24h
+ * @property {number} comments24h
+ * @property {number} openReports   Открытые жалобы на его материалы.
+ * @property {number} autoHidden    Его материалов, скрытых после пяти жалоб.
+ * @property {number} sectionMutes  Активных тишин по разделам.
+ * @property {boolean} banned
+ * @property {Date|null} mutedUntil
+ * @property {Date|null} lastActivity
+ * @property {string[]} signals     Причины, по которым человек здесь; пустой не бывает.
+ */
+
+/**
  * Тишина в одном разделе: писать сюда нельзя, остальной форум открыт.
  *
  * Пары «человек и раздел» уникальны, поэтому продление — это та же запись,
@@ -318,6 +347,7 @@
  * @property {() => Promise<{targetType: string, targetId: string, reportCount: number, priority: string}[]>} listModerationQueue
  * @property {() => Promise<{id: string, actorNick: string, targetType: string, targetId: string, targetNick: string, action: string, details: object, createdAt: Date}[]>} listModerationActions
  * @property {() => Promise<ForumUser[]>} listUsers
+ * @property {() => Promise<ForumSpamSignal[]>} listSpamSignals  Кто сел на предел выдержки, у кого открытые жалобы и скрытое после пяти. Читает только модерация: игрок не узнаёт, что он в списке. Без функции в базе вызов падает, и панель называет недостающую миграцию.
  *
  * Восстановление доступа (см. supabase/20260925-self-recovery.sql). Пароль
  * придумывает игрок, а заявка открывает ему дверь сама через 12 часов —

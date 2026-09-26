@@ -1448,6 +1448,23 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-rename-history .adm-reserved__item code { color: var(--dim); }
 
 /*
+  Сигналы о спаме — список, а не карточки: строк много, и модератору нужно
+  сравнить их глазами, а не разворачивать каждую. Тревожных цветов у блока нет
+  намеренно: строка «темы на пределе выдержки» — это просьба посмотреть, а не
+  уже вынесенное решение, и краской оно начало бы выглядеть наказанием.
+*/
+.adm-signal-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.adm-signal { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--text) 2%, transparent); }
+.adm-signal__who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.adm-signal__role, .adm-signal__mark { padding: 2px 7px; border: 1px solid var(--line-soft); border-radius: 8px; font-size: 11.5px; color: var(--dim); }
+.adm-signal__reasons { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
+.adm-signal__reasons li { font-size: 12.5px; font-weight: 700; }
+.adm-signal__nums { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--mute); }
+.adm-signal__nums b { color: var(--text); }
+.adm-signal time { font-size: 12px; }
+.adm-signals__foot { margin: 14px 0 0; font-size: 12px; }
+
+/*
   История наград тем же списком, что и переименования: и то и другое — журнал
   решений владельца про одного игрока, и выглядеть они должны одинаково.
   Очки выделены знаком, а не цветом: минус на сером фоне читается хуже цифры.

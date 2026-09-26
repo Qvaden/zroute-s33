@@ -925,6 +925,41 @@ export async function listUsers() {
   return (Array.isArray(rows) ? rows : []).map(userOut);
 }
 
+/* ── Сигналы о спаме ───────────────────────────────────────────────────────── */
+
+/**
+ * Список «на кого посмотреть». Считает его база, здесь только разбор строк.
+ *
+ * Функция, а не представление: темы и ответы читают все, и представление с
+ * `security_invoker` отдало бы список подозреваемых кому угодно, включая гостя.
+ * Отказ тоже важен: пустой список и «тебе не видно» — разные вещи, и панель
+ * обязана различать их, поэтому ошибку вызывающий не глушит.
+ * См. supabase/20260926-spam-signals.sql.
+ */
+function spamSignalOut(row) {
+  return {
+    userId: String(row.user_id),
+    nick: row.nick || '',
+    role: row.role || 'member',
+    posts20m: Number(row.posts_20m) || 0,
+    comments2m: Number(row.comments_2m) || 0,
+    posts24h: Number(row.posts_24h) || 0,
+    comments24h: Number(row.comments_24h) || 0,
+    openReports: Number(row.open_reports) || 0,
+    autoHidden: Number(row.auto_hidden) || 0,
+    sectionMutes: Number(row.section_mutes) || 0,
+    banned: Boolean(row.banned),
+    mutedUntil: toDate(row.muted_until),
+    lastActivity: toDate(row.last_activity),
+    signals: Array.isArray(row.signals) ? row.signals : [],
+  };
+}
+
+export async function listSpamSignals() {
+  const rows = await rest('/rpc/forum_spam_signals', { method: 'POST', body: {} });
+  return (Array.isArray(rows) ? rows : []).map(spamSignalOut);
+}
+
 /**
  * ВОССТАНОВЛЕНИЕ ДОСТУПА.
  *

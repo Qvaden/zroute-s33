@@ -91,10 +91,12 @@ export function renderModeration(view) {
     тебя». Второе человек ждёт, поэтому оно и стоит выше.
   */
   const appeals = renderAppeals(f.appeals);
+  const signals = renderSpamSignals(f.spamSignals);
 
   if (!f.reports.length) {
     return `
       ${appeals}
+      ${signals}
       <section class="panel">
         <header class="panel__head">
           <span class="eyebrow">Форум · модерация</span>
@@ -110,6 +112,7 @@ export function renderModeration(view) {
 
   return `
     ${appeals}
+    ${signals}
     <section class="panel">
       <header class="panel__head">
         <span class="eyebrow">Форум · модерация</span>
@@ -224,6 +227,110 @@ function renderAppealCard(a) {
         </p>
       `}
     </article>`;
+}
+
+/* ── Сигналы о спаме ──────────────────────────────────────────────────────────
+ *
+ * Список считает база на каждый запрос (supabase/20260926-spam-signals.sql), и
+ * здесь он просто напечатан. Поэтому у блока нет ни кнопок, ни форм: строчка
+ * означает «посмотри», а не «наказано». Решение модератор принимает обычными
+ * действиями этой панели — тишиной по разделу или запретом во вкладке
+ * «Игроки» — и каждое из них попадает в журнал решений, а сигнальный список
+ * через сутки забудет про этого человека сам.
+ *
+ * Игрок не видит, что он здесь. Публичный рейтинг подозрений превратился бы
+ * в игру: держаться ровно на одну тему ниже предела, чтобы не засветиться.
+ */
+
+/** Роль человеком: «moderator» в списке модерации читается как код. */
+const SIGNAL_ROLE = { admin: 'администратор', moderator: 'модератор' };
+
+function renderSpamSignals(signals) {
+  const L = CONFIG.forum.limits;
+  const head = `
+    <header class="panel__head">
+      <span class="eyebrow">Форум · модерация</span>
+      <h1 class="adm-h1">Сигналы о спаме</h1>
+    </header>`;
+
+  if (!Array.isArray(signals)) {
+    return `
+      <section class="panel adm-signals">
+        ${head}
+        <p class="adm-lead">
+          Список недоступен: в базе ещё нет функции <code>forum_spam_signals()</code>.
+          Выполните <code>supabase/20260926-spam-signals.sql</code> — она ничего не
+          хранит и ничего не меняет в таблицах, только показывает модерации тех,
+          кто сидит на пределе выдержки.
+        </p>
+      </section>`;
+  }
+
+  if (!signals.length) {
+    return `
+      <section class="panel adm-signals">
+        ${head}
+        <p class="adm-lead">
+          Сейчас никто не упрётся в выдержку и ни у кого нет двух открытых жалоб.
+          Пусто — не значит «чисто»: список показывает живое окно
+          (${plural(L.postHoldMinutes, 'минута', 'минуты', 'минут')} для тем и
+          ${plural(L.commentHoldMinutes, 'минута', 'минуты', 'минут')} для ответов),
+          а не историю за неделю.
+        </p>
+      </section>`;
+  }
+
+  return `
+    <section class="panel adm-signals">
+      ${head}
+      <p class="adm-lead">
+        ${plural(signals.length, 'человек', 'человека', 'человек')}
+        видно по данным форума: предел выдержки рядом, открытые жалобы на его
+        материалах или скрытое после пяти жалоб. Ни одно действие отсюда не
+        следует автоматически, и сам человек про себя ничего не узнаёт.
+      </p>
+      <ul class="adm-signal-list">${signals.map((row) => renderSignalRow(row, L)).join('')}</ul>
+      <p class="adm-signals__foot muted">
+        Пределом считается ${plural(L.postHoldMax, 'тема', 'темы', 'тем')}
+        за ${plural(L.postHoldMinutes, 'минута', 'минуты', 'минут')} и
+        ${plural(L.commentHoldMax, 'ответ', 'ответа', 'ответов')}
+        за ${plural(L.commentHoldMinutes, 'минута', 'минуты', 'минут')};
+        модерации разрешено втрое больше, и для неё это не сигнал. Жалобы и скрытые
+        материалы смотрятся за ${plural(L.spamSignalWindowDays, 'день', 'дня', 'дней')}.
+      </p>
+    </section>`;
+}
+
+function renderSignalRow(row, L) {
+  const staff = row.role === 'admin' || row.role === 'moderator';
+  const postsAllowed = L.postHoldMax * (staff ? 3 : 1);
+  const commentsAllowed = L.commentHoldMax * (staff ? 3 : 1);
+  const muted = row.mutedUntil instanceof Date && row.mutedUntil > new Date();
+
+  return `
+    <li class="adm-signal">
+      <div class="adm-signal__who">
+        <b>${esc(row.nick || 'игрок')}</b>
+        ${SIGNAL_ROLE[row.role] ? `<span class="adm-signal__role">${esc(SIGNAL_ROLE[row.role])}</span>` : ''}
+        ${row.banned ? '<span class="adm-signal__mark">запрет писем</span>' : ''}
+        ${muted ? `<span class="adm-signal__mark">тишина до ${esc(shortTime(row.mutedUntil))}</span>` : ''}
+        ${row.sectionMutes ? `<span class="adm-signal__mark">тишина в разделах: ${esc(String(row.sectionMutes))}</span>` : ''}
+      </div>
+
+      <ul class="adm-signal__reasons">
+        ${row.signals.map((r) => `<li>${esc(r)}</li>`).join('')}
+      </ul>
+
+      <div class="adm-signal__nums">
+        <span>темы за ${L.postHoldMinutes} мин: <b>${esc(String(row.posts20m))} из ${esc(String(postsAllowed))}</b></span>
+        <span>ответы за ${L.commentHoldMinutes} мин: <b>${esc(String(row.comments2m))} из ${esc(String(commentsAllowed))}</b></span>
+        <span>за сутки: <b>${plural(row.posts24h, 'тема', 'темы', 'тем')}, ${plural(row.comments24h, 'ответ', 'ответа', 'ответов')}</b></span>
+        <span>открытых жалоб: <b>${esc(String(row.openReports))}</b></span>
+        ${row.autoHidden ? `<span>скрыто после жалоб: <b>${esc(String(row.autoHidden))}</b></span>` : ''}
+      </div>
+
+      <time class="muted">активность: ${esc(shortTime(row.lastActivity))}</time>
+    </li>`;
 }
 
 function renderPriorityQueue(queue) {
