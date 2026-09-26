@@ -1,6 +1,7 @@
 import { esc, plural } from '../../ui/helpers.js';
 import { RULES, categoryLabel } from '../../forum/rules.js';
 import { postBody } from '../../forum/format.js';
+import { slaLevel, SLA_LABELS } from '../../forum/sla.js';
 import { CONFIG } from '../../../config.js';
 
 /**
@@ -110,6 +111,16 @@ export function renderModeration(view) {
       </section>`;
   }
 
+  /*
+    Забытая жалоба не кричит — она просто уезжает в конец списка, который
+    адаптер принёс «свежие сверху». Поэтому очередь здесь разворачивается:
+    дежурный читает сверху вниз в порядке запущенности, и строка заголовка
+    называет число тех, чей публичный срок уже вышел.
+  */
+  const waiting = [...f.reports].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const late = waiting.filter((r) => slaLevel(r.createdAt) === 'late').length;
+
   return `
     ${appeals}
     ${signals}
@@ -118,7 +129,9 @@ export function renderModeration(view) {
         <span class="eyebrow">Форум · модерация</span>
         <h1 class="adm-h1">Жалобы</h1>
         <p class="adm-lead">
-          ${esc(String(f.reports.length))} ${esc(reportWord(f.reports.length))} ждёт решения.
+          ${esc(String(f.reports.length))} ${esc(reportWord(f.reports.length))} ждёт решения,
+          старшая подана ${esc(shortTime(waiting[0].createdAt))}.
+          ${late ? ` <b class="adm-sla adm-sla--late">просрочено: ${esc(String(late))}</b>` : ''}
           Удаление всегда с указанием пункта: автор должен узнать причину.
         </p>
       </header>
@@ -128,7 +141,7 @@ export function renderModeration(view) {
       ${renderPriorityQueue(queue)}
 
       <div class="adm-reports">
-        ${f.reports.map(renderReport).join('')}
+        ${waiting.map(renderReport).join('')}
       </div>
 
       ${renderActionLog(actions)}
@@ -163,7 +176,11 @@ function renderAppeals(appeals) {
       </section>`;
   }
 
-  const open = appeals.filter((a) => a.status === 'open');
+  /* Открытые — старшими вперёд, по той же причине, что и жалобы: игрок
+     ждёт ответа, и очереди чтения идут от давности, а не от свежести. */
+  const open = appeals
+    .filter((a) => a.status === 'open')
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   const decided = appeals.filter((a) => a.status !== 'open').slice(0, 5);
 
   return `
@@ -201,6 +218,7 @@ function renderAppealCard(a) {
       <header class="adm-appeal__head">
         <b>${esc(a.userNick || 'игрок')}</b>
         <span class="adm-appeal__kind">оспаривает: ${esc(APPEAL_KIND[a.kind] ?? a.kind)}</span>
+        ${isOpen ? slaMark(a.createdAt) : ''}
         <time>${esc(shortTime(a.createdAt))}</time>
       </header>
 
@@ -371,6 +389,16 @@ function actionLabel(item) {
   return 'разобрал жалобу';
 }
 
+/**
+ * Метка ожидания у карточки. У «свежей» заявки метки нет намеренно:
+ * серая плашка на каждой второй строке приучила бы дежурного её не видеть.
+ */
+function slaMark(createdAt) {
+  const level = slaLevel(createdAt);
+  if (level === 'fresh') return '';
+  return `<span class="adm-sla adm-sla--${level}">${esc(SLA_LABELS[level])}</span>`;
+}
+
 function renderReport(r) {
   const index = RULES.findIndex((x) => x.id === r.ruleId);
   const rule = RULES[index];
@@ -381,6 +409,7 @@ function renderReport(r) {
         <span class="adm-report__rule">
           ${rule ? `${index + 1}. ${esc(rule.title)}` : 'Пункт не указан'}
         </span>
+        ${slaMark(r.createdAt)}
         <span class="adm-report__meta">
           на ${esc(r.targetType === 'post' ? 'пост' : 'комментарий')}
           · пожаловался ${esc(r.reporterNick)}

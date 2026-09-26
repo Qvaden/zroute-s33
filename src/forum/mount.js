@@ -31,6 +31,7 @@ import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from '.
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { normalizeQuietWindow, parseQuietTime, saveQuietWindow } from './quiet.js';
+import { slaPromiseLine } from './sla.js';
 import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { esc } from '../ui/helpers.js';
 import { leaderboardOf } from './leaderboard.js';
@@ -1291,7 +1292,7 @@ async function sendAppeal(form, submitter) {
       } catch {
         /* список останется прошлым: заявка принята, и это уже видно */
       }
-      notice('Апелляция отправлена модерации. Запрет на время разбора остаётся.');
+      notice(`Апелляция отправлена модерации. Запрет на время разбора остаётся. ${slaPromiseLine()}`);
     } catch (err) {
       // Отказ говорит сам за себя: в нём и причина, и граница. Своего текста
       // у страницы нет, чтобы два объяснения не разошлись.
@@ -2759,7 +2760,7 @@ function wire() {
           note: form.note.value,
         });
         closeModal('[data-forum-report-modal]');
-        notice('Жалоба отправлена. Администратор разберётся.');
+        notice(`Жалоба отправлена. ${slaPromiseLine()}`);
       } catch (err) {
         showError('[data-forum-report-error]', String(err?.message ?? err));
       }

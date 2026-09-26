@@ -5804,7 +5804,7 @@ console.log('\nW. Оспаривание запрета писать и тиши
   check('отправкой заявки занимается одна функция и она перекрашивает страницу',
     mountSrc.includes('async function sendAppeal(form, submitter)')
       && mountSrc.includes('await forum.openAppeal(kind, message)')
-      && mountSrc.includes("'Апелляция отправлена модерации. Запрет на время разбора остаётся.'"));
+      && mountSrc.includes('Апелляция отправлена модерации. Запрет на время разбора остаётся.'));
 
   /* ── Очередь панели ── */
   const { renderModeration } = await import('../src/admin/screens/moderation.js');
@@ -8765,6 +8765,121 @@ console.log('\nAG. Тихие часы');
   check('миграция стоит в списке и в описании',
     readmeSrc.includes('`20260926-quiet-hours.sql`')
       && readmeSrc.indexOf('20260926-update-pulse.sql') < readmeSrc.indexOf('20260926-quiet-hours.sql'));
+}
+
+// ── AH. Сроки ответа модерации ───────────────────────────────────────────────
+
+console.log('\nAH. Сроки ответа модерации');
+{
+  /*
+    Пункт с донорского форума, где очередь обращений размечают уровнем
+    ожидания. Перенесено ровно то, что у нас честно: уровень считается на
+    чтении из created_at, и у него нет ни колонки, ни будильника. Отсюда и
+    главная опасность: обещание игроку и линейка дежурного обязаны расти из
+    одного числа, иначе страница обещает сутки, а очередь красит трое.
+    Тест сверяет границы, имена меток, единственное место формулировки
+    обещания и то, что очереди читаются от давности.
+  */
+  const { readFile, readdir } = await import('node:fs/promises');
+  const sla = await import('../src/forum/sla.js');
+  const slaSrc = await readFile('src/forum/sla.js', 'utf8');
+  const modSrc = await readFile('src/admin/screens/moderation.js', 'utf8');
+  const guidesSrc = await readFile('src/pages/guides.js', 'utf8');
+  const pageSrc = await readFile('src/pages/forum.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const adminCss = await readFile('src/admin/admin.css', 'utf8');
+  const forumCss = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const L = CONFIG.forum.limits;
+
+  /* ── Числа ── */
+  equal('«скоро срок» — ровно сутки', L.slaDueSoonHours, 24);
+  equal('«просрочено» — ровно трое суток', L.slaOverdueHours, 72);
+  check('границы не переставлены', L.slaDueSoonHours < L.slaOverdueHours);
+
+  /* ── Линейка возраста ── */
+  const now = new Date('2026-09-26T12:00:00Z');
+  const hoursAgo = (h) => new Date(now.getTime() - h * 3600000);
+  const CASES = [
+    [0, 'fresh'], [23, 'fresh'],
+    [24, 'soon'], [36, 'soon'], [71, 'soon'],
+    [72, 'late'], [500, 'late'],
+    [-5, 'fresh'],
+  ];
+  for (const [h, want] of CASES) {
+    equal(`возраст ${h} ч — уровень ${want}`, sla.slaLevel(hoursAgo(h), now), want);
+  }
+  check('без даты уровень «свежая»: очередь не врёт о сроке там, где не знает даты',
+    sla.slaLevel(null, now) === 'fresh' && sla.slaLevel(undefined, now) === 'fresh'
+      && sla.slaLevel('не дата', now) === 'fresh' && sla.slaLevel(NaN, now) === 'fresh');
+  check('число миллисекунд понимается так же, как Date',
+    sla.slaLevel(hoursAgo(80).getTime(), now) === 'late');
+
+  /* ── Метки и обещание ── */
+  check('у «свежей» заявки метки нет, и её некому напечатать',
+    !('fresh' in sla.SLA_LABELS) && Object.keys(sla.SLA_LABELS).every(
+      (k) => k === 'soon' || k === 'late'));
+  equal('скоро срок называется по-русски', sla.SLA_LABELS.soon, 'скоро срок');
+  equal('просрочено называется по-русски', sla.SLA_LABELS.late, 'просрочено');
+  equal('обещание в сутках — то же число, что красит «просрочено»',
+    sla.slaPromiseDays(), L.slaOverdueHours / 24);
+  equal('строка обещания собрана из этого числа',
+    sla.slaPromiseLine(), `Обычно отвечаем в течение ${sla.slaPromiseDays()} суток.`);
+  check('формулировка обещания живёт ровно в помощнике',
+    !modSrc.includes('Обычно отвечаем') && !guidesSrc.includes('Обычно отвечаем')
+      && !pageSrc.includes('Обычно отвечаем') && !mountSrc.includes('Обычно отвечаем')
+      && slaSrc.includes('Обычно отвечаем'));
+
+  /* ── Очереди читаются от давности ── */
+  check('жалобы в панели выстроены старшими вперёд',
+    modSrc.includes('[...f.reports].sort(')
+      && modSrc.includes('new Date(a.createdAt) - new Date(b.createdAt)'));
+  check('число тех, чей публичный срок вышел, названо в заголовке',
+    modSrc.includes("slaLevel(r.createdAt) === 'late'")
+      && modSrc.includes('adm-sla adm-sla--late'));
+  check('метка стоит и на жалобе, и на открытой апелляции',
+    modSrc.includes('${slaMark(r.createdAt)}') && modSrc.includes('slaMark(a.createdAt)'));
+  check('разобранная апелляция метки не носит: ждёт — открытая',
+    modSrc.includes("isOpen ? slaMark(a.createdAt) : ''"));
+  check('апелляции в очереди тоже от давности',
+    modSrc.includes(".filter((a) => a.status === 'open')")
+      && modSrc.includes('.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))'));
+  check('очередь заявок на гайдах читается от давности и метку печатает только модерации',
+    guidesSrc.includes('[...open].sort(') && guidesSrc.includes('${slaMark(r.createdAt)}'));
+  const openRow = guidesSrc.slice(guidesSrc.indexOf('function openRequestRow'),
+    guidesSrc.indexOf('function ownRequestRow'));
+  check('игрок своей просрочки не видит: «просрочено» — внутреннее слово дежурного',
+    !openRow.includes('slaMark') && !guidesSrc.slice(
+      guidesSrc.indexOf('function ownRequestRow'), guidesSrc.indexOf('function requestForm'))
+      .includes('slaMark'));
+
+  /* ── Публичное обещание там, где игрок ждёт ── */
+  check('под правилами стоит строка обещания',
+    pageSrc.includes('esc(slaPromiseLine())') && pageSrc.includes('forum-rules__note'));
+  check('и подтверждение жалобы, и подтверждение апелляции называют срок',
+    mountSrc.includes('`Жалоба отправлена. ${slaPromiseLine()}`')
+      && mountSrc.includes('Апелляция отправлена модерации. Запрет на время разбора остаётся. ${slaPromiseLine()}`')
+      && mountSrc.includes('import { slaPromiseLine }'));
+  check('открытая апелляция напоминает срок прямо в состоянии',
+    pageSrc.includes('модератор ещё не ответил. ${esc(slaPromiseLine())}'));
+
+  /* ── Внешний вид ── */
+  check('панель красит метку теми же словами, что помощник',
+    adminCss.includes('.adm-sla--soon') && adminCss.includes('.adm-sla--late'));
+  check('и страница гайдов — тоже',
+    forumCss.includes('.guide-req__sla--soon') && forumCss.includes('.guide-req__sla--late'));
+
+  /* ── Честное «миграции нет» ── */
+  const sqlFiles = await readdir('supabase');
+  check('ни SQL-файла, ни колонки у срока нет — уровень считается на чтении',
+    !sqlFiles.some((f) => /sla|response-time|deadline/i.test(f)));
+  check('документ называет, чего в сроках нет намеренно',
+    docsSrc.includes('## Сроки ответа модерации')
+      && docsSrc.includes('Напоминаний по расписанию')
+      && docsSrc.includes('Донорских четырёх часов')
+      && docsSrc.includes('Миграции.'));
+  check('обещание в документе — то же число, что в конфиге',
+    docsSrc.includes(`Обычно отвечаем в течение ${L.slaOverdueHours / 24} суток.`));
 }
 
 console.log(`\n${'─'.repeat(52)}`);

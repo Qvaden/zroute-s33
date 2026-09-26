@@ -2472,6 +2472,17 @@
 .guide-req--mine { border-left-color: var(--accent); }
 .guide-req__title { font-size: 14px; line-height: 1.35; }
 .guide-req__by { font-size: 11.5px; }
+/* Метка ожидания — та же, что в панели; классы свои, цвета общие. */
+.guide-req__sla {
+  align-self: flex-start;
+  padding: 1px 7px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.guide-req__sla--soon { color: var(--gold); }
+.guide-req__sla--late { color: var(--loss); }
 .guide-req__details { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
 .guide-req__outcome { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; }
 .guide-req__outcome a { color: var(--accent); }

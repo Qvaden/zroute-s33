@@ -1233,6 +1233,23 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-report__note { margin: 9px 0 0; color: var(--dim); font-size: 13px; font-style: italic; }
 
 /*
+  Метка ожидания (src/forum/sla.js). Цвета те же, чем панель уже говорит:
+  янтарь — «время вышло бы вчера», красный — «публичный срок не выдержать».
+  «Свежая» заявка метки не имеет — серый знак на каждой второй карточке
+  читался бы шумом.
+*/
+.adm-sla {
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+.adm-sla--soon { color: var(--gold); }
+.adm-sla--late { color: var(--loss); }
+
+/*
   То, на что жалуются, отделено рамкой слева: в разборе важно не спутать
   текст жалобы с текстом нарушения.
 */

@@ -5,6 +5,7 @@
  */
 import { esc } from '../ui/helpers.js';
 import { postBody } from '../forum/format.js';
+import { slaLevel, SLA_LABELS } from '../forum/sla.js';
 import { renderMdBar } from './forum.js';
 import { CONFIG } from '../../config.js';
 
@@ -275,19 +276,32 @@ function requestForm(L) {
   с полем объяснения и выбором гайда. Гайд берётся из соседнего списка, поэтому
   решение принимается там, где видно, что уже написано.
 */
+
+/** Метка ожидания: слово то же, что в панели, класс — с приставкой страницы. */
+function slaMark(createdAt) {
+  const level = slaLevel(createdAt);
+  if (level === 'fresh') return '';
+  return `<span class="guide-req__sla guide-req__sla--${level}">${esc(SLA_LABELS[level])}</span>`;
+}
+
 function staffQueue(open, s) {
   if (!open.length) return '';
   const L = CONFIG.forum.limits;
   const guideOptions = (Array.isArray(s.guides) ? s.guides : [])
     .map((g) => `<option value="${esc(g.id)}">${esc(g.title)}</option>`)
     .join('');
+  /* Очередь читается от давности, а не от свежести: заявка, которую ждут
+     дольше обещанного, должна лежать под рукой, а не в конце списка. */
+  const waiting = [...open].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   return `
     <h3 class="guide-requests__sub">Очередь модерации (${open.length})</h3>
-    <ul class="guide-req-list guide-req-list--staff">${open
+    <ul class="guide-req-list guide-req-list--staff">${waiting
       .map((r) => `
         <li class="guide-req">
           <b class="guide-req__title">${esc(r.title)}</b>
           <span class="guide-req__by muted">${esc(r.userNick || '—')} · ${esc(ruDate(r.createdAt))}</span>
+          ${slaMark(r.createdAt)}
           ${r.details ? `<p class="guide-req__details">${esc(r.details)}</p>` : ''}
           <div class="guide-req__acts">
             <label class="forum-field">

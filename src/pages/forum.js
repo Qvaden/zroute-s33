@@ -28,6 +28,7 @@ import { eventBadge, eventActions } from './calendar.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
 import { formatQuietTime } from '../forum/quiet.js';
+import { slaPromiseLine } from '../forum/sla.js';
 import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
@@ -654,6 +655,8 @@ function renderRules() {
         Смысл написанного оценивает человек, а не программа: списка запрещённых
         слов здесь нет. У каждой записи есть кнопка «Пожаловаться» — по жалобе
         разбирается администратор и удаляет пост с указанием пункта.
+        ${esc(slaPromiseLine())} Жалоба или апелляция не теряется: очередь
+        модерации показывает дежурному, что ждёт ответа дольше обещанного.
       </p>
     </details>`;
 }
@@ -952,7 +955,7 @@ function sanctionState(appeal) {
   if (!appeal) return '';
 
   if (appeal.status === 'open') {
-    return `<p class="forum-appeal__state">Вы оспорили решение ${esc(shortDate(appeal.createdAt))} — модератор ещё не ответил.</p>`;
+    return `<p class="forum-appeal__state">Вы оспорили решение ${esc(shortDate(appeal.createdAt))} — модератор ещё не ответил. ${esc(slaPromiseLine())}</p>`;
   }
 
   const left = appealCooldownLeft(appeal);
