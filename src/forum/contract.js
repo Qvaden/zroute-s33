@@ -413,6 +413,10 @@
  * @property {(id: string) => Promise<void>} [deleteGuide]
  * @property {(id: string, status: 'none'|'verified'|'outdated', note?: string) => Promise<void>} [reviewGuide]  Ставит отметку модерации; для игрока — отказ.
  * @property {(id: string, note: string) => Promise<void>} [reportGuideStale]  Сигнал «гайд устарел», один на человека.
+ * @property {() => Promise<ForumGuideRequest[]>} [listGuideRequests]  Открытые — всем, разобранные: только автору и модерации.
+ * @property {(draft: {title: string, details?: string}) => Promise<ForumGuideRequest>} [createGuideRequest]
+ * @property {(id: string) => Promise<void>} [cancelGuideRequest]  Отзыв своей открытой заявки.
+ * @property {(id: string, status: 'linked'|'closed', answer: string, guideId?: string|null) => Promise<void>} [resolveGuideRequest]  Решение модерации; для игрока — отказ.
  * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean}>} [getPushPrefs]
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
  * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
@@ -462,6 +466,28 @@
  * @property {string} userId   Кому принадлежит сигнал.
  * @property {string} note
  * @property {Date} createdAt
+ */
+
+/**
+ * Заявка на гайд: тему называет игрок, разбирает модерация. Голосов у неё нет
+ * намеренно — счётчик показывал бы не потребность, а активность одного
+ * кружка. Исход видит только автор и модерация, поэтому `guideId` здесь —
+ * именно id, а не название: карточка сама найдёт гайд в уже загруженном
+ * списке, и архивный или удалённый гайд станет «гайд недоступен» вместо
+ * ссылки в никуда.
+ *
+ * @typedef {Object} ForumGuideRequest
+ * @property {string} id
+ * @property {string} userId
+ * @property {string} userNick
+ * @property {string} title
+ * @property {string} details   Необязательное «где именно встал».
+ * @property {'open'|'linked'|'closed'|'cancelled'} status
+ * @property {string|null} guideId  Гайд, которым закрыли вопрос.
+ * @property {string} answer  Пояснение модерации; пусто, пока заявка открыта.
+ * @property {Date} createdAt
+ * @property {Date|null} decidedAt  У отозванной — момент отзыва.
+ * @property {string|null} decidedByNick  Кто решил; при отзыве — сам автор.
  */
 
 /**

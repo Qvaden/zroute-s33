@@ -7439,6 +7439,311 @@ console.log('\nAB. Бартер-доска');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── AC. Заявки на гайды ─────────────────────────────────────────────────────
+
+console.log('\nAC. Заявки на гайды');
+{
+  /*
+    Заявка разбросана по четырём местам: таблица и три двери в базе, два
+    адаптера, блок на странице гайдов и числа в config.js. Ошибка в любом стыке
+    невидима: страница продолжит показывать «Связана с гайдом», которую на этот
+    раз поставил не тот, и никто не заметит, что лимит в три заявки держит
+    только браузер. Поэтому сверяем места между собой, а не наличие слов.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-guide-requests.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/guides.js', 'utf8');
+  const behavSrc = await readFile('src/forum/guides.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const L = CONFIG.forum.limits;
+  const flat = sql.replace(/\s+/g, ' ');
+
+  /* ── Форма правила: заявка — своя таблица, а не метка темы ── */
+  check('заявка живёт отдельной таблицей, а не колонкой у темы или меткой',
+    flat.includes('create table if not exists public.forum_guide_requests')
+      && !/add column if not exists .*guide_request/i.test(sql)
+      && !sql.includes("'guide-request'"));
+  check('исхода ровно четыре, и «взято в работу» среди них нет',
+    flat.includes(`check (status in ('open', 'linked', 'closed', 'cancelled'))`)
+      && !/in progress|claimed|accepted/.test(sql)
+      && pagesSrc.includes("linked: 'Связана с гайдом'")
+      && pagesSrc.includes("closed: 'Закрыта модерацией'")
+      && pagesSrc.includes("cancelled: 'Отозвана автором'"));
+  check('ссылка на гайд переживает его удаление, а автор заявки — нет',
+    flat.includes('references public.forum_guides (id) on delete set null')
+      && flat.includes('references public.forum_users (id) on delete cascade'));
+  check('голосов, наград и истории правок в таблице намеренно нет',
+    !/vote|upvote|reward|payout|revision|history/i.test(sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '')));
+
+  /* ── Числа: форма, база и черновик говорят одно ── */
+  check('границы названия и описания держит проверка таблицы, числа те же, что в конфиге',
+    flat.includes(`char_length(title) between ${L.guideRequestTitleMin} and ${L.guideRequestTitleMax}`)
+      && flat.includes(`char_length(details) <= ${L.guideRequestDetailsMax}`));
+  check('объяснение модерации держит те же числа, что и комментарий к отметке гайда',
+    flat.includes(`answer = '' or char_length(answer) between ${L.guideNoteMin} and ${L.guideNoteMax}`)
+      && !Object.keys(L).some((k) => /^guideRequest.*(Answer|Note)/.test(k)));
+  check('форма называет те же границы, что и база',
+    pagesSrc.includes('minlength="${L.guideRequestTitleMin}" maxlength="${L.guideRequestTitleMax}"')
+      && pagesSrc.includes('maxlength="${L.guideRequestDetailsMax}"')
+      && pagesSrc.includes('не больше ${L.guideRequestDailyMax} заявок за сутки'));
+
+  /* Каждое отказное слово базы обязано жить и в черновом режиме. */
+  const refusals = [
+    'Заявку отправляет только вошедший игрок',
+    'У вас уже есть открытая заявка с таким названием',
+    'Заявка не найдена',
+    'Отозвать можно только свою заявку',
+    'Отозвать можно только открытую заявку',
+    'Заявку разбирает модерация',
+    'Нужно указать гайд, которым закрывается заявка',
+    'Связать заявку можно только с опубликованным гайдом',
+    'Эта заявка уже разобрана: ',
+  ];
+  for (const line of refusals) {
+    check(`отказ «${line.trim()}» назван одинаково в базе и в черновом режиме`,
+      sql.includes(line) && localSrc.includes(line));
+  }
+  /*
+    Отказы с числом в черновике собраны из значений конфига, поэтому их сверяют
+    две отдельные проверки: база обязана знать число из config.js, а черновик —
+    ту же фразу без числа. Иначе правка лимита в одном месте осталась бы
+    незаметной.
+  */
+  const numbered = [
+    [`Название темы короче ${L.guideRequestTitleMin} символов: по трём словам гайд не написать`,
+      'символов: по трём словам гайд не написать'],
+    [`Название темы длиннее ${L.guideRequestTitleMax} символов: его не прочитает ни модератор, ни автор гайда`,
+      'символов: его не прочитает ни модератор, ни автор гайда'],
+    [`Описание длиннее ${L.guideRequestDetailsMax} символов: суть влезает и в меньшее`,
+      'символов: суть влезает и в меньшее'],
+    [`Не больше ${L.guideRequestDailyMax} заявок за сутки: их читают люди`,
+      'заявок за сутки: их читают люди'],
+  ];
+  for (const [full, tail] of numbered) {
+    check(`числовая граница «${tail}» сошлась в базе, конфиге и черновике`,
+      sql.includes(full) && localSrc.includes(tail));
+  }
+  check('числа в отказе черновик берёт из конфига, а не пишет руками',
+    localSrc.includes('`Название темы короче ${REQ_TITLE_MIN} символов')
+      && localSrc.includes('`Название темы длиннее ${REQ_TITLE_MAX} символов')
+      && localSrc.includes('`Описание длиннее ${REQ_DETAILS_MAX} символов')
+      && localSrc.includes('`Не больше ${REQ_DAILY_MAX} заявок за сутки')
+      && localSrc.includes('const REQ_TITLE_MIN = CONFIG.forum.limits.guideRequestTitleMin'));
+  check('объяснение требует тех же слов, что и запись об устаревании',
+    localSrc.includes('`Нужно хотя бы ${NOTE_MIN} символов: игрок ждёт объяснения, а не молчаливого отказа`')
+      && sql.includes('Нужно хотя бы 5 символов: игрок ждёт объяснения, а не молчаливого отказа'));
+
+  /* ── Двери, права и вид ── */
+  check('правило «не больше трёх» и запрет повтора держат функции, а не браузер',
+    flat.includes(`from public.forum_guide_requests where user_id = auth.uid() and created_at > now() - interval '24 hours'`)
+      && flat.includes(`where user_id = auth.uid() and status = 'open'`)
+      && /lower\(regexp_replace\(btrim\(title\), '\\s\+', ' ', 'g'\)\)/.test(flat));
+  check('нормализация названия в черновике — то же выражение, что в индексе базы',
+    localSrc.includes("String(t ?? '').trim().toLowerCase().replace(/\\s+/g, ' ')"));
+  check('повтор держит и частичный уникальный индекс: две вкладки не пройдут',
+    /create unique index if not exists forum_guide_requests_one_open[\s\S]*?where status = 'open';/.test(sql));
+  check('политика одна, и она читает: открытое — всем, разбор — автору и модерации',
+    flat.includes(`create policy forum_guide_requests_read on public.forum_guide_requests for select using (status = 'open' or user_id = auth.uid() or public.forum_is_staff());`)
+      && (sql.match(/create policy/g) || []).length === 1);
+  check('ни одной политики записи: строки правят только двери',
+    !/create policy[\s\S]{0,200}for (insert|update|delete)/.test(sql)
+      && flat.includes('grant select on public.forum_guide_requests to anon, authenticated')
+      && !/grant (insert|update|delete) on public\.forum_guide_requests/.test(sql));
+  check('все три двери вызваны адаптером, а не прямой записью в таблицу',
+    supaSrc.includes("'/rpc/forum_open_guide_request'")
+      && supaSrc.includes("'/rpc/forum_cancel_guide_request'")
+      && supaSrc.includes("'/rpc/forum_resolve_guide_request'")
+      && !supaSrc.includes("rest('/forum_guide_requests?"));
+  check('анонимный вызов функций не работает, вошедший платит за свою строку',
+    (sql.match(/revoke all on function public\.forum_\w*guide_request\w*[^;]*from public, anon;/g) || []).length === 3
+      && (sql.match(/grant execute on function public\.forum_\w*guide_request\w*[^;]*to authenticated;/g) || []).length === 3);
+  check('список выходит представлением с никами, и оно читает от своего имени',
+    sql.includes('create or replace view public.forum_guide_request_list\nwith (security_invoker = on) as')
+      && sql.includes('u.nick       as user_nick')
+      && sql.includes('d.nick       as decided_by_nick'));
+  check('представление не трогает forum_guides: гость остался бы без всего списка',
+    !/forum_guide_request_list[\s\S]{0,900}join public\.forum_guides/.test(sql)
+      && pagesSrc.includes('Название связанного гайда ищется в уже загруженном списке')
+      && pagesSrc.includes('гайд недоступен'));
+
+  /* ── Контракт и оба адаптера ── */
+  check('контракт объявляет четыре новые возможности и форму заявки',
+    contractSrc.includes('(draft: {title: string, details?: string}) => Promise<ForumGuideRequest>} [createGuideRequest]')
+      && contractSrc.includes('(id: string) => Promise<void>} [cancelGuideRequest]')
+      && contractSrc.includes("status: 'linked'|'closed', answer: string, guideId?: string|null")
+      && contractSrc.includes('ForumGuideRequest[]'));
+  check('оба адаптера отдают заявку одними полями',
+    /function guideRequestOut\(r\)[\s\S]{0,400}userId: r\.userId[\s\S]{0,400}decidedByNick: r\.decidedByNick/.test(localSrc)
+      && /function guideRequestOut\(row\)[\s\S]{0,400}userId: row\.user_id[\s\S]{0,400}decidedByNick: row\.decided_by_nick/.test(supaSrc));
+  check('решение модерации уведомляет автора тем же видом, что и ответ на апелляцию',
+    localSrc.includes("kind: 'moderation',") && sql.includes(`'moderation',`)
+      && localSrc.includes('`Заявка «${row.title}» ${requestOutcomeWord(status)}: ${text}`')
+      && sql.includes(`left('Заявка «' || v.title || '» ' || v_word || ': ' || v_answer, 120)`));
+
+  /* ── Экран ── */
+  check('блок стоит под списком гайдов, а не над ним',
+    /<div class="guide-list-wrap">\$\{list\}<\/div>\s*\$\{guideRequestsBlock\(s\)\}/.test(pagesSrc));
+  check('гостю форму не показывают, а открытые заявки показывают',
+    pagesSrc.includes('const canAsk = Boolean(s.me) && !s.me.banned && !isMuted(s.me);')
+      && pagesSrc.includes('${canAsk ? requestForm(L) :')
+      && pagesSrc.includes('Войдите на сайт, чтобы предложить тему.'));
+  check('очередь модерации живёт на странице гайдов, а не вторым экраном в панели',
+    pagesSrc.includes('data-grq-resolve="linked"') && pagesSrc.includes('data-grq-resolve="closed"')
+      && pagesSrc.includes('data-grq-answer=') && pagesSrc.includes('data-grq-guide=')
+      && !/guideRequest/i.test(await readFile('src/admin/screens/moderation.js', 'utf8')));
+  check('отозвать можно только свою открытую заявку — кнопка у неё одна',
+    pagesSrc.includes('data-grq-cancel="${esc(r.id)}"')
+      && /r\.status === 'open'\s*\?\s*`<button[^`]*data-grq-cancel/.test(pagesSrc));
+  check('страница слушает три действия и перечитывает список после каждого',
+    behavSrc.includes("t.closest('[data-grq-cancel]')")
+      && behavSrc.includes("t.closest('[data-grq-resolve]')")
+      && behavSrc.includes("e.target.closest('[data-grq-form]')")
+      && /async function runRequestAction\(btn, fn\)[\s\S]{0,300}await loadRequests\(\)/.test(behavSrc));
+  check('набранное в форме не стирается при перерисовке',
+    behavSrc.includes("'[data-grq-form] [name=\"title\"]'")
+      && behavSrc.includes("'[data-grq-answer]'"));
+  check('без миграции блок называет файл, а не молчит',
+    behavSrc.includes('supabase/20260926-guide-requests.sql'));
+  check('блок одет своим стилем',
+    cssSrc.includes('.guide-req-form {') && cssSrc.includes('.guide-req-list--staff .guide-req {')
+      && cssSrc.includes('.guide-req__answer {'));
+
+  /* ── Документы ── */
+  check('правило описано и в базе, и в документах, и в списке миграций',
+    sql.includes('── ПРАВИЛО ──') && docsSrc.includes('20260926-guide-requests.sql')
+      && readmeSrc.includes('20260926-guide-requests.sql'));
+  check('документ называет, чего в заявках нет намеренно',
+    docsSrc.includes('## Заявки на гайды')
+      && /- \*\*Голосов \(«\+1»\)\.\*\*/.test(docsSrc)
+      && docsSrc.includes('очередь разбора живёт на странице гайдов'));
+
+  /* ── Живой черновой прогон: те же правила, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const raw = () => JSON.parse(store.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+
+  await local.signUp('Вопрошающий');           // первый — админ, он же модерация
+  await local.signUp('Обычный');
+  await local.signIn('Обычный');
+
+  await local.signOut();
+  equal('без входа заявку не отправить',
+    await says(() => local.createGuideRequest({ title: 'Как добывать серебро' })),
+    'Заявку отправляет только вошедший игрок');
+  await local.signIn('Обычный');
+
+  equal('короткое название отклоняется словами базы',
+    await says(() => local.createGuideRequest({ title: 'гай' })),
+    `Название темы короче ${L.guideRequestTitleMin} символов: по трём словам гайд не написать`);
+  equal('длинное название — тоже',
+    await says(() => local.createGuideRequest({ title: 'и'.repeat(L.guideRequestTitleMax + 1) })),
+    `Название темы длиннее ${L.guideRequestTitleMax} символов: его не прочитает ни модератор, ни автор гайда`);
+  equal('и длинное описание',
+    await says(() => local.createGuideRequest({
+      title: 'Как добывать серебро', details: 'а'.repeat(L.guideRequestDetailsMax + 1),
+    })),
+    `Описание длиннее ${L.guideRequestDetailsMax} символов: суть влезает и в меньшее`);
+
+  const first = await local.createGuideRequest({
+    title: 'Как добывать серебро', details: 'караван в одиночку не доезжает',
+  });
+  equal('заявка принята открытой', first.status, 'open');
+  check('и названа целиком, с ником автора',
+    first.title === 'Как добывать серебро' && first.userNick === 'Обычный');
+
+  equal('повтор той же темы этим же автором не проходит',
+    await says(() => local.createGuideRequest({ title: ' как   добывать  серебро ' })),
+    'У вас уже есть открытая заявка с таким названием');
+
+  await local.createGuideRequest({ title: 'Где взять аптеки в 22-м веке' });
+  await local.createGuideRequest({ title: 'Как ставить лагерь на холме' });
+  equal('четвёртая за сутки — уже не заявка',
+    await says(() => local.createGuideRequest({ title: 'Как читать карту альянсов' })),
+    `Не больше ${L.guideRequestDailyMax} заявок за сутки: их читают люди`);
+
+  /* Видимость: открытое видит каждый, разбор — только свой. */
+  await local.signOut();
+  const asGuest = await local.listGuideRequests();
+  equal('гость видит открытые заявки', asGuest.length, 3);
+  check('и не видит ни объяснения, ни исхода',
+    asGuest.every((r) => r.status === 'open' && r.answer === ''));
+
+  /* Право разбирать — не у автора, даже если заявка его. */
+  await local.signIn('Обычный');
+  equal('игрок свою заявку не разберёт',
+    await says(() => local.resolveGuideRequest(first.id, 'closed', 'разберём позже')),
+    'Заявку разбирает модерация');
+  await local.signOut();
+  equal('и без входа тем более',
+    await says(() => local.resolveGuideRequest(first.id, 'closed', 'разберём позже')),
+    'Заявку разбирает модерация');
+
+  const other = asGuest.find((r) => r.id !== first.id);
+  await local.signIn('Вопрошающий');
+  equal('чужую заявку не отозвать',
+    await says(() => local.cancelGuideRequest(first.id)), 'Отозвать можно только свою заявку');
+  equal('несуществующей заявки нет ни у кого',
+    await says(() => local.resolveGuideRequest('нет-такой', 'closed', 'текст длиннее пяти')),
+    'Заявка не найдена');
+
+  const guide = await local.createGuide({
+    slug: 'serebro', title: 'Серебро: где брать', category: 'strategy', body: '<p>карьер и биржа</p>',
+  });
+  equal('закрытие гайдом без самого гайда не принимается',
+    await says(() => local.resolveGuideRequest(other.id, 'linked', 'смотрим сюда', null)),
+    'Нужно указать гайд, которым закрывается заявка');
+  equal('и только с опубликованным',
+    await says(() => local.resolveGuideRequest(other.id, 'linked', 'смотрим сюда', 'nope')),
+    'Связать заявку можно только с опубликованным гайдом');
+  equal('короткое объяснение не считается ответом',
+    await says(() => local.resolveGuideRequest(other.id, 'closed', 'ок')),
+    `Нужно хотя бы ${L.guideNoteMin} символов: игрок ждёт объяснения, а не молчаливого отказа`);
+
+  await local.resolveGuideRequest(other.id, 'linked', 'вот разбор, раздел «Серебро»', guide.id);
+  const afterLink = (await local.listGuideRequests()).find((r) => r.id === other.id);
+  equal('заявка закрыта ссылкой на гайд', `${afterLink.status}/${afterLink.guideId}`, `linked/${guide.id}`);
+  equal('и объяснение дошло до автора', afterLink.answer, 'вот разбор, раздел «Серебро»');
+  equal('повторное решение не перетирает исход',
+    await says(() => local.resolveGuideRequest(other.id, 'closed', 'передумаем, тут длиннее')),
+    'Эта заявка уже разобрана: связана с гайдом');
+
+  /* Уведомление уходит автору, а не тому, кто решал. */
+  const note = raw().notifications.find((n) => String(n.preview).startsWith('Заявка «'));
+  check('автору пришло уведомление о решении тем же видом',
+    Boolean(note) && note.kind === 'moderation' && note.userId === afterLink.userId
+      && note.preview.includes('связана с гайдом'));
+
+  await local.signIn('Обычный');
+  const mine = await local.listGuideRequests();
+  check('свой разбор автор видит', mine.some((r) => r.id === other.id && r.status === 'linked'));
+  check('чужого разбора у него нет', !mine.some((r) => r.status === 'linked' && r.id !== other.id));
+  equal('открытые заявки других игроков остаются видны',
+    mine.filter((r) => r.status === 'open').length, 2);
+  equal('разобранную заявку не отозвать',
+    await says(() => local.cancelGuideRequest(other.id)), 'Отозвать можно только открытую заявку');
+
+  await local.cancelGuideRequest(first.id);
+  equal('свою открытую заявку автор отзывает',
+    (await local.listGuideRequests()).find((r) => r.id === first.id).status, 'cancelled');
+  await local.signOut();
+  check('отозванная заявка исчезла из чужих глаз',
+    !(await local.listGuideRequests()).some((r) => r.id === first.id));
+  check('но осталась в хранилище: исход — факт, а не удаление',
+    raw().guideRequests.some((r) => r.id === first.id && r.status === 'cancelled'));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 
 console.log('\nR3. Ключ восстановления');

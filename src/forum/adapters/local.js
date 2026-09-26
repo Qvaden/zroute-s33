@@ -2967,6 +2967,192 @@ export async function reportGuideStale(id, note) {
   write(s);
 }
 
+/* ── Заявки на гайды в локальном режиме ───────────────────────────────────── */
+
+const REQ_TITLE_MIN = CONFIG.forum.limits.guideRequestTitleMin;
+const REQ_TITLE_MAX = CONFIG.forum.limits.guideRequestTitleMax;
+const REQ_DETAILS_MAX = CONFIG.forum.limits.guideRequestDetailsMax;
+const REQ_DAILY_MAX = CONFIG.forum.limits.guideRequestDailyMax;
+
+/*
+  Нормализация названия — то же выражение, что в индексе и в функции базы
+  (supabase/20260926-guide-requests.sql): обрезка, нижний регистр, схлопнутые
+  пробелы. Расхождение означало бы, что черновой режим видит дубликаты, которых
+  база не заметила бы, и наоборот.
+*/
+const normalizeRequestTitle = (t) => String(t ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const requestOutcomeWord = (status) => (status === 'linked' ? 'связана с гайдом'
+  : status === 'closed' ? 'закрыта' : 'отозвана');
+
+function guideRequestOut(r) {
+  return {
+    id: r.id,
+    userId: r.userId,
+    userNick: r.userNick || '',
+    title: r.title,
+    details: r.details || '',
+    status: r.status,
+    guideId: r.guideId || null,
+    answer: r.answer || '',
+    createdAt: toDate(r.createdAt) ?? new Date(),
+    decidedAt: toDate(r.decidedAt),
+    decidedByNick: r.decidedByNick || null,
+  };
+}
+
+/*
+  Видимость повторяет политику forum_guide_requests: открытая заявка публична
+  (это вопрос «чего не хватает», и он полезен тому, кто мог бы написать гайд),
+  разбор видят только автор и модерация.
+*/
+export async function listGuideRequests() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me) || null;
+  return (s.guideRequests || [])
+    .filter((r) => r.status === 'open' || (me && r.userId === me.id) || isStaff(me))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map(guideRequestOut);
+}
+
+/*
+  Нижняя граница названия — не придирка, а то же правило, что в базе: заявка
+  из слова «гайд» неразбираема. Порядок проверок повторяет функцию базы
+  (право писать → длина названия → длина описания → частота → повтор), чтобы
+  черновой режим не показывал человеку другой отказ, чем получит боевой.
+*/
+export async function createGuideRequest(draft) {
+  const s = read();
+  /*
+    Первым делом — вход: в базе это первая же проверка функции, и её слово
+    («Заявку отправляет только вошедший игрок») черновик обязан давать тот же,
+    иначе человек в черновом режиме увидит отказ, которого в бою не бывает.
+  */
+  if (!s.users.find((u) => u.id === s.me)) {
+    throw new Error('Заявку отправляет только вошедший игрок');
+  }
+  const me = requireWriter(s);
+  const title = String(draft?.title ?? '').trim();
+  const details = String(draft?.details ?? '').trim();
+
+  if (title.length < REQ_TITLE_MIN) {
+    throw new Error(`Название темы короче ${REQ_TITLE_MIN} символов: по трём словам гайд не написать`);
+  }
+  if (title.length > REQ_TITLE_MAX) {
+    throw new Error(`Название темы длиннее ${REQ_TITLE_MAX} символов: его не прочитает ни модератор, ни автор гайда`);
+  }
+  if (details.length > REQ_DETAILS_MAX) {
+    throw new Error(`Описание длиннее ${REQ_DETAILS_MAX} символов: суть влезает и в меньшее`);
+  }
+
+  const dayAgo = Date.now() - 24 * 3600 * 1000;
+  const recent = (s.guideRequests || [])
+    .filter((r) => r.userId === me.id && new Date(r.createdAt).getTime() > dayAgo);
+  if (recent.length >= REQ_DAILY_MAX) {
+    throw new Error(`Не больше ${REQ_DAILY_MAX} заявок за сутки: их читают люди`);
+  }
+
+  if ((s.guideRequests || []).some((r) => r.userId === me.id && r.status === 'open'
+    && normalizeRequestTitle(r.title) === normalizeRequestTitle(title))) {
+    throw new Error('У вас уже есть открытая заявка с таким названием');
+  }
+
+  const row = {
+    id: newId('grq'),
+    userId: me.id,
+    userNick: me.nick,
+    title: title.slice(0, REQ_TITLE_MAX),
+    details: details.slice(0, REQ_DETAILS_MAX),
+    status: 'open',
+    guideId: null,
+    answer: '',
+    createdAt: new Date().toISOString(),
+    decidedAt: null,
+    decidedBy: null,
+    decidedByNick: null,
+  };
+  if (!s.guideRequests) s.guideRequests = [];
+  s.guideRequests.push(row);
+  write(s);
+  return guideRequestOut(row);
+}
+
+/*
+  Отзыв — единственное, что автор может сделать после отправки. Разобранную
+  заявку отозвать нельзя: под ней уже лежит объяснение модерации, и «отозвал»
+  стёр бы его из истории.
+*/
+export async function cancelGuideRequest(id) {
+  const s = read();
+  const me = meOrThrow(s);
+  const row = (s.guideRequests || []).find((x) => x.id === id);
+  if (!row) throw new Error('Заявка не найдена');
+  if (row.userId !== me.id) throw new Error('Отозвать можно только свою заявку');
+  if (row.status !== 'open') throw new Error('Отозвать можно только открытую заявку');
+
+  row.status = 'cancelled';
+  row.decidedAt = new Date().toISOString();
+  row.decidedBy = me.id;
+  row.decidedByNick = me.nick;
+  write(s);
+}
+
+export async function resolveGuideRequest(id, status, answer, guideId = null) {
+  const s = read();
+  /*
+    Гость слышит то же слово, что и игрок без прав: в базе проверка одна —
+    forum_is_staff(), и она не различает «не вошёл» и «вошёл без прав».
+  */
+  const me = s.users.find((u) => u.id === s.me) || null;
+  if (!isStaff(me)) throw new Error('Заявку разбирает модерация');
+  if (!['linked', 'closed'].includes(status)) {
+    throw new Error(`Неизвестное решение по заявке: ${status}`);
+  }
+
+  const row = (s.guideRequests || []).find((x) => x.id === id);
+  if (!row) throw new Error('Заявка не найдена');
+
+  const text = String(answer ?? '').trim();
+  if (text.length < NOTE_MIN) {
+    throw new Error(`Нужно хотя бы ${NOTE_MIN} символов: игрок ждёт объяснения, а не молчаливого отказа`);
+  }
+  if (text.length > NOTE_MAX) {
+    throw new Error(`Не больше ${NOTE_MAX} символов: объяснение должно читаться и с телефона`);
+  }
+
+  if (status === 'linked') {
+    if (!guideId) throw new Error('Нужно указать гайд, которым закрывается заявка');
+    if (!(s.guides || []).some((g) => g.id === guideId && g.status === 'published')) {
+      throw new Error('Связать заявку можно только с опубликованным гайдом');
+    }
+  }
+
+  if (row.status !== 'open') {
+    throw new Error(`Эта заявка уже разобрана: ${requestOutcomeWord(row.status)}`);
+  }
+
+  row.status = status;
+  row.answer = text.slice(0, NOTE_MAX);
+  row.guideId = status === 'linked' ? guideId : null;
+  row.decidedAt = new Date().toISOString();
+  row.decidedBy = me.id;
+  row.decidedByNick = me.nick;
+
+  /*
+    Исход приходит уведомлением, а не лежит в очереди панели: игрок в панель
+    не заходит вообще. Вид 'moderation' тот же, что у ответа на апелляцию, —
+    новых слов в проверку вида не заводим и здесь.
+  */
+  pushNotification(s, {
+    userId: row.userId,
+    actorId: me.id,
+    actorNick: me.nick,
+    kind: 'moderation',
+    preview: `Заявка «${row.title}» ${requestOutcomeWord(status)}: ${text}`,
+  });
+  write(s);
+}
+
 /* ── Push-настройки (посты форума) в локальном режиме ─────────────────────── */
 
 export async function getPushPrefs() {

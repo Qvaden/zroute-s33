@@ -31,6 +31,13 @@ function ruDate(value) {
 
 const isStaff = (me) => Boolean(me && (me.role === 'admin' || me.role === 'moderator'));
 
+/*
+  Молчание закрывает и заявку: в базе её пропускает та же проверка права
+  писать, что и пост. Показывать форму повесившемуся игроку — значит выдать
+  ему отказ после того, как он уже набрал текст.
+*/
+const isMuted = (me) => Boolean(me?.mutedUntil && new Date(me.mutedUntil) > new Date());
+
 /** Короткий знак состояния у строки списка. Без отметки — ничего. */
 function reviewBadge(g) {
   const label = REVIEW_LABEL[g.reviewStatus];
@@ -112,6 +119,7 @@ function renderList(s) {
         : ''}
       ${canWrite && s.composing ? composeForm(s) : ''}
       <div class="guide-list-wrap">${list}</div>
+      ${guideRequestsBlock(s)}
     </section>`;
 }
 
@@ -182,6 +190,184 @@ function reviewNotice(g) {
       ${g.reviewNote ? `<p class="guide-review__note">${esc(g.reviewNote)}</p>` : ''}
       <p class="guide-review__why">${esc(why)}</p>
     </div>`;
+}
+
+/**
+ * Заявка — не голосование и не обещание. Игрок называет тему, модерация
+ * решает её двумя словами: вот готовый гайд, или этого на сервере не будет.
+ * Поэтому у исхода нет «взято в работу»: автор у нас никто, и статус без
+ * хозяина висел бы вечно.
+ */
+const REQ_OUTCOME = {
+  linked: 'Связана с гайдом',
+  closed: 'Закрыта модерацией',
+  cancelled: 'Отозвана автором',
+};
+
+function requestOutcome(r, s) {
+  const label = REQ_OUTCOME[r.status] || '';
+  if (!label) return '';
+  const guide = r.status === 'linked'
+    ? (Array.isArray(s.guides) ? s.guides.find((g) => g.id === r.guideId) : null)
+    : null;
+  /*
+    Название связанного гайда ищется в уже загруженном списке, а не приходит
+    из базы вместе с заявкой: у гостя нет прав на таблицу гайдов, а архивный
+    или удалённый гайд иначе превратился бы в ссылку в никуда.
+  */
+  const link = r.status === 'linked'
+    ? (guide
+      ? `: <a href="#/guides/${esc(guide.slug)}">${esc(guide.title)}</a>`
+      : ' — гайд недоступен')
+    : '';
+  const who = r.decidedByNick ? ` · ${esc(r.decidedByNick)}` : '';
+  return `
+    <p class="guide-req__outcome">
+      <b>${esc(label)}</b>${link}${who}${r.decidedAt ? ` · ${esc(ruDate(r.decidedAt))}` : ''}
+    </p>
+    ${r.answer ? `<p class="guide-req__answer">${esc(r.answer)}</p>` : ''}`;
+}
+
+function openRequestRow(r) {
+  return `
+    <li class="guide-req">
+      <b class="guide-req__title">${esc(r.title)}</b>
+      <span class="guide-req__by muted">${esc(r.userNick || '—')} · ${esc(ruDate(r.createdAt))}</span>
+      ${r.details ? `<p class="guide-req__details">${esc(r.details)}</p>` : ''}
+    </li>`;
+}
+
+function ownRequestRow(r, s) {
+  return `
+    <li class="guide-req guide-req--mine">
+      <b class="guide-req__title">${esc(r.title)}</b>
+      <span class="guide-req__by muted">${esc(ruDate(r.createdAt))}</span>
+      ${r.status === 'open'
+        ? `<button type="button" class="forum-btn forum-btn--ghost" data-grq-cancel="${esc(r.id)}">Отозвать</button>`
+        : requestOutcome(r, s)}
+    </li>`;
+}
+
+function requestForm(L) {
+  return `
+    <form class="guide-req-form" data-grq-form>
+      <label class="forum-field">
+        <span>Какой гайд нужен</span>
+        <input name="title" minlength="${L.guideRequestTitleMin}" maxlength="${L.guideRequestTitleMax}"
+               required autocomplete="off" placeholder="Например: как собирать караван в одиночку">
+      </label>
+      <label class="forum-field">
+        <span>Где именно встали (необязательно)</span>
+        <textarea name="details" maxlength="${L.guideRequestDetailsMax}" rows="2"
+                  placeholder="Что уже пробовали и чего не хватило"></textarea>
+        <small class="muted">${L.guideRequestTitleMin}–${L.guideRequestTitleMax} символов в названии,
+          не больше ${L.guideRequestDailyMax} заявок за сутки. Разбирает модерация: ссылка на готовый
+          гайд или закрытие с объяснением.</small>
+      </label>
+      <div class="forum-composer__actions">
+        <button type="submit" class="forum-btn forum-btn--primary">Отправить заявку</button>
+      </div>
+    </form>`;
+}
+
+/*
+  Список для модерирующего — не отдельный экран, а те же открытые заявки, но
+  с полем объяснения и выбором гайда. Гайд берётся из соседнего списка, поэтому
+  решение принимается там, где видно, что уже написано.
+*/
+function staffQueue(open, s) {
+  if (!open.length) return '';
+  const L = CONFIG.forum.limits;
+  const guideOptions = (Array.isArray(s.guides) ? s.guides : [])
+    .map((g) => `<option value="${esc(g.id)}">${esc(g.title)}</option>`)
+    .join('');
+  return `
+    <h3 class="guide-requests__sub">Очередь модерации (${open.length})</h3>
+    <ul class="guide-req-list guide-req-list--staff">${open
+      .map((r) => `
+        <li class="guide-req">
+          <b class="guide-req__title">${esc(r.title)}</b>
+          <span class="guide-req__by muted">${esc(r.userNick || '—')} · ${esc(ruDate(r.createdAt))}</span>
+          ${r.details ? `<p class="guide-req__details">${esc(r.details)}</p>` : ''}
+          <div class="guide-req__acts">
+            <label class="forum-field">
+              <span>Объяснение</span>
+              <input data-grq-answer="${esc(r.id)}" maxlength="${L.guideNoteMax}" autocomplete="off"
+                     placeholder="Что именно изменилось или почему темы не будет">
+            </label>
+            ${guideOptions
+              ? `<label class="forum-field">
+                   <span>Готовый гайд</span>
+                   <select data-grq-guide="${esc(r.id)}">${guideOptions}</select>
+                 </label>`
+              : ''}
+            <div class="guide-req__btns">
+              <button type="button" class="forum-btn forum-btn--ghost"
+                      data-grq-resolve="linked" data-grq-id="${esc(r.id)}"
+                      ${guideOptions ? '' : 'disabled'}>Есть такой гайд</button>
+              <button type="button" class="forum-btn forum-btn--ghost"
+                      data-grq-resolve="closed" data-grq-id="${esc(r.id)}">Закрыть</button>
+            </div>
+          </div>
+        </li>`)
+      .join('')}</ul>`;
+}
+
+/**
+ * Место блока — под списком гайдов, а не над ним: сначала человек видит, что
+ * уже написано, и только потом понимает, чего не хватает. Форма видна
+ * вошедшему без запрета писать; гостю показывается список открытых тем, но не
+ * кнопка, иначе первая же отправка кончилась бы отказом без объяснения.
+ */
+function guideRequestsBlock(s) {
+  const L = CONFIG.forum.limits;
+  const all = Array.isArray(s.requests) ? s.requests : [];
+  const open = all.filter((r) => r.status === 'open');
+  const staff = isStaff(s.me);
+  const mine = s.me ? all.filter((r) => r.userId === s.me.id) : [];
+  const canAsk = Boolean(s.me) && !s.me.banned && !isMuted(s.me);
+  const none = '<p class="guide-requests__note muted">Открытых заявок нет: всё, что просили, уже разобрано.</p>';
+
+  if (s.requestsNote) {
+    return `
+      <section class="guide-requests">
+        <header class="panel__head">
+          <span class="eyebrow">Чего не хватает</span>
+          <h2>Заявки на гайды</h2>
+        </header>
+        <p class="guide-requests__note">${esc(s.requestsNote)}</p>
+      </section>`;
+  }
+
+  return `
+    <section class="guide-requests">
+      <header class="panel__head">
+        <span class="eyebrow">Чего не хватает</span>
+        <h2>Заявки на гайды</h2>
+        <p class="muted">Назовите тему, которой нет в списке выше. Модерация либо
+          покажет готовый гайд, либо закроет заявку с объяснением. Голосования
+          здесь нет намеренно: счётчик голосов показывает не потребность, а
+          активность одного кружка.</p>
+      </header>
+
+      ${canAsk ? requestForm(L) : `<p class="guide-requests__note muted">${
+        !s.me ? 'Войдите на сайт, чтобы предложить тему.'
+        : 'Сейчас вы не можете писать — заявка ушла бы в отказ.'}</p>`}
+
+      <p class="forum-error guide-requests__error" data-grq-error hidden></p>
+
+      ${staff
+        ? (open.length ? staffQueue(open, s) : none)
+        : `<h3 class="guide-requests__sub">Открытые заявки${open.length ? ` (${open.length})` : ''}</h3>
+           ${open.length
+             ? `<ul class="guide-req-list">${open.map((r) => openRequestRow(r)).join('')}</ul>`
+             : none}`}
+
+      ${mine.length
+        ? `<h3 class="guide-requests__sub">Мои заявки</h3>
+           <ul class="guide-req-list">${mine.map((r) => ownRequestRow(r, s)).join('')}</ul>`
+        : ''}
+    </section>`;
 }
 
 /**

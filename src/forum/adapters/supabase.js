@@ -1917,6 +1917,76 @@ export async function reportGuideStale(id, note) {
   });
 }
 
+/* ── Заявки на гайды ───────────────────────────────────────────────────────── */
+
+function guideRequestOut(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userNick: row.user_nick || '',
+    title: row.title,
+    details: row.details || '',
+    status: row.status || 'open',
+    guideId: row.guide_id || null,
+    answer: row.answer || '',
+    createdAt: toDate(row.created_at) ?? new Date(),
+    decidedAt: toDate(row.decided_at),
+    decidedByNick: row.decided_by_nick || null,
+  };
+}
+
+/*
+  Список читается представлением с никами, а не голой таблицей: ник заявки
+  нигде не хранится и берётся из профиля тем же порядком, что у очереди
+  апелляций. Разбор по принадлежности делает политика forum_guide_requests, а
+  не этот запрос: открытые строки видит и гость, разобранные — только автор и
+  модерация.
+*/
+export async function listGuideRequests() {
+  const rows = await rest('/forum_guide_request_list?select=*&order=created_at.desc&limit=200');
+  return Array.isArray(rows) ? rows.map(guideRequestOut) : [];
+}
+
+/*
+  Создание и отзыв идут через функции базы: «не больше трёх за сутки» и
+  повтор названия политикой не выражаются, а отказ должен быть внятным, а не
+  текстом нарушения ограничения. rpc возвращает один id, поэтому строку
+  дочитываем отдельным запросом — иначе форма показывала бы заявку без ника и
+  без времени, которые проставила база.
+*/
+export async function createGuideRequest(draft) {
+  const id = await rest('/rpc/forum_open_guide_request', {
+    method: 'POST',
+    body: {
+      p_title: String(draft.title ?? '').trim(),
+      p_details: String(draft.details ?? '').trim(),
+    },
+  });
+  const rows = await rest(`/forum_guide_request_list?id=eq.${encodeURIComponent(id)}&limit=1`);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) throw new Error('Заявка не найдена сразу после отправки');
+  return guideRequestOut(row);
+}
+
+export async function cancelGuideRequest(id) {
+  await rest('/rpc/forum_cancel_guide_request', {
+    method: 'POST',
+    body: { p_target: id },
+  });
+}
+
+export async function resolveGuideRequest(id, status, answer, guideId = null) {
+  await rest('/rpc/forum_resolve_guide_request', {
+    method: 'POST',
+    body: {
+      p_target: id,
+      p_status: String(status),
+      p_answer: String(answer ?? ''),
+      p_guide: guideId || null,
+    },
+  });
+}
+
 /* ── Push-настройки (посты форума) ────────────────────────────────────────── */
 
 export async function getPushPrefs() {
