@@ -463,6 +463,13 @@
  * @property {(draft: {title: string, details?: string}) => Promise<ForumGuideRequest>} [createGuideRequest]
  * @property {(id: string) => Promise<void>} [cancelGuideRequest]  Отзыв своей открытой заявки.
  * @property {(id: string, status: 'linked'|'closed', answer: string, guideId?: string|null) => Promise<void>} [resolveGuideRequest]  Решение модерации; для игрока — отказ.
+ *
+ * Пульс обновлений игры (см. supabase/20260926-update-pulse.sql). Заметку
+ * пишет модерация руками: автоматического чтения чужих страниц у сайта нет ни
+ * в каком режиме, и быть не может — серверной части нет вовсе.
+ * @property {() => Promise<ForumUpdateNote[]>} [listUpdateNotes]  Свежие сверху; опубликованные видят и невошедшие, архив — только модерация. Ошибку вызывающий не глушит: по ней страница называет файл миграции.
+ * @property {(draft: {kind: string, title: string, summary: string, sourceName: string, sourceUrl: string, sourceAt: string, gameVersion?: string}) => Promise<ForumUpdateNote>} [publishUpdateNote]  Порядок отказов одинаков в обоих режимах: право → тип → заголовок → содержание → источник → дата → версия.
+ * @property {(id: string, archived: boolean) => Promise<void>} [setUpdateNoteArchived]  Убрать и вернуть одной функцией: правка текста после публикации не разрешена намеренно.
  * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean}>} [getPushPrefs]
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
  * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
@@ -534,6 +541,32 @@
  * @property {Date} createdAt
  * @property {Date|null} decidedAt  У отозванной — момент отзыва.
  * @property {string|null} decidedByNick  Кто решил; при отзыве — сам автор.
+ */
+
+/**
+ * Заметка об обновлении игры. Дата здесь — не момент публикации на форуме, а
+ * момент, когда текст вышел у первоисточника: читателя интересует свежесть
+ * перемены в игре, а не то, когда её пересказал дежурный модератор.
+ *
+ * Правки у заметки нет сознательно: это датированное свидетельство, и текст,
+ * который можно переписать молча, перестаёт им быть. Ошиблись — в архив и
+ * новую, поэтому `archivedAt` и `archivedByNick` описывают ровно одно
+ * движение.
+ *
+ * @typedef {Object} ForumUpdateNote
+ * @property {string} id
+ * @property {'patch'|'notice'|'issue'} kind
+ * @property {string} title
+ * @property {string} summary  Пересказ изменения своими словами.
+ * @property {string} sourceName  Как называется первоисточник: «Официальный сайт».
+ * @property {string} sourceUrl  Только HTTPS; ссылка на то, откуда это взято.
+ * @property {Date} sourceAt  Дата публикации у первоисточника.
+ * @property {string} gameVersion  Пустая строка, если версии нет.
+ * @property {'published'|'archived'} status
+ * @property {string} authorNick  Кто положил заметку в список.
+ * @property {Date} createdAt
+ * @property {Date|null} archivedAt
+ * @property {string|null} archivedByNick  Кто убрал; пусто, пока заметка открыта.
  */
 
 /**

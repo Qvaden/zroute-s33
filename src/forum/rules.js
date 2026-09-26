@@ -196,6 +196,42 @@ export function needsBarterLines(tags) {
   return (Array.isArray(tags) ? tags : []).includes(BARTER_TAG_ID);
 }
 
+/**
+ * Пульс обновлений игры. Три слова вместо свободного названия типа: список,
+ * где каждый называет перемену как хочет, через месяц читается как свалка
+ * синонимов, и отфильтровать его нельзя. Те же три значения перечислены в
+ * проверке колонки kind (supabase/20260926-update-pulse.sql), и расхождение
+ * сторожит тест.
+ *
+ * `hint` — не украшение: форма модерации показывает его под выбором, потому
+ * что «Объявление» и «Патч» на глаз неотличимы, а различить их нужно до того,
+ * как заметка легла в список.
+ */
+export const UPDATE_KINDS = [
+  {
+    id: 'patch',
+    label: 'Патч',
+    hint: 'в игре что-то изменили: баланс, карта, экономика',
+  },
+  {
+    id: 'notice',
+    label: 'Объявление',
+    hint: 'разработчики сказали что-то, ещё не изменив',
+  },
+  {
+    id: 'issue',
+    label: 'Известная проблема',
+    hint: 'сломано и признано: ждём починки, не надо об этом тем',
+  },
+];
+export const UPDATE_KIND_IDS = UPDATE_KINDS.map((k) => k.id);
+
+/** @param {string} id */
+export function updateKindLabel(id) {
+  const kind = UPDATE_KINDS.find((k) => k.id === id);
+  return kind ? kind.label : id;
+}
+
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 
 /**

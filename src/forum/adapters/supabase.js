@@ -2044,6 +2044,75 @@ export async function resolveGuideRequest(id, status, answer, guideId = null) {
   });
 }
 
+/* ── Пульс обновлений игры ─────────────────────────────────────────────────── */
+
+function updateNoteOut(row) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    summary: row.summary,
+    sourceName: row.source_name || '',
+    sourceUrl: row.source_url || '',
+    sourceAt: toDate(row.source_at) ?? new Date(),
+    gameVersion: row.game_version || '',
+    status: row.status || 'published',
+    authorNick: row.author_nick || '',
+    createdAt: toDate(row.created_at) ?? new Date(),
+    archivedAt: toDate(row.archived_at),
+    archivedByNick: row.archived_by_nick || null,
+  };
+}
+
+/*
+  Список выходит представлением с никами: авторов у заметки две и ни у одной
+  ник не хранится в самой таблице. Порядок задаёт source_at, а не created_at:
+  читатель спрашивает, что изменилось в игре и когда, а не когда об этом
+  вспомнил дежурный модератор. Ошибку не глушим: по ней страница называет файл
+  миграции, которого не хватает, вместо вида «заметок нет».
+*/
+export async function listUpdateNotes() {
+  const limit = CONFIG.forum.limits.updateListMax;
+  const rows = await rest(
+    `/forum_update_note_list?select=*&order=source_at.desc&limit=${limit}`,
+    { retryOnAbort: true },
+  );
+  return (Array.isArray(rows) ? rows : []).map(updateNoteOut);
+}
+
+/*
+  Публикация идёт только через функцию базы. Ссылку и дату обязана проверять
+  база, а не форма: страница печатает href как есть, и один запрос мимо формы
+  стоил бы чужого кода в браузере читателя. rpc отдаёт id новой строки, поэтому
+  заметку дочитываем отдельным запросом — иначе карточка вышла бы без ника
+  автора, который знала только база.
+*/
+export async function publishUpdateNote(draft) {
+  const id = await rest('/rpc/forum_publish_update_note', {
+    method: 'POST',
+    body: {
+      p_kind: String(draft.kind ?? ''),
+      p_title: String(draft.title ?? '').trim(),
+      p_summary: String(draft.summary ?? '').trim(),
+      p_source_name: String(draft.sourceName ?? '').trim(),
+      p_source_url: String(draft.sourceUrl ?? '').trim(),
+      p_source_at: String(draft.sourceAt ?? ''),
+      p_game_version: String(draft.gameVersion ?? '').trim(),
+    },
+  });
+  const rows = await rest(`/forum_update_note_list?id=eq.${encodeURIComponent(id)}&limit=1`);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) throw new Error('Заметка не найдена сразу после публикации');
+  return updateNoteOut(row);
+}
+
+export async function setUpdateNoteArchived(id, archived) {
+  await rest('/rpc/forum_set_update_note_archive', {
+    method: 'POST',
+    body: { p_target: id, p_archived: Boolean(archived) },
+  });
+}
+
 /* ── Push-настройки (посты форума) ────────────────────────────────────────── */
 
 export async function getPushPrefs() {

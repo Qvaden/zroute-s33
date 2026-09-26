@@ -2749,7 +2749,7 @@
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--mute);
 }
 .forum-barter dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
 /* Снятое объявление читается, но не зовёт: тот же смысл, что у знака «срок вышел». */
@@ -2771,7 +2771,7 @@
   padding: 3px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--mute);
   font-size: 10.5px;
   font-weight: 700;
   white-space: nowrap;
@@ -2791,3 +2791,203 @@
 .forum-barter-fields .forum-field { flex: 1 1 220px; }
 .forum-barter-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
 
+/* ══ ПУЛЬС ОБНОВЛЕНИЙ ИГРЫ ══════════════════════════════════════════════════
+   Заметки пишет модерация, поэтому карточка обязана называть источник и его
+   дату: без них пересказ неотличим от слуха.
+*/
+
+.upd-page .panel__head { margin-bottom: 14px; }
+.upd-page .panel__head h1 { font-size: clamp(20px, 3vw, 26px); margin: 4px 0 0; }
+.upd-page .panel__head p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+
+.upd-new { margin: 0 0 14px; }
+
+.upd-card {
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+}
+.upd-card--archived { opacity: .72; }
+
+.upd-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.upd-kind {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.upd-kind--patch {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.upd-kind--notice {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 40%, var(--line));
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.upd-kind--issue {
+  color: var(--loss);
+  border-color: color-mix(in srgb, var(--loss) 40%, var(--line));
+  background: color-mix(in srgb, var(--loss) 10%, transparent);
+}
+
+.upd-card__date { font-size: 12px; color: var(--dim); }
+.upd-card__version {
+  margin-left: auto;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  color: var(--mute);
+}
+
+.upd-card__title { margin: 7px 0 0; font-size: 15px; line-height: 1.35; }
+.upd-card__text {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  /* Модератор переносит строки сам, и они значимы: список патчей читается
+     построчно, а не абзацем. */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.upd-card__foot {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+.upd-card__source { color: var(--accent); text-decoration: none; }
+.upd-card__source:hover { text-decoration: underline; }
+.upd-card__source--broken {
+  color: var(--mute);
+  border-bottom: 1px dotted var(--mute);
+  cursor: help;
+}
+.upd-card__by { color: var(--mute); }
+
+.upd-card__action {
+  margin-left: auto;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.upd-card__action:hover { color: var(--text); border-color: var(--accent); }
+.upd-card__action:disabled { opacity: .55; cursor: progress; }
+
+.upd-card__error {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--loss);
+}
+.upd-card__was { margin: 5px 0 0; font-size: 11.5px; color: var(--mute); }
+
+.upd-archived { margin-top: 18px; }
+.upd-archived__head {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.upd-archived > .muted { margin: 0 0 10px; font-size: 12px; line-height: 1.5; }
+
+/* ── Форма модерации ─────────────────────────────────────────────────────── */
+
+.upd-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--raised));
+}
+.upd-form__lead { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dim); }
+
+.upd-field { display: grid; gap: 4px; }
+.upd-field > span { font-size: 12px; font-weight: 700; color: var(--dim); }
+.upd-field input,
+.upd-field textarea,
+.upd-field select {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.upd-field input:focus,
+.upd-field textarea:focus,
+.upd-field select:focus { outline: none; border-color: var(--accent); }
+.upd-field textarea { min-height: 78px; resize: vertical; }
+.upd-field small { font-size: 11.5px; line-height: 1.45; }
+
+.upd-field-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.upd-field-row .upd-field { flex: 1 1 180px; }
+
+.upd-form__actions { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+
+.upd-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--loss) 12%, transparent);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--loss);
+}
+
+.upd-none {
+  margin: 0;
+  padding: 18px 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--mute);
+}
+
+.upd-page__foot {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.upd-page__foot p { margin: 0; font-size: 12px; line-height: 1.55; }
+.upd-note { margin-top: 6px !important; color: var(--gold); }
+
+@media (max-width: 560px) {
+  /* Кнопка архива — единственная в карточке, и мимо 24 пикселей мажет. */
+  .upd-card__action {
+    margin-left: 0;
+    min-height: 38px;
+    padding: 9px 14px;
+    font-size: 12.5px;
+  }
+  .upd-card__version { margin-left: 0; }
+  .upd-field-row .upd-field { flex: 1 1 100%; }
+}

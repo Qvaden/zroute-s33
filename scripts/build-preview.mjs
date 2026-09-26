@@ -33,6 +33,7 @@ import { renderChats } from '../src/pages/chats.js';
 import { renderTournaments } from '../src/pages/tournaments.js';
 import { renderGuides } from '../src/pages/guides.js';
 import { renderCalendar } from '../src/pages/calendar.js';
+import { renderUpdates } from '../src/pages/updates.js';
 import { computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 
 const data = await loadAll();
@@ -81,6 +82,7 @@ const NAV = [
   { id: 'tournaments', label: 'Турниры', html: renderTournaments({ me: null, alliances: view.alliances, tournaments: [] }) },
   { id: 'guides', label: 'Гайды', html: renderGuides({ me: null, guides: [], category: 'all' }) },
   { id: 'calendar', label: 'Календарь', html: renderCalendar({ ready: false, shared: false, sourceName: 'без базы', me: null, events: [], loading: false, error: '', view: 'next' }) },
+  { id: 'updates', label: 'Обновления игры', html: renderUpdates({ ready: false, shared: false, sourceName: 'без базы', me: null, canManage: false, notes: [], loading: false, error: '', composing: false }) },
   { id: 'home', label: 'Итоги недели', html: renderHome(view) },
   { id: 'quarter', label: 'Кварт', html: renderQuarter({ standings: quarterStandings, quarter }) },
   { id: 'ladder', label: 'Рейтинг', html: renderLadder(view) },

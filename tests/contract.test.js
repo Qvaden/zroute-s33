@@ -3674,12 +3674,12 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /retryOnAbort = false/.test(clientJs));
   check('повтор по таймауту включён у чтения ленты',
     /retryOnAbort: true/.test(forumDbJs));
-  check('повтор по таймауту у ленты, поста, комментариев, чатов и календаря — шесть мест',
-    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 6);
+  check('повтор по таймауту у ленты, поста, комментариев, чатов, календаря и пульса — семь мест',
+    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 7);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
-  check('живые вкладки — форум, чаты, календарь и страница участника',
-    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar' \|\| \(id === 'user' && param\)/.test(mainJs));
+  check('живые вкладки — форум, чаты, календарь, пульс обновлений и страница участника',
+    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'\s*\|\|\s*id === 'updates'\s*\|\|\s*\(id === 'user' && param\)/.test(mainJs));
 
   /*
     ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.
@@ -6428,7 +6428,7 @@ console.log('\nY. Календарь встреч');
       && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js\?v=\d+'/.test(mainSrc)
       && /mountCalendar\(app, search\)/.test(mainSrc));
   check('между вкладками календарь не наследует состояние: его закрывают на каждом уходе',
-    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 7
+    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 8
       && (mainSrc.match(/unmountCalendar\(\);/g) || []).length === (mainSrc.match(/unmountChats\(\);/g) || []).length);
   check('календарь стартует живым кадром, а не надписью «загружаем данные»',
     /const liveFirst = id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'/.test(mainSrc));
@@ -8150,6 +8150,424 @@ console.log('\nAE. Чек-лист новичка');
     (await local.listStarterSteps()).length, 0);
   await local.signIn('Столп');
   check('а ровесник форума свои шаги всё ещё видит', (await open()).length > 0);
+}
+
+// ── AF. Пульс обновлений игры ────────────────────────────────────────────────
+
+console.log('\nAF. Пульс обновлений игры');
+{
+  /*
+    Пункт перенесён с форума сообщества, где заметки об обновлениях ведёт
+    модерация. Перенесли вместе с главным смыслом: серверной части у нас нет,
+    поэтому читателя кормит не робот, а человек, и обязанность эту он
+    подтверждает ссылкой на первоисточник. Проверяем три вещи: что база и
+    черновой режим отказывают одними словами в одном порядке, что страница не
+    печатает ссылку, которую база не приняла бы, и что архив не виден никому,
+    кроме модерации.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-update-pulse.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const pageSrc = await readFile('src/pages/updates.js', 'utf8');
+  const updSrc = await readFile('src/forum/updates.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const { UPDATE_KINDS, UPDATE_KIND_IDS, updateKindLabel } = await import('../src/forum/rules.js');
+  const { renderUpdates } = await import('../src/pages/updates.js');
+  const L = CONFIG.forum.limits;
+
+  const flat = sql.replace(/\s+/g, ' ');
+  const pubSql = sql.slice(sql.indexOf('create or replace function public.forum_publish_update_note'),
+    sql.indexOf('-- ── Шаг 3.')).replace(/\s+/g, ' ');
+  const archSql = sql.slice(sql.indexOf('create or replace function public.forum_set_update_note_archive'))
+    .replace(/\s+/g, ' ');
+  const pubLocal = localSrc.slice(localSrc.indexOf('export async function publishUpdateNote'),
+    localSrc.indexOf('export async function setUpdateNoteArchived'));
+  const archLocal = localSrc.slice(localSrc.indexOf('export async function setUpdateNoteArchived'),
+    localSrc.indexOf('/* ── Push-настройки'));
+  const supaPulse = supaSrc.slice(supaSrc.indexOf('function updateNoteOut(row)'),
+    supaSrc.indexOf('/* ── Push-'));
+  const pulseContract = contractSrc.slice(contractSrc.indexOf('Пульс обновлений игры (см.'));
+
+  /* Отказы публикации: один и тот же порядок в базе и в черновом режиме. */
+  const PUBLISH_REFUSALS = [
+    'Заметку об обновлении публикует модерация',
+    'Неизвестный тип заметки',
+    'Заголовок короче',
+    'Заголовок длиннее',
+    'Содержание короче',
+    'Содержание длиннее',
+    'Нужно название первоисточника',
+    'Название первоисточника длиннее',
+    'Нужна прямая HTTPS-ссылка на первоисточник',
+    'Ссылка не может содержать пробелы',
+    'Ссылка длиннее',
+    'Нужна дата публикации у первоисточника',
+    'Дата первоисточника не может быть из будущего',
+    'Дата первоисточника раньше',
+    'Номер версии длиннее',
+  ];
+  const ARCHIVE_REFUSALS = [
+    'Заметку об обновлении убирает и возвращает модерация',
+    'Заметка не найдена',
+    'Эта заметка уже в архиве',
+    'Эта заметка и так опубликована',
+    'Заметка уже изменена',
+  ];
+
+  /** Фразы идут в тексте именно в этом порядке. */
+  function inOrder(src, phrases) {
+    let from = 0;
+    for (const phrase of phrases) {
+      const at = src.indexOf(phrase, from);
+      if (at < 0) return false;
+      from = at + 1;
+    }
+    return true;
+  }
+
+  /* ── Форма правила: таблица, а не метка темы ── */
+  check('заметка — отдельная таблица, а не ещё одна метка темы',
+    flat.includes('create table if not exists public.forum_update_notes ('));
+  check('тип замкнут в те же три слова, что названы в правилах',
+    flat.includes(`kind in (${UPDATE_KINDS.map((k) => `'${k.id}'`).join(', ')})`));
+  check('дата у первоисточника — свой столбец, а не дата записи',
+    flat.includes('source_at timestamptz not null')
+      && flat.includes('created_at timestamptz not null default now()'));
+  check('список читается по дате источника',
+    flat.includes('on public.forum_update_notes (status, source_at desc, created_at desc)'));
+  check('архив — состояние строки, а не удаление',
+    flat.includes(`status text not null default 'published' check (status in ('published', 'archived'))`)
+      && !/delete from/i.test(sql));
+  check('и он назван своим временем и ником',
+    flat.includes('archived_at timestamptz') && flat.includes('archived_by uuid'));
+  check('номер версии необязателен: пустая строка, а не null',
+    flat.includes("game_version text not null default ''"));
+
+  /* ── Числа: база и страница знают одно и то же ── */
+  const SQL_NUMBERS = [
+    ['заголовок', `char_length(title) between ${L.updateTitleMin} and ${L.updateTitleMax}`],
+    ['содержание', `char_length(summary) between ${L.updateSummaryMin} and ${L.updateSummaryMax}`],
+    ['имя источника', `char_length(source_name) between ${L.updateSourceNameMin} and ${L.updateSourceNameMax}`],
+    ['длина ссылки', `char_length(source_url) <= ${L.updateUrlMax}`],
+    ['версия', `char_length(game_version) <= ${L.updateVersionMax}`],
+    ['запас на часы', `interval '${L.updateFutureGraceMinutes} minutes'`],
+    ['нижняя дата', `timestamp with time zone '${L.updateSourceYearFloor}-01-01 00:00:00+00'`],
+  ];
+  for (const [label, needle] of SQL_NUMBERS) {
+    check(`число «${label}» в базе и в конфиге одно и то же`, flat.includes(needle), needle);
+  }
+  check('функция записывает ровно то, что разрешила: строки не обрезаются молча',
+    pubSql.includes(`left(v_title, ${L.updateTitleMax})`));
+
+  /* ── Право: читает каждый, пишет только модерация ── */
+  check('опубликованное видит невошедший, архив — только модерация',
+    flat.includes(`for select using (status = 'published' or public.forum_is_staff());`));
+  check('ни одной политики на запись: браузер в таблицу не пишет',
+    !/for insert|for update|for delete/i.test(sql));
+  check('право чтения дано и гостю, и вошедшему — таблице и представлению',
+    flat.includes('grant select on public.forum_update_notes to anon, authenticated;')
+      && flat.includes('grant select on public.forum_update_note_list to anon, authenticated;'));
+  check('список выходит представлением, которое спрашивает права читателя',
+    flat.includes('create or replace view public.forum_update_note_list with (security_invoker = on) as'));
+  check('ники берутся из вью профилей, а не дублируются в таблице',
+    flat.includes('join public.forum_profiles a on a.id = n.author_id')
+      && flat.includes('left join public.forum_profiles b on b.id = n.archived_by'));
+  check('публикация и архив — две двери, и обе спрашивают роль сами',
+    (sql.match(/language plpgsql security definer/g) || []).length === 2
+      && pubSql.includes('if not public.forum_is_staff() then')
+      && archSql.includes('if not public.forum_is_staff() then'));
+  check('ни триггеров, ни присоединения к темам и гайдам',
+    !/create trigger/i.test(sql) && !/forum_posts|forum_guides/.test(sql));
+  check('внешних запросов нет ни в базе, ни в коде страницы',
+    !/net\.http|udf\.|pg_net/i.test(sql) && !/fetch\(/.test(pageSrc + updSrc));
+  check('функции закрыты от гостя и открыты вошедшему',
+    flat.includes('revoke all on function public.forum_publish_update_note( text, text, text, text, text, timestamptz, text ) from public, anon;')
+      && flat.includes('revoke all on function public.forum_set_update_note_archive(uuid, boolean) from public, anon;')
+      && flat.includes('grant execute on function public.forum_set_update_note_archive(uuid, boolean) to authenticated;'));
+  check('автором становится тот, кто вошёл, а не тот, о ком попросили',
+    pubSql.includes('auth.uid()') && !/p_author/.test(pubSql));
+
+  /* ── Ссылка: https обязана проверяться до того, как станет href ── */
+  check('база принимает только https без пробелов',
+    flat.includes(`source_url ~ '^https://[^[:space:]]+$'`));
+  check('тип сверяется через coalesce: null не пройдёт доменную проверку',
+    pubSql.includes(`if coalesce(p_kind, '') not in`));
+  check('прописная схема приводится к строчной — иначе её отверг бы CHECK',
+    pubSql.includes(`v_url := 'https://' || substring(v_url from 9);`)
+      && pubLocal.includes("https://${rawUrl.slice("));
+  check('архив и возврат меняют строку по прежнему состоянию: гонка двух модераторов видна',
+    archSql.includes(`and status = case when p_archived then 'published' else 'archived' end;`));
+
+  /* ── Один порядок и одни слова в обоих режимах ── */
+  check('публикация отказывает в одном порядке в базе и в черновом режиме',
+    inOrder(pubSql, PUBLISH_REFUSALS) && inOrder(pubLocal, PUBLISH_REFUSALS));
+  /*
+    «Заметка уже изменена» есть только в базе: там два клика могут пересечься
+    по сети, и UPDATE с условием по статусу это ловит. В localStorage клики
+    идут строго один за другим, поэтому выдумывать гонку черновому адаптеру
+    значило бы проверять фразу, которую он никогда не скажет.
+  */
+  const ARCHIVE_SHARED = ARCHIVE_REFUSALS.filter((p) => p !== 'Заметка уже изменена');
+  check('архив — тот же порядок отказов',
+    inOrder(archSql, ARCHIVE_REFUSALS) && inOrder(archLocal, ARCHIVE_SHARED));
+  check('отказ гонки знает одна база',
+    archSql.includes('Заметка уже изменена') && !archLocal.includes('Заметка уже изменена'));
+  check('черновой режим берёт границы из конфига, а не переписывает числа руками',
+    (pubLocal.match(/L\.update/g) || []).length >= 11 && !/= 1500/.test(pubLocal));
+  check('типы он знает из правил, а не из своего списка',
+    pubLocal.includes('UPDATE_KIND_IDS.includes(kind)'));
+
+  /* ── Слова и контракт ── */
+  check('типа три, и у каждого есть название и объяснение',
+    UPDATE_KINDS.length === 3 && UPDATE_KINDS.every((k) => k.id && k.label && k.hint)
+      && UPDATE_KIND_IDS.join(',') === 'patch,notice,issue');
+  check('неизвестный тип не превращается в пустую метку', updateKindLabel('quest') === 'quest');
+  check('название типа печатает разметка, а не свой список', pageSrc.includes('updateKindLabel('));
+  check('контракт обещает три функции и форму заметки',
+    ['listUpdateNotes', 'publishUpdateNote', 'setUpdateNoteArchived'].every((n) => contractSrc.includes(`[${n}]`))
+      && contractSrc.includes('@typedef {Object} ForumUpdateNote')
+      && contractSrc.includes('@property {Date} sourceAt'));
+  check('и называет отсутствующие правки сознательным ограничением',
+    /правка текста после публикации не разрешена/.test(pulseContract));
+  check('боевой режим читает представление и зовёт функции базы',
+    supaPulse.includes('/forum_update_note_list?select=*&order=source_at.desc')
+      && supaPulse.includes("'/rpc/forum_publish_update_note'")
+      && supaPulse.includes("'/rpc/forum_set_update_note_archive'")
+      && supaPulse.includes('p_archived: Boolean(archived)'));
+  check('дата уходит в базу строкой, а не объектом',
+    supaPulse.includes('p_source_at: String(draft.sourceAt'));
+  check('после публикации заметка дочитывается, а не додумывается',
+    supaPulse.includes('Заметка не найдена сразу после публикации'));
+
+  /* ── Страница: что увидит читатель ── */
+  const baseNote = {
+    id: 'n1', kind: 'patch', title: 'Перечисление карт вышло из ротации',
+    summary: 'Карты убраны из ротации, бонус за них больше не начисляется.',
+    sourceName: 'Официальный сайт', sourceUrl: 'https://example.com/patch-notes',
+    sourceAt: new Date('2026-09-20T12:00:00Z'), gameVersion: '1.4.2',
+    status: 'published', authorNick: 'Дежурный', createdAt: new Date('2026-09-21T08:00:00Z'),
+    archivedAt: null, archivedByNick: null,
+  };
+  const archivedNote = {
+    ...baseNote, id: 'n2', kind: 'issue', title: 'Голос в чате пропадал после патча',
+    status: 'archived', archivedAt: new Date('2026-09-24T09:00:00Z'), archivedByNick: 'Дежурный',
+  };
+  const page = (over) => renderUpdates({
+    ready: true, shared: true, me: null, canManage: false, notes: [],
+    loading: false, error: '', composing: false, ...over,
+  });
+
+  check('карточка отдаёт читателю тип, заголовок, пересказ и версию',
+    page({ notes: [baseNote] }).includes('Перечисление карт')
+      && page({ notes: [baseNote] }).includes('Патч')
+      && page({ notes: [baseNote] }).includes('1.4.2'));
+  check('ссылка ведёт прямо на первоисточник и не оставляет следов для него',
+    page({ notes: [baseNote] }).includes('href="https://example.com/patch-notes"')
+      && page({ notes: [baseNote] }).includes('rel="noreferrer noopener nofollow"')
+      && page({ notes: [baseNote] }).includes('target="_blank"'));
+  const evil = page({ notes: [{ ...baseNote, sourceUrl: 'javascript:alert(1)' }] });
+  check('ссылка вне https не становится ссылкой и говорит об этом',
+    !evil.includes('href="javascript') && evil.includes('upd-card__source--broken'));
+  check('данные, которые правит человек, экранируются',
+    page({ notes: [{ ...baseNote, title: '<img src=x onerror=alert(1)>' }] }).includes('&lt;img'));
+  check('невошедший не видит ни формы, ни кнопок архива',
+    !page({ notes: [baseNote] }).includes('<form')
+      && !page({ notes: [baseNote] }).includes('data-upd-new')
+      && !page({ notes: [baseNote] }).includes('data-upd-archive'));
+  check('модератор видит и кнопку новой заметки, и архивирование',
+    page({ canManage: true, notes: [baseNote] }).includes('data-upd-new')
+      && page({ canManage: true, notes: [baseNote] }).includes('data-upd-archive'));
+  check('архив виден только модерации и называется архивом',
+    page({ canManage: true, notes: [archivedNote] }).includes('Убрано из списка · 1')
+      && page({ canManage: true, notes: [archivedNote] }).includes('вернуть в список')
+      && !page({ notes: [archivedNote] }).includes('Убрано из списка'));
+  const form = page({ canManage: true, composing: true });
+  const FORM_FIELDS = JSON.parse(`[${updSrc.match(/for \(const name of \[([^\]]+)\]/)[1].replace(/'/g, '"')}]`);
+  equal('форма называет ровно те поля, что читает поведение',
+    [...form.matchAll(/name="([A-Za-z]+)"/g)].map((m) => m[1]).sort().join(','),
+    [...FORM_FIELDS].sort().join(','));
+  check('и у текстовых полей есть потолок длины',
+    (form.match(/maxlength="/g) || []).length === 5);
+  check('поля не пустят дату из будущего и из доисторических времён',
+    form.includes(`min="${L.updateSourceYearFloor}-01-01T00:00"`) && form.includes('max="'));
+  check('правок нет ни в разметке, ни в поведении',
+    !/data-upd-edit|data-upd-update/.test(pageSrc + updSrc));
+  check('пустой список объясняет, почему он пуст',
+    page().includes('Заметок пока нет'));
+  const broken = page({ error: 'relation "forum_update_note_list" does not exist' });
+  check('без миграции страница называет её файл, а не делает вид, что заметок нет',
+    broken.includes('20260926-update-pulse.sql') && broken.includes('Список не открылся'));
+  const otherError = page({ error: 'что-то совсем странное' });
+  check('и не подсказывает файл на каждую ошибку',
+    !otherError.includes('20260926-update-pulse.sql') && otherError.includes('что-то совсем странное'));
+  check('подвал обещает ровно столько заметок, сколько умеет',
+    page().includes(String(L.updateListMax)));
+  check('черновой режим сказан вслух', page({ shared: false }).includes('Черновой режим'));
+  check('карточка, форма и архив одеты стилем',
+    ['upd-card', 'upd-form', 'upd-archived', 'upd-kind--patch', 'upd-card__source--broken', 'upd-error']
+      .every((c) => cssSrc.includes(`.${c}`)));
+
+  /* ── Маршрут ── */
+  check('страница стоит в меню и живёт по своему адресу',
+    mainSrc.includes("{ id: 'updates', label: 'Обновления игры', live: true }")
+      && mainSrc.includes('mountUpdates(app)'));
+  check('она ждёт ответа хранилища, как живой раздел',
+    mainSrc.includes("id === 'updates' || (id === 'user' && param)"));
+  equal('страница закрывается там же, где закрывается календарь',
+    (mainSrc.match(/unmountUpdates\(\);/g) || []).length,
+    (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
+  equal('новая страница одета в ту же версию, что и остальные импорты',
+    new Set(mainSrc.match(/\?v=\d+/g) || []).size, 1);
+  check('ошибка списка не глохнет, а форма переживает перерисовку',
+    updSrc.includes('state.error = String(err?.message ?? err)')
+      && updSrc.includes('state.composing ? readForm() : null'));
+  check('отказ действия ложится в свою карточку, а не над списком',
+    updSrc.includes('upd-card__error') && updSrc.includes("closest('.upd-card')"));
+  check('поздний ответ базы не нарисует список поверх другой страницы',
+    updSrc.includes('mountToken'));
+  check('правило описано в документах и стоит в списке миграций',
+    docsSrc.includes('## Пульс обновлений игры') && docsSrc.includes('20260926-update-pulse.sql')
+      && readmeSrc.includes('20260926-update-pulse.sql')
+      && readmeSrc.indexOf('20260926-starter-checklist.sql') < readmeSrc.indexOf('20260926-update-pulse.sql'));
+
+  /* ── Живой черновой прогон: те же слова, что сказала бы база ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const fresh = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (fresh.has(k) ? fresh.get(k) : null),
+    setItem: (k, v) => fresh.set(k, String(v)),
+    removeItem: (k) => fresh.delete(k),
+  };
+  const raw = () => JSON.parse(fresh.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const hour = 3600 * 1000;
+  const valid = (over) => ({
+    kind: 'patch',
+    title: 'Перечисление карт вышло из ротации',
+    summary: 'Карты A и B убраны из ротации, бонус снабжения за них больше не начисляется.',
+    sourceName: 'Официальный сайт',
+    sourceUrl: 'https://example.com/patch-notes',
+    sourceAt: new Date(Date.now() - 2 * hour).toISOString(),
+    gameVersion: '1.4.2',
+    ...over,
+  });
+
+  await local.signUp('Дежурный');            // первый в черновой базе — владелец
+  await local.signUp('Обычный');
+  await local.signOut();
+
+  equal('без заметок список пуст, а не ошибка', (await local.listUpdateNotes()).length, 0);
+  equal('гость заметку не опубликует',
+    await says(() => local.publishUpdateNote(valid())), 'Заметку об обновлении публикует модерация');
+  await local.signIn('Обычный');
+  equal('и игрок без прав — теми же словами',
+    await says(() => local.publishUpdateNote(valid())), 'Заметку об обновлении публикует модерация');
+  await local.signOut();
+
+  const REFUSALS = [
+    { label: 'тип не из трёх', draft: { kind: 'quest' }, words: 'Неизвестный тип заметки: quest', base: 'Неизвестный тип заметки: %' },
+    { label: 'заголовок короткий', draft: { title: 'карт' }, words: `Заголовок короче ${L.updateTitleMin} символов: по двум словам не понять, о чём заметка` },
+    { label: 'заголовок длинный', draft: { title: 'а'.repeat(L.updateTitleMax + 1) }, words: `Заголовок длиннее ${L.updateTitleMax} символов: на телефоне он уйдёт в три строки` },
+    { label: 'содержание в две слова', draft: { summary: 'обновили игру' }, words: `Содержание короче ${L.updateSummaryMin} символов: «обновили игру» — это заголовок, а не заметка` },
+    { label: 'содержание на страницу', draft: { summary: 'а'.repeat(L.updateSummaryMax + 1) }, words: `Содержание длиннее ${L.updateSummaryMax} символов: материал о патче пишется на форуме темой` },
+    { label: 'источник без имени', draft: { sourceName: ' ' }, words: 'Нужно название первоисточника: ссылка без имени — это просто домен' },
+    { label: 'имя источника длинное', draft: { sourceName: 'О'.repeat(L.updateSourceNameMax + 1) }, words: `Название первоисточника длиннее ${L.updateSourceNameMax} символов: достаточно короткого «Официальный сайт»` },
+    { label: 'ссылка по http', draft: { sourceUrl: 'http://example.com/notes' }, words: 'Нужна прямая HTTPS-ссылка на первоисточник' },
+    { label: 'ссылка-код', draft: { sourceUrl: 'javascript:alert(1)' }, words: 'Нужна прямая HTTPS-ссылка на первоисточник' },
+    { label: 'ссылка с пробелом', draft: { sourceUrl: 'https://example.com/notes 1' }, words: 'Ссылка не может содержать пробелы: похоже, к ней прилипло что-то ещё' },
+    { label: 'ссылка длинная', draft: { sourceUrl: `https://example.com/${'a'.repeat(L.updateUrlMax)}` }, words: `Ссылка длиннее ${L.updateUrlMax} символов: в карточке она не читается` },
+    { label: 'дата не названа', draft: { sourceAt: '' }, words: 'Нужна дата публикации у первоисточника' },
+    { label: 'дата из будущего', draft: { sourceAt: new Date(Date.now() + (L.updateFutureGraceMinutes + 30) * hour).toISOString() }, words: 'Дата первоисточника не может быть из будущего' },
+    { label: 'дата шестилетней давности', draft: { sourceAt: '2019-05-01T00:00:00.000Z' }, words: `Дата первоисточника раньше ${L.updateSourceYearFloor} года: похоже, ошиблись годом` },
+    { label: 'версия длинная', draft: { gameVersion: 'v'.repeat(L.updateVersionMax + 1) }, words: `Номер версии длиннее ${L.updateVersionMax} символов: его не называют так длинно` },
+  ];
+  await local.signIn('Дежурный');
+  for (const r of REFUSALS) {
+    equal(`отказ «${r.label}» назван словами`, await says(() => local.publishUpdateNote(valid(r.draft))), r.words);
+    check(`и те же слова записаны в базе: ${r.label}`, pubSql.includes(r.base ?? r.words));
+  }
+  equal('ни одна плохая заметка не записилась', (await local.listUpdateNotes()).length, 0);
+
+  const note1 = await local.publishUpdateNote(valid());
+  check('заметка принята и названа целиком, с ником автора',
+    note1.status === 'published' && note1.title === 'Перечисление карт вышло из ротации'
+      && note1.authorNick === 'Дежурный');
+  check('дата первоисточника пришла датой, а не строкой',
+    note1.sourceAt instanceof Date && note1.createdAt instanceof Date);
+  check('у свежей заметки архива нет', note1.archivedAt === null && note1.archivedByNick === null);
+
+  /* Схема приводится к нижнему регистру — ровно как в функции базы. */
+  const note2 = await local.publishUpdateNote(valid({
+    title: 'Работы на сервере в воскресенье',
+    sourceAt: new Date(Date.now() - 3 * hour).toISOString(),
+    sourceUrl: 'HTTPS://Example.COM/maintenance',
+  }));
+  equal('прописная схема принята и приведена к строчной',
+    note2.sourceUrl, 'https://Example.COM/maintenance');
+
+  const note3 = await local.publishUpdateNote(valid({
+    title: 'Обещание нового сезона', kind: 'notice',
+    sourceAt: new Date(Date.now() - 5 * 24 * hour).toISOString(),
+  }));
+  equal('список отсортирован по дате первоисточника, а не по дате записи',
+    (await local.listUpdateNotes()).map((n) => n.title).join(' | '),
+    'Перечисление карт вышло из ротации | Работы на сервере в воскресенье | Обещание нового сезона');
+
+  await local.signOut();
+  equal('невошедший читает опубликованное', (await local.listUpdateNotes()).length, 3);
+
+  await local.signIn('Обычный');
+  equal('игрок без прав не уберёт и не вернёт',
+    await says(() => local.setUpdateNoteArchived(note1.id, true)),
+    'Заметку об обновлении убирает и возвращает модерация');
+  await local.signOut();
+  await local.signIn('Дежурный');
+
+  equal('заметки с таким id нет',
+    await says(() => local.setUpdateNoteArchived('нет-такой', true)), 'Заметка не найдена');
+  await local.setUpdateNoteArchived(note3.id, true);
+  equal('повторный архив не перетирает решение',
+    await says(() => local.setUpdateNoteArchived(note3.id, true)), 'Эта заметка уже в архиве');
+  equal('возврат открытой заметки — отказ',
+    await says(() => local.setUpdateNoteArchived(note1.id, false)), 'Эта заметка и так опубликована');
+  for (const words of ARCHIVE_REFUSALS) {
+    check(`слова «${words}» записаны и в базе`, archSql.includes(words));
+  }
+
+  await local.setUpdateNoteArchived(note1.id, true);
+  await local.signOut();
+  const guestList = await local.listUpdateNotes();
+  check('гость архива не видит', guestList.every((n) => n.status === 'published'));
+  equal('и у него только опубликованное', guestList.length, 1);
+  await local.signIn('Дежурный');
+  const hidden = (await local.listUpdateNotes()).find((n) => n.id === note1.id);
+  check('модерация видит убранную заметку, её время и свой ник',
+    hidden.status === 'archived' && hidden.archivedAt instanceof Date
+      && hidden.archivedByNick === 'Дежурный');
+  await local.setUpdateNoteArchived(note1.id, false);
+  const back = (await local.listUpdateNotes()).find((n) => n.id === note1.id);
+  equal('возврат работает: правки-то нет', back.status, 'published');
+  check('и у возвращённой заметки следов архива не осталось',
+    back.archivedAt === null && back.archivedByNick === null);
+  check('строка не удалялась ни разу: решение переживает саму заметку',
+    raw().updateNotes.length === 3);
+
+  /* Предел списка — число конфига, а не «сколько прислали». */
+  const padded = raw();
+  padded.updateNotes = Array.from({ length: L.updateListMax + 7 }, (_, i) => ({
+    id: `upn_${i}`, kind: 'patch', title: `Заметка номер ${i}`,
+    summary: 'текст заметки о перемене в игре', sourceName: 'Официальный сайт',
+    sourceUrl: 'https://example.com/n', sourceAt: new Date(Date.now() - i * hour).toISOString(),
+    gameVersion: '', status: 'published', authorId: 'u_1', authorNick: 'Дежурный',
+    createdAt: new Date().toISOString(), archivedAt: null, archivedBy: null, archivedByNick: null,
+  }));
+  fresh.set('zr33.forum.local', JSON.stringify(padded));
+  equal('длиннее предела список не становится', (await local.listUpdateNotes()).length, L.updateListMax);
 }
 
 console.log(`\n${'─'.repeat(52)}`);

@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=65';
-import { loadAll, capabilities, db } from './data/index.js?v=65';
-import { validateDataset } from './data/contract.js?v=65';
+import { CONFIG } from '../config.js?v=66';
+import { loadAll, capabilities, db } from './data/index.js?v=66';
+import { validateDataset } from './data/contract.js?v=66';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,27 +9,28 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=65';
-import { renderHome } from './pages/home.js?v=65';
-import { renderLadder } from './pages/ladder.js?v=65';
-import { renderQuarter } from './pages/quarter-final.js?v=65';
-import { renderTimeline } from './pages/timeline.js?v=65';
-import { renderGuide } from './pages/guide.js?v=65';
-import { renderBot } from './pages/bot.js?v=65';
-import { renderAbout } from './pages/about.js?v=65';
-import { renderAlliance } from './pages/alliance.js?v=65';
-import { computeAchievements } from './logic/achievements.js?v=65';
-import { esc } from './ui/helpers.js?v=65';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=65';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=65';
+} from './logic/standings.js?v=66';
+import { renderHome } from './pages/home.js?v=66';
+import { renderLadder } from './pages/ladder.js?v=66';
+import { renderQuarter } from './pages/quarter-final.js?v=66';
+import { renderTimeline } from './pages/timeline.js?v=66';
+import { renderGuide } from './pages/guide.js?v=66';
+import { renderBot } from './pages/bot.js?v=66';
+import { renderAbout } from './pages/about.js?v=66';
+import { renderAlliance } from './pages/alliance.js?v=66';
+import { computeAchievements } from './logic/achievements.js?v=66';
+import { esc } from './ui/helpers.js?v=66';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=66';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=66';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=65';
-import './ui/timeline-controls.js?v=65';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=65';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=65';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=65';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=65';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=65';
+import './ui/ladder-controls.js?v=66';
+import './ui/timeline-controls.js?v=66';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=66';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=66';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=66';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=66';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=66';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=66';
 
 /*
   РАЗДЕЛЫ.
@@ -59,6 +60,12 @@ const ROUTES = [
   { id: 'tournaments', label: 'Турниры', live: true, primary: true },
   { id: 'guides', label: 'Гайды', live: true, primary: true },
   { id: 'calendar', label: 'Календарь', live: true, primary: true },
+  /*
+    Пульс обновлений — живой, но не «общение»: здесь не спорят, здесь читают
+    то, что изменилось в игре за последние недели. Поэтому он в группе
+    «Сервер», рядом с хроникой, а не в меню рядом с форумом.
+  */
+  { id: 'updates', label: 'Обновления игры', live: true },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -330,6 +337,7 @@ function render() {
     unmountForum();
     unmountChats();
     unmountCalendar();
+    unmountUpdates();
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
     path = `/alliance/${param}`;
@@ -346,6 +354,7 @@ function render() {
     unmountTournaments();
     unmountGuides();
     unmountCalendar();
+    unmountUpdates();
     renderNav('forum');
     app.innerHTML = '';
     mountUser(app, decodeURIComponent(param));
@@ -359,6 +368,7 @@ function render() {
       unmountTournaments();
       unmountGuides();
       unmountCalendar();
+      unmountUpdates();
       app.innerHTML = '';
       // Второй сегмент — id чата; ссылка-приглашение: #/chats/join/<код>.
       const rest = location.hash.replace(/^#\/?chats\/?/, '');
@@ -369,6 +379,7 @@ function render() {
       unmountChats();
       unmountGuides();
       unmountCalendar();
+      unmountUpdates();
       app.innerHTML = '';
       mountTournaments(app, view.alliances);
       path = '/tournaments';
@@ -377,6 +388,7 @@ function render() {
       unmountChats();
       unmountTournaments();
       unmountCalendar();
+      unmountUpdates();
       app.innerHTML = '';
       // Второй сегмент — slug гайда: #/guides/na-sklad.
       const rest = location.hash.replace(/^#\/?guides\/?/, '');
@@ -387,6 +399,7 @@ function render() {
       unmountChats();
       unmountTournaments();
       unmountGuides();
+      unmountUpdates();
       app.innerHTML = '';
       /*
         Хвост адреса хранит вид календаря (#/calendar?view=mine): ссылка на
@@ -395,11 +408,26 @@ function render() {
       */
       mountCalendar(app, search);
       path = '/calendar';
+    } else if (route.id === 'updates') {
+      /*
+        У списка обновлений нет хвоста в адресе: одна страница, один порядок,
+        и ссылка из чата обязана открывать ровно то, что видит тот, кто в неё
+        перешёл, — а не то же самое, но с открытой формой.
+      */
+      unmountForum();
+      unmountChats();
+      unmountTournaments();
+      unmountGuides();
+      unmountCalendar();
+      app.innerHTML = '';
+      mountUpdates(app);
+      path = '/updates';
     } else if (route.live) {
       unmountChats();
       unmountTournaments();
       unmountGuides();
       unmountCalendar();
+      unmountUpdates();
       /*
         Живому разделу нельзя просто подставить строку: он сам решает, что
         показать, потому что ждёт ответа хранилища. Второй сегмент адреса —
@@ -419,6 +447,7 @@ function render() {
       unmountTournaments();
       unmountGuides();
       unmountCalendar();
+      unmountUpdates();
       app.innerHTML = route.id === 'quarter'
         ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
         : route.id === 'bot'
@@ -488,7 +517,8 @@ async function boot() {
     и она допишется, когда данные приедут. А сами данные грузятся фоном.
   */
   const { id, param } = parseHash();
-  const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar' || (id === 'user' && param);
+  const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar'
+    || id === 'updates' || (id === 'user' && param);
 
   app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
   if (liveFirst) {

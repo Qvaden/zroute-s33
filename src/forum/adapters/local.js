@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -74,6 +74,7 @@ function emptyState() {
     chatMessages: [],
     reservedNicks: [],
     nickHistory: [],
+    updateNotes: [],
   };
 }
 
@@ -3352,6 +3353,168 @@ export async function resolveGuideRequest(id, status, answer, guideId = null) {
     kind: 'moderation',
     preview: `Заявка «${row.title}» ${requestOutcomeWord(status)}: ${text}`,
   });
+  write(s);
+}
+
+/* ── Пульс обновлений игры в локальном режиме ──────────────────────────────── */
+
+/*
+  Черновик обязан отказывать теми же словами и в том же порядке, что функция
+  базы forum_publish_update_note: право → тип → заголовок → содержание →
+  источник → дата → версия. Иначе проверка страницы в черновом режиме
+  подтверждает не тот отказ, который человек увидит в бою, и весь смысл
+  черновика теряется.
+*/
+function updateNoteOut(r) {
+  return {
+    id: r.id,
+    kind: r.kind,
+    title: r.title,
+    summary: r.summary,
+    sourceName: r.sourceName || '',
+    sourceUrl: r.sourceUrl || '',
+    sourceAt: toDate(r.sourceAt) ?? new Date(),
+    gameVersion: r.gameVersion || '',
+    status: r.status,
+    authorNick: r.authorNick || '',
+    createdAt: toDate(r.createdAt) ?? new Date(),
+    archivedAt: toDate(r.archivedAt),
+    archivedByNick: r.archivedByNick || null,
+  };
+}
+
+/*
+  Архив видит только модерация — та же граница, что держит политика
+  forum_update_notes в бою. Порядок сортировки по sourceAt, а не по createdAt:
+  страница отвечает на вопрос «что изменилось в игре и когда».
+*/
+export async function listUpdateNotes() {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me) || null;
+  const staff = isStaff(me);
+  return (s.updateNotes || [])
+    .filter((n) => n.status === 'published' || staff)
+    .sort((a, b) => String(b.sourceAt).localeCompare(String(a.sourceAt)))
+    .slice(0, L.updateListMax)
+    .map(updateNoteOut);
+}
+
+export async function publishUpdateNote(draft) {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  /*
+    Гость и игрок без прав слышат одно слово: в базе проверка одна —
+    forum_is_staff(), и она не различает «не вошёл» и «вошёл без прав».
+  */
+  const me = s.users.find((u) => u.id === s.me) || null;
+  if (!isStaff(me)) throw new Error('Заметку об обновлении публикует модерация');
+
+  const kind = String(draft?.kind ?? '');
+  if (!UPDATE_KIND_IDS.includes(kind)) {
+    throw new Error(`Неизвестный тип заметки: ${kind}`);
+  }
+
+  const title = String(draft?.title ?? '').trim();
+  if (title.length < L.updateTitleMin) {
+    throw new Error(`Заголовок короче ${L.updateTitleMin} символов: по двум словам не понять, о чём заметка`);
+  }
+  if (title.length > L.updateTitleMax) {
+    throw new Error(`Заголовок длиннее ${L.updateTitleMax} символов: на телефоне он уйдёт в три строки`);
+  }
+
+  const summary = String(draft?.summary ?? '').trim();
+  if (summary.length < L.updateSummaryMin) {
+    throw new Error(`Содержание короче ${L.updateSummaryMin} символов: «обновили игру» — это заголовок, а не заметка`);
+  }
+  if (summary.length > L.updateSummaryMax) {
+    throw new Error(`Содержание длиннее ${L.updateSummaryMax} символов: материал о патче пишется на форуме темой`);
+  }
+
+  const sourceName = String(draft?.sourceName ?? '').trim();
+  if (sourceName.length < L.updateSourceNameMin) {
+    throw new Error('Нужно название первоисточника: ссылка без имени — это просто домен');
+  }
+  if (sourceName.length > L.updateSourceNameMax) {
+    throw new Error(`Название первоисточника длиннее ${L.updateSourceNameMax} символов: достаточно короткого «Официальный сайт»`);
+  }
+
+  /*
+    Схему проверяем здесь так же строго, как в базе, хотя локальный режим
+    никуда не ходит: смысл проверки — тот же текст отказа, а не защита от
+    перехода. Приведение к нижнему регистру повторяет базу слово в слово.
+  */
+  const rawUrl = String(draft?.sourceUrl ?? '').trim();
+  if (!/^https:\/\//i.test(rawUrl)) {
+    throw new Error('Нужна прямая HTTPS-ссылка на первоисточник');
+  }
+  if (/\s/.test(rawUrl)) {
+    throw new Error('Ссылка не может содержать пробелы: похоже, к ней прилипло что-то ещё');
+  }
+  if (rawUrl.length > L.updateUrlMax) {
+    throw new Error(`Ссылка длиннее ${L.updateUrlMax} символов: в карточке она не читается`);
+  }
+  const sourceUrl = `https://${rawUrl.slice('https://'.length)}`;
+
+  if (!draft?.sourceAt) throw new Error('Нужна дата публикации у первоисточника');
+  const sourceAt = new Date(String(draft.sourceAt));
+  if (Number.isNaN(sourceAt.getTime())) {
+    throw new Error('Нужна дата публикации у первоисточника');
+  }
+  if (sourceAt.getTime() > Date.now() + L.updateFutureGraceMinutes * 60 * 1000) {
+    throw new Error('Дата первоисточника не может быть из будущего');
+  }
+  if (sourceAt.getUTCFullYear() < L.updateSourceYearFloor) {
+    throw new Error(`Дата первоисточника раньше ${L.updateSourceYearFloor} года: похоже, ошиблись годом`);
+  }
+
+  const gameVersion = String(draft?.gameVersion ?? '').trim();
+  if (gameVersion.length > L.updateVersionMax) {
+    throw new Error(`Номер версии длиннее ${L.updateVersionMax} символов: его не называют так длинно`);
+  }
+
+  const row = {
+    id: newId('upn'),
+    kind,
+    title: title.slice(0, L.updateTitleMax),
+    summary: summary.slice(0, L.updateSummaryMax),
+    sourceName: sourceName.slice(0, L.updateSourceNameMax),
+    sourceUrl: sourceUrl.slice(0, L.updateUrlMax),
+    sourceAt: sourceAt.toISOString(),
+    gameVersion: gameVersion.slice(0, L.updateVersionMax),
+    status: 'published',
+    authorId: me.id,
+    authorNick: me.nick,
+    createdAt: new Date().toISOString(),
+    archivedAt: null,
+    archivedBy: null,
+    archivedByNick: null,
+  };
+  if (!s.updateNotes) s.updateNotes = [];
+  s.updateNotes.push(row);
+  write(s);
+  return updateNoteOut(row);
+}
+
+/*
+  Убрать и вернуть — одна функция, как в базе: два движения над одним полем, и
+  отказ у них общий. Удалять заметку нельзя: «мы это публиковали и потом
+  убрали» — факт, который обязан пережить саму заметку.
+*/
+export async function setUpdateNoteArchived(id, archived) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me) || null;
+  if (!isStaff(me)) throw new Error('Заметку об обновлении убирает и возвращает модерация');
+
+  const row = (s.updateNotes || []).find((n) => n.id === id);
+  if (!row) throw new Error('Заметка не найдена');
+  if (archived && row.status === 'archived') throw new Error('Эта заметка уже в архиве');
+  if (!archived && row.status === 'published') throw new Error('Эта заметка и так опубликована');
+
+  row.status = archived ? 'archived' : 'published';
+  row.archivedAt = archived ? new Date().toISOString() : null;
+  row.archivedBy = archived ? me.id : null;
+  row.archivedByNick = archived ? me.nick : null;
   write(s);
 }
 
