@@ -8,10 +8,17 @@
  * страницы и при возврате «назад» из темы.
  *
  * ПОЧЕМУ КЛЮЧИ КОРОТКИЕ И НЕПОДВИЖНЫЕ. Ссылку пишут один раз, а открывают
- * через месяцы. `cat`, `tag`, `sort`, `q` — те же имена, что у полей состояния
- * ленты, и переименовать их значит обессмыслить всё, что уже разослано.
- * Значения — id разделов и тегов из базы (rules.js), поэтому они
+ * через месяцы. `cat`, `tag`, `sort`, `q`, `saved` — те же имена, что у полей
+ * состояния ленты, и переименовать их значит обессмыслить всё, что уже
+ * разослано. Значения — id разделов и тегов из базы (rules.js), поэтому они
  * автоматически живут столько же, сколько сама база.
+ *
+ * ПОЧЕМУ `saved` — ВСЁ-ТАКИ АДРЕС, ХОТЬ СПИСОК ЛИЧНЫЙ. Закладки приватны, и
+ * кинутая в чат ссылка `#/forum?saved=1` откроет собеседнику его собственный
+ * список, а не ваш — обычно пустой. Это не обман, а то же правило, что у
+ * «только мои темы» в любом почтовике: адрес описывает вид, а не данные.
+ * Выигрывает от этого сам человек: фильтр переживает перезагрузку страницы и
+ * возврат «назад» из темы, а ради этого ключи и живут в адресе.
  *
  * ПОЧЕМУ ФУНКЦИИ ЧИСТЫЕ. Адрес — единственное место форума, где одна и та же
  * строка должна дважды дать один и тот же результат: один раз при входе на
@@ -25,6 +32,13 @@ export const QUERY_MAX = 80;
 /** Дефолт не пишем: «Все разделы, свежее» — это просто #/forum без хвоста. */
 export const DEFAULT_SECTION = 'all';
 export const DEFAULT_SORT = 'fresh';
+
+/**
+ * Закладки в адресе — одно слово, а не список id. Id уехали бы в ссылку на
+ * сотни тем, устарели бы в тот же день и перестали бы быть «моими закладками»
+ * у того, кто открыл адрес.
+ */
+export const SAVED_FLAG = '1';
 
 /**
  * Адрес → состояние ленты.
@@ -46,6 +60,8 @@ export function filtersFromSearch(search, known) {
     tag: tag && known.tags.includes(tag) ? tag : DEFAULT_SECTION,
     sort: sort && known.sorts.includes(sort) ? sort : DEFAULT_SORT,
     query: (params.get('q') ?? '').slice(0, QUERY_MAX),
+    // Не «1» — значит выключено: чужой или битый адрес не обязан что-то значить.
+    saved: params.get('saved') === SAVED_FLAG,
   };
 }
 
@@ -56,7 +72,7 @@ export function filtersFromSearch(search, known) {
  * видит в строке браузера и копирует оттуда, «+» посреди русского слова
  * выглядит поломкой, а не пробелом. Берём %20.
  *
- * @param {{category: string, tag: string, sort: string, query: string}} filters
+ * @param {{category: string, tag: string, sort: string, query: string, saved?: boolean}} filters
  */
 export function searchFromFilters(filters) {
   const params = new URLSearchParams();
@@ -64,6 +80,7 @@ export function searchFromFilters(filters) {
   if (filters.tag && filters.tag !== DEFAULT_SECTION) params.set('tag', filters.tag);
   if (filters.sort && filters.sort !== DEFAULT_SORT) params.set('sort', filters.sort);
   if (filters.query) params.set('q', filters.query);
+  if (filters.saved) params.set('saved', SAVED_FLAG);
   return params.toString().replace(/\+/g, '%20');
 }
 

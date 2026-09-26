@@ -55,6 +55,8 @@ const state = {
   openPostId: null,
   comments: [],
   query: '',
+  /** Лента сужена до «В закладках»; обычная лента — это false. */
+  saved: false,
   /** Какой пост сейчас в режиме правки; null — правки нет. */
   editingPostId: null,
   /** Что удаляем или на что жалуемся, пока открыто окно. */
@@ -710,6 +712,7 @@ async function loadFeed({ append = false } = {}) {
       tag: state.tag,
       sort: state.sort,
       q: state.query,
+      saved: state.saved,
       limit: CONFIG.forum.pageSize,
       offset: append ? state.posts.length : 0,
     });
@@ -834,7 +837,17 @@ async function refreshOne(targetType, targetId) {
     if (targetType === 'post') {
       const fresh = await forum.getPost(targetId);
       const i = state.posts.findIndex((p) => p.id === targetId);
-      if (fresh && i >= 0) state.posts[i] = fresh;
+      if (fresh && i >= 0) {
+        /*
+          Три поля старой карточки — не про тему, а про того, кто на неё
+          смотрит: getPost приносит тему, а «подписку», «закладку» и счётчик
+          новых ответов приклеивает лента. Без переноса карточка, обновлённая
+          после реакции, выглядела бы так, будто человек отписался от темы и
+          потерял её из закладок.
+        */
+        const { subscribed, saved, unread } = state.posts[i];
+        state.posts[i] = Object.assign(fresh, { subscribed, saved, unread });
+      }
     } else if (state.openPostId) {
       state.comments = await forum.listComments(state.openPostId);
     }
@@ -1465,6 +1478,41 @@ function wire() {
       return;
     }
 
+    const bookmark = t.closest('[data-forum-bookmark]');
+    if (bookmark && host.contains(bookmark)) {
+      const postId = bookmark.dataset.forumBookmark;
+      const post = state.posts.find((p) => p.id === postId);
+      if (!post) return;
+      /*
+        Закладка — своя строка во владении одного человека, поэтому состояние
+        правим по объекту ленты, а не по надписи на кнопке: флаг живёт ещё и
+        в шапке карточки, и менять две кнопки руками — способ однажды забыть
+        про одну из них.
+
+        В фильтре «В закладках» снятая тема перестаёт быть тем, ради чего
+        список собран, и уходит из него сразу — как письмо из «Флагов». Ленту
+        целиком на это не перезапрашиваем: прокрутка подпрыгнула бы из-за
+        действия, которое человек уже увидел и одобрил.
+      */
+      const was = Boolean(post.saved);
+      post.saved = !was;
+      if (was && state.saved) state.posts = state.posts.filter((p) => p.id !== postId);
+      paint();
+
+      try {
+        await (was ? forum.unbookmarkTopic(postId) : forum.bookmarkTopic(postId));
+      } catch (err) {
+        /*
+          Отказ базы честнее догадок: просим ленту заново — она вернёт и
+          флаг, и место темы в списке, — и показываем её словами.
+        */
+        console.error('закладка не сохранена:', err?.message ?? err);
+        await loadFeed();
+        notice(String(err?.message ?? err));
+      }
+      return;
+    }
+
     const allianceSubscribe = t.closest('[data-forum-alliance-subscribe]');
     if (allianceSubscribe && host.contains(allianceSubscribe)) {
       try {
@@ -1653,6 +1701,20 @@ function wire() {
     const sort = t.closest('[data-forum-sort]');
     if (sort && host.contains(sort)) {
       state.sort = sort.dataset.forumSort;
+      await loadFeed();
+      return;
+    }
+
+    /*
+      «В закладках» — не особый список, а та же лента, суженная до своих тем:
+      раздел, порядок и поиск остаются там, где их поставили, и адрес живёт по
+      тому же правилу. Поэтому и обработчик только переворачивает флаг — вся
+      остальная работа у loadFeed.
+    */
+    const savedFilter = t.closest('[data-forum-saved]');
+    if (savedFilter && host.contains(savedFilter)) {
+      state.saved = !state.saved;
+      state.openPostId = null;
       await loadFeed();
       return;
     }

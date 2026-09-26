@@ -1377,6 +1377,28 @@
 }
 .forum-post__acts { display: flex; gap: 4px; margin-left: auto; }
 
+/*
+  Флажок закладки. Знак, а не слово — как «Ваш след» и «новых ответов» над
+  ним: своя тема узнаётся в ленте по форме флага (контурный → полный) и по
+  цвету, а не по надписи, которую пришлось бы читать.
+*/
+.forum-save {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--mute);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: color .15s var(--ease), border-color .15s var(--ease);
+}
+.forum-save:hover { color: var(--text); border-color: var(--line); }
+.forum-save.is-on { color: var(--accent); }
+.forum-save:disabled { color: var(--mute); opacity: .5; cursor: not-allowed; }
+
 .forum-act {
   padding: 5px 9px;
   border: 1px solid transparent;
@@ -1651,6 +1673,8 @@
 @media (hover: none) and (pointer: coarse) {
   .forum-react__btn { min-height: 40px; padding: 8px 12px; }
   .forum-act { min-height: 40px; padding: 8px 11px; }
+  /* Флажок закладки стоит рядом с действиями и должен попадаться пальцем так же. */
+  .forum-save { min-height: 40px; padding: 8px 11px; }
   .forum-emoji__item { min-width: 44px; min-height: 44px; justify-content: center; }
   .seg__btn { min-height: 40px; }
   .side .nav__link { min-height: 46px; }

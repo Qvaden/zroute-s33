@@ -96,6 +96,10 @@
  * @property {boolean} [iThanked]     Благодарил ли здесь сам вошедший. Своё,
  *                                    как my_reaction; снятой благодарность не
  *                                    бывает никогда, поэтому и метка одна.
+ * @property {boolean} [saved]        Лежит ли тема в закладках у вошедшего.
+ *                                    Тоже своё и тоже приклеивается отдельным
+ *                                    запросом в ленте: числа у закладки нет,
+ *                                    и в представление базы она не просится.
  * @property {number}  score          Согласны минус не согласны.
  */
 
@@ -255,7 +259,7 @@
  * @property {(nick: string, password: string) => Promise<ForumUser>} signUp
  * @property {(nick: string, password: string) => Promise<ForumUser>} signIn
  * @property {() => Promise<void>} signOut
- * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string}) => Promise<{posts: ForumPost[], total: number}>} listPosts
+ * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean}) => Promise<{posts: ForumPost[], total: number}>} listPosts
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
@@ -286,6 +290,16 @@
  * @property {(reportId: string) => Promise<void>} resolveReport
  * @property {(postId: string) => Promise<void>} subscribeTopic
  * @property {(postId: string) => Promise<void>} unsubscribeTopic
+ * @property {(postId: string) => Promise<void>} bookmarkTopic
+ *                                    Положить тему в закладки. Двери в базе для
+ *                                    этого нет — одна своя строка, и правило
+ *                                    доступа к ней есть прямо в таблице
+ *                                    (forum_bookmarks). Кто поставил, решает
+ *                                    токен, а не браузер.
+ * @property {(postId: string) => Promise<void>} unbookmarkTopic
+ *                                    Снять закладку: строка удаляется, а не
+ *                                    помечается. Возвращать «удалённую»
+ *                                    закладку нечем.
  * @property {(allianceId: string) => Promise<void>} subscribeAlliance
  * @property {(allianceId: string) => Promise<void>} unsubscribeAlliance
  * @property {() => Promise<string[]>} listAllianceSubscriptions

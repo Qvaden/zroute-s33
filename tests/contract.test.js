@@ -6966,6 +6966,230 @@ console.log('\nZ. Благодарности автора и репутация'
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── AA. Закладки тем ────────────────────────────────────────────────────────
+console.log('\nAA. Закладки тем');
+{
+  /*
+    Заимствование с формулировкой «сохранил себе» опасно не тем, что его
+    можно сделать дважды, а тем, где оно однажды разъедется с собой: имя в
+    строке поставит один, а читать его будет другой; приватный список станет
+    публичным числом; окно запроса переедет в базу и станет лимитом; и
+    наконец подписка, которая молча не работает, потому что её клиент шлёт
+    без идентификатора. Поэтому тесты ниже сверяют места между собой, а не
+    только наличие слов.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-post-bookmarks.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/forum.js', 'utf8');
+  const rankSrc = await readFile('src/forum/rank.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const WINDOW = CONFIG.forum.limits.savedWindow;
+
+  /* ── Форма строки: что где лежит ── */
+  check('закладка — пара идентификаторов, а не запись с текстом',
+    sql.includes('create table if not exists public.forum_bookmarks (')
+      && sql.includes('primary key (post_id, user_id)')
+      && !/forum_bookmarks[\s\S]{0,400}?(title|body|note)/.test(sql));
+  check('тема и человек уходят каскадом: сдохнет тема — сдохнет закладка',
+    sql.includes('references public.forum_posts (id) on delete cascade')
+      && sql.includes('references public.forum_users (id) on delete cascade'));
+  check('свой список читается своим указателем, а не перебором',
+    sql.includes('on public.forum_bookmarks (user_id, created_at desc)'));
+  check('три правила доступа — только про свои строки',
+    /create policy forum_bookmarks_read[\s\S]{0,140}for select using \(user_id = auth\.uid\(\)\)/.test(sql)
+      && /create policy forum_bookmarks_add[\s\S]{0,140}for insert with check \(user_id = auth\.uid\(\)\)/.test(sql)
+      && /create policy forum_bookmarks_drop[\s\S]{0,140}for delete using \(user_id = auth\.uid\(\)\)/.test(sql));
+  check('передвигать закладку нечем: ни одного update в базе и в выдаче',
+    !/for update/.test(sql) && !sql.includes('grant select, insert, update'));
+  check('выдано ровно то, чем пользуются, и только вошедшему',
+    sql.includes('grant select, insert, delete on public.forum_bookmarks to authenticated;')
+      && !sql.includes('forum_bookmarks to anon'));
+
+  /* ── Имя в строке ── */
+  check('who is who решает токен: пользователя вставляет триггер',
+    /create or replace function public\.forum_set_row_user\(\)[\s\S]{0,220}new\.user_id := auth\.uid\(\);/.test(sql)
+      && sql.includes('create trigger forum_bookmarks_user'));
+  check('браузер присылает одну колонку — идентификатора человека в теле нет',
+    /export async function bookmarkTopic\(postId\)[\s\S]{0,260}body: \{ post_id: postId \}/.test(supaSrc)
+      && !/forum_bookmarks[\s\S]{0,300}user_id:/.test(supaSrc));
+  check('подписки получили то же правило: его отсутствие и было их отказом',
+    sql.includes('create trigger forum_topic_subscriptions_user')
+      && sql.includes('create trigger forum_alliance_subscriptions_user')
+      && !/create trigger forum_topic_subscriptions_user/.test(
+        sql.slice(0, sql.indexOf('── Шаг 4'))));
+
+  /* ── Число окна: одно, и не в базе ── */
+  check('окно списка живёт в конфиге и названо обоими адаптерами',
+    Number.isInteger(WINDOW) && WINDOW > 0
+      && supaSrc.includes('limit=${CONFIG.forum.limits.savedWindow}')
+      && localSrc.includes('CONFIG.forum.limits.savedWindow'));
+  /*
+    Размер окна в тексте миграции писать нельзя: однажды кто-то примет его за
+    лимит и перенесёт в базу. Число живёт в конфиге, а здесь ему место только
+    как имени поля. Смотрим только исполняемый текст: в комментариях стоят
+    даты файлов, а это числа из трёх и более цифр.
+  */
+  const sqlBody = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '');
+  check('окно — не лимит: в командах миграции нет ни числа, ни единого отказа',
+    !/\b\d{3,}\b/.test(sqlBody) && !/raise exception/.test(sqlBody));
+  check('двери у закладки нет: ни функции, ни rpc-вызова',
+    !/create or replace function public\.forum_bookmark/.test(sql)
+      && !supaSrc.includes('/rpc/forum_bookmark')
+      && !localSrc.includes('forum_bookmark'));
+  check('закладка ничего не сообщает: ни вставки уведомлений, ни нового вида',
+    !/insert into public\.forum_notifications/.test(sql)
+      && !sql.includes('forum_notifications_kind_check')
+      && !localSrc.includes("'bookmark'"));
+  check('ни уровень, ни репутация не знают про закладки',
+    !/bookmark|saved/i.test(rankSrc));
+
+  /* ── Контракт и оба адаптера ── */
+  check('контракт знает обе двери и флаг ленты',
+    contractSrc.includes('@property {(postId: string) => Promise<void>} bookmarkTopic')
+      && contractSrc.includes('@property {(postId: string) => Promise<void>} unbookmarkTopic')
+      && contractSrc.includes('q?: string, saved?: boolean}')
+      && /@property \{boolean\} \[saved\]/.test(contractSrc));
+  check('черновик повторяет форму: строка, дата и удаление вместо отметки',
+    /export async function bookmarkTopic\(postId\)[\s\S]{0,320}createdAt: new Date\(\)\.toISOString\(\)/.test(localSrc)
+      && /export async function unbookmarkTopic\(postId\)[\s\S]{0,200}s\.bookmarks = s\.bookmarks\.filter/.test(localSrc));
+  check('без входа нечего ни ставить, ни смотреть — и там, и там своим словом',
+    localSrc.includes('const me = meOrThrow(s);')
+      && supaSrc.includes('if (!currentUserId()) return { posts: [], total: 0 };')
+      && localSrc.includes('if (!s.me) return { posts: [], total: 0 };'));
+  check('лента не падает без миграции: отметки закладок прощают отказ',
+    supaSrc.includes("rest('/forum_bookmarks?select=post_id').catch(() => [])"));
+  check('обновлённая карточка уносит свои отметки с собой',
+    mountSrc.includes('const { subscribed, saved, unread } = state.posts[i];')
+      && mountSrc.includes('state.posts[i] = Object.assign(fresh, { subscribed, saved, unread });'));
+
+  /* ── Экран ── */
+  check('флажок стоит в подвале карточки, а не в меню «⋯»',
+    /class="forum-post__views">👁 \$\{Number\(p\.views \|\| 0\)\}<\/span>\s*\$\{renderSaveButton\(p, s\)\}/.test(pagesSrc));
+  check('кнопка знает своё состояние и не даёт гостю пустоты',
+    pagesSrc.includes('data-forum-bookmark="${esc(p.id)}"')
+      && pagesSrc.includes('aria-label="Закладка темы" aria-pressed=')
+      && pagesSrc.includes("${s.me ? '' : ' disabled'}")
+      && pagesSrc.includes("'⚑' : '⚐'"));
+  check('в фильтрах ленты — переключатель своим именем',
+    pagesSrc.includes('class="seg seg--saved"') && pagesSrc.includes('data-forum-saved'));
+  check('страница слушает и кнопку, и переключатель',
+    mountSrc.includes("t.closest('[data-forum-bookmark]')")
+      && mountSrc.includes("t.closest('[data-forum-saved]')")
+      && mountSrc.includes('saved: state.saved,'));
+  check('пустые закладки объясняют приём, а не зовут писать первым',
+    pagesSrc.includes('Отложенных тем пока нет')
+      && pagesSrc.includes('В закладках по этому поиску пусто'));
+  check('гостю за фильтром не пустота, а путь: список виден только вошедшим',
+    /if \(s\.saved\) \{\s*[\s\S]{0,260}?if \(!s\.me\) \{[\s\S]{0,400}?Список виден только вошедшим/.test(pagesSrc));
+  check('флаг одет своим стилем, и состояние видно цветом',
+    cssSrc.includes('.forum-save.is-on'));
+  check('на телефоне по флажку попадают пальцем, как по действиям',
+    /@media \(hover: none\) and \(pointer: coarse\)[\s\S]{0,600}\.forum-save \{ min-height: 40px/.test(cssSrc));
+
+  /* ── Адрес ── */
+  const url = await import('../src/forum/feed-url.js');
+  const known = { categories: ['vs'], tags: ['guide'], sorts: ['fresh'] };
+  equal('адрес «saved=1» читается как включённый фильтр',
+    url.filtersFromSearch('cat=vs&saved=1', known).saved, true);
+  equal('всё остальное в адресе закладок не значится',
+    url.filtersFromSearch('saved=yes', known).saved, false);
+  equal('обратная сборка пишет только флаг, а не список id',
+    url.searchFromFilters({ category: 'vs', tag: 'all', sort: 'fresh', query: '', saved: true }),
+    'cat=vs&saved=1');
+  check('обычная лента остаётся чистым адресом',
+    url.searchFromFilters({ category: 'all', tag: 'all', sort: 'fresh', query: '', saved: false }) === '');
+  equal('адрес переживает перезагрузку: чтение и запись совпадают',
+    url.filtersFromSearch(url.searchFromFilters({ category: 'all', tag: 'all', sort: 'top', query: '', saved: true }), known).saved,
+    true);
+
+  /* ── Документы ── */
+  check('правило описано и в базе, и в документах, и в списке миграций',
+    sql.includes('Список приватен') && docsSrc.includes('20260926-post-bookmarks.sql')
+      && readmeSrc.includes('20260926-post-bookmarks.sql'));
+
+  /* ── Живой черновой прогон: те же правила, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const rawBm = () => JSON.parse(store.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+
+  await local.signUp('Распорядитель');
+  await local.createPost({ title: 'Как держать фронт', body: 'Новая тема.', category: 'vs' });
+  const older = await local.createPost({ title: 'Разбор флангов', body: 'Старая тема.', category: 'vs' });
+  const newer = await local.createPost({ title: 'Осада без потерь', body: 'Свежая тема.', category: 'vs' });
+  await local.signUp('Ковыль');
+
+  const seen = await local.listPosts({});
+  check('тема приходит уже с отметкой закладки', seen.posts.every((p) => 'saved' in p));
+  equal('свежая тема ещё не в закладках',
+    seen.posts.filter((p) => p.saved).length, 0);
+
+  await local.bookmarkTopic(newer.id);
+  await local.bookmarkTopic(older.id);
+  const savedList = await local.listPosts({ saved: true });
+  equal('в отобранном списке — только отложенное', savedList.posts.length, 2);
+  check('порядок держит лента, а не дата постановки',
+    savedList.posts.map((p) => p.id).join() === seen.posts
+      .filter((p) => p.saved || p.id === newer.id || p.id === older.id).map((p) => p.id).join());
+  await local.bookmarkTopic(older.id);
+  equal('второе нажатие не множит строк',
+    rawBm().bookmarks.filter((b) => b.postId === older.id).length, 1);
+  await local.unbookmarkTopic(older.id);
+  equal('снятие убирает строку, а не прячет её',
+    rawBm().bookmarks.filter((b) => b.postId === older.id).length, 0);
+  await local.bookmarkTopic(older.id);
+  equal('снятая закладка ставится снова', (await local.listPosts({ saved: true })).posts.length, 2);
+
+  /* Черновик не оставляет после себя ни чужих имён, ни текста. */
+  check('в хранилище закладка — пара идентификаторов с датой, без ника и текста',
+    rawBm().bookmarks.every((b) => b.postId && b.userId && b.createdAt && !b.nick && !b.title));
+
+  const notifBefore = rawBm().notifications.length;
+  const profileBefore = await local.getProfile('Ковыль');
+  await local.signIn('Распорядитель');
+  equal('автор темы не видит чужих закладок у себя',
+    (await local.listPosts({ saved: true })).posts.length, 0);
+  check('и в ленте автора тема не помечена его закладкой',
+    (await local.listPosts({})).posts.every((p) => !p.saved));
+  equal('закладка не пишет уведомлений', rawBm().notifications.length, notifBefore);
+  const profileAfter = await local.getProfile('Ковыль');
+  check('закладка не двигает ни уровень, ни репутацию',
+    profileAfter.postCount === profileBefore.postCount
+      && profileAfter.repGrantPoints === profileBefore.repGrantPoints);
+
+  /* Окно: не предел, а размер запроса. */
+  CONFIG.forum.limits.savedWindow = 1;
+  await local.signIn('Ковыль');
+  equal('за окном остаётся ровно окно', (await local.listPosts({ saved: true })).posts.length, 1);
+  CONFIG.forum.limits.savedWindow = WINDOW;
+  equal('и возвращается назад тем же движением',
+    (await local.listPosts({ saved: true })).posts.length, 2);
+
+  /* Гость и удалённая тема. */
+  await local.signOut();
+  equal('гостю список пуст', (await local.listPosts({ saved: true })).posts.length, 0);
+  equal('гость закладку не поставит', await says(() => local.bookmarkTopic(newer.id)), 'Сначала войдите');
+  await local.signIn('Распорядитель');
+  await local.deletePost(newer.id, null);
+  await local.signIn('Ковыль');
+  check('удалённая тема уходит из списка',
+    !(await local.listPosts({ saved: true })).posts.some((p) => p.id === newer.id));
+  check('но её строка в списке живёт: тема вернётся — вернётся и закладка',
+    rawBm().bookmarks.some((b) => b.postId === newer.id));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');
 {

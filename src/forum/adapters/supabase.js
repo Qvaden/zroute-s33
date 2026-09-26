@@ -324,9 +324,9 @@ function pollOut(p) {
   };
 }
 
-/** @param {{category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string}} [opts] */
+/** @param {{category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean}} [opts] */
 export async function listPosts(opts = {}) {
-  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
+  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false } = opts;
 
   const ORDER = {
     fresh: 'pinned.desc,created_at.desc',
@@ -358,6 +358,24 @@ export async function listPosts(opts = {}) {
   if (query) {
     params.set('or', `(title.ilike.*${query}*,body.ilike.*${query}*)`);
   }
+  /*
+    Фильтр «мои закладки» разворачивается в список id ДО запроса ленты, а не
+    после: после пришлось бы резать уже отсортированную страницу, и «Показать
+    ещё» считалось бы по чужому числу. Порядок человек выбирает сам (свежее,
+    лучшее, обсуждаемое) — закладка не право на первое место, а метка чтения.
+
+    Гостю список пуст по той же причине, по какой ему не видно кнопок: читать
+    нечего, и спрашивать базу незачем.
+  */
+  if (saved) {
+    if (!currentUserId()) return { posts: [], total: 0 };
+    const rows = await rest(
+      `/forum_bookmarks?select=post_id&order=created_at.desc&limit=${CONFIG.forum.limits.savedWindow}`
+    );
+    const ids = (Array.isArray(rows) ? rows : []).map((row) => row.post_id);
+    if (!ids.length) return { posts: [], total: 0 };
+    params.set('id', `in.(${ids.map((id) => encodeURIComponent(id)).join(',')})`);
+  }
 
   const rows = await rest(`/forum_post_list?${params}`, { retryOnAbort: true });
   const hasMore = Array.isArray(rows) && rows.length > limit;
@@ -365,8 +383,8 @@ export async function listPosts(opts = {}) {
     .map(postOut);
   if (currentUserId() && posts.length) {
     /*
-      Подписки и счётчик новых ответов — два независимых запроса, и ждут их
-      вместе: второй ничего не знает про первый.
+      Подписки, закладки и счётчик новых ответов — три независимых запроса, и
+      ждут их вместе: каждый ничего не знает про соседа.
 
       Счётчик берётся из представления forum_topic_unread, а не из колонки
       ленты: forum_post_list — большое представление, и каждая тема в нём
@@ -374,17 +392,25 @@ export async function listPosts(opts = {}) {
       гасит только знак «новых», но не ленту: человек увидит темы без счётчика
       там, где мог бы увидеть темы целиком.
     */
-    const [subscriptions, unreadRows] = await Promise.all([
+    const [subscriptions, unreadRows, bookmarkRows] = await Promise.all([
       rest('/forum_topic_subscriptions?select=post_id'),
       rest('/forum_topic_unread?select=post_id,unread').catch(() => []),
+      /*
+        Закладки — третий такой же запрос, и он первым прощается с ошибкой:
+        таблицы ещё может не быть (миграцию ставят руками), а лента без
+        флажка «в закладках» — обычная лента, а не сломанная.
+      */
+      rest('/forum_bookmarks?select=post_id').catch(() => []),
     ]);
     const subscribed = new Set((Array.isArray(subscriptions) ? subscriptions : []).map((row) => row.post_id));
+    const bookmarked = new Set((Array.isArray(bookmarkRows) ? bookmarkRows : []).map((row) => row.post_id));
     const unread = new Map();
     for (const row of Array.isArray(unreadRows) ? unreadRows : []) {
       unread.set(row.post_id, Number(row.unread || 0));
     }
     posts.forEach((post) => {
       post.subscribed = subscribed.has(post.id);
+      post.saved = bookmarked.has(post.id);
       post.unread = unread.get(post.id) || 0;
     });
   }
@@ -783,6 +809,24 @@ export async function subscribeTopic(postId) {
 
 export async function unsubscribeTopic(postId) {
   await rest(`/forum_topic_subscriptions?post_id=eq.${encodeURIComponent(postId)}`, { method: 'DELETE' });
+}
+
+/**
+ * Закладка — одна своя строка, и дверь ей не нужна: ни чужих строк здесь
+ * никто не читает, ни на что одно нажатие не влияет. Идентификатор человека
+ * ставит триггер базы из токена, поэтому тело запроса — ровно тема.
+ *
+ * Повторное нажатие не плодит строк: слияние по первичному ключу (post_id,
+ * user_id) делает это одним запросом, а не проверкой «есть ли уже».
+ */
+export async function bookmarkTopic(postId) {
+  await rest('/forum_bookmarks', {
+    method: 'POST', prefer: 'resolution=merge-duplicates', body: { post_id: postId },
+  });
+}
+
+export async function unbookmarkTopic(postId) {
+  await rest(`/forum_bookmarks?post_id=eq.${encodeURIComponent(postId)}`, { method: 'DELETE' });
 }
 
 export async function subscribeAlliance(allianceId) {

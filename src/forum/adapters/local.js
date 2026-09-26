@@ -59,6 +59,7 @@ function emptyState() {
     repGrants: [],
     reports: [],
     topicSubscriptions: [],
+    bookmarks: [],
     topicReads: [],
     allianceSubscriptions: [],
     moderationActions: [],
@@ -313,6 +314,8 @@ function postOut(state, p) {
     commentCount: state.comments.filter((c) => c.postId === p.id && !c.deleted).length,
     unread: unreadCount(state, p.id),
     subscribed: state.topicSubscriptions.some((s) => s.postId === p.id && s.userId === state.me),
+    // Своя строка закладки — как подписка: ни числа, ни чужого взгляда.
+    saved: state.bookmarks.some((b) => b.postId === p.id && b.userId === state.me),
     // Вложений в локальном режиме нет: файлы некуда класть, хранилища нет.
     attachments: [],
     ...r,
@@ -368,11 +371,28 @@ function pollOut(state, postId) {
  */
 export async function listPosts(opts = {}) {
   const s = read();
-  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '' } = opts;
+  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false } = opts;
 
   let list = s.posts.filter((p) => !p.deleted).map((p) => postOut(s, p));
   if (category !== 'all') list = list.filter((p) => p.category === category);
   if (tag !== 'all') list = list.filter((p) => p.tags.includes(tag));
+  /*
+    «Только мои закладки» — те же id, что перечисляет рабочий адаптер, и то же
+    окно: последние savedWindow закладок, посчитанные по дате постановки.
+    Без окна два режима расходились бы на списке длиннее окна, а проверить это
+    в черновом режиме всё равно никто не стал бы.
+  */
+  if (saved) {
+    if (!s.me) return { posts: [], total: 0 };
+    const mine = new Set(
+      s.bookmarks
+        .filter((b) => b.userId === s.me)
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+        .slice(0, CONFIG.forum.limits.savedWindow)
+        .map((b) => b.postId)
+    );
+    list = list.filter((p) => mine.has(p.id));
+  }
   /*
     Поиск по названию и тексту. Регистр не важен — так же ведёт себя
     ilike в рабочем адаптере, и два режима не должны расходиться в этом.
@@ -1227,6 +1247,27 @@ export async function subscribeTopic(postId) {
 export async function unsubscribeTopic(postId) {
   const s = read();
   s.topicSubscriptions = s.topicSubscriptions.filter((x) => x.postId !== postId || x.userId !== s.me);
+  write(s);
+}
+
+/**
+ * Закладка в черновом режиме — ровно та же форма, что в базе: одна строка
+ * «человек — тема» с датой постановки. Дубликат не удваивается, снятие
+ * удаляет строку, а не прячет её, и ничего не сообщает автору: уведомлений
+ * у закладки нет ни в одном из режимов.
+ */
+export async function bookmarkTopic(postId) {
+  const s = read();
+  const me = meOrThrow(s);
+  if (!s.bookmarks.some((x) => x.postId === postId && x.userId === me.id)) {
+    s.bookmarks.push({ postId, userId: me.id, createdAt: new Date().toISOString() });
+    write(s);
+  }
+}
+
+export async function unbookmarkTopic(postId) {
+  const s = read();
+  s.bookmarks = s.bookmarks.filter((x) => x.postId !== postId || x.userId !== s.me);
   write(s);
 }
 

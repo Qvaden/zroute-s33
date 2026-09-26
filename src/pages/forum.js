@@ -1663,6 +1663,21 @@ function renderFeedControls(s) {
           ).join('')}
         </div>
       </div>
+      ${
+        /*
+          Переключатель, а не ссылка на «страницу закладок»: список закладок —
+          та же лента, только уже отобранная. Поэтому раздел, порядок и поиск
+          остаются там, где их поставили, а адрес страницы по-прежнему описывает
+          вид (см. src/forum/feed-url.js).
+        */
+        s.me
+          ? `<div class="seg seg--saved" role="group" aria-label="Только мои закладки">
+              <button type="button" class="seg__btn${s.saved ? ' is-on' : ''}" data-forum-saved
+                      aria-pressed="${s.saved ? 'true' : 'false'}"
+                      title="Показать только темы, которые вы отложили. Этот список видите только вы">⚑ В закладках</button>
+            </div>`
+          : ''
+      }
       <div class="seg seg--sort" role="group" aria-label="Порядок">
         ${SORTS.map(
           (o) => `<button type="button" class="seg__btn ${s.sort === o.id ? 'is-on' : ''}"
@@ -1754,6 +1769,36 @@ function renderFeed(s) {
   }
 
   if (!s.posts.some((p) => !p.deleted)) {
+    /*
+      Пустые закладки — не «пустой форум»: человек не опоздал на новинки, а
+      ещё не воспользовался приёмом. Поэтому здесь объяснение, где кнопка, а
+      не приглашение написать первым.
+    */
+    if (s.saved) {
+      /*
+        Гостю список показывать нечем: закладки приватны, и у него их ещё не
+        было. Слова про флажок здесь были бы обещанием, а подсказка, где вход,
+        — дело.
+      */
+      if (!s.me) {
+        return `<section class="panel forum-empty">
+          <span class="eyebrow">Ваши закладки</span>
+          <h2>Список виден только вошедшим</h2>
+          <p class="muted">Отложенное хранится за вашим ником, поэтому чужой
+            браузер его не покажет. Войдите или создайте запись в левом
+            столбце — и флажок ⚐ под темами начнёт работать.</p>
+        </section>`;
+      }
+      return `<section class="panel forum-empty">
+        <span class="eyebrow">Ваши закладки</span>
+        <h2>${s.query ? 'В закладках по этому поиску пусто' : 'Отложенных тем пока нет'}</h2>
+        <p class="muted">
+          Тема попадает сюда, когда вы нажимаете флажок ⚐ под её текстом, — и
+          ждёт ровно столько, сколько нужно. Список видите только вы: ни автор,
+          ни читатели ничего не замечают.
+        </p>
+      </section>`;
+    }
     if (s.query) {
       return `<section class="panel forum-empty">
         <span class="eyebrow">Поиск по форуму</span>
@@ -1889,6 +1934,7 @@ export function renderPostCard(p, s) {
           💬 ${p.commentCount ? esc(plural(p.commentCount, 'ответ', 'ответа', 'ответов')) : 'ответить'}
         </a>
         <span class="forum-post__views">👁 ${Number(p.views || 0)}</span>
+        ${renderSaveButton(p, s)}
         <span class="forum-post__acts">
           ${
             isMine
@@ -1947,6 +1993,32 @@ export function renderPostCard(p, s) {
 
       ${isOpen ? renderComments(p, s) : ''}
     </article>`;
+}
+
+/**
+ * Флажок «в закладки» под темой.
+ *
+ * Единственная закладка на карточке, и она на виду, а не в меню «⋯»: спрятать
+ * «прочитать позже» в сложенное — значит лишить человека ровно того, ради
+ * чего приём существует: он вспоминает про закладку в тот момент, когда
+ * собирается вернуться, а не когда разбирает меню.
+ *
+ * Числа рядом нет и быть не может: список приватен, и наружу эта кнопка не
+ * говорит ничего. Гость видит её заглушкой нарочно — так про приём узнают до
+ * того, как смогут им воспользоваться.
+ */
+function renderSaveButton(p, s) {
+  const on = Boolean(p.saved);
+  const title = s.me
+    ? (on ? 'В закладках — снять' : 'В закладки: прочитать позже')
+    : 'Войдите, чтобы отложить тему';
+  return `
+    <button type="button" class="forum-save${on ? ' is-on' : ''}"
+            data-forum-bookmark="${esc(p.id)}"
+            aria-label="Закладка темы" aria-pressed="${on ? 'true' : 'false'}"
+            title="${esc(title)}"${s.me ? '' : ' disabled'}>
+      <span aria-hidden="true">${on ? '⚑' : '⚐'}</span>
+    </button>`;
 }
 
 /**
