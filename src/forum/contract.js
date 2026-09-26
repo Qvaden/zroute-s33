@@ -470,8 +470,8 @@
  * @property {() => Promise<ForumUpdateNote[]>} [listUpdateNotes]  Свежие сверху; опубликованные видят и невошедшие, архив — только модерация. Ошибку вызывающий не глушит: по ней страница называет файл миграции.
  * @property {(draft: {kind: string, title: string, summary: string, sourceName: string, sourceUrl: string, sourceAt: string, gameVersion?: string}) => Promise<ForumUpdateNote>} [publishUpdateNote]  Порядок отказов одинаков в обоих режимах: право → тип → заголовок → содержание → источник → дата → версия.
  * @property {(id: string, archived: boolean) => Promise<void>} [setUpdateNoteArchived]  Убрать и вернуть одной функцией: правка текста после публикации не разрешена намеренно.
- * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean}>} [getPushPrefs]
- * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean}) => Promise<void>} [setPushPrefs]
+ * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean, quietStart: number|null, quietEnd: number|null}>} [getPushPrefs]  Окно тихих часов — минуты от полуночи локального времени игрока; null в обеих — окно не задано.
+ * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean, quietStart?: number|null, quietEnd?: number|null}) => Promise<void>} [setPushPrefs]  null здесь значит «стереть», поэтому выключить окно можно одной записью; база не примет половину окна и совпавшие границы.
  * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
  * @property {(userId: string) => Promise<ForumUserActivity|null>} [getUserActivity]  Личный GitHub-график: активность по дням.
  */

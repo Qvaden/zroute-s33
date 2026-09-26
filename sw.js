@@ -23,7 +23,7 @@
   копия стилей осталась бы лежать рядом с новой. Офлайн показывает ровно
   то, что человек видел в последний раз, — пусть тогда уже последнее.
 */
-const CACHE = 'zroute-s33-v53';
+const CACHE = 'zroute-s33-v54';
 
 /*
   Минимум для первого офлайн-открытия. Добавляем поштучно и не падаем,
@@ -79,6 +79,59 @@ self.addEventListener('activate', (event) => {
 
 /* ── Web Push: показать уведомление даже когда вкладка закрыта ──────── */
 
+/*
+  ТИХИЕ ЧАСЫ. Работник не видит localStorage и не может импортировать
+  src/forum/quiet.js — обычный скрипт, не модуль. Поэтому имена хранилища
+  зеркала, правило окна и границы минуты продублированы здесь; совпадение
+  имён и поведение на контрольных случаях сторожит тест («прогоняют и тест
+  страницы, и тест сервисного работника»).
+
+  Держит окно фронт (quiet.js:saveQuietWindow), сюда оно попадает через
+  IndexedDB. Ошибка любая — показываем: тишину, которую нельзя объяснить,
+  человек замечает позже, чем шум. Промолчанный пуш не откладывается и не
+  досылается — строка уведомления всё это время лежит в ленте колокольчика.
+*/
+const QUIET_DB = 'zr33-quiet-hours';
+const QUIET_STORE = 'hours';
+const QUIET_KEY = 'me';
+const QUIET_MINUTES_MAX = 1439;
+
+function readQuietWindow() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(QUIET_DB, 1);
+      req.onupgradeneeded = () => {
+        // Работник может прийти раньше фронта: пустое хранилище — не окно.
+        if (req.result && !req.result.objectStoreNames.contains(QUIET_STORE)) {
+          req.result.createObjectStore(QUIET_STORE);
+        }
+      };
+      req.onerror = () => resolve(null);
+      req.onsuccess = () => {
+        try {
+          const db = req.result;
+          const get = db.transaction(QUIET_STORE, 'readonly').objectStore(QUIET_STORE).get(QUIET_KEY);
+          get.onsuccess = () => { db.close(); resolve(get.result || null); };
+          get.onerror = () => { db.close(); resolve(null); };
+        } catch {
+          resolve(null);
+        }
+      };
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+function quietMutesPush(win, now) {
+  const s = win && win.start;
+  const e = win && win.end;
+  const ok = (v) => Number.isInteger(v) && v >= 0 && v <= QUIET_MINUTES_MAX;
+  if (!ok(s) || !ok(e) || s === e) return false;
+  const m = now.getHours() * 60 + now.getMinutes();
+  return s < e ? (m >= s && m < e) : (m >= s || m < e);
+}
+
 self.addEventListener('push', (event) => {
   let data = { title: 'Сервер 33', body: '' };
   try {
@@ -86,13 +139,18 @@ self.addEventListener('push', (event) => {
   } catch {
     try { data.body = String(event.data?.text?.() ?? ''); } catch { /* ignore */ }
   }
-  event.waitUntil(self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: './public/icons/icon-192.svg',
-    badge: './public/icons/icon-32.svg',
-    data: data,
-    tag: data.tag || undefined,
-  }));
+  event.waitUntil(
+    (async () => {
+      if (quietMutesPush(await readQuietWindow(), new Date())) return;
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: './public/icons/icon-192.svg',
+        badge: './public/icons/icon-32.svg',
+        data: data,
+        tag: data.tag || undefined,
+      });
+    })()
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

@@ -27,6 +27,7 @@ import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
+import { formatQuietTime } from '../forum/quiet.js';
 import { leaderBadge } from './chats.js';
 import { CONFIG } from '../../config.js';
 
@@ -89,6 +90,8 @@ export function renderForum(view, state = {}) {
     leadPeriod: 'week',
     /** Push-настройки форума: приходит ли уведомление о новом посте и об ответе. */
     pushPrefs: null,
+    /** Отказ тихих часов: строка живёт в состоянии, потому что перерисовка блока стёрла бы её в DOM. */
+    quietError: '',
     /** Активность сервера: посты и сообщения по дням за неделю; null — нет данных. */
     activity: null,
     /** Уведомления: открыта ли панель и что в ней. */
@@ -1256,15 +1259,24 @@ function renderRecovery(s) {
  * Состояние хранится в базе (forum_push_prefs) и подгружается адаптером.
  * Показываются, только когда человек вошёл и настройки уже прочитались —
  * иначе пустые тумблеры путали бы, какое значение действительно сохранено.
+ *
+ * Третья строка — тихие часы: то же окно в той же таблице. Границы вводятся
+ * локальным временем браузера, поэтому часовой пояс здесь не спрашивают:
+ * переехал — и ночь поехала следом. Выключенные часы показываются с числами
+ * по умолчанию, чтобы включение не требовало сначала набирать окно.
  */
 function renderPushPrefs(s) {
   if (!s.me || !s.pushPrefs) return '';
+  const L = CONFIG.forum.limits;
   const toggle = (key, label) => `
     <label class="forum-push__row">
       <input type="checkbox" data-forum-push-pref="${key}"
              ${s.pushPrefs[key] ? 'checked' : ''}>
       <span>${esc(label)}</span>
     </label>`;
+  const quietOn = s.pushPrefs.quietStart != null && s.pushPrefs.quietEnd != null;
+  const quietStart = formatQuietTime(s.pushPrefs.quietStart ?? L.quietDefaultStart);
+  const quietEnd = formatQuietTime(s.pushPrefs.quietEnd ?? L.quietDefaultEnd);
   return `
     <div class="forum-push">
       <span class="forum-push__head">
@@ -1275,6 +1287,18 @@ function renderPushPrefs(s) {
         ${toggle('newForumPost', 'Новые посты')}
         ${toggle('newForumReply', 'Ответы на мои посты')}
       </div>
+      <div class="forum-push__row forum-push__quiet">
+        <label class="forum-push__quiet-on">
+          <input type="checkbox" data-forum-quiet-toggle ${quietOn ? 'checked' : ''}>
+          <span>Тихие часы</span>
+        </label>
+        <span class="forum-push__quiet-window">
+          с <input type="time" data-forum-quiet="start" value="${quietStart}" ${quietOn ? '' : 'disabled'}>
+          до <input type="time" data-forum-quiet="end" value="${quietEnd}" ${quietOn ? '' : 'disabled'}>
+        </span>
+      </div>
+      <p class="forum-push__quiet-hint muted">Ночью оповещения не будят — в ленту они приходят сразу и ждут там утра</p>
+      <p class="forum-push__quiet-error forum-error" data-forum-quiet-error ${s.quietError ? '' : 'hidden'}>${esc(s.quietError || '')}</p>
       <p class="forum-push__hint muted">Включите и разрешите уведомления — в чатах есть отдельная кнопка включения</p>
     </div>`;
 }

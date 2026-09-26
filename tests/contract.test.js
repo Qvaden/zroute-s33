@@ -8571,6 +8571,203 @@ console.log('\nAF. Пульс обновлений игры');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── AG. Тихие часы ───────────────────────────────────────────────────────────
+
+console.log('\nAG. Тихие часы');
+{
+  /*
+    Пункт пришёл с форума сообщества, где игрок сам задаёт окно молчания
+    оповещений. Перенесено ровно то, что у нас работает: решает браузер
+    игрока, а не сервер. Отсюда и главная опасность переноса: правило живёт
+    в двух местах сразу — в странице (quiet.js) и в сервисном работнике
+    (sw.js, он не видит localStorage и не умеет импортировать модули). Тест
+    прогоняет контрольные минуты через обе копии и не даёт им разъехаться;
+    заодно сверяет имена зеркала IndexedDB, числа миграции и слову отказа,
+    которые оба адаптера берут из одной функции.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-quiet-hours.sql', 'utf8');
+  const swSrc = await readFile('sw.js', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const pageSrc = await readFile('src/pages/forum.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const chatsSrc = await readFile('src/forum/chats.js', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const quiet = await import('../src/forum/quiet.js');
+  const L = CONFIG.forum.limits;
+  const flat = sql.replace(/\s+/g, ' ');
+
+  /* ── Правило: одни и те же часы в странице и в работнике ── */
+
+  /*
+    Контрольные минуты: обычный вечер, окно через полночь (это норма, а не
+    ошибка), границы «начало молчит, конец уже нет» и мусор, при котором
+    показывать обязанно.
+  */
+  const NIGHT = { start: 22 * 60, end: 8 * 60 };
+  const DAYWIN = { start: 60, end: 120 };
+  const MINUTES = [
+    [NIGHT, 21 * 60 + 59, false, 'минуту до начала вечер не будит'],
+    [NIGHT, 22 * 60, true, 'ровно в начале уже молчит'],
+    [NIGHT, 23 * 60 + 30, true, 'глубокой ночью молчит'],
+    [NIGHT, 0, true, 'полночь — середина окна через неё'],
+    [NIGHT, 7 * 60 + 59, true, 'за минуту до конца ещё молчит'],
+    [NIGHT, 8 * 60, false, 'в 08:00 будит снова: конец — не входит'],
+    [NIGHT, 12 * 60, false, 'днём не вмешивается'],
+    [DAYWIN, 0, false, 'короткое дневное окно полночь не трогает'],
+    [DAYWIN, 60, true, 'час ночи — начало окна'],
+    [DAYWIN, 119, true, 'последняя минута окна'],
+    [DAYWIN, 120, false, 'первая минута после окна'],
+    [{ start: 9 * 60, end: 9 * 60 }, 9 * 60, false, 'совпавшие границы молчат ноль минут'],
+    [null, 2 * 60, false, 'без окна показываем'],
+    [{ start: '22:00', end: null }, 23 * 60, false, 'мусор в границах — не повод молчать'],
+  ];
+
+  /* Копию правила из sw.js исполняем здесь же: больше сверять слова бесполезно. */
+  const swBlock = swSrc.slice(swSrc.indexOf('const QUIET_DB'), swSrc.indexOf("self.addEventListener('push'"));
+  const swQuiet = new Function(`${swBlock}; return { quietMutesPush, QUIET_DB, QUIET_STORE, QUIET_KEY, QUIET_MINUTES_MAX };`)();
+
+  for (const [win, m, expect, label] of MINUTES) {
+    const date = new Date(2026, 8, 26, Math.floor(m / 60), m % 60);
+    equal(`страница: ${label}`, quiet.quietMutes(win, m), expect);
+    equal(`работник: ${label}`, swQuiet.quietMutesPush(win, date), expect);
+  }
+  check('и имена зеркала у работника те же, что у помощника',
+    swQuiet.QUIET_DB === quiet.QUIET_DB && swQuiet.QUIET_STORE === quiet.QUIET_STORE
+      && swQuiet.QUIET_KEY === quiet.QUIET_KEY);
+  check('верхняя граница минуты у работника — то же число конфига',
+    swQuiet.QUIET_MINUTES_MAX === L.quietMinutesMax);
+  equal('помощник форматирует минуту как поле формы', quiet.formatQuietTime(L.quietDefaultStart), '22:00');
+  equal('и разбирает поле формы в минуту', quiet.parseQuietTime('08:00'), L.quietDefaultEnd);
+  check('пустое, «24:00» и «22-00» разбираются в null: молчать на плохих данных нельзя',
+    quiet.parseQuietTime('') === null && quiet.parseQuietTime('24:00') === null
+      && quiet.parseQuietTime('22-00') === null && quiet.parseQuietTime('9:00') === null);
+  check('вне диапазона формат молчит пустой строкой, а не «NaN:NaN»',
+    quiet.formatQuietTime(L.quietMinutesMax + 1) === '' && quiet.formatQuietTime(null) === '');
+
+  /* ── Отказ: одна формулировка на оба режима ── */
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  equal('окно без изменений: вызов ни про какие границы — не отказ',
+    await says(async () => quiet.normalizeQuietWindow(undefined, undefined)), '');
+  check('стёртое окно — законный ответ, а не половина',
+    JSON.stringify(quiet.normalizeQuietWindow(null, null)) === '{"start":null,"end":null}');
+  equal('половина окна названа словами',
+    await says(async () => quiet.normalizeQuietWindow(1320, undefined)),
+    'У тихих часов должно быть две границы: начало и конец');
+  equal('совпавшие границы названы словами',
+    await says(async () => quiet.normalizeQuietWindow(600, 600)),
+    'Начало совпадает с концом: окно молчало бы весь день, для этого есть тумблеры подписки');
+  equal('минута вне диапазона названа словами',
+    await says(async () => quiet.normalizeQuietWindow(0, L.quietMinutesMax + 1)),
+    `Границы тихих часов — целые минуты от 0 до ${L.quietMinutesMax}`);
+  const supaSet = supaSrc.slice(supaSrc.indexOf('export async function setPushPrefs'),
+    supaSrc.indexOf('/* ── Активность сервера'));
+  const localSet = localSrc.slice(localSrc.indexOf('export async function setPushPrefs'), localSrc.length);
+  check('оба адаптера спрашивают отказ у одной функции, а не пересказывают его',
+    supaSet.includes('normalizeQuietWindow(') && localSet.includes('normalizeQuietWindow(')
+      && !supaSrc.includes('У тихих часов') && !localSrc.includes('У тихих часов'));
+
+  /* ── База: те же числа и имена ── */
+  check('окно живёт двумя колонками у уже существующей таблицы настроек',
+    flat.includes('alter table public.forum_push_prefs')
+      && flat.includes('add column if not exists quiet_start smallint')
+      && flat.includes('add column if not exists quiet_end smallint'));
+  check('проверка держит обе границы, диапазон конфига и запрет совпадения',
+    flat.includes('constraint forum_push_prefs_quiet_window check')
+      && flat.includes(`quiet_start between 0 and ${L.quietMinutesMax}`)
+      && flat.includes(`quiet_end between 0 and ${L.quietMinutesMax}`)
+      && flat.includes('quiet_start <> quiet_end'));
+  check('и не верит половине окна: null только вместе',
+    flat.includes('(quiet_start is null and quiet_end is null)'));
+  check('повторный запуск файла не оставляет старых границ',
+    flat.includes('drop constraint if exists forum_push_prefs_quiet_window'));
+  check('ни дверей, ни новых таблиц: пишет владелец строки сам',
+    !/security definer/i.test(sql.replace(/--[^\n]*/g, '')) && !/create table/i.test(sql));
+  check('адаптер в базу пишет колонки теми же именами',
+    supaSrc.includes('body.quiet_start = win.start;') && supaSrc.includes('body.quiet_end = win.end;')
+      && supaSrc.includes('row?.quiet_start') && supaSrc.includes('row?.quiet_end'));
+  check('контракт обещает quietStart/quietEnd в обе стороны',
+    contractSrc.includes('quietStart: number|null, quietEnd: number|null')
+      && contractSrc.includes('quietStart?: number|null, quietEnd?: number|null'));
+
+  /* ── Черновой прогон: то же поведение, что у базы ── */
+  const fresh = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (fresh.has(k) ? fresh.get(k) : null),
+    setItem: (k, v) => fresh.set(k, String(v)),
+    removeItem: (k) => fresh.delete(k),
+  };
+  const raw = () => JSON.parse(fresh.get('zr33.forum.local'));
+  const local = await import('../src/forum/adapters/local.js');
+
+  const off = await local.getPushPrefs();
+  check('без записанных настроек окна нет ни в начале, ни в конце',
+    off.quietStart === null && off.quietEnd === null);
+  await local.setPushPrefs({ quietStart: 1320, quietEnd: 480 });
+  const on = await local.getPushPrefs();
+  check('окно через полночь принято и вернулось целым',
+    on.quietStart === 1320 && on.quietEnd === 480);
+  check('и легло в черновую базу под своими именами',
+    raw().pushPrefs.quietStart === 1320 && raw().pushPrefs.quietEnd === 480);
+  equal('половина окна отказана теми же словами, что и страница',
+    await says(() => local.setPushPrefs({ quietStart: 600 })),
+    'У тихих часов должно быть две границы: начало и конец');
+  equal('совпавшие границы — тоже',
+    await says(() => local.setPushPrefs({ quietStart: 600, quietEnd: 600 })),
+    'Начало совпадает с концом: окно молчало бы весь день, для этого есть тумблеры подписки');
+  check('после отказа сохранённое окно не пострадало',
+    (await local.getPushPrefs()).quietStart === 1320);
+  await local.setPushPrefs({ quietStart: null, quietEnd: null });
+  const cleared = await local.getPushPrefs();
+  check('выключается окно одной записью с двумя null',
+    cleared.quietStart === null && cleared.quietEnd === null);
+  check('тумблеры подписки при этом живут своей жизнью',
+    'newForumPost' in cleared && 'newForumReply' in cleared);
+
+  /* Зеркало для работника: без IndexedDB — честный отказ и честное null. */
+  check('без хранилища браузера зеркало не делает вид, что записало',
+    (await quiet.saveQuietWindow({ start: 1320, end: 480 })) === false
+      && (await quiet.readQuietWindow()) === null);
+  equal('и молчание без зеркала — всегда «показываем»', await quiet.quietMutesNow(new Date(2026, 8, 26, 3, 0)), false);
+
+  /* ── Страница и обработчики ── */
+  check('рядом с тумблерами подписки — строка тихих часов с двумя полями времени',
+    pageSrc.includes('data-forum-quiet-toggle') && pageSrc.includes('type="time"')
+      && pageSrc.includes('data-forum-quiet="start"') && pageSrc.includes('data-forum-quiet="end"'));
+  check('выключенное окно показывает поля с числами по умолчанию, но неактивными',
+    pageSrc.includes('s.pushPrefs.quietStart ?? L.quietDefaultStart')
+      && pageSrc.includes("${quietOn ? '' : 'disabled'}"));
+  check('подсказка обещает ленту, а не досылку утром',
+    pageSrc.includes('в ленту они приходят сразу и ждут там утра'));
+  check('отказ показывается строкой под полями и живёт в состоянии, переживая перерисовку',
+    pageSrc.includes('data-forum-quiet-error') && pageSrc.includes('s.quietError')
+      && mountSrc.includes('state.quietError = String(err?.message ?? err)')
+      && !mountSrc.includes("showError('[data-forum-quiet-error]'"));
+  check('чекбокс и поля времени ведут в одну запись настроек',
+    mountSrc.includes('async function applyQuietWindow(')
+      && mountSrc.includes('data-forum-quiet-toggle') && mountSrc.includes('parseQuietTime('));
+  check('после входа зеркало обновляется одним чтением настроек',
+    mountSrc.slice(mountSrc.indexOf('async function loadPushPrefs'), mountSrc.indexOf('Переложить окно из состояния'))
+      .includes('await mirrorQuietWindow();'));
+  check('и выход стирает чужую ночь из этого браузера',
+    mountSrc.includes('await mirrorQuietWindow();',
+      mountSrc.indexOf("data-forum-signout")));
+  check('открытый чат спрашивает то же зеркало перед оповещением',
+    chatsSrc.includes('!(await quietMutesNow())') && chatsSrc.includes('import { quietMutesNow }'));
+  check('а работник проверяет окно до showNotification',
+    swSrc.indexOf('quietMutesPush(await readQuietWindow()') < swSrc.indexOf('showNotification(data.title'));
+
+  /* ── Документы ── */
+  check('правило описано в документах форума', docsSrc.includes('## Тихие часы'));
+  check('миграция стоит в списке и в описании',
+    readmeSrc.includes('`20260926-quiet-hours.sql`')
+      && readmeSrc.indexOf('20260926-update-pulse.sql') < readmeSrc.indexOf('20260926-quiet-hours.sql'));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');
 {

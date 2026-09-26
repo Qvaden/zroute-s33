@@ -24,6 +24,7 @@
 import { CONFIG } from '../../../config.js';
 import { CATEGORY_IDS, REACTION_IDS, TOPIC_TAG_IDS, reactionMeta } from '../rules.js';
 import { nickToEmail } from '../nick-email.js';
+import { normalizeQuietWindow } from '../quiet.js';
 /*
   ВЕСЬ ТРАНСПОРТ — ИЗ ОБЩЕГО КЛИЕНТА.
 
@@ -2117,12 +2118,14 @@ export async function setUpdateNoteArchived(id, archived) {
 
 export async function getPushPrefs() {
   const me = currentUserId();
-  if (!me) return { newForumPost: false, newForumReply: false };
+  if (!me) return { newForumPost: false, newForumReply: false, quietStart: null, quietEnd: null };
   const rows = await rest(`/forum_push_prefs?user_id=eq.${encodeURIComponent(me)}&limit=1`);
   const row = Array.isArray(rows) ? rows[0] : null;
   return {
     newForumPost: Boolean(row?.new_forum_post),
     newForumReply: Boolean(row?.new_forum_reply),
+    quietStart: Number.isInteger(row?.quiet_start) ? row.quiet_start : null,
+    quietEnd: Number.isInteger(row?.quiet_end) ? row.quiet_end : null,
   };
 }
 
@@ -2132,6 +2135,12 @@ export async function setPushPrefs(prefs) {
   const body = { user_id: me };
   if (prefs.newForumPost != null) body.new_forum_post = Boolean(prefs.newForumPost);
   if (prefs.newForumReply != null) body.new_forum_reply = Boolean(prefs.newForumReply);
+  const win = normalizeQuietWindow(prefs.quietStart, prefs.quietEnd);
+  if (win) {
+    // null уходит в базу как null: одной записью и включают, и выключают окно.
+    body.quiet_start = win.start;
+    body.quiet_end = win.end;
+  }
   await rest('/forum_push_prefs', {
     method: 'POST',
     prefer: 'resolution=merge-duplicates',

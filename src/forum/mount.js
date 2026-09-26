@@ -30,6 +30,7 @@ import {
 import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
+import { normalizeQuietWindow, parseQuietTime, saveQuietWindow } from './quiet.js';
 import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { esc } from '../ui/helpers.js';
 import { leaderboardOf } from './leaderboard.js';
@@ -939,6 +940,45 @@ async function loadPushPrefs() {
   } catch {
     state.pushPrefs = null;
   }
+  /*
+    Зеркало тихого окна в IndexedDB обновляется при каждой загрузке настроек:
+    сервисный работник `localStorage` не видит, и без этого шага настройка,
+    сделанная на другом устройстве, до здешнего работника не доезжала бы,
+    пока человек не тронет тумблер.
+  */
+  await mirrorQuietWindow();
+}
+
+/**
+ * Переложить окно из состояния в зеркало IndexedDB для sw.js.
+ * null (часы выключены или окно не прочиталось) — стирает запись.
+ */
+async function mirrorQuietWindow() {
+  const p = state.pushPrefs;
+  await saveQuietWindow(p && p.quietStart != null && p.quietEnd != null
+    ? { start: p.quietStart, end: p.quietEnd }
+    : null);
+}
+
+/**
+ * Записать окно тихих часов и обновить зеркало.
+ *
+ * Отказ адаптера (совпавшие границы, половина окна, сеть) показывается строкой
+ * под полями: молчание настройки человек замечает, только когда пуш всё-таки
+ * пришёл или не пришёл, — объяснение нужно сразу.
+ */
+async function applyQuietWindow(prefs) {
+  state.quietError = '';
+  const next = { ...(state.pushPrefs || {}), ...prefs };
+  try {
+    await forum.setPushPrefs?.(next);
+    state.pushPrefs = next;
+  } catch (err) {
+    state.quietError = String(err?.message ?? err);
+    state.pushPrefs = { ...state.pushPrefs };
+  }
+  await mirrorQuietWindow();
+  paint();
 }
 
 /**
@@ -1863,6 +1903,11 @@ function wire() {
       state.notifyFresh = new Set();
       state.pushPrefs = null;
       /*
+        Зеркало тихого окна — тоже про конкретного человека: следующий, кто
+        откроет сайт в этом браузере, не должен унаследовать чужую ночь.
+      */
+      await mirrorQuietWindow();
+      /*
         Список первых шагов — про конкретного человека, и после выхода он
         чужой: следующий вошедший не должен увидеть подсказки, которые считались
         для предыдущего.
@@ -1886,6 +1931,18 @@ function wire() {
         state.pushPrefs = { ...state.pushPrefs };
       }
       paint();
+      return;
+    }
+
+    // Тихие часы: чекбокс включения. Выключенные часы — это null в обе
+    // границы, а не отдельные тумблеры: половине окна база не верит.
+    const quietToggle = t.closest('[data-forum-quiet-toggle]');
+    if (quietToggle && host.contains(quietToggle)) {
+      const L = CONFIG.forum.limits;
+      const cur = state.pushPrefs || {};
+      await applyQuietWindow(quietToggle.checked
+        ? { quietStart: cur.quietStart ?? L.quietDefaultStart, quietEnd: cur.quietEnd ?? L.quietDefaultEnd }
+        : { quietStart: null, quietEnd: null });
       return;
     }
 
@@ -2278,6 +2335,32 @@ function wire() {
 
   document.addEventListener('change', async (e) => {
     if (!host || !host.contains(e.target)) return;
+
+    /*
+      Границы тихих часов. Проверяются той же функцией, что и запись в базу,
+      поэтому отказ на «22:00 → 22:00» или пустое поле человек видит до
+      отправки, а не в виде сообщения о нарушенном ограничении.
+    */
+    const quietInput = e.target.closest('[data-forum-quiet]');
+    if (quietInput) {
+      const row = quietInput.closest('.forum-push__quiet-window');
+      const start = parseQuietTime(row?.querySelector('[data-forum-quiet="start"]')?.value);
+      const end = parseQuietTime(row?.querySelector('[data-forum-quiet="end"]')?.value);
+      try {
+        normalizeQuietWindow(start, end);
+      } catch (err) {
+        /*
+          Отказ — в состояние, а не в DOM: следующий paint перерисовал бы блок
+          настроек вместе с надписью, и человек увидел бы молча вернувшиеся
+          поля вместо объяснения.
+        */
+        state.quietError = String(err?.message ?? err);
+        paint();
+        return;
+      }
+      await applyQuietWindow({ quietStart: start, quietEnd: end });
+      return;
+    }
 
     /*
       Срок напоминания о встрече. Отдельно от кнопок ответа: человек мог

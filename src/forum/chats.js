@@ -17,6 +17,7 @@ import { esc } from '../ui/helpers.js';
 import { renderChats, renderScrollArea, renderChatList, renderMessage, dayLabel } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
 import { excerpt } from './format.js';
+import { quietMutesNow } from './quiet.js';
 import { uploadFile, currentUserId } from '../db/client.js';
 
 const POLL_MS = 4000;
@@ -629,7 +630,14 @@ async function tick() {
       /* Звук и уведомление: только для чужих сообщений, только когда видим. */
       if (newFromOthers.length && !document.hidden) {
         playNewMessageSound();
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        /*
+          Тихие часы убирают оповещение, но не звук: раз страница на экране,
+          человек перед ней сам, и «ночь» по часам ему не помеха. Проверка
+          читает то же зеркало IndexedDB, что и sw.js, — поведение открытой
+          вкладки и закрытой не разъезжается.
+        */
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted'
+            && !(await quietMutesNow())) {
           const sender = newFromOthers[newFromOthers.length - 1].authorNick;
           const preview = excerpt(newFromOthers[newFromOthers.length - 1].body || 'Вложение', 60);
           new Notification(`${sender}: ${preview}`, { silent: true });

@@ -18,6 +18,7 @@
  */
 import { CONFIG } from '../../../config.js';
 import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
+import { normalizeQuietWindow } from '../quiet.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -3523,7 +3524,12 @@ export async function setUpdateNoteArchived(id, archived) {
 export async function getPushPrefs() {
   const s = read();
   const p = s.pushPrefs || {};
-  return { newForumPost: Boolean(p.newForumPost), newForumReply: Boolean(p.newForumReply) };
+  return {
+    newForumPost: Boolean(p.newForumPost),
+    newForumReply: Boolean(p.newForumReply),
+    quietStart: Number.isInteger(p.quietStart) ? p.quietStart : null,
+    quietEnd: Number.isInteger(p.quietEnd) ? p.quietEnd : null,
+  };
 }
 
 export async function setPushPrefs(prefs) {
@@ -3531,6 +3537,11 @@ export async function setPushPrefs(prefs) {
   s.pushPrefs = { ...(s.pushPrefs || {}) };
   if (prefs.newForumPost != null) s.pushPrefs.newForumPost = Boolean(prefs.newForumPost);
   if (prefs.newForumReply != null) s.pushPrefs.newForumReply = Boolean(prefs.newForumReply);
+  const win = normalizeQuietWindow(prefs.quietStart, prefs.quietEnd);
+  if (win) {
+    s.pushPrefs.quietStart = win.start;
+    s.pushPrefs.quietEnd = win.end;
+  }
   write(s);
 }
 
