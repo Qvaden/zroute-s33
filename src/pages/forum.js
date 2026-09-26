@@ -21,7 +21,7 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel, needsExpiry, needsEventDate } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
@@ -1301,9 +1301,9 @@ function expiryChoices() {
  *
  * Срок можно назначить любой теме, а не только набору: «разбор актуален до
  * патча» стареет по тем же часам. Пустое значение — «бессрочно», и база
- * прощает его всем меткам, кроме «Набор» и «Срочно»: там откажет триггер, а
- * форма заранее подставит срок при выборе метки (см. mount.js) — иначе
- * человек узнавал бы о требовании уже после того, как написал текст.
+ * прощает его всем меткам, кроме «Набор», «Срочно» и «Обмен»: там откажет
+ * триггер, а форма заранее подставит срок при выборе метки (см. mount.js) —
+ * иначе человек узнавал бы о требовании уже после того, как написал текст.
  *
  * Списком вариантов правим мы, а решают часы базы: предложение, которое она
  * отвергла бы («+200 дней»), в поле висеть не должно.
@@ -1314,9 +1314,9 @@ function renderExpiryField(tags) {
   if (!days.length) return '';
   const now = Date.now();
   /*
-    Метка «нужен» стоит у тех вариантов, которые база примет при метке «Набор»
-    или «Срочно»: автоподстановка подставляет ровно такой вариант, и человеку
-    видно, что выбор честный, а не случайный.
+    Метка «нужен» стоит у тех вариантов, которые база примет при метке «Набор»,
+    «Срочно» или «Обмен»: автоподстановка подставляет ровно такой вариант, и
+    человеку видно, что выбор честный, а не случайный.
   */
   const required = [...new Set(Object.values(defaults).map(Number))]
     .filter((d) => days.includes(d));
@@ -1327,12 +1327,12 @@ function renderExpiryField(tags) {
         <option value="">Бессрочно</option>
         ${days
           .map(
-            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора и срочных тем)' : ''}</option>`
+            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора, срочных тем и обмена)' : ''}</option>`
           )
           .join('')}
       </select>
-      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор» или «Срочно» срок нужен обязательно:
-        он подставится сам, но его можно выбрать другой.</small>
+      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор», «Срочно» или «Обмен» срок нужен
+        обязательно: он подставится сам, но его можно выбрать другой.</small>
     </label>`;
 }
 
@@ -1366,6 +1366,92 @@ function renderEventFields(open) {
       </label>
       <small class="muted">Встреча — это обычная тема с назначенным моментом: обсуждение,
         ответы и картинки остаются в ней. Момент можно перенести потом прямо в карточке.</small>
+    </div>`;
+}
+
+/**
+ * Поля обмена в форме темы.
+ *
+ * Метка «Обмен» обязывает назвать обе стороны — это правило триггера базы
+ * (forum_posts_barter), и форма держит ту же длину, что и проверка таблицы:
+ * объявление, которое база отвергла бы, не должно проходить в поле. Поля
+ * скрыты, пока метка не отмечена, — как у встречи.
+ *
+ * Денег и контактов здесь нет намеренно: доска держит предложение, а не сделку,
+ * и связаться можно с автором по его нику, который и так виден в теме.
+ */
+function renderBarterFields(open) {
+  const L = CONFIG.forum.limits;
+  return `
+    <div class="forum-barter-fields" data-forum-barter-fields${open ? '' : ' hidden'}>
+      <label class="forum-field">
+        <span>Отдаёте</span>
+        <input type="text" name="barter_gives" data-forum-barter-gives
+               minlength="${L.barterLineMin}" maxlength="${L.barterLineMax}"
+               placeholder="что готовы отдать: 200 .308, аптека, бронежилет">
+      </label>
+      <label class="forum-field">
+        <span>Ищете</span>
+        <input type="text" name="barter_wants" data-forum-barter-wants
+               minlength="${L.barterLineMin}" maxlength="${L.barterLineMax}"
+               placeholder="что нужно взамен: банки, патроны 7.62">
+      </label>
+      <small class="muted">Объявление — это обычная тема: торговаться и договариваться
+        пишут в ответах под ней. Когда всё роздано, отметьте это в карточке — тема
+        останется со своими ответами.</small>
+    </div>`;
+}
+
+/**
+ * Строки обмена в карточке.
+ *
+ * Показаны и в ленте, и в открытой теме: доску читают именно по этим двум
+ * строкам, и прятать их за «читать целиком» — значит заставить человека
+ * открывать каждую тему, чтобы понять, что отдают.
+ *
+ * Пары без метки не бывает: триггер базы обнуляет колонки вместе с меткой,
+ * поэтому здесь не нужна ни проверка метки, ни запасная подпись.
+ */
+function barterLines(p) {
+  if (!p.barterGives && !p.barterWants) return '';
+  return `
+    <dl class="forum-barter${p.barterClosedAt ? ' forum-barter--closed' : ''}">
+      <div><dt>Отдаёт</dt><dd>${esc(p.barterGives || '—')}</dd></div>
+      <div><dt>Ищет</dt><dd>${esc(p.barterWants || '—')}</dd></div>
+    </dl>`;
+}
+
+/**
+ * Значок закрытого объявления.
+ *
+ * Снятое с доски не прячется и не удаляется: под темой могли договориться
+ * другие, и их ответы исчезли бы вместе с объявлением. Тема остаётся и честно
+ * говорит, что предложение больше не действует — тот же порядок, что у знака
+ * «срок вышел».
+ */
+function barterBadge(p) {
+  if (!p.barterClosedAt) return '';
+  return `<span class="forum-post__barter-closed" title="Автор снял это объявление с доски ${esc(shortDate(p.barterClosedAt))}">Снято с доски</span>`;
+}
+
+/**
+ * Кнопка «снял с доски» для автора и модерации.
+ *
+ * Отметка обратима: нажатие мимо кнопки не должно навсегда прятать
+ * предложение, которое человек ещё не роздал.
+ */
+function barterControl(p, s) {
+  const closed = Boolean(p.barterClosedAt);
+  if (!s.me) return '';
+  if (s.me.id !== p.authorId && s.me.role !== 'admin' && s.me.role !== 'moderator') return '';
+  return `
+    <div class="forum-barter__foot">
+      <button type="button" class="forum-act" data-forum-barter-close="${esc(p.id)}"
+              data-forum-barter-closed="${closed ? '1' : ''}"
+              title="${closed ? 'Вернуть объявление на доску' : 'Снять объявление с доски — тема останется со своими ответами'}">${
+        closed ? 'Вернуть на доску' : 'Снято с доски'
+      }</button>
+      ${closed ? `<span class="muted">предложение больше не действует</span>` : ''}
     </div>`;
 }
 
@@ -1467,6 +1553,8 @@ function renderComposer(s) {
         ${renderExpiryField(tags)}
 
         ${renderEventFields(needsEventDate(tags))}
+
+        ${renderBarterFields(needsBarterLines(tags))}
 
         <label class="forum-field">
           <span>Заголовок</span>
@@ -1895,6 +1983,7 @@ export function renderPostCard(p, s) {
         }
         ${expiryBadge(p)}
         ${eventBadge(p)}
+        ${barterBadge(p)}
       </header>
 
       ${
@@ -1907,6 +1996,8 @@ export function renderPostCard(p, s) {
 
       ${p.tags?.length ? `<div class="forum-post__tags">${p.tags.map((tag) => `<button type="button" class="forum-tag" data-forum-tag="${esc(tag)}">#${esc(TOPIC_TAGS.find((item) => item.id === tag)?.label || tag)}</button>`).join('')}</div>` : ''}
 
+      ${barterLines(p)}
+
       <div class="forum-post__body">
         ${isOpen ? postBody(p.body) : `<p>${esc(excerpt(p.body))}</p>`}
       </div>
@@ -1916,6 +2007,8 @@ export function renderPostCard(p, s) {
       ${p.poll ? renderPoll(p.poll, s) : ''}
 
       ${isOpen ? expiryControl(p, s) : ''}
+
+      ${isOpen && barterLines(p) ? barterControl(p, s) : ''}
 
       ${isOpen && needsEventDate(p.tags) ? eventActions(p, s) : ''}
 

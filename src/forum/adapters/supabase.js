@@ -268,6 +268,15 @@ function postOut(row) {
     */
     eventAt: toDate(row.event_at) ?? null,
     eventCapacity: Number(row.event_capacity ?? 0) || null,
+    /*
+      Бартер-доска: две стороны обмена и отметка закрытия. Колонки живут у темы
+      и объявлением её делает метка, а не отдельная таблица (шаг 1
+      supabase/20260926-barter-board.sql). До прогона миграции колонок в строке
+      нет вовсе — отсюда null, а не ошибка.
+    */
+    barterGives: row.barter_gives || null,
+    barterWants: row.barter_wants || null,
+    barterClosedAt: toDate(row.barter_closed_at) ?? null,
     pinned: Boolean(row.pinned),
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
@@ -494,12 +503,26 @@ export async function createPost(draft) {
     tags,
     /*
       Срок уезжает в базу как есть, без местной проверки: границ (от суток до
-      90 дней) и требования срока для «Набор» и «Срочно» держит триггер
-      forum_posts_expiry, и его текст человек видит целиком. Дублировать
+      90 дней) и требования срока для «Набора», «Срочно» и «Обмена» держит
+      триггер forum_posts_expiry, и его текст человек видит целиком. Дублировать
       отказ здесь значило бы однажды разойтись с базой формулировкой.
     */
     expires_at: draft.expiresAt ?? null,
   };
+
+  /*
+    Бартер: две стороны обмена. Как и момент встречи, это колонки темы, и их
+    обязывает метка, а не страница: обе строки требует триггер
+    forum_posts_barter, длину — проверка таблицы.
+
+    Поля прикладываются только когда их попросили: до прогона
+    20260926-barter-board.sql PostgREST отверг бы весь запрос из-за неизвестного
+    столбца, и встала бы не доска, а весь форум.
+  */
+  if (draft.barterGives != null || draft.barterWants != null) {
+    payload.barter_gives = draft.barterGives ?? null;
+    payload.barter_wants = draft.barterWants ?? null;
+  }
 
   /*
     Момент встречи и места — те же колонки темы, что и срок действия: событие
@@ -623,6 +646,25 @@ export async function setExpiry(id, expiresAt) {
   });
   const full = await getPost(id);
   if (!full) throw new Error('Пост не найден после продления');
+  return full;
+}
+
+/**
+ * Снять объявление с доски или вернуть его.
+ *
+ * Отметка закрытия — та же колонка темы, что и срок действия, поэтому и право
+ * на неё решает RLS: строку правит автор, модерация — любую. Двери здесь нет
+ * нарочно: «это моя тема» — единственное правило, а его политика умеет отвечать
+ * сама. Тема при этом не удаляется: под объявлением могли договориться другие,
+ * и их ответы исчезли бы вместе с ним.
+ */
+export async function closeBarter(id, closed) {
+  await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: { barter_closed_at: closed ? new Date().toISOString() : null },
+  });
+  const full = await getPost(id);
+  if (!full) throw new Error('Пост не найден после снятия объявления');
   return full;
 }
 

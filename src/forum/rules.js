@@ -132,21 +132,23 @@ export const TOPIC_TAGS = [
   { id: 'guide', label: 'Гайд' },
   { id: 'question', label: 'Вопрос' },
   { id: 'event', label: 'Событие' },
+  { id: 'barter', label: 'Обмен' },
 ];
 export const TOPIC_TAG_IDS = TOPIC_TAGS.map((tag) => tag.id);
 
 /**
  * Метки, которым нужен срок действия.
  *
- * «Набор открыт» и «помогите со столицей» — это обещания, у которых срок
- * жизни короче, чем у обсуждения. Через месяц такая тема уже не приглашение,
- * а мусор, и читатель, пришедший по ней в закрытый набор, делает вывод, что
- * форуму верить нельзя. Поэтому форма обязана спросить дату, а база —
- * проверить ответ: числа лежат в CONFIG.forum.limits, а те же два id стоят
- * в функции forum_expiry_required (supabase/20260925-announcement-expiry.sql).
- * Расхождение сторожит тест.
+ * «Набор открыт», «помогите со столицей» и «отдам патроны, ищу банки» — это
+ * обещания, у которых срок жизни короче, чем у обсуждения. Через месяц такая
+ * тема уже не приглашение и не предложение, а мусор, и читатель, пришедший по
+ * ней в закрытый набор или к человеку, который давно всё роздал, делает вывод,
+ * что форуму верить нельзя. Поэтому форма обязана спросить дату, а база —
+ * проверить ответ: числа лежат в CONFIG.forum.limits, а те же три id стоят
+ * в функции forum_expiry_required (supabase/20260925-announcement-expiry.sql,
+ * расширена в supabase/20260926-barter-board.sql). Расхождение сторожит тест.
  */
-export const EXPIRY_TAG_IDS = ['recruiting', 'sos'];
+export const EXPIRY_TAG_IDS = ['recruiting', 'sos', 'barter'];
 
 /** @param {string[]} tags */
 export function needsExpiry(tags) {
@@ -178,6 +180,21 @@ export const EVENT_RSVP = [
   { id: 'declined', label: 'Не приду', seats: false },
 ];
 export const EVENT_RSVP_IDS = EVENT_RSVP.map((r) => r.id);
+
+/*
+  Бартер-доска. Объявлением тема становится тоже по метке, а не по отдельной
+  таблице (рассуждение — в шаге 1 миграции supabase/20260926-barter-board.sql),
+  и у метки своё требование: названы обе стороны, иначе «отдам патроны» без
+  «ищу банки» — это реклама, и половина таких тем заканчивается вопросом «а что
+  тебе нужно?». Тот же id стоит в триггере forum_posts_barter и в проверке
+  меток темы. Расхождение сторожит тест.
+*/
+export const BARTER_TAG_ID = 'barter';
+
+/** @param {string[]} tags */
+export function needsBarterLines(tags) {
+  return (Array.isArray(tags) ? tags : []).includes(BARTER_TAG_ID);
+}
 
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 

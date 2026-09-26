@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -307,6 +307,10 @@ function postOut(state, p) {
     // Момент встречи и лимит мест; оба null у обычной темы (см. шаг 1 миграции).
     eventAt: toDate(p.eventAt),
     eventCapacity: p.eventCapacity == null ? null : Number(p.eventCapacity),
+    // Обе стороны обмена и отметка, что автор снял объявление с доски.
+    barterGives: p.barterGives || null,
+    barterWants: p.barterWants || null,
+    barterClosedAt: toDate(p.barterClosedAt) ?? null,
     pinned: Boolean(p.pinned),
     deleted: Boolean(p.deleted),
     deletedReason: p.deletedReason || '',
@@ -533,7 +537,7 @@ function checkHold(state, kind, me, text) {
 function expiryProblem(tags, when) {
   const L = CONFIG.forum.limits;
   if (needsExpiry(tags) && !when) {
-    return 'У темы с меткой «Набор» или «Срочно» должен быть срок действия — выберите, сколько дней она висит';
+    return 'У темы с меткой «Набор», «Срочно» или «Обмен» должен быть срок действия — выберите, сколько дней она висит';
   }
   if (!when) return '';
   const at = new Date(when).getTime();
@@ -543,6 +547,36 @@ function expiryProblem(tags, when) {
   }
   if (at > Date.now() + L.expiryDaysMax * day) {
     return `Срок не дальше ${L.expiryDaysMax} дней — иначе тема зависнет в ленте навсегда`;
+  }
+  return '';
+}
+
+/**
+ * СТОРОНЫ ОБМЕНА В ЧЕРНОВОМ РЕЖИМЕ.
+ *
+ * Требование обеих строк держит триггер forum_posts_barter
+ * (supabase/20260926-barter-board.sql), и его текст здесь повторяется слово в
+ * слово — за этим следит тест. Длина строк — проверка таблицы
+ * (`char_length between 3 and 200`); она отвергла бы запрос текстом нарушения
+ * ограничения, а не словами для человека, поэтому текст здесь свой, а числа те
+ * же, что в проверке.
+ *
+ * @param {string[]} tags  Метки темы.
+ * @param {string|null} gives  Что отдаёт автор.
+ * @param {string|null} wants  Что он ищет.
+ * @returns {string}  Пусто, всё в порядке; иначе — текст отказа.
+ */
+function barterProblem(tags, gives, wants) {
+  const L = CONFIG.forum.limits;
+  if (!needsBarterLines(tags)) return '';
+  const a = String(gives ?? '').trim();
+  const b = String(wants ?? '').trim();
+  if (!a || !b) {
+    return 'У темы с меткой «Обмен» должны быть названы обе стороны: что отдаёте и что ищете';
+  }
+  if (a.length < L.barterLineMin || a.length > L.barterLineMax
+    || b.length < L.barterLineMin || b.length > L.barterLineMax) {
+    return `Каждая сторона обмена — от ${L.barterLineMin} до ${L.barterLineMax} символов`;
   }
   return '';
 }
@@ -598,10 +632,12 @@ export async function createPost(draft) {
   const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
   /*
     Порядок проверок повторяет алфавит триггеров на forum_posts:
-    forum_posts_event_at идёт раньше forum_posts_expiry, и тема сразу с двумя
-    метками («Событие» и «Набор») обязана получить отказ в том же порядке, в
-    каком её отвергла бы база.
+    forum_posts_barter идёт раньше forum_posts_event_at, а тот — раньше
+    forum_posts_expiry. Тема сразу с тремя метками обязана получить отказ в том
+    же порядке, в каком её отвергла бы база.
   */
+  const barterError = barterProblem(tags, draft.barterGives ?? null, draft.barterWants ?? null);
+  if (barterError) throw new Error(barterError);
   const eventError = eventWhenProblem(tags, draft.eventAt ?? null)
     || eventSeatsProblem(draft.eventCapacity ?? null);
   if (eventError) throw new Error(eventError);
@@ -628,6 +664,10 @@ export async function createPost(draft) {
     // висеть с датой, которую игрок никогда не утверждал.
     eventAt: needsEventDate(tags) ? (draft.eventAt ?? null) : null,
     eventCapacity: needsEventDate(tags) ? (draft.eventCapacity ?? null) : null,
+    // Та же картинка, что и в базе: без метки «Обмен» строк обмена не бывает.
+    barterGives: needsBarterLines(tags) ? String(draft.barterGives ?? '').trim() : '',
+    barterWants: needsBarterLines(tags) ? String(draft.barterWants ?? '').trim() : '',
+    barterClosedAt: null,
     pinned: false,
     deleted: false,
     views: 0,
@@ -797,6 +837,29 @@ export async function setEventAt(id, eventAt, eventCapacity = null) {
     }
   }
 
+  write(s);
+  return postOut(s, post);
+}
+
+export async function closeBarter(id, closed) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const post = s.posts.find((p) => p.id === id);
+  if (!post) throw new Error('Пост не найден');
+  if (!isStaff(me) && post.authorId !== me.id) throw new Error('Это не ваш пост');
+  if (!needsBarterLines(Array.isArray(post.tags) ? post.tags : [])) {
+    throw new Error('Снимать с доски можно только объявление с меткой «Обмен»');
+  }
+
+  /*
+    Тема не удаляется: под объявлением могли договориться другие, и их ответы
+    исчезли бы вместе с ним. Отметка закрытия — единственное, что меняет
+    картина, и она обратима: нажатие мимо кнопки не должно навсегда прятать
+    предложение, которое человек ещё не роздал.
+  */
+  post.barterClosedAt = closed ? new Date().toISOString() : null;
   write(s);
   return postOut(s, post);
 }

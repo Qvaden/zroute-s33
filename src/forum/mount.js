@@ -24,7 +24,7 @@ import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY }
 import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
-  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, EVENT_TAG_ID,
+  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines, EVENT_TAG_ID,
   EVENT_RSVP_IDS,
 } from './rules.js';
 import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
@@ -2069,6 +2069,37 @@ function wire() {
     }
 
     /*
+      Объявление снято с доски — или возвращено на неё. Отметка закрытия живёт
+      у темы, поэтому право на неё решает та же политика, что и правка срока, а
+      тема остаётся на месте вместе с ответами: под объявлением могли
+      договориться другие.
+    */
+    const barterBtn = t.closest('[data-forum-barter-close]');
+    if (barterBtn && host.contains(barterBtn)) {
+      const id = barterBtn.dataset.forumBarterClose;
+      const closed = barterBtn.dataset.forumBarterClosed !== '1';
+      barterBtn.disabled = true;
+      try {
+        const updated = await forum.closeBarter(id, closed);
+        /*
+          Карточку правим ответом адаптера, а не своей догадкой: момент закрытия
+          считает база по своим часам, и в подписи должно быть её значение.
+        */
+        if (updated) {
+          const i = state.posts.findIndex((p) => p.id === id);
+          if (i >= 0) state.posts[i] = updated;
+          else state.posts = [updated, ...state.posts];
+        }
+        paint();
+      } catch (err) {
+        notice(`${String(err?.message ?? err)}
+Если база ещё не обновлена, прогоните supabase/20260926-barter-board.sql.`.trim());
+        barterBtn.disabled = false;
+      }
+      return;
+    }
+
+    /*
       Ответ на приглашение прямо в теме. На странице календаря те же кнопки
       обслуживает forum/calendar.js; здесь они нужны потому, что человек
       читает анонс и хочет ответить, не уходя с темы. Двойной обработки не
@@ -2260,6 +2291,13 @@ function wire() {
       const eventFields = form?.querySelector('[data-forum-event-fields]');
       if (eventFields) eventFields.hidden = !needsEventDate(chosen);
       /*
+        Поля обмена прячутся так же: без метки «Обмен» базы для них нет, а
+        «отдам патроны», висящее под обычной темой, обещало бы доску, которой
+        человек не собирался заводить.
+      */
+      const barterFields = form?.querySelector('[data-forum-barter-fields]');
+      if (barterFields) barterFields.hidden = !needsBarterLines(chosen);
+      /*
         Черновик пересохраняем именно здесь: автосохранение идёт на input,
         который случился до того, как поле заполнилось, и без этого шага
         перерисовка вернула бы пустой срок.
@@ -2403,6 +2441,19 @@ function wire() {
       */
       draft.eventAt = form.event_at?.value ? new Date(form.event_at.value).toISOString() : null;
       draft.eventCapacity = form.event_seats?.value ? Number(form.event_seats.value) : null;
+      /*
+        Обе стороны обмена. Строку отдаём как есть, без местной проверки длины:
+        её держат проверка таблицы и триггер базы, и их текст человек видит
+        целиком. Пустая строка — null, и тогда поля в запрос не уезжают вовсе:
+        до прогона миграции PostgREST отверг бы запрос с неизвестным столбцом,
+        а обычной теме эти колонки не нужны.
+      */
+      const gives = form.barter_gives?.value?.trim() ?? '';
+      const wants = form.barter_wants?.value?.trim() ?? '';
+      if (needsBarterLines(draft.tags)) {
+        draft.barterGives = gives || null;
+        draft.barterWants = wants || null;
+      }
 
       await withBusy(submitter, 'Публикуем…', async () => {
         try {

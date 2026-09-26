@@ -5341,6 +5341,13 @@ console.log('\nV. Срок действия темы');
   const { readFile } = await import('node:fs/promises');
   const L = CONFIG.forum.limits;
   const sql = await readFile('supabase/20260925-announcement-expiry.sql', 'utf8');
+  /*
+    Правило срока переопределено позже: метка «Обмен» добавлена в
+    20260926-barter-board.sql, и он же пересоздаёт и проверку меток, и функцию
+    списка, и триггер. Поэтому список меток и текст отказа сверяются с ПОСЛЕДНИМ
+    файлом — с прежним они разойтись обязаны, и ниже есть проверка на это.
+  */
+  const later = await readFile('supabase/20260926-barter-board.sql', 'utf8');
   const oldSql = await readFile('supabase/20260916-forum-community.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
@@ -5351,17 +5358,20 @@ console.log('\nV. Срок действия темы');
   /* Метка «Срочно» должна доехать до списка, который принимает база. */
   const listOf = (s) => (s ?? '').split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean).sort().join('/');
   equal('метки темы: база и правила называют одно и то же',
-    listOf(sql.match(/tags <@ array\[([^\]]*)\]::text\[\]/)?.[1]),
+    listOf(later.match(/tags <@ array\[([^\]]*)\]::text\[\]/)?.[1]),
     listOf(rules.TOPIC_TAG_IDS.join(',')));
   check('метка «Срочно» названа по-русски и есть в списке',
     rules.TOPIC_TAGS.some((tag) => tag.id === 'sos' && tag.label === 'Срочно'));
+  check('список меток переписан целиком, а не дописан одним файлом поверх другого',
+    (later.match(/add constraint forum_posts_tags_check/g) || []).length === 1
+      && later.includes("array['vs','recruiting','diplomacy','guide','question','event','sos','barter']::text[]"));
 
   /*
     Список меток, требующих срока, живёт в SQL-функции и в rules.js. Совпадать
     они обязаны буквально: база отвергнет тему, которой форма обещала прощение.
   */
   equal('требовать срок база и страница договариваются об одних метках',
-    listOf(sql.match(/&& array\[([^\]]*)\]::text\[\];/)?.[1]),
+    listOf(later.match(/&& array\[([^\]]*)\]::text\[\];/)?.[1]),
     listOf(rules.EXPIRY_TAG_IDS.join(',')));
   check('нужен срок или нет — решает одна функция, а не два списка',
     rules.needsExpiry(['recruiting']) && rules.needsExpiry(['sos', 'vs'])
@@ -5380,9 +5390,11 @@ console.log('\nV. Срок действия темы');
   /* Проверка висит на записи и на правке, иначе её можно перешагнуть PATCH. */
   check('срок проверяется при создании и при продлении',
     /create trigger forum_posts_expiry[\s\S]{0,140}before insert or update on public\.forum_posts/.test(sql));
-  const need = 'У темы с меткой «Набор» или «Срочно» должен быть срок действия — выберите, сколько дней она висит';
+  const need = 'У темы с меткой «Набор», «Срочно» или «Обмен» должен быть срок действия — выберите, сколько дней она висит';
   check('отказ про срок назван одинаково в базе и в черновом режиме',
-    (sql.match(new RegExp(need, 'g')) || []).length === 1 && localSrc.includes(need));
+    (later.match(new RegExp(need, 'g')) || []).length === 1 && localSrc.includes(need));
+  check('прежний файл остаётся со своим текстом: читают последний, и он один',
+    !sql.includes(need) && (later.match(/create or replace function public\.forum_posts_expiry\(\)/g) || []).length === 1);
   check('требование срока не мешает правкам, которые его не касаются',
     sql.includes('new.tags is distinct from old.tags or new.expires_at is distinct from old.expires_at'));
   check('функцию списка меток нельзя позвать из браузера',
@@ -7190,7 +7202,245 @@ console.log('\nAA. Закладки тем');
 }
 
 console.log(`\n${'─'.repeat(52)}`);
+// ── AB. Бартер-доска ────────────────────────────────────────────────────────
+console.log('\nAB. Бартер-доска');
+{
+  /*
+    Бартер опасен не тем, что кто-то обманет в сделке, — форум сделки не
+    ведёт, — а тем, где правило однажды разойдётся с собой: метка в правилах и
+    в списке базы, длина строк в форме и в проверке таблицы, отметка закрытия,
+    которая переживает удаление темы, и срок, который у объявления обязателен.
+    Поэтому тесты ниже сверяют места между собой, а не только наличие слов.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-barter-board.sql', 'utf8');
+  /* Определение ленты до этого файла — эталон копии: её пересоздают копией. */
+  const prevSql = await readFile('supabase/20260926-author-thanks.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/forum.js', 'utf8');
+  const rulesSrc = await readFile('src/forum/rules.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const L = CONFIG.forum.limits;
+
+  /* ── Форма правила: обмен живёт у темы ── */
+  /*
+    SQL читается нормализованным по пробелам: перенос строки в команде — это
+    форматирование файла, а не смысл, и сверять фразы по одному пробелу
+    означало бы падать на каждом переносе.
+  */
+  const flat = sql.replace(/\s+/g, ' ');
+  check('обмен — метка темы, а не отдельный ящик: ни таблицы, ни новой страницы',
+    !/create table[^;]*barter/i.test(sql)
+      && flat.includes('add column if not exists barter_gives')
+      && flat.includes('add column if not exists barter_wants')
+      && flat.includes('add column if not exists barter_closed_at'));
+  check('метку принимает список базы, и карточка темы по-прежнему держит три',
+    sql.includes("tags <@ array['vs','recruiting','diplomacy','guide','question','event','sos','barter']::text[]")
+      && sql.includes('cardinality(tags) <= 3'));
+  /*
+    Имя метки знает из трёх мест: список правил, проверка базы и функция
+    списка требующих срока. Расхождение выглядит как «галочку поставил, а
+    база не поняла», поэтому сверяем все три сразу.
+  */
+  check('имя метки одно: правила, проверка таблицы и функция срока',
+    rulesSrc.includes("export const BARTER_TAG_ID = 'barter';")
+      && rulesSrc.includes("EXPIRY_TAG_IDS = ['recruiting', 'sos', 'barter']")
+      && sql.includes("array['recruiting','sos','barter']::text[]"));
+  check('решает одна функция, а не два списка: обмен в требующих срок',
+    (await import('../src/forum/rules.js')).needsExpiry(['barter'])
+      && (await import('../src/forum/rules.js')).needsBarterLines(['vs', 'barter'])
+      && !(await import('../src/forum/rules.js')).needsBarterLines(['vs']));
+
+  /* ── Числа: форма и база говорят одними словами ── */
+  check('длину обеих строк держит проверка таблицы, и числа те же, что в конфиге',
+    sql.includes(`char_length(barter_gives) between ${L.barterLineMin} and ${L.barterLineMax}`)
+      && sql.includes(`char_length(barter_wants) between ${L.barterLineMin} and ${L.barterLineMax}`));
+  check('черновик называет ту же границу тем же словом',
+    localSrc.includes('`Каждая сторона обмена — от ${L.barterLineMin} до ${L.barterLineMax} символов`'));
+  const both = 'У темы с меткой «Обмен» должны быть названы обе стороны: что отдаёте и что ищете';
+  check('отказ про обе стороны назван одинаково в базе и в черновом режиме',
+    (sql.match(new RegExp(both, 'g')) || []).length === 1 && localSrc.includes(both));
+  check('сроку объявления отдельного числа не заводят: он общий',
+    L.expiryDefaultDays.barter === L.expiryChoices.find((d) => d >= 3)
+      && !Object.keys(L).some((k) => /barter.*(min|max|days)/i.test(k) && !/barterLine/.test(k)));
+
+  /* ── Что триггер делает сам ── */
+  check('метку сняли — строки и отметка уходят вместе с ней',
+    /if not \('barter' = any\(new\.tags\)\) then\s*new\.barter_gives := null;\s*new\.barter_wants := null;\s*new\.barter_closed_at := null;/.test(sql));
+  check('требование строк мешает только тем, кто трогает метки или строки',
+    sql.includes('new.tags is distinct from old.tags')
+      && sql.includes('new.barter_gives is distinct from old.barter_gives')
+      && sql.includes('new.barter_wants is distinct from old.barter_wants'));
+  check('будущая отметка закрытия сжимается в «сейчас»: часы браузера не указ',
+    /if new\.barter_closed_at > now\(\) then\s*new\.barter_closed_at := now\(\);/.test(sql));
+  const backdate = 'Нельзя закрыть объявление раньше, чем оно появилось';
+  check('закрыть объявление задним числом нельзя — и в черновике это то же правило',
+    sql.includes(backdate) && localSrc.includes('post.barterClosedAt = closed ? new Date().toISOString() : null'));
+
+  /* ── Двери и права ── */
+  check('двери у обмена нет: объявление правит политика темы',
+    !/create or replace function public\.forum_barter/.test(sql)
+      && !supaSrc.includes('/rpc/forum_barter')
+      && !sql.includes('execute function public.forum_barter'));
+  check('новых прав не выдано: колонки живут уже выданной таблицей',
+    !/grant[\s\S]{0,120}barter/.test(sql) && !/create policy/.test(sql));
+  check('частоту объявлений держит выдержка тем, а не второй счётчик',
+    !/barter.*(hold|limit|count)/i.test(sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, ''))
+      && !sql.includes('barter_hold'));
+  check('ни денег, ни контактов, ни способа связаться в колонках нет',
+    !/barter_(price|cost|money|contact|discord|phone|telegram)/.test(sql));
+
+  /* ── Лента ── */
+  const viewOf = (src) => (src.match(/create view public\.forum_post_list[\s\S]*?author_id;/)?.[0] ?? '')
+    .replace(/\s+/g, ' ').trim();
+  check('лента пересоздана копией прежнего определения: select p.* увидит колонки',
+    viewOf(sql).length > 200 && viewOf(sql) === viewOf(prevSql)
+      && sql.includes('drop view if exists public.forum_post_list'));
+  check('доска смотрит на свежие открытые объявления, и указатель частичный',
+    /create index if not exists forum_posts_barter_idx[\s\S]{0,140}where 'barter' = any \(tags\) and not deleted/.test(sql));
+
+  /* ── Контракт и оба адаптера ── */
+  check('контракт знает три свойства темы и дверь закрытия',
+    /@property \{string\|null\} \[barterGives\]/.test(contractSrc)
+      && /@property \{string\|null\} \[barterWants\]/.test(contractSrc)
+      && /@property \{Date\|null\} \[barterClosedAt\]/.test(contractSrc)
+      && contractSrc.includes('(id: string, closed: boolean) => Promise<ForumPost>} closeBarter'));
+  check('черновик отдаёт те же три поля и своим null, и своей датой',
+    /barterGives: p\.barterGives \|\| null/.test(localSrc)
+      && /barterWants: p\.barterWants \|\| null/.test(localSrc)
+      && /barterClosedAt: toDate\(p\.barterClosedAt\) \?\? null/.test(localSrc));
+  check('рабочий адаптер читает колонки темы и не падает без миграции',
+    /barterGives: row\.barter_gives \|\| null/.test(supaSrc)
+      && /barterClosedAt: toDate\(row\.barter_closed_at\) \?\? null/.test(supaSrc));
+  check('колонки уезжают в запрос только когда их попросили',
+    /if \(draft\.barterGives != null \|\| draft\.barterWants != null\) \{[\s\S]{0,160}payload\.barter_gives = draft\.barterGives \?\? null/.test(supaSrc));
+  check('отметка закрытия — PATCH одной колонки, как срок темы',
+    /export async function closeBarter\(id, closed\)[\s\S]{0,240}method: 'PATCH'[\s\S]{0,90}barter_closed_at/.test(supaSrc));
+  check('черновик повторяет отказ про метку своим словом',
+    localSrc.includes('Снимать с доски можно только объявление с меткой «Обмен»'));
+
+  /* ── Форма и карточка ── */
+  check('форма спрашивает обе стороны и держит длину базы',
+    pagesSrc.includes('name="barter_gives"') && pagesSrc.includes('name="barter_wants"')
+      && /name="barter_gives" data-forum-barter-gives[\s\S]{0,120}maxlength="\$\{L\.barterLineMax\}"/.test(pagesSrc));
+  check('поля прячутся вместе с меткой — как у встречи',
+    mountSrc.includes('barterFields.hidden = !needsBarterLines(chosen)'));
+  check('в запрос не уедет ничего, если метку не ставили',
+    /if \(needsBarterLines\(draft\.tags\)\) \{[\s\S]{0,160}draft\.barterGives = gives \|\| null/.test(mountSrc));
+  check('карточка показывает обе стороны и в ленте, и в теме',
+    pagesSrc.includes('${barterLines(p)}') && /function barterLines\(p\)/.test(pagesSrc));
+  check('снятое объявление названо знаком, а не исчезновением',
+    /function barterBadge\(p\)[\s\S]{0,240}Снято с доски/.test(pagesSrc)
+      && pagesSrc.includes('${barterBadge(p)}'));
+  check('кнопка есть только у автора и модерации и знает своё состояние',
+    /function barterControl\(p, s\)[\s\S]{0,400}s\.me\.id !== p\.authorId/.test(pagesSrc)
+      && pagesSrc.includes('data-forum-barter-close=') && pagesSrc.includes('data-forum-barter-closed='));
+  check('страница слушает кнопку и правит карточку ответом адаптера',
+    mountSrc.includes("t.closest('[data-forum-barter-close]')")
+      && mountSrc.includes('await forum.closeBarter(id, closed)'));
+  check('отказ без миграции называет файл, а не «операция не выполнена»',
+    mountSrc.includes('supabase/20260926-barter-board.sql'));
+  check('блок одет своим стилем, и снятое объявление читается приглушённо',
+    cssSrc.includes('.forum-barter-fields {') && cssSrc.includes('.forum-barter--closed > div'));
+
+  /* ── Документы ── */
+  check('правило описано и в базе, и в документах, и в списке миграций',
+    sql.includes('── ПРАВИЛО ──') && docsSrc.includes('20260926-barter-board.sql')
+      && readmeSrc.includes('20260926-barter-board.sql'));
+  check('документ называет ограничение доски: сделку форум не ведёт',
+    /не обещает сделку|сделку не ведёт|не ведёт её/.test(docsSrc));
+
+  /* ── Живой черновой прогон: те же правила, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const rawBt = () => JSON.parse(store.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const DAY = 86400000;
+  const inDays = (n) => new Date(Date.now() + n * DAY).toISOString();
+
+  await local.signUp('Меняла');
+  equal('объявлению без второй стороны база отказывает тем же словом',
+    await says(() => local.createPost({
+      title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
+      tags: ['barter'], barterGives: '200 патронов 7.62', expiresAt: inDays(3),
+    })), both);
+  equal('и срок для объявления обязателен',
+    await says(() => local.createPost({
+      title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
+      tags: ['barter'], barterGives: '200 патронов 7.62', barterWants: 'банки',
+    })), 'У темы с меткой «Набор», «Срочно» или «Обмен» должен быть срок действия — выберите, сколько дней она висит');
+  equal('короткая строка не проходит, как и в проверке таблицы',
+    await says(() => local.createPost({
+      title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
+      tags: ['barter'], barterGives: '200 патронов 7.62', barterWants: 'да', expiresAt: inDays(3),
+    })), `Каждая сторона обмена — от ${L.barterLineMin} до ${L.barterLineMax} символов`);
+  equal('длинная строка — тоже',
+    await says(() => local.createPost({
+      title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
+      tags: ['barter'], barterGives: 'я'.repeat(L.barterLineMax + 1), barterWants: 'банки', expiresAt: inDays(3),
+    })), `Каждая сторона обмена — от ${L.barterLineMin} до ${L.barterLineMax} символов`);
+
+  const ad = await local.createPost({
+    title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
+    tags: ['barter'], barterGives: '200 патронов 7.62', barterWants: 'банки и аптеки', expiresAt: inDays(3),
+  });
+  equal('объявление принято и названо обеими сторонами', ad.barterGives, '200 патронов 7.62');
+  equal('вторая сторона доехала целиком', ad.barterWants, 'банки и аптеки');
+  equal('свежее объявление открыто', ad.barterClosedAt, null);
+
+  const calm = await local.createPost({
+    title: 'Разбор флангов', body: '<p>обычная тема</p>', category: 'vs',
+    tags: ['vs'], barterGives: '200 патронов 7.62', barterWants: 'банки',
+  });
+  check('без метки строк обмена не бывает, даже если их прислали',
+    calm.barterGives === null && calm.barterWants === null && calm.barterClosedAt === null);
+
+  const byTag = await local.listPosts({ tag: 'barter' });
+  equal('доска — обычный фильтр по метке, отдельной страницы нет',
+    byTag.posts.map((p) => p.id), [ad.id]);
+
+  const closed = await local.closeBarter(ad.id, true);
+  check('закрытие ставит момент, а не флаг', closed.barterClosedAt instanceof Date);
+  equal('объявление осталось темой со своим текстом', closed.title, 'Отдам патроны');
+  equal('повторное нажатие возвращает на доску',
+    (await local.closeBarter(ad.id, false)).barterClosedAt, null);
+  await local.signOut();
+  equal('без входа снимать некому',
+    await says(() => local.closeBarter(ad.id, true)), 'Сначала войдите');
+  await local.signUp('Посторонний');
+  equal('и автор чужой строки не тронет',
+    await says(() => local.closeBarter(ad.id, true)), 'Это не ваш пост');
+  const ownCalm = await local.createPost({
+    title: 'Своё без обмена', body: '<p>обычная тема</p>', category: 'vs', tags: ['vs'],
+  });
+  equal('у своей темы без метки снимать нечего',
+    await says(() => local.closeBarter(ownCalm.id, true)),
+    'Снимать с доски можно только объявление с меткой «Обмен»');
+
+  await local.signIn('Меняла');
+  await local.closeBarter(ad.id, true);
+  check('в хранилище у темы — две строки, момент закрытия и ничего лишнего',
+    rawBt().posts.some((p) => p.id === ad.id && p.barterGives && p.barterWants && p.barterClosedAt));
+  check('закрытая тема не пропадает из ленты: ответы людей остаются',
+    (await local.listPosts({})).posts.some((p) => p.id === ad.id));
+  await local.deletePost(ad.id, null);
+  check('удалённое объявление уходит с доски вместе с темой',
+    !(await local.listPosts({ tag: 'barter' })).posts.some((p) => p.id === ad.id));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
+
 console.log('\nR3. Ключ восстановления');
 {
   const rec = await import('../src/forum/recovery.js');

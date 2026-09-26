@@ -55,9 +55,9 @@
  * @property {Date}    createdAt
  * @property {Date}    [editedAt]
  * @property {Date|null} [expiresAt]  До какого числа тема считается актуальной.
- *                                    null — срок не назначен. Для меток «Набор»
- *                                    и «Срочно» его требует база; истёкшая тема
- *                                    из ленты не исчезает, она получает метку
+ *                                    null — срок не назначен. Для меток «Набор»,
+ *                                    «Срочно» и «Обмен» его требует база; истёкшая
+ *                                    тема из ленты не исчезает, она получает метку
  *                                    «срок вышел» (см. 20260925-announcement-expiry.sql).
  * @property {Date|null} [eventAt]    Момент встречи, если тема — событие
  *                                    (метка «Событие»); null — обычная тема.
@@ -67,6 +67,15 @@
  * @property {number|null} [eventCapacity]  Сколько мест, null — без лимита.
  *                                    Считаются ответившие «буду»; «возможно»
  *                                    места не занимает.
+ * @property {string|null} [barterGives]  Что отдаёт автор объявления с меткой
+ *                                    «Обмен»; null — тема не обмен. Обязательность
+ *                                    обеих строк держит триггер forum_posts_barter,
+ *                                    длину — проверка таблицы
+ *                                    (20260926-barter-board.sql).
+ * @property {string|null} [barterWants]  Что автор ищет взамен.
+ * @property {Date|null} [barterClosedAt]  Когда автор снял объявление с доски;
+ *                                    null — объявление открыто. Тема при этом
+ *                                    остаётся: под ней могли договориться другие.
  * @property {boolean} [pinned]       Держать сверху ленты.
  * @property {boolean} [deleted]
  * @property {string}  [deletedReason]
@@ -263,11 +272,12 @@
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
- * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, barterGives?: string|null, barterWants?: string|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
  * @property {(id: string, expiresAt: string|null) => Promise<ForumPost>} setExpiry  Продлить срок или снять его; база считает границы, страница показывает отказ как есть.
+ * @property {(id: string, closed: boolean) => Promise<ForumPost>} closeBarter  Снять объявление обмена с доски или вернуть его. Право решает RLS темы, как у setExpiry: своей строкой правит автор.
  * @property {(postId: string) => Promise<ForumComment[]>} listComments
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment
  * @property {(id: string, reason: string) => Promise<void>} deleteComment

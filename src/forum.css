@@ -2612,3 +2612,72 @@
 .forum-event-fields .forum-field { flex: 1 1 160px; }
 .forum-event-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
 
+/*
+  Бартер-доска. Две стороны обмена — это не подписи к тексту, а главная строка
+  карточки: доску просматривают глазами «что отдают», поэтому блок стоит над
+  телом поста и в ленте, и в открытой теме.
+*/
+.forum-barter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+}
+.forum-barter > div {
+  flex: 1 1 200px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--win) 26%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--win) 7%, var(--raised));
+}
+.forum-barter dt {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.forum-barter dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+/* Снятое объявление читается, но не зовёт: тот же смысл, что у знака «срок вышел». */
+.forum-barter--closed > div {
+  border-color: var(--line);
+  background: transparent;
+  opacity: .62;
+}
+.forum-barter__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.forum-barter__foot .muted { font-size: 11.5px; }
+.forum-post__barter-closed {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Поля обмена в форме — по образцу полей встречи: тот же жест «метка открыла
+   свои поля» и та же подсветка, чтобы человек видел, откуда взялось поле. */
+.forum-barter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--win) 7%, var(--raised));
+  border: 1px solid color-mix(in srgb, var(--win) 26%, var(--line));
+}
+.forum-barter-fields .forum-field { flex: 1 1 220px; }
+.forum-barter-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
+
