@@ -92,7 +92,7 @@ export function renderModeration(view) {
     тебя». Второе человек ждёт, поэтому оно и стоит выше.
   */
   const appeals = renderAppeals(f.appeals);
-  const signals = renderSpamSignals(f.spamSignals);
+  const signals = renderSpamSignals(f.spamSignals, f.spamSignalsError);
 
   if (!f.reports.length) {
     return `
@@ -263,7 +263,43 @@ function renderAppealCard(a) {
 /** Роль человеком: «moderator» в списке модерации читается как код. */
 const SIGNAL_ROLE = { admin: 'администратор', moderator: 'модератор' };
 
-function renderSpamSignals(signals) {
+/**
+ * Перевод отказа базы на русский. Разбираем только те формы, которыми этот
+ * блок действительно может отказывать, и каждую лечат разные руки. Всё прочее
+ * возвращаем пустой строкой: додумывать перевод чужой ошибки — значит врать
+ * громче, чем база.
+ */
+function signalReasonHint(reason) {
+  const r = String(reason || '');
+  if (/could not find the function|pgrst202|forum_spam_signals\(\) does not exist/i.test(r)) {
+    return 'API не нашёл функцию в кэше схемы: она либо ещё не создана, либо '
+      + 'Supabase не перезаметил её после прогона. Если файл уже выполнялся — '
+      + 'выполните в SQL Editor `notify pgrst, \'reload schema\';` и вернитесь '
+      + 'на эту вкладку заново.';
+  }
+  if (/does not exist/i.test(r)) {
+    return 'не хватает таблицы или колонки, на которую опирается функция: не прогнана '
+      + 'одна из более ранних миграций форума, а сам файл сигналов здесь ни при чём.';
+  }
+  if (/permission denied|insufficient_privilege|no privilege/i.test(r)) {
+    return 'нет права вызывать функцию: либо шаг 2 миграции (grants) не выполнен, '
+      + 'либо вы зашли без роли модератора.';
+  }
+  if (r.includes('Сигналы о спаме видит модерация')) {
+    return 'база считает, что вы не модерация: проверьте, под каким ником вошли здесь.';
+  }
+  return '';
+}
+
+/**
+ * Блок сигналов. `reason` — слово, которым база отказала, когда списка нет.
+ *
+ * Показываем его дословно и не переводим автоматически в «мигрируйте»: отказ
+ * «column ... does not exist» и «Could not find the function» — разные болезни,
+ * а прошлая версия блока лечила только одну из них и путала того, у кого
+ * миграция давно выполнена.
+ */
+function renderSpamSignals(signals, reason = '') {
   const L = CONFIG.forum.limits;
   const head = `
     <header class="panel__head">
@@ -272,14 +308,20 @@ function renderSpamSignals(signals) {
     </header>`;
 
   if (!Array.isArray(signals)) {
+    const said = reason
+      ? `Список недоступен. База ответила так: <code>${esc(reason)}</code>`
+      : 'Список недоступен. База не вернула ничего.';
+    const hint = signalReasonHint(reason);
     return `
       <section class="panel adm-signals">
         ${head}
+        <p class="adm-lead">${said}</p>
+        ${hint ? `<p class="adm-lead">${esc(hint)}</p>` : ''}
         <p class="adm-lead">
-          Список недоступен: в базе ещё нет функции <code>forum_spam_signals()</code>.
-          Выполните <code>supabase/20260926-spam-signals.sql</code> — она ничего не
-          хранит и ничего не меняет в таблицах, только показывает модерации тех,
-          кто сидит на пределе выдержки.
+          Список считает <code>forum_spam_signals()</code> из
+          <code>supabase/20260926-spam-signals.sql</code> — она ничего не хранит
+          и ничего не меняет в таблицах, только показывает модерации тех, кто
+          сидит на пределе выдержки.
         </p>
       </section>`;
   }

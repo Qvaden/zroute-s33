@@ -7782,6 +7782,12 @@ console.log('\nAD. Сигналы о спаме');
     !/create (table|index)|add column/i.test(sql));
   check('функция ничего не пишет и ничего не меняет в чужих строках',
     !/insert into|update public\.|delete from/i.test(sql));
+  check('повторный прогон не упирается в прежний состав колонок: имя снимается',
+    sql.includes("execute 'drop function ' || r.sig;")
+      && flat.includes("where n.nspname = 'public' and p.proname = 'forum_spam_signals'"));
+  check('шаг 0 снимает только эту функцию, таблиц он не касается',
+    (sql.match(/drop function/gi) || []).length === 1
+      && !/drop (table|column|index|view)/i.test(sql));
   check('вход один — функция, и роль проверяет она, а не политика таблицы',
     flat.includes('create or replace function public.forum_spam_signals() returns table')
       && flat.includes('if not public.forum_is_staff() then')
@@ -7847,9 +7853,29 @@ console.log('\nAD. Сигналы о спаме');
   check('панель читает сигналы своим броском: без функции остальной экран живёт',
     loaderSrc.includes('view.forum.spamSignals = await forum.listSpamSignals();')
       && loaderSrc.includes('view.forum.spamSignals = null;'));
-  check('без миграции блок называет файл, а не объявляет форум чистым',
+  check('словом отказа панель не выбрасывает: оно доезжает до экрана',
+    loaderSrc.includes('view.forum.spamSignalsError = String(err?.message ?? err)')
+      && loaderSrc.includes("view.forum.spamSignalsError = '';")
+      && screenSrc.includes('renderSpamSignals(f.spamSignals, f.spamSignalsError)'));
+  check('блок называет файл, а не объявляет форум чистым',
     screenSrc.includes('Список недоступен')
       && screenSrc.includes('supabase/20260926-spam-signals.sql'));
+  check('и цитирует базу дословно вместо «мигрируйте» на любой отказ',
+    screenSrc.includes('База ответила так: <code>${esc(reason)}</code>'));
+  check('перевод отказа различает три болезни, у которых разные руки',
+    /function signalReasonHint\(reason\)[\s\S]{0,1400}reload schema/.test(screenSrc)
+      && /function signalReasonHint\(reason\)[\s\S]{0,1400}не прогнана/.test(screenSrc)
+      && /function signalReasonHint\(reason\)[\s\S]{0,1400}нет права вызывать/.test(screenSrc));
+  check('неизвестному отказу перевод не придумывается',
+    /function signalReasonHint\(reason\)[\s\S]*?\n\}/.test(screenSrc)
+      && screenSrc.slice(screenSrc.indexOf('function signalReasonHint')).includes("  return '';\n}"));
+  check('документы велели цитировать базу, а не звать мигрировать дважды',
+    docsSrc.includes('Показывает дословно, словами базы')
+      && docsSrc.includes('notify pgrst')
+      && docsSrc.includes('только слово базы и перевод к нему'));
+  check('и объяснили, почему файл сначала снимает имя, а README — про кэш схемы',
+    docsSrc.includes('перебор перегрузок по `pg_proc`')
+      && readmeSrc.includes('notify pgrst'));
   check('пустой список объясняет, что показывает только живое окно',
     /if \(!signals\.length\) \{[\s\S]{0,900}Пусто — не значит «чисто»/.test(screenSrc));
   check('строка показывает числа, а не вывод: колонки выдержки, жалоб и скрытого',
