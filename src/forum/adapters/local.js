@@ -1535,6 +1535,69 @@ export async function listSpamSignals() {
       || a.nick.localeCompare(b.nick, 'ru'));
 }
 
+/* ── Первые шаги новичка ──────────────────────────────────────────────────
+ *
+ * Черновой режим повторяет функцию базы
+ * (supabase/20260926-starter-checklist.sql) строго по составу: те же пять
+ * ключей, то же окно новичка и те же условия — шаг закрыт, только когда в
+ * черновых строках действительно что-то лежит. Отмечать шаги нажатием здесь
+ * нельзя ровно по той же причине, что и в базе: снял закладку — галочка
+ * осталась бы висеть.
+ *
+ * Ни ответа базы, ни ошибок этот список не требует: он приватен и ни на что не
+ * влияет, поэтому и в черновом режиме виден ровно одному человеку — тому, кто
+ * вошёл.
+ */
+export async function listStarterSteps() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) return [];
+
+  /*
+    Новичок — столько дней, сколько считает база (`starterWindowDays`), и ни
+    днём больше. Отдельной кнопки «хватит меня учить» для этого нет ни здесь,
+    ни там: срок хранит себя сам.
+  */
+  const L = CONFIG.forum.limits;
+  const windowMs = L.starterWindowDays * 24 * 3600 * 1000;
+  const born = toDate(me.createdAt);
+  if (!born || Date.now() - born.getTime() > windowMs) return [];
+
+  return [
+    {
+      /*
+        Любой из трёх знаков профиля (правило 4 базы). Проверка совпадает с
+        базовой до буквы: пустое значение аватарки — это отсутствие строки, а
+        не пробел, поэтому пробел из неё вырезать не нужно.
+      */
+      id: 'profile',
+      done: Boolean(
+        String(me.about || '').trim()
+        || String(me.allianceTag || '').trim()
+        || String(me.avatarUrl || '')
+      ),
+    },
+    {
+      // Удалённый ответ не считается: его сняли за нарушение.
+      id: 'reply',
+      done: s.comments.some((c) => c.authorId === me.id && !c.deleted),
+    },
+    {
+      // Своя благодарность автору, а не та, что поставили тебе.
+      id: 'thanks',
+      done: s.thanks.some((t) => t.giverId === me.id),
+    },
+    {
+      id: 'save',
+      done: (s.bookmarks || []).some((b) => b.userId === me.id),
+    },
+    {
+      id: 'ally',
+      done: (s.allianceSubscriptions || []).some((a) => a.userId === me.id),
+    },
+  ];
+}
+
 /* ── Страница участника ───────────────────────────────────────────────────── */
 
 /*

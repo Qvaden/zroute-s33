@@ -7949,6 +7949,209 @@ console.log('\nAD. Сигналы о спаме');
     (await local.listSpamSignals()).length, 0);
 }
 
+// ── AE. Чек-лист новичка ─────────────────────────────────────────────────────
+
+console.log('\nAE. Чек-лист новичка');
+{
+  /*
+    Пункт перенесён с донорского форума, но не его список. У донора три шага:
+    выбрать сервер, закрепить псевдоним, принять правила. У нас один сервер, ник
+    дают при регистрации, а согласия с правилами никто не собирает — все три
+    шага были бы либо всегда закрыты, либо никогда. Перенесли смысл: шаги
+    вычисляются по тем строкам, что форум и так хранит, и ничего не отмечают.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20260926-starter-checklist.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const rulesSrc = await readFile('src/forum/rules.js', 'utf8');
+  const pageSrc = await readFile('src/pages/forum.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const L = CONFIG.forum.limits;
+  const flat = sql.replace(/\s+/g, ' ');
+  const starterLocal = localSrc.slice(localSrc.indexOf('export async function listStarterSteps'),
+    localSrc.indexOf('/* ── Страница участника'));
+  const starterRules = rulesSrc.slice(rulesSrc.indexOf('export const STARTER_STEPS'),
+    rulesSrc.indexOf('/* ── Проверки формы'));
+  const starterPage = pageSrc.slice(pageSrc.indexOf('function renderStarterSteps(s)'),
+    pageSrc.indexOf('/* ── Статья недели'));
+  const KEYS = ['profile', 'reply', 'thanks', 'save', 'ally'];
+
+  /* ── Форма правила: список вычисляется, а не хранится ── */
+  check('ни таблицы, ни колонок, ни индексов: шаг — это запрос, а не запись',
+    !/create (table|index)|add column/i.test(sql));
+  check('ни политик, ни триггеров: приватность держит авторство строк',
+    !/create policy|create trigger|row level security/i.test(sql));
+  check('функция ничего не пишет',
+    !/insert into|update public\.|delete from/i.test(sql));
+  check('и ни во что не превращается: вызывающий видит только свои строки',
+    sql.includes('security invoker') && !/security definer/i.test(sql));
+  check('вход один — функция, и чужой список через неё не выпросить',
+    flat.includes('create or replace function public.forum_starter_checklist() returns table')
+      && flat.includes('where f.id = auth.uid()'));
+  check('окно новичка — одно число, и оно из конфига',
+    sql.split(`interval '${L.starterWindowDays} days'`).length - 1 === 1
+      && flat.includes('and f.created_at > now()'));
+  check('право исполнения только у вошедших: гостю спрашивать не о чём',
+    flat.includes('revoke all on function public.forum_starter_checklist() from public, anon;')
+      && flat.includes('grant execute on function public.forum_starter_checklist() to authenticated;'));
+  for (const key of KEYS) {
+    check(`шаг «${key}» назван одним словом в базе, в правилах и в черновом режиме`,
+      sql.includes(`('${key}',`) && starterRules.includes(`id: '${key}'`)
+        && starterLocal.includes(`id: '${key}'`));
+  }
+  check('шаги не пересчитывают пределы выдержки и частоту: шаг — факт строки',
+    !/postHold|commentHold|thanksPerWindow/i.test(sql));
+
+  /* ── Слова живут в коде, факт — в базе ── */
+  check('список шагов с названием и объяснением, и их ровно пять',
+    rulesSrc.includes('export const STARTER_STEPS = [') && !rulesSrc.includes('STARTER_STEP_IDS')
+      && KEYS.every((k) => starterRules.includes(`id: '${k}'`))
+      && (starterRules.match(/\n    id: '/g) || []).length === 5);
+  check('у каждого шага есть что сказать и зачем',
+    (starterRules.match(/title: '/g) || []).length === 5
+      && (starterRules.match(/hint: '/g) || []).length === 5);
+  check('ссылка ведёт туда, где шаг делается, и только когда вести есть куда',
+    starterRules.includes('return `#/user/${encodeURIComponent(nick)}`;')
+      && starterRules.includes("return '#/forum?saved=1';")
+      && starterRules.includes("return '';"));
+  check('названия шагов не обещают награду: за обычный поступок очков не дают',
+    !/репутаци|очк|балл|наград/i.test(starterRules));
+
+  /* ── Контракт и оба адаптера ── */
+  check('контракт объявляет форму шага и его чтение',
+    contractSrc.includes('@typedef {Object} ForumStarterStep')
+      && contractSrc.includes('() => Promise<ForumStarterStep[]>} listStarterSteps'));
+  check('рабочий режим спрашивает функцию базы одним запросом',
+    supaSrc.includes("'/rpc/forum_starter_checklist', { method: 'POST', body: {} }")
+      && supaSrc.includes('function starterStepOut(row)')
+      && supaSrc.includes('id: String(row.step_key), done: Boolean(row.done)'));
+  check('черновой режим отдаёт те же пять ключей',
+    KEYS.every((k) => starterLocal.includes(`id: '${k}'`)));
+  check('черновой режим берёт окно из конфига, а не переписывает число руками',
+    starterLocal.includes('L.starterWindowDays * 24 * 3600 * 1000') && !/\b14\b/.test(starterLocal));
+  check('и повторяет условия базы: свой ответ, своя благодарность, своя строка',
+    starterLocal.includes('c.authorId === me.id && !c.deleted')
+      && starterLocal.includes('t.giverId === me.id')
+      && starterLocal.includes('b.userId === me.id')
+      && starterLocal.includes('a.userId === me.id'));
+  check('гость и вышедший получают пустой список, а не исключение',
+    starterLocal.includes('if (!me) return [];'));
+
+  /* ── Страница ── */
+  check('блок нарисован сразу под строкой аккаунта',
+    pageSrc.includes('${renderStarterSteps(s)}')
+      && pageSrc.indexOf('${renderStarterSteps(s)}') > pageSrc.indexOf('${renderAccountBar(s)}'));
+  check('и только для вошедшего, когда список пришёл',
+    starterPage.includes('if (!s.me || !Array.isArray(s.starter) || !s.starter.length)'));
+  check('показаны только незакрытые шаги, а когда закрыты все — блока нет',
+    starterPage.includes('STARTER_STEPS.filter((step) => !doneById.get(step.id))')
+      && starterPage.includes("if (!open.length) return '';"));
+  check('шаг ищется по ключу, а не по номеру строки',
+    starterPage.includes('new Map(s.starter.map((row) => [row.id'));
+  check('у блока нет ни кнопок, ни форм: он указывает, а не действует',
+    !/<button|<form|<input|<textarea/.test(starterPage)
+      && starterPage.includes('data-forum-starter'));
+  check('число не печатается дважды рядом со словом plural',
+    !/}\s+\$\{plural/.test(starterPage));
+  check('подвал называет срок из конфига, а не число из воздуха',
+    starterPage.includes('lim.starterWindowDays'));
+  check('счётчик молчит, пока нечего показать: «0 шагов сделано» — не новость',
+    starterPage.includes('${done ? `<span class="forum-starter__count">'));
+  check('блок одет своим стилем',
+    cssSrc.includes('.forum-starter__list {') && cssSrc.includes('.forum-starter__item {'));
+  check('состояние живёт в загрузчике и закрывается самим действием',
+    mountSrc.includes('starter: [],')
+      && mountSrc.includes('await loadStarterSteps();')
+      && KEYS.every((k) => mountSrc.includes(`closeStarterStep('${k}')`)));
+  check('ошибка базы глушится: подсказка не имеет права становиться полосой ошибок',
+    /async function loadStarterSteps\(\)[\s\S]{0,400}catch \{\r?\n\s*list = \[\];/.test(mountSrc));
+  check('смена человека спрашивает список заново, а выход стирает его совсем',
+    /state\.me = mode === 'signup'[\s\S]{0,400}await loadStarterSteps\(\);\r?\n\s*await loadFeed\(\);/.test(mountSrc)
+      && /data-forum-signout[\s\S]{0,700}state\.starter = \[\];/.test(mountSrc));
+  check('правило описано в документах и стоит в списке миграций',
+    docsSrc.includes('## Чек-лист новичка') && docsSrc.includes('20260926-starter-checklist.sql')
+      && readmeSrc.includes('20260926-starter-checklist.sql'));
+
+  /* ── Живой черновой прогон: те же шаги, что посчитала бы база ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const fresh = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (fresh.has(k) ? fresh.get(k) : null),
+    setItem: (k, v) => fresh.set(k, String(v)),
+    removeItem: (k) => fresh.delete(k),
+  };
+  const state = () => JSON.parse(fresh.get('zr33.forum.local'));
+  const open = async () => (await local.listStarterSteps()).filter((row) => !row.done).map((row) => row.id);
+
+  await local.signUp('Новичок');
+  await local.signUp('Столп');
+  await local.signOut();
+  equal('гость получает пустой список вместо ошибки', (await local.listStarterSteps()).length, 0);
+
+  await local.signIn('Новичок');
+  equal('свежий аккаунт видит все пять шагов открытыми', (await open()).join(','), KEYS.join(','));
+
+  await local.signIn('Столп');
+  const othersPost = await local.createPost({
+    category: 'help',
+    title: 'Где ставить лагерь у блокпоста',
+    body: 'интересует порядок действий и безопасное место',
+  });
+
+  await local.signIn('Новичок');
+  await local.saveProfile({ about: 'хожу в вечернее время, играю за снабжение' });
+  check('профиль закрыт строкой «о себе»', !(await open()).includes('profile'));
+
+  const reply = await local.addComment(othersPost.id, 'ставим за насыпью, оттуда обзор на обе дороги');
+  check('ответ закрыт собственным комментарием в чужой теме', !(await open()).includes('reply'));
+
+  await local.bookmarkTopic(othersPost.id);
+  check('закладка закрыта одной сохранённой темой', !(await open()).includes('save'));
+
+  await local.subscribeAlliance('KOP');
+  check('подписка на альянс закрыта строкой подписки', !(await open()).includes('ally'));
+
+  const myPost = await local.createPost({
+    category: 'vs',
+    title: 'Разбор выхода с караваном',
+    body: 'что пошло не так на повороте и как это исправить',
+  });
+  await local.signIn('Столп');
+  await local.giveThanks('post', myPost.id);
+  await local.signIn('Новичок');
+  equal('своя благодарность чужой теме осталась открытой: тебе поставили, а не ты',
+    (await open()).join(','), 'thanks');
+
+  /* Снятое действие открывает шаг обратно — отметка не зависает. */
+  await local.unbookmarkTopic(othersPost.id);
+  check('закладку убрали — шаг снова открыт', (await open()).includes('save'));
+  await local.deleteComment(reply.id, 'передумал, ответ не нужен');
+  check('ответ убран — шаг снова открыт', (await open()).includes('reply'));
+
+  /* Чужие строки свой список не закрывают. */
+  await local.signIn('Столп');
+  equal('у другого игрока открыто своё: чужие ответ и закладка его не считают, а его благодарность — закрыта',
+    (await open()).join(','), 'profile,reply,save,ally');
+  await local.signIn('Новичок');
+  equal('и новичок от чужих действий не изменился', (await open()).join(','), 'reply,thanks,save');
+
+  /* Срок: за окном новичка список пуст, сколько бы шагов ни было сделано. */
+  const snapshot = state();
+  const aged = new Date(Date.now() - (L.starterWindowDays + 1) * 24 * 3600 * 1000).toISOString();
+  snapshot.users = snapshot.users.map((u) => (u.nick === 'Новичок' ? { ...u, createdAt: aged } : u));
+  fresh.set('zr33.forum.local', JSON.stringify(snapshot));
+  await local.signIn('Новичок');
+  equal('прошло окно новичка — список пуст, и блоку нечего рисовать',
+    (await local.listStarterSteps()).length, 0);
+  await local.signIn('Столп');
+  check('а ровесник форума свои шаги всё ещё видит', (await open()).length > 0);
+}
+
 console.log(`\n${'─'.repeat(52)}`);
 // ── R3. Ключ восстановления: криптография браузера ──────────────────────────
 console.log('\nR3. Ключ восстановления');

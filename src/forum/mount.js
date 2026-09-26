@@ -57,6 +57,11 @@ const state = {
   query: '',
   /** Лента сужена до «В закладках»; обычная лента — это false. */
   saved: false,
+  /**
+   * Пять первых шагов вошедшего (supabase/20260926-starter-checklist.sql).
+   * Пустой список — блока нет: шаги либо уже сделаны, либо срок новичка прошёл.
+   */
+  starter: [],
   /** Какой пост сейчас в режиме правки; null — правки нет. */
   editingPostId: null,
   /** Что удаляем или на что жалуемся, пока открыто окно. */
@@ -878,6 +883,46 @@ async function loadNotifications() {
   paint();
 }
 
+/* ── Первые шаги новичка ──────────────────────────────────────────────────
+ *
+ * Список целиком считает база, здесь он только грузится и рисуется. Своих
+ * галочек у шагов нет: закрыть шаг можно одним честным способом — сделать его.
+ *
+ * Ошибку глушим молча, и это правило, а не лень: блок новичка — подсказка. Не
+ * будет функции в базе, странице не из-за чего превращаться в полосу ошибок;
+ * лента, темы и все кнопки работают как раньше.
+ */
+async function loadStarterSteps() {
+  if (!state.me) {
+    state.starter = [];
+    return;
+  }
+  const token = mountToken;
+  let list = [];
+  try {
+    list = await forum.listStarterSteps();
+  } catch {
+    list = [];
+  }
+  if (token !== mountToken) return;
+  state.starter = Array.isArray(list) ? list : [];
+}
+
+/**
+ * Шаг закрывают на месте, без второго запроса: человек только что сделал ровно
+ * то, что этот шаг просил. Следующее открытие страницы спросит базу и увидит то
+ * же самое, поэтому соврать здесь нельзя даже из оптимизма: если база отказала,
+ * шаг на следующем открытии страницы вернётся открытым.
+ *
+ * Шага нет в списке (срок новичка прошёл, никто не вошёл, список не пришёл) —
+ * значит рисовать нечего, и вызов проходит мимо.
+ */
+function closeStarterStep(id) {
+  const step = state.starter.find((row) => row.id === id);
+  if (!step || step.done) return;
+  step.done = true;
+}
+
 async function loadPushPrefs() {
   /*
     Push-настройки — только для вошедшего и только когда источник умеет их
@@ -960,6 +1005,12 @@ async function handleAuth(form, mode, submitter) {
       : await forum.signIn(nick.value, password.value);
     await loadNotifications();
     await loadPushPrefs();
+    /*
+      Шаг новичка спрашивают заново при каждом входе: до этой строки в state
+      мог лежать список предыдущего человека, а он приватный и чужому не
+      показывается.
+    */
+    await loadStarterSteps();
     await loadFeed();
   } catch (err) {
     showError('[data-forum-auth-error]', String(err?.message ?? err));
@@ -1501,6 +1552,7 @@ function wire() {
 
       try {
         await (was ? forum.unbookmarkTopic(postId) : forum.bookmarkTopic(postId));
+        if (!was) { closeStarterStep('save'); paint(); }
       } catch (err) {
         /*
           Отказ базы честнее догадок: просим ленту заново — она вернёт и
@@ -1521,6 +1573,7 @@ function wire() {
         await (subscribed ? forum.unsubscribeAlliance(id) : forum.subscribeAlliance(id));
         state.allianceSubscriptions = new Set(state.allianceSubscriptions || []);
         subscribed ? state.allianceSubscriptions.delete(id) : state.allianceSubscriptions.add(id);
+        if (!subscribed) closeStarterStep('ally');
         paint();
       } catch (err) { notice(String(err?.message ?? err)); }
       return;
@@ -1809,6 +1862,12 @@ function wire() {
       state.notifyUnread = 0;
       state.notifyFresh = new Set();
       state.pushPrefs = null;
+      /*
+        Список первых шагов — про конкретного человека, и после выхода он
+        чужой: следующий вошедший не должен увидеть подсказки, которые считались
+        для предыдущего.
+      */
+      state.starter = [];
       await loadFeed();
       return;
     }
@@ -1935,6 +1994,8 @@ function wire() {
 
       try {
         await forum.giveThanks(targetType, targetId);
+        closeStarterStep('thanks');
+        paint();
       } catch (err) {
         /*
           Здесь откат молча не уместен, в отличие от реакции: отказ базы
@@ -2321,6 +2382,7 @@ function wire() {
       try {
         const url = await uploadAvatar(file);
         if (state.me) state.me.avatarUrl = url;
+        closeStarterStep('profile');
         await loadProfile(profileState.nick);
         profileState.editing = true;
         paint();
@@ -2507,6 +2569,7 @@ function wire() {
         try {
           const postId = commentForm.dataset.forumCommentForm;
           const created = await forum.addComment(postId, checked.value);
+          closeStarterStep('reply');
 
           const shotError = created?.id
             ? await uploadShots(postId, 'comment', created.id, (i, n) => {
@@ -2585,6 +2648,9 @@ function wire() {
             about: form.about.value,
             allianceTag: form.allianceTag.value,
           });
+          if (String(form.about.value || '').trim() || String(form.allianceTag.value || '').trim()) {
+            closeStarterStep('profile');
+          }
           profileState.editing = false;
           // После смены ника страница живёт уже под новым именем.
           await loadProfile(newNick || profileState.nick);
@@ -2852,6 +2918,13 @@ export async function mountForum(container, view, postId = null, search = '') {
   if (state.me && typeof forum.listAllianceSubscriptions === 'function') {
     try { state.allianceSubscriptions = new Set(await forum.listAllianceSubscriptions()); } catch { state.allianceSubscriptions = new Set(); }
   }
+
+  /*
+    Первые шаги новичка. Один короткий запрос вместо пяти: список считает база.
+    Гостю он не нужен вовсе, и не нужен тому, кто вышел, — поэтому запрос стоит
+    рядом с проверкой, что человек вошёл.
+  */
+  await loadStarterSteps();
 
   await loadPushPrefs();
 

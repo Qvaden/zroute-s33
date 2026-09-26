@@ -960,6 +960,28 @@ export async function listSpamSignals() {
   return (Array.isArray(rows) ? rows : []).map(spamSignalOut);
 }
 
+/* ── Первые шаги новичка ──────────────────────────────────────────────────
+ *
+ * Одна функция базы (supabase/20260926-starter-checklist.sql) отвечает пятью
+ * строками: ключ шага и сделано ли. Здесь из неё берётся ровно это — слова к
+ * ключу подбирает страница, потому что база считает строки, а не окончания.
+ *
+ * Функция ничего не пишет и ни во что не превращается: вызывающий видит в ней
+ * только свои строки теми же политиками, что и в таблицах. Без неё страница
+ * форума делала бы пять запросов там, где один.
+ *
+ * Ошибку вызывающий глушит сам, и это не лень: блок новичка — подсказка. Ему
+ * лучше исчезнуть, чем занять место на странице сообщением про миграцию.
+ */
+function starterStepOut(row) {
+  return { id: String(row.step_key), done: Boolean(row.done) };
+}
+
+export async function listStarterSteps() {
+  const rows = await rest('/rpc/forum_starter_checklist', { method: 'POST', body: {} });
+  return (Array.isArray(rows) ? rows : []).map(starterStepOut);
+}
+
 /**
  * ВОССТАНОВЛЕНИЕ ДОСТУПА.
  *

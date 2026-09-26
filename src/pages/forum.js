@@ -21,7 +21,7 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
@@ -53,6 +53,7 @@ export const QUARTER_SEEN_KEY = 's33-quarter-seen';
  * @property {string}  sourceName
  * @property {import('../forum/contract.js').ForumUser|null} me
  * @property {import('../forum/contract.js').ForumPost[]} posts
+ * @property {import('../forum/contract.js').ForumStarterStep[]} starter
  * @property {number}  total
  * @property {string}  category
  * @property {string}  sort
@@ -131,6 +132,7 @@ export function renderForum(view, state = {}) {
       <div class="forum-main">
         ${renderWelcome(s)}
         ${renderAccountBar(s)}
+        ${renderStarterSteps(s)}
         ${renderNotifications(s)}
         ${renderComposer(s)}
         ${renderFeedControls(s)}
@@ -267,6 +269,67 @@ function renderWelcome(s) {
       <button type="button" class="forum-btn forum-btn--ghost" data-forum-welcome-auth>
         Войти и начать тему
       </button>
+    </section>`;
+}
+
+/* ── Первые шаги новичка ─────────────────────────────────────────────────── */
+
+/**
+ * Подсказка тем, кто на форуме две недели.
+ *
+ * Пять действий, которые легко пропустить: оформить профиль, ответить кому-
+ * нибудь, поблагодарить автора, сохранить тему, подписаться на альянс. Шаги
+ * не отмечаются нажатием — закрыт только тот, ради которого человек что-то
+ * сделал, поэтому список не может соврать ни снятой закладкой, ни удалённым
+ * ответом.
+ *
+ * Показаны только незакрытые шаги: «сделано два» над тремя строками читается
+ * легче, чем пять строк с галочками, из которых две ничего не просят.
+ *
+ * Блок уходит сам и не просит кнопку «хватит меня учить»: по окончании срока
+ * база отдаёт пустой список, и рисовать нечего. Обработчиков у блока нет — он
+ * указывает, а не действует.
+ */
+function renderStarterSteps(s) {
+  if (!s.me || !Array.isArray(s.starter) || !s.starter.length) return '';
+
+  /*
+    Шаг ищется по ключу, а не по номеру строки: порядок в ответе базы
+    косметический, и менять его можно без правки здесь.
+  */
+  const doneById = new Map(s.starter.map((row) => [row.id, Boolean(row.done)]));
+  const open = STARTER_STEPS.filter((step) => !doneById.get(step.id));
+  if (!open.length) return '';
+
+  const lim = CONFIG.forum.limits;
+  const done = STARTER_STEPS.length - open.length;
+
+  return `
+    <section class="panel forum-starter" data-forum-starter aria-label="Первые шаги">
+      <header class="forum-starter__head">
+        <span class="eyebrow">Первые шаги</span>
+        ${done ? `<span class="forum-starter__count">${esc(plural(done, 'шаг сделан', 'шага сделано', 'шагов сделано'))}</span>` : ''}
+      </header>
+
+      <ul class="forum-starter__list">
+        ${open.map((step) => {
+          const href = starterStepHref(step.id, s.me.nick);
+          return `
+            <li class="forum-starter__item">
+              <div class="forum-starter__text">
+                <b>${esc(step.title)}</b>
+                <span class="muted">${esc(step.hint)}</span>
+              </div>
+              ${href ? `<a class="forum-starter__go" href="${esc(href)}" aria-label="${esc(step.title)}">→</a>` : ''}
+            </li>`;
+        }).join('')}
+      </ul>
+
+      <p class="forum-starter__foot muted">
+        Отмечать ничего не нужно: шаг гаснет, когда вы его делаете. Список уйдёт
+        сам через ${plural(lim.starterWindowDays, 'день', 'дня', 'дней')} после
+        регистрации — дальше форум вам не наставник.
+      </p>
     </section>`;
 }
 
