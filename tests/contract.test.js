@@ -9099,6 +9099,18 @@ console.log('\nAJ. Справочник официальных гайдов иг
   check('декоративных черт из бота не осталось', !flat.some((s) => /[━─—]{4,}/.test(s)));
   check('кнопочных подсказок бота («Выберите действие») не перенесено',
     !flat.some((s) => /выбер(?:ите|и)[^\n]{0,30}действие/i.test(s)));
+  /*
+    Подпись под картинкой бот нередко передаёт не строкой, а переменной:
+    send_photo_cached(msg, "….jpg", text_block_1). Экстрактор, разворачивая
+    такие переменные, ошибается молча — файл на месте, размеры записаны,
+    alt непустой, тесты зелёные, а под картинкой игрок читает «text_block_1».
+    Поэтому проверка не про формат данных, а про то, что в поле попал текст.
+  */
+  const varName = (s) => /^[a-z_][a-z0-9_]*$/.test((s || '').trim());
+  check('в alt и подписях нет имён переменных из кода бота',
+    images.every(({ b }) => !varName(b.alt) && !varName(b.caption)),
+    images.filter(({ b }) => varName(b.alt) || varName(b.caption))
+      .map(({ g, b }) => `${g.id} → ${b.image.split('/').pop()}`).join(', '));
   const rendered = flat.filter(Boolean).map((s) => postBody(s)).join('\n');
   check('разметка Telegram закрывается, а не остаётся в тексте',
     (rendered.match(/<(?:strong|em)>/g) || []).length === (rendered.match(/<\/(?:strong|em)>/g) || []).length);
