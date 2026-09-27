@@ -8973,5 +8973,31 @@ console.log('\nR3. Ключ восстановления');
   globalThis.localStorage = hadStorage;
 }
 
+// ── AI. Настройки раздачи ────────────────────────────────────────────────────
+
+console.log('\nAI. Настройки раздачи');
+{
+  /*
+    Netlify заморозил прод-деплои на исходе месячных кредитов, и push в main
+    перестал означать «изменение на сайте»: два коммита висели в статусе
+    Skipped. Файл ниже — настройки нового раздатчика, и он же единственное
+    место, где записано, какая папка публикуется. Ошибки здесь невидимы:
+    не тот publish directory — сайт отдаёт 404 вместо собственных страниц, а
+    кэшируемый sw.js оставляет часть игроков на прошлой версии неопределённо
+    долго. Поэтому сверяем не формулировки, а смысл.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const render = (await readFile('render.yaml', 'utf8')).replace(/\s+/g, ' ');
+  check('публикуется корень репозитория, а не собранная папка',
+    /staticPublishPath: \.\//.test(render));
+  check('сборки нет: пустой шаг вместо установки по наличию package.json',
+    /buildCommand: 'true'/.test(render));
+  check('сервис-воркер объявлен не кэшируемым',
+    /path: \/sw\.js name: Cache-Control value: '[^']*no-store/.test(render));
+  check('старый раздатчик требует того же — слова о sw.js не разъезжаются',
+    /Cache-Control = "no-cache, no-store, must-revalidate"/.test(
+      await readFile('netlify.toml', 'utf8')));
+}
+
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
