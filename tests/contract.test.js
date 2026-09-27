@@ -3678,8 +3678,8 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 7);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
-  check('живые вкладки — форум, чаты, календарь, пульс обновлений и страница участника',
-    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'\s*\|\|\s*id === 'updates'\s*\|\|\s*\(id === 'user' && param\)/.test(mainJs));
+  check('живые вкладки — форум, чаты, календарь, пульс обновлений, справочник и страница участника',
+    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'\s*\|\|\s*id === 'updates'\s*\|\|\s*id === 'handbook'\s*\|\|\s*\(id === 'user' && param\)/.test(mainJs));
 
   /*
     ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.
@@ -6428,7 +6428,7 @@ console.log('\nY. Календарь встреч');
       && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js\?v=\d+'/.test(mainSrc)
       && /mountCalendar\(app, search\)/.test(mainSrc));
   check('между вкладками календарь не наследует состояние: его закрывают на каждом уходе',
-    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 8
+    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 9
       && (mainSrc.match(/unmountCalendar\(\);/g) || []).length === (mainSrc.match(/unmountChats\(\);/g) || []).length);
   check('календарь стартует живым кадром, а не надписью «загружаем данные»',
     /const liveFirst = id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'/.test(mainSrc));
@@ -7587,7 +7587,7 @@ console.log('\nAC. Заявки на гайды');
 
   /* ── Экран ── */
   check('блок стоит под списком гайдов, а не над ним',
-    /<div class="guide-list-wrap">\$\{list\}<\/div>\s*\$\{guideRequestsBlock\(s\)\}/.test(pagesSrc));
+    /<div class="guide-list-wrap">\$\{list\}<\/div>\s*\$\{renderHandbookTeaser\(\)\}\s*\$\{guideRequestsBlock\(s\)\}/.test(pagesSrc));
   check('гостю форму не показывают, а открытые заявки показывают',
     pagesSrc.includes('const canAsk = Boolean(s.me) && !s.me.banned && !isMuted(s.me);')
       && pagesSrc.includes('${canAsk ? requestForm(L) :')
@@ -8443,7 +8443,7 @@ console.log('\nAF. Пульс обновлений игры');
     mainSrc.includes("{ id: 'updates', label: 'Обновления игры', live: true }")
       && mainSrc.includes('mountUpdates(app)'));
   check('она ждёт ответа хранилища, как живой раздел',
-    mainSrc.includes("id === 'updates' || (id === 'user' && param)"));
+    mainSrc.includes("id === 'updates' || id === 'handbook' || (id === 'user' && param)"));
   equal('страница закрывается там же, где закрывается календарь',
     (mainSrc.match(/unmountUpdates\(\);/g) || []).length,
     (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
@@ -8997,6 +8997,180 @@ console.log('\nAI. Настройки раздачи');
   check('старый раздатчик требует того же — слова о sw.js не разъезжаются',
     /Cache-Control = "no-cache, no-store, must-revalidate"/.test(
       await readFile('netlify.toml', 'utf8')));
+}
+
+// ── AJ. Справочник официальных гайдов игры ────────────────────────────────
+
+console.log('\nAJ. Справочник официальных гайдов игры');
+{
+  /*
+    Справочник перенесён из Telegram-бота целиком: 44 гайда, 164 картинки,
+    пятьдесят тысяч знаков текста. Глазами такой объём не проверить ни при
+    переносе, ни после, а портится он молча: потерянная ветка дерева не
+    ругается — она просто перестаёт открываться по ссылке из чата, а
+    переименованная при перетаскивании картинка отдаёт 404 уже на бое.
+    Поэтому проверки здесь не про смысл текстов, а про связку
+    «данные — файл на диске — ссылка на странице».
+  */
+  const { readFile, stat } = await import('node:fs/promises');
+  const { readdirSync } = await import('node:fs');
+  const { HANDBOOK, HANDBOOK_ROOTS } = await import('../src/handbook/guides.js');
+  const hb = await import('../src/pages/handbook.js');
+  const { postBody } = await import('../src/forum/format.js');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const indexSrc = await readFile('index.html', 'utf8');
+  const swSrc = await readFile('sw.js', 'utf8');
+  const controlsSrc = await readFile('src/ui/handbook-controls.js', 'utf8');
+  const guidesPageSrc = await readFile('src/pages/guides.js', 'utf8');
+  const cssSrc = await readFile('src/handbook.css', 'utf8');
+
+  const byId = new Map(HANDBOOK.map((g) => [g.id, g]));
+  const leaves = HANDBOOK.filter(hb.isHandbookGuide);
+
+  equal('дерево целое: 57 узлов — 44 гайда и 13 разделов', HANDBOOK.length, 57);
+  equal('листов ровно 44, больше ни один узел не раскрывается', leaves.length, 44);
+  equal('идентификаторы узлов не повторяются', byId.size, HANDBOOK.length);
+
+  const dangling = [];
+  for (const g of HANDBOOK) {
+    for (const child of g.children) if (!byId.has(child)) dangling.push(`${g.id}→${child}`);
+  }
+  equal('каждая ссылка на подраздел ведёт в существующий узел', dangling.join(', '), '');
+
+  const claimed = new Set();
+  for (const g of HANDBOOK) for (const child of g.children) claimed.add(child);
+  const orphans = HANDBOOK
+    .filter((g) => !claimed.has(g.id) && !HANDBOOK_ROOTS.includes(g.id))
+    .map((g) => g.id);
+  equal('в дереве нет узлов, до которых нельзя дойти от корня', orphans.join(', '), '');
+
+  equal('корней восемь', HANDBOOK_ROOTS.length, 8);
+  check('каждый корень существует в дереве', HANDBOOK_ROOTS.every((id) => byId.has(id)));
+  /*
+    Четыре корня («Строительство», «Солдаты», «Исследования», «Должности
+    министров») — сразу гайды: в боте эти пункты меню открывали один экран,
+    а не список. Проверять нужно не форму, а то, что корень не пустой.
+  */
+  check('корень не бывает пустой веткой: либо список, либо готовый гайд',
+    HANDBOOK_ROOTS.every((id) => {
+      const root = byId.get(id);
+      return root.children.length > 0 || (hb.isHandbookGuide(root) && root.blocks.length > 0);
+    }));
+  const rootTitles = new Set(HANDBOOK_ROOTS.map((id) => byId.get(id).title));
+  check('раздел каждого узла — название одного из восьми корней',
+    HANDBOOK.every((g) => rootTitles.has(g.section)));
+  check('у каждого узла есть заголовок и хотя бы один блок',
+    HANDBOOK.every((g) => g.title.trim() && g.blocks.length));
+  check('ни один гайд не пуст: текст или картинка обязательно есть',
+    leaves.every((g) => g.blocks.some((b) => (b.text || '').trim() || b.image)));
+
+  /* Картинки: путь, размеры и наличие файла на диске. */
+  const images = [];
+  for (const g of HANDBOOK) for (const b of g.blocks) if (b.image) images.push({ g, b });
+  equal('картинок перенесено 164', images.length, 164);
+  check('каждая картинка лежит в public/guides',
+    images.every(({ b }) => b.image.startsWith('./public/guides/')));
+  check('у каждой картинки есть alt — без него телефон читает файл вслух',
+    images.every(({ b }) => (b.alt || '').trim()));
+  check('у каждой картинки записаны исходные размеры',
+    images.every(({ b }) => b.w > 0 && b.h > 0),
+    'без width/height страница подпрыгивает при догрузке');
+  const missing = [];
+  for (const { b } of images) {
+    try {
+      await stat(b.image.replace('./', ''));
+    } catch {
+      missing.push(b.image);
+    }
+  }
+  equal('каждый файл из данных действительно лежит в репозитории', missing.join(', '), '');
+
+  const walk = (dir) => readdirSync(dir, { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [/\.jpe?g$/i.test(e.name) ? `${dir}/${e.name}` : null]))
+    .filter(Boolean);
+  const onDisk = walk('public/guides');
+  const referenced = new Set(images.map(({ b }) => b.image.replace('./', '')));
+  equal('лишних картинок в репозитории нет: всё, что лежит, где-то показано',
+    onDisk.filter((p) => !referenced.has(p)).join(', '), '');
+  equal('число картинок в данных равно числу файлов на диске', onDisk.length, images.length);
+
+  /* Мусор, который переносится вместе с ботовскими текстами. */
+  const flat = HANDBOOK.flatMap((g) => g.blocks.flatMap((b) => [b.text || '', b.caption || '']));
+  check('декоративных черт из бота не осталось', !flat.some((s) => /[━─—]{4,}/.test(s)));
+  check('кнопочных подсказок бота («Выберите действие») не перенесено',
+    !flat.some((s) => /выбер(?:ите|и)[^\n]{0,30}действие/i.test(s)));
+  const rendered = flat.filter(Boolean).map((s) => postBody(s)).join('\n');
+  check('разметка Telegram закрывается, а не остаётся в тексте',
+    (rendered.match(/<(?:strong|em)>/g) || []).length === (rendered.match(/<\/(?:strong|em)>/g) || []).length);
+  check('сырых <b> и <i> очиститель не пропускает', !/<[bi]>/.test(rendered));
+  check('текст перенесён без сокращений',
+    HANDBOOK.reduce((s, g) => s + g.blocks.reduce((x, b) => x + (b.text || '').length, 0), 0) > 50000);
+
+  /* Раздел подключён к сайту, а не просто лежит рядом. */
+  check('маршрут и пункт меню зарегистрированы',
+    /\{ id: 'handbook', label: 'Справочник игры' \}/.test(mainSrc));
+  check('справочник открывается до ответа хранилища',
+    /id === 'updates' \|\| id === 'handbook' \|\| \(id === 'user' && param\)/.test(mainSrc));
+  const branch = /\} else if \(route\.id === 'handbook'\) \{([\s\S]*?)path = param/.exec(mainSrc);
+  check('ветка маршрута выгружает все живые разделы перед отрисовкой',
+    branch && (branch[1].match(/unmount\w+\(\);/g) || []).length === 6);
+  check('стили справочника подключены к странице',
+    /<link rel="stylesheet" href="\.\/src\/handbook\.css/.test(indexSrc));
+  check('стили справочника попали в офлайн-копию',
+    swSrc.includes("'./src/handbook.css'"));
+  check('классы, которые рисует страница, описаны в её stylesheet',
+    ['hb-page', 'hb-tile', 'hb-fig', 'hb-crumbs', 'hb-search', 'hb-hits', 'guide-official']
+      .every((cls) => cssSrc.includes(`.${cls}`)));
+
+  /* Поиск: поле, отражение запроса в адресе и клавиши. */
+  check('модуль поиска слушает ввод и клавиши',
+    /addEventListener\('input'/.test(controlsSrc) && /addEventListener\('keydown'/.test(controlsSrc));
+  check('запрос пишется в адрес, чтобы ссылку можно было скинуть в чат',
+    /replaceState/.test(controlsSrc) && /#\/handbook\?q=/.test(controlsSrc));
+  check('Escape очищает поле', /Escape/.test(controlsSrc));
+  check('модуль поиска подключён в main.js',
+    /import '\.\/ui\/handbook-controls\.js/.test(mainSrc));
+
+  /* Разметка страниц. */
+  const overview = hb.renderHandbook({});
+  check('на обзорной странице есть поле поиска', /data-hb-query/.test(overview));
+  equal('обзор показывает восемь разделов', (overview.match(/class="hb-section"/g) || []).length, 8);
+  equal('обзор показывает 18 плиток первого уровня',
+    (overview.match(/class="hb-tile"/g) || []).length, 18);
+  const hrefs = [...overview.matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+  check('каждая плитка ведёт в существующий узел', hrefs.length > 0 && hrefs.every((id) => byId.has(id)),
+    hrefs.filter((id) => !byId.has(id)).join(', '));
+  check('ссылка с запросом открывает список найденного',
+    /hb-hits/.test(hb.renderHandbook({ query: 'броня' })));
+
+  const detail = hb.renderHandbook({ guideId: 'mythic_gear_create' });
+  check('гайд показывает картинки лениво и с размерами',
+    /<figure/.test(detail) && /loading="lazy"/.test(detail) && /width="\d+" height="\d+"/.test(detail));
+  check('гайд показывает путь по разделам и соседей',
+    /hb-crumbs/.test(detail) && /aria-current="page"/.test(detail) && /hb-siblings/.test(detail));
+  check('битая ссылка не роняет страницу, а объясняет',
+    /Такого гайда нет/.test(hb.renderHandbook({ guideId: '%zz' })));
+
+  /* Мостик со страницы «Гайды». */
+  check('со страницы гайдов есть вход в справочник',
+    /renderHandbookTeaser/.test(guidesPageSrc) && /guide-official/.test(hb.renderHandbookTeaser()));
+  const teaserIds = [...hb.renderHandbookTeaser().matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => m[1]);
+  check('каждая плашка мостика ведёт в существующий раздел',
+    teaserIds.length === 8 && teaserIds.every((id) => byId.has(id)));
+
+  /* Смысл поиска: два слова — оба обязаны встретиться, «ё» равно «е». */
+  equal('два слова ищутся как «и», а не как «или»',
+    hb.searchHandbook('засада урон').items.map((r) => r.node.id), ['alliance_ambush']);
+  equal('буква ё в запросе равносильна е',
+    hb.searchHandbook('ещё').total, hb.searchHandbook('еще').total);
+  const many = hb.searchHandbook('а');
+  check('выдача поиска ограничена 24 строками, но число найдено полное',
+    many.total > 24 && many.items.length === 24 && /показаны первые/.test(hb.renderResults('а')));
+  check('чужое слово не может протащить разметку в страницу',
+    !/<img src=x/.test(hb.renderResults('<img src=x onerror=alert(1)>')));
+  check('найденное слово подсвечено', /<mark>/.test(hb.renderResults('броня')));
+  check('без запроса показаны разделы, а не «ничего не найдено»',
+    /hb-section/.test(hb.resultsSlot('')) && !/hb-none/.test(hb.resultsSlot('')));
 }
 
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);

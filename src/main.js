@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=68';
-import { loadAll, capabilities, db } from './data/index.js?v=68';
-import { validateDataset } from './data/contract.js?v=68';
+import { CONFIG } from '../config.js?v=69';
+import { loadAll, capabilities, db } from './data/index.js?v=69';
+import { validateDataset } from './data/contract.js?v=69';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,28 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=68';
-import { renderHome } from './pages/home.js?v=68';
-import { renderLadder } from './pages/ladder.js?v=68';
-import { renderQuarter } from './pages/quarter-final.js?v=68';
-import { renderTimeline } from './pages/timeline.js?v=68';
-import { renderGuide } from './pages/guide.js?v=68';
-import { renderBot } from './pages/bot.js?v=68';
-import { renderAbout } from './pages/about.js?v=68';
-import { renderAlliance } from './pages/alliance.js?v=68';
-import { computeAchievements } from './logic/achievements.js?v=68';
-import { esc } from './ui/helpers.js?v=68';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=68';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=68';
+} from './logic/standings.js?v=69';
+import { renderHome } from './pages/home.js?v=69';
+import { renderLadder } from './pages/ladder.js?v=69';
+import { renderQuarter } from './pages/quarter-final.js?v=69';
+import { renderTimeline } from './pages/timeline.js?v=69';
+import { renderGuide } from './pages/guide.js?v=69';
+import { renderBot } from './pages/bot.js?v=69';
+import { renderHandbook } from './pages/handbook.js?v=69';
+import { renderAbout } from './pages/about.js?v=69';
+import { renderAlliance } from './pages/alliance.js?v=69';
+import { computeAchievements } from './logic/achievements.js?v=69';
+import { esc } from './ui/helpers.js?v=69';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=69';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=69';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=68';
-import './ui/timeline-controls.js?v=68';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=68';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=68';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=68';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=68';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=68';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=68';
+import './ui/ladder-controls.js?v=69';
+import './ui/timeline-controls.js?v=69';
+// Поиск по справочнику: поле перерисовывает только список результатов.
+import './ui/handbook-controls.js?v=69';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=69';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=69';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=69';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=69';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=69';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=69';
 
 /*
   РАЗДЕЛЫ.
@@ -66,6 +69,13 @@ const ROUTES = [
     «Сервер», рядом с хроникой, а не в меню рядом с форумом.
   */
   { id: 'updates', label: 'Обновления игры', live: true },
+  /*
+    Справочник — текст самой игры, перенесённый из Telegram-бота один в один.
+    Он рядом с пульсом обновлений, потому что отвечает на тот же вопрос
+    («как это работает»), и отделён от «Гайдов», потому что там пишут игроки,
+    а здесь — разработчики.
+  */
+  { id: 'handbook', label: 'Справочник игры' },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -422,6 +432,27 @@ function render() {
       app.innerHTML = '';
       mountUpdates(app);
       path = '/updates';
+    } else if (route.id === 'handbook') {
+      /*
+        Справочник — единственная страница, которой не нужно ни хранилище, ни
+        данные сайта: всё дерево лежит рядом с ней в src/handbook/guides.js.
+        Поэтому она из строки, а не «живая», и открывается за секунду.
+
+        Второй сегмент адреса — узел дерева (#/handbook/alliance_ambush), а хвост
+        — запрос (#/handbook?q=засада): ссылку на результат поиска кидают в чат
+        ровно в том виде, в каком её видит тот, кто искал.
+      */
+      unmountForum();
+      unmountChats();
+      unmountTournaments();
+      unmountGuides();
+      unmountCalendar();
+      unmountUpdates();
+      app.innerHTML = renderHandbook({
+        guideId: param,
+        query: new URLSearchParams(search).get('q') || '',
+      });
+      path = param ? '/handbook/node' : '/handbook';
     } else if (route.live) {
       unmountChats();
       unmountTournaments();
@@ -515,10 +546,15 @@ async function boot() {
     Поэтому живые вкладки (форум и страница участника) рисуем сразу, ещё
     пустым контуром: им от данных сайта нужна только плашка хроники в шапке,
     и она допишется, когда данные приедут. А сами данные грузятся фоном.
+
+    Справочник попадает в этот же список по другой причине: ему не нужны ни
+    база, ни данные сайта — всё дерево лежит рядом с ним в репозитории. Ждать
+    пробуждения базы, чтобы открыть правило про засаду, значит платить десятью
+    секундами за чужую сонливость.
   */
   const { id, param } = parseHash();
   const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar'
-    || id === 'updates' || (id === 'user' && param);
+    || id === 'updates' || id === 'handbook' || (id === 'user' && param);
 
   app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
   if (liveFirst) {

@@ -7,6 +7,7 @@ import { esc } from '../ui/helpers.js';
 import { postBody } from '../forum/format.js';
 import { slaLevel, SLA_LABELS } from '../forum/sla.js';
 import { renderMdBar } from './forum.js';
+import { renderHandbookTeaser } from './handbook.js';
 import { CONFIG } from '../../config.js';
 
 const CATEGORIES = [
@@ -120,6 +121,7 @@ function renderList(s) {
         : ''}
       ${canWrite && s.composing ? composeForm(s) : ''}
       <div class="guide-list-wrap">${list}</div>
+      ${renderHandbookTeaser()}
       ${guideRequestsBlock(s)}
     </section>`;
 }

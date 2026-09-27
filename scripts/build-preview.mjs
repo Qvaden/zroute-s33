@@ -34,6 +34,7 @@ import { renderTournaments } from '../src/pages/tournaments.js';
 import { renderGuides } from '../src/pages/guides.js';
 import { renderCalendar } from '../src/pages/calendar.js';
 import { renderUpdates } from '../src/pages/updates.js';
+import { renderHandbook } from '../src/pages/handbook.js';
 import { computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 
 const data = await loadAll();
@@ -90,6 +91,7 @@ const NAV = [
   { id: 'guide', label: 'Малым алам', html: renderGuide(view) },
   { id: 'bot', label: 'Бот в ТГ', html: renderBot() },
   { id: 'about', label: 'О проекте', html: renderAbout() },
+  { id: 'handbook', label: 'Справочник игры', html: renderHandbook({}) },
 ];
 
 /*
