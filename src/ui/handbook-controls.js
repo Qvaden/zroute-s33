@@ -18,7 +18,7 @@
   на каждый нажатый знак назад не ходят, и история из двадцати состояний
   одного слова была бы вредна.
 */
-import { renderResults, renderSections } from '../pages/handbook.js?v=69';
+import { renderResults, renderSections } from '../pages/handbook.js?v=70';
 
 /** Адрес справочника с текущим запросом — ровно то, что кинут в чат. */
 function writeQuery(query) {

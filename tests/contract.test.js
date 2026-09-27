@@ -9027,8 +9027,8 @@ console.log('\nAJ. Справочник официальных гайдов иг
   const byId = new Map(HANDBOOK.map((g) => [g.id, g]));
   const leaves = HANDBOOK.filter(hb.isHandbookGuide);
 
-  equal('дерево целое: 57 узлов — 44 гайда и 13 разделов', HANDBOOK.length, 57);
-  equal('листов ровно 44, больше ни один узел не раскрывается', leaves.length, 44);
+  equal('дерево целое: 61 узел — 47 гайдов и 14 разделов', HANDBOOK.length, 61);
+  equal('листов ровно 47, больше ни один узел не раскрывается', leaves.length, 47);
   equal('идентификаторы узлов не повторяются', byId.size, HANDBOOK.length);
 
   const dangling = [];
@@ -9047,14 +9047,16 @@ console.log('\nAJ. Справочник официальных гайдов иг
   equal('корней восемь', HANDBOOK_ROOTS.length, 8);
   check('каждый корень существует в дереве', HANDBOOK_ROOTS.every((id) => byId.has(id)));
   /*
-    Четыре корня («Строительство», «Солдаты», «Исследования», «Должности
-    министров») — сразу гайды: в боте эти пункты меню открывали один экран,
-    а не список. Проверять нужно не форму, а то, что корень не пустой.
+    Три корня («Строительство», «Солдаты», «Должности министров») — сразу
+    гайды: в боте эти пункты меню открывали один экран, а не список. Поэтому
+    проверяем не форму, а то, что корень не пустой: содержимое на своей
+    странице обязан быть и у списка, и у гайда.
   */
-  check('корень не бывает пустой веткой: либо список, либо готовый гайд',
+  check('корень не бывает пустой веткой: содержимое есть и у списка, и у гайда',
     HANDBOOK_ROOTS.every((id) => {
       const root = byId.get(id);
-      return root.children.length > 0 || (hb.isHandbookGuide(root) && root.blocks.length > 0);
+      const filled = root.blocks.some((b) => b.text || b.image);
+      return filled && (root.children.length > 0 || hb.isHandbookGuide(root));
     }));
   const rootTitles = new Set(HANDBOOK_ROOTS.map((id) => byId.get(id).title));
   check('раздел каждого узла — название одного из восьми корней',
@@ -9067,7 +9069,7 @@ console.log('\nAJ. Справочник официальных гайдов иг
   /* Картинки: путь, размеры и наличие файла на диске. */
   const images = [];
   for (const g of HANDBOOK) for (const b of g.blocks) if (b.image) images.push({ g, b });
-  equal('картинок перенесено 164', images.length, 164);
+  equal('картинок перенесено 164 — каждая хотя бы раз показана', new Set(images.map(({ b }) => b.image)).size, 164);
   check('каждая картинка лежит в public/guides',
     images.every(({ b }) => b.image.startsWith('./public/guides/')));
   check('у каждой картинки есть alt — без него телефон читает файл вслух',
@@ -9092,7 +9094,7 @@ console.log('\nAJ. Справочник официальных гайдов иг
   const referenced = new Set(images.map(({ b }) => b.image.replace('./', '')));
   equal('лишних картинок в репозитории нет: всё, что лежит, где-то показано',
     onDisk.filter((p) => !referenced.has(p)).join(', '), '');
-  equal('число картинок в данных равно числу файлов на диске', onDisk.length, images.length);
+  equal('файлов на диске ровно столько, сколько картинок в данных', onDisk.length, referenced.size);
 
   /* Мусор, который переносится вместе с ботовскими текстами. */
   const flat = HANDBOOK.flatMap((g) => g.blocks.flatMap((b) => [b.text || '', b.caption || '']));
@@ -9111,6 +9113,51 @@ console.log('\nAJ. Справочник официальных гайдов иг
     images.every(({ b }) => !varName(b.alt) && !varName(b.caption)),
     images.filter(({ b }) => varName(b.alt) || varName(b.caption))
       .map(({ g, b }) => `${g.id} → ${b.image.split('/').pop()}`).join(', '));
+
+  /*
+    Четыре подробных разбора базовых веток исследований. В самом боте они
+    мёртвые: обработчик, текст и картинки на месте, а кнопок, которые бы это
+    открывали, не осталось — меню листает research_page_N и показывает по
+    каждой ветке короткий список. Здесь они стали отдельными страницами
+    «Исследований», и ценность их ровно в том, что каждый бонус пояснён, а не
+    просто перечислен одной строкой.
+  */
+  const branches = ['research_develop', 'research_economy', 'research_hero', 'research_soldiers'];
+  const research = byId.get('menu_research');
+  equal('у «Исследований» четыре подробных разбора веток', research.children.join(','), branches.join(','));
+  check('каждый разбор — страница с одним текстом и двумя скриншотами',
+    branches.every((id) => {
+      const g = byId.get(id);
+      return g.blocks.filter((b) => b.text).length === 1 &&
+        g.blocks.filter((b) => b.image).length === 2 &&
+        g.path.join(' » ') === research.title;
+    }));
+  /*
+    Смысл переноса держится на разнице длин: разбор обязан быть подробнее
+    короткого списка той же ветки. Сравнение по первому заголовку — чтобы
+    проверка не протихла, когда списки в разделе переставят местами.
+  */
+  for (const id of branches) {
+    const detail = byId.get(id).blocks.find((b) => b.text).text;
+    const heading = detail.split('\n')[0];
+    const brief = research.blocks.find((b) => b.text && b.text.split('\n')[0] === heading);
+    check(`${id}: разбор длиннее короткого списка той же ветки`,
+      brief && detail.length > brief.text.length,
+      brief ? `${detail.length} знаков против ${brief.text.length}` : 'в разделе нет списка этой ветки');
+  }
+  equal('подробные разборы не принесли новых файлов: 172 показа картинок при 164 файлах',
+    images.length, 172);
+  /*
+    Поиск обязан находить и раздел, у которого есть свой текст: «Исследования»
+    больше не лист, а тринадцать разборов веток на одной странице. Слова,
+    встречающиеся ровно один раз во всём справочнике, — чтобы проверка не
+    зависела от того, сколько строк влезло в выдачу.
+  */
+  check('страница раздела находится поиском, а не только гайды-листы',
+    hb.searchHandbook('поэтапно').items.some((r) => r.node.id === 'menu_research'));
+  check('перенесённый разбор ветки находится по словам из него',
+    hb.searchHandbook('возвращаются в строй').items.map((r) => r.node.id), ['research_develop']);
+
   const rendered = flat.filter(Boolean).map((s) => postBody(s)).join('\n');
   check('разметка Telegram закрывается, а не остаётся в тексте',
     (rendered.match(/<(?:strong|em)>/g) || []).length === (rendered.match(/<\/(?:strong|em)>/g) || []).length);
@@ -9147,8 +9194,8 @@ console.log('\nAJ. Справочник официальных гайдов иг
   const overview = hb.renderHandbook({});
   check('на обзорной странице есть поле поиска', /data-hb-query/.test(overview));
   equal('обзор показывает восемь разделов', (overview.match(/class="hb-section"/g) || []).length, 8);
-  equal('обзор показывает 18 плиток первого уровня',
-    (overview.match(/class="hb-tile"/g) || []).length, 18);
+  equal('обзор показывает 22 плитки первого уровня',
+    (overview.match(/class="hb-tile"/g) || []).length, 22);
   const hrefs = [...overview.matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   check('каждая плитка ведёт в существующий узел', hrefs.length > 0 && hrefs.every((id) => byId.has(id)),
     hrefs.filter((id) => !byId.has(id)).join(', '));
