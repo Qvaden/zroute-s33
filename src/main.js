@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=70';
-import { loadAll, capabilities, db } from './data/index.js?v=70';
-import { validateDataset } from './data/contract.js?v=70';
+import { CONFIG } from '../config.js?v=71';
+import { loadAll, capabilities, db } from './data/index.js?v=71';
+import { validateDataset } from './data/contract.js?v=71';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,31 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=70';
-import { renderHome } from './pages/home.js?v=70';
-import { renderLadder } from './pages/ladder.js?v=70';
-import { renderQuarter } from './pages/quarter-final.js?v=70';
-import { renderTimeline } from './pages/timeline.js?v=70';
-import { renderGuide } from './pages/guide.js?v=70';
-import { renderBot } from './pages/bot.js?v=70';
-import { renderHandbook } from './pages/handbook.js?v=70';
-import { renderAbout } from './pages/about.js?v=70';
-import { renderAlliance } from './pages/alliance.js?v=70';
-import { computeAchievements } from './logic/achievements.js?v=70';
-import { esc } from './ui/helpers.js?v=70';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=70';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=70';
+} from './logic/standings.js?v=71';
+import { renderHome } from './pages/home.js?v=71';
+import { renderLadder } from './pages/ladder.js?v=71';
+import { renderQuarter } from './pages/quarter-final.js?v=71';
+import { renderTimeline } from './pages/timeline.js?v=71';
+import { renderGuide } from './pages/guide.js?v=71';
+import { renderBot } from './pages/bot.js?v=71';
+import { renderHandbook } from './pages/handbook.js?v=71';
+import { renderAbout } from './pages/about.js?v=71';
+import { renderAlliance } from './pages/alliance.js?v=71';
+import { computeAchievements } from './logic/achievements.js?v=71';
+import { esc } from './ui/helpers.js?v=71';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=71';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=71';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=70';
-import './ui/timeline-controls.js?v=70';
+import './ui/ladder-controls.js?v=71';
+import './ui/timeline-controls.js?v=71';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=70';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=70';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=70';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=70';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=70';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=70';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=70';
+import './ui/handbook-controls.js?v=71';
+import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=71';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=71';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=71';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=71';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=71';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=71';
 
 /*
   РАЗДЕЛЫ.
@@ -71,11 +71,12 @@ const ROUTES = [
   { id: 'updates', label: 'Обновления игры', live: true },
   /*
     Справочник — текст самой игры, перенесённый из Telegram-бота один в один.
-    Он рядом с пульсом обновлений, потому что отвечает на тот же вопрос
-    («как это работает»), и отделён от «Гайдов», потому что там пишут игроки,
-    а здесь — разработчики.
+    Своей вкладки у него больше нет: он живёт внутри «Гайдов», под списком
+    авторских разборов. `hidden: true` убирает его из меню, но маршрут и
+    адреса узлов (#/handbook/<узел>) остаются — по ним ведут ссылки, уже
+    лежащие в чатах и закладках.
   */
-  { id: 'handbook', label: 'Справочник игры' },
+  { id: 'handbook', label: 'Справочник игры', hidden: true, navAs: 'guides' },
   { id: 'home', label: 'Итоги недели', render: renderHome },
   { id: 'quarter', label: 'Кварт', render: renderQuarter },
   { id: 'ladder', label: 'Рейтинг', render: renderLadder },
@@ -142,18 +143,29 @@ function parseHash() {
 }
 
 function renderNav(activeId) {
+  /* Какую вкладку подсветить, когда страница открыта: у раздела без своего
+     пункта меню (`hidden`) это чужая вкладка — `navAs`. */
+  const navId = (r) => r.navAs || r.id;
+
   /*
     aria-current сообщает экранному диктору, где человек находится. Подсветка
     цветом об этом говорит только тем, кто видит: без атрибута незрячий
     слышит семь одинаковых ссылок и не знает, какая открыта.
   */
-  const link = (r) => `<a href="#/${r.id}" class="nav__link ${r.id === activeId ? 'is-active' : ''}${
+  const link = (r) => `<a href="#/${r.id}" class="nav__link ${navId(r) === activeId ? 'is-active' : ''}${
       r.primary ? ' nav__link--primary' : ''
-    }"${r.id === activeId ? ' aria-current="page"' : ''}>${r.label}${
+    }"${navId(r) === activeId ? ' aria-current="page"' : ''}>${r.label}${
       r.id === 'chats' ? '<span class="nav__badge" data-nav-chats-badge hidden></span>' : ''
     }</a>`;
-  const primary = ROUTES.filter((r) => r.primary);
-  const rest = ROUTES.filter((r) => !r.primary);
+  /*
+    `hidden` — раздел без своего пункта меню: страница существует и открывается
+    по адресу, но в оглавлении её нет. Справочник живёт внутри «Гайдов», и две
+    соседние ссылки на один и тот же вопрос («как это работает») читались бы
+    как спор двух разделов за место в списке.
+  */
+  const shown = ROUTES.filter((r) => !r.hidden);
+  const primary = shown.filter((r) => r.primary);
+  const rest = shown.filter((r) => !r.primary);
   /*
     Две группы с подписью между ними: «Общение» и «Сервер». Меню читается
     как оглавление, а не как семь равнозначных ссылок, — сразу видно, что
@@ -371,7 +383,7 @@ function render() {
     path = '/user';
   } else {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
-    renderNav(route.id);
+    renderNav(route.navAs || route.id);
 
     if (route.id === 'chats') {
       unmountForum();
@@ -400,10 +412,14 @@ function render() {
       unmountCalendar();
       unmountUpdates();
       app.innerHTML = '';
-      // Второй сегмент — slug гайда: #/guides/na-sklad.
-      const rest = location.hash.replace(/^#\/?guides\/?/, '');
-      mountGuides(app, rest ? decodeURIComponent(rest) : null);
-      path = rest ? '/guides/slug' : '/guides';
+      /*
+        Второй сегмент — slug гайда: #/guides/na-sklad. Берём его из разобранного
+        адреса, а не из хвоста строки: адрес страницы несёт и фильтры
+        (#/guides?q=засада), и в хвосте они превратились бы в часть имени,
+        которого в базе нет.
+      */
+      mountGuides(app, param ? decodeURIComponent(param) : null);
+      path = param ? '/guides/slug' : '/guides';
     } else if (route.id === 'calendar') {
       unmountForum();
       unmountChats();
@@ -434,25 +450,29 @@ function render() {
       path = '/updates';
     } else if (route.id === 'handbook') {
       /*
-        Справочник — единственная страница, которой не нужно ни хранилище, ни
-        данные сайта: всё дерево лежит рядом с ней в src/handbook/guides.js.
-        Поэтому она из строки, а не «живая», и открывается за секунду.
+        Справочник больше не отдельная вкладка: он живёт внутри «Гайдов»
+        (см. handbookBlock в pages/guides.js). Отдельные адреса у узлов остались
+        — по ним ведут ссылки, уже разосланные в чаты, и страница узелка
+        по-прежнему рисуется целиком, со своими хлебными крошками.
 
-        Второй сегмент адреса — узел дерева (#/handbook/alliance_ambush), а хвост
-        — запрос (#/handbook?q=засада): ссылку на результат поиска кидают в чат
-        ровно в том виде, в каком её видит тот, кто искал.
+        Пустой адрес (#/handbook, в том числе с запросом #/handbook?q=засада)
+        переводим на вкладку: там и поле поиска, и список разделов. Молчать
+        или показывать половину страницы значило бы наказывать за старую
+        ссылку из меню. Запрос сохраняется: «вот это место в правиле» пересылают
+        ссылкой, и она обязана открываться уже с результатами.
       */
+      if (!param) {
+        location.replace(`${location.pathname}${location.search}#/guides${search ? `?${search}` : ''}`);
+        return;
+      }
       unmountForum();
       unmountChats();
       unmountTournaments();
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
-      app.innerHTML = renderHandbook({
-        guideId: param,
-        query: new URLSearchParams(search).get('q') || '',
-      });
-      path = param ? '/handbook/node' : '/handbook';
+      app.innerHTML = renderHandbook({ guideId: param });
+      path = '/handbook/node';
     } else if (route.live) {
       unmountChats();
       unmountTournaments();

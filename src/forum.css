@@ -2249,6 +2249,13 @@
   background: var(--accent);
   border-color: transparent;
 }
+/*
+  «Мои гайды» — не категория, а фильтр поверх неё: пунктирная граница говорит,
+  что кнопка меняет только видимость списка, а не раздел.
+*/
+.guide-chip--mine { border-style: dashed; margin-left: auto; }
+.guides-page__signin { margin: 0 0 12px; font-size: 12.5px; }
+.guides-page__signin a { color: var(--accent); }
 
 .guide-search {
   display: flex;
@@ -2392,6 +2399,13 @@
 .guide-badge--verified { color: var(--win); border-color: var(--win); }
 .guide-badge--outdated { color: var(--gold); border-color: var(--gold); }
 .guide-badge--signal { color: var(--loss); border-color: var(--loss); }
+/*
+  «Не проверен» — теперь самое частое состояние гайда: игроки публикуют сразу.
+  Метка нейтральная и пунктирная: это не похвала и не порицание, а честное
+  «модерация до этого текста ещё не доходила».
+*/
+.guide-badge--none { color: var(--mute); border-style: dashed; }
+.guide-review--none { border-left-color: var(--line); }
 
 .guide-review {
   margin-top: 12px;

@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, EVENT_RSVP_IDS, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
 import { normalizeQuietWindow } from '../quiet.js';
 
 export const name = 'локальный (только этот браузер)';
@@ -3018,8 +3018,9 @@ export async function addTournamentRound(tournamentId, winnerId = null, notes = 
 /* Те же границы, что у проверки в базе; числа лежат в config.js. */
 const NOTE_MIN = CONFIG.forum.limits.guideNoteMin;
 const NOTE_MAX = CONFIG.forum.limits.guideNoteMax;
+const GUIDE_DAILY_MAX = CONFIG.forum.limits.guideDailyMax;
 
-function guideOut(row, signals = []) {
+function guideOut(row, signals = [], attachments = []) {
   return {
     id: row.id,
     slug: row.slug,
@@ -3033,6 +3034,7 @@ function guideOut(row, signals = []) {
     reviewNote: row.reviewNote || '',
     reviewedAt: row.reviewedAt ? new Date(row.reviewedAt) : null,
     signals,
+    attachments,
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
   };
@@ -3057,33 +3059,78 @@ export async function listGuides() {
   const me = s.users.find((u) => u.id === s.me) || null;
   return (s.guides || [])
     .filter((g) => g.status === 'published')
-    .map((g) => guideOut(g, guideSignalsFor(s, g.id, me)));
+    .map((g) => guideOut(g, guideSignalsFor(s, g.id, me), g.attachments || []));
 }
 
 export async function getGuide(slug) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me) || null;
   const g = (s.guides || []).find((x) => x.slug === slug);
-  return g ? guideOut(g, guideSignalsFor(s, g.id, me)) : null;
+  return g ? guideOut(g, guideSignalsFor(s, g.id, me), g.attachments || []) : null;
 }
 
+/*
+  Гайд пишет любой вошедший с правом писать — ровно как политика
+  `forum_guides_insert` после supabase/20260929-player-guides.sql. Лидерство
+  здесь больше ничего не решает: черновой режим нужен ещё и для того, чтобы
+  проверить страницу глазами обычного участника, а не только глазами админа.
+
+  Порядок отказов повторяет порядок триггеров базы по алфавиту:
+  forum_guide_author_guard (отметка, темп, длина) идёт раньше forum_guide_before
+  (заголовок, адрес).
+*/
 export async function createGuide(draft) {
   const s = read();
-  const me = meOrThrow(s);
-  if (!me.isLeader && !isStaff(me)) throw new Error('Гайды пишут лидеры альянсов');
-  const slug = String(draft.slug || '').toLowerCase().trim();
-  if (!/^[a-z0-9а-яё-]{2,80}$/.test(slug)) throw new Error('Slug: только буквы, цифры и дефис');
-  if ((s.guides || []).some((g) => g.slug === slug)) throw new Error('Такой slug уже занят');
-  const title = String(draft.title).trim();
-  if (title.length < 2) throw new Error('Заголовок слишком короткий');
+  const me = requireWriter(s);
+  const body = String(draft.body ?? '');
+  const title = String(draft.title ?? '').trim();
+  const given = String(draft.slug ?? '').toLowerCase().trim();
+  const staff = isStaff(me);
+
+  if (!staff) {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const today = (s.guides || []).filter((g) => g.authorId === me.id
+      && new Date(g.createdAt) >= midnight);
+    if (today.length >= GUIDE_DAILY_MAX) throw new Error(GUIDE_DAILY_LIMIT);
+    const problem = guideBodyProblem(body);
+    if (problem) throw new Error(problem);
+  }
+
+  if (title.length < 2) throw new Error('Заголовок гайда короче двух символов');
+
+  const base = guideSlug(given, title);
+  if (!base) throw new Error('Заголовок не даёт адреса: в нём нет букв или цифр');
+  if (!/^[a-z0-9а-яё-]{2,80}$/.test(base)) throw new Error('Slug: только буквы, цифры и дефис');
+
+  const taken = (value) => (s.guides || []).some((g) => g.slug === value);
+  let slug = base;
+  if (taken(slug)) {
+    /*
+      Явно запрошенный адрес получает отказ, а построенный из заголовка —
+      суффикс: два человека, одинаково назвавшие свой разбор, не должны спорить
+      за адрес. Ровно так же поступает триггер базы.
+    */
+    if (given) throw new Error('Такой slug уже занят');
+    let n = 2;
+    while (taken(`${base.slice(0, 74)}-${n}`)) n += 1;
+    slug = `${base.slice(0, 74)}-${n}`;
+  }
+
   const now = new Date().toISOString();
   const g = {
-    id: newId('g'), slug, title,
+    id: newId('g'),
+    slug,
+    title,
     category: String(draft.category || 'strategy'),
-    body: String(draft.body),
-    authorId: me.id, authorNick: me.nick,
+    body,
+    authorId: me.id,
+    authorNick: me.nick,
     status: 'published',
-    createdAt: now, updatedAt: now,
+    publishedAt: now,
+    attachments: [],
+    createdAt: now,
+    updatedAt: now,
   };
   if (!s.guides) s.guides = [];
   s.guides.push(g);

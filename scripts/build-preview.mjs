@@ -91,7 +91,9 @@ const NAV = [
   { id: 'guide', label: 'Малым алам', html: renderGuide(view) },
   { id: 'bot', label: 'Бот в ТГ', html: renderBot() },
   { id: 'about', label: 'О проекте', html: renderAbout() },
-  { id: 'handbook', label: 'Справочник игры', html: renderHandbook({}) },
+  // На сайте у справочника своей вкладки нет: он живёт внутри «Гайдов».
+  // Страницу всё равно рисуем — по ней приходят из чатов и закладок.
+  { id: 'handbook', label: 'Справочник игры', hidden: true, html: renderHandbook({}) },
 ];
 
 /*
@@ -177,7 +179,7 @@ ${css}
     <span class="brand__text"><b>Сервер 33</b><small>Z Route: Redemption</small></span>
   </a>
   <nav class="nav" id="nav">
-    ${NAV.map((p) => `<a href="#" class="nav__link${p.id === startNavId ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n    ')}
+    ${NAV.filter((p) => !p.hidden).map((p) => `<a href="#" class="nav__link${p.id === startNavId ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n    ')}
   </nav>
   <div class="side__foot"><span class="side__note">Собранная копия сайта</span></div>
 </aside>

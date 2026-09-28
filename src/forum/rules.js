@@ -459,3 +459,59 @@ export function deletionReason(ruleId, note = '') {
   const head = rule ? `Пункт ${index + 1}: ${rule.title}` : 'Нарушение правил форума';
   return note.trim() ? `${head} — ${note.trim()}` : head;
 }
+
+/* ── Гайд участника: адрес, длина и отказ ────────────────────────────────── */
+
+/*
+  И адрес, и длину гайда считает база (supabase/20260929-player-guides.sql):
+  функции здесь — не вторая проверка, а единственный способ для формы и
+  чернового режима сказать те же слова, что скажет Postgres. Мера длины та же,
+  что в триггере: разметка снимается, пробелы схлопываются. Иначе форма
+  приняла бы «гайд» из трёх пустых <div>, а база бы его отвергла — и человек
+  увидел бы отказ там, где его уже не ждали.
+*/
+
+/** Текст гайда без разметки — ровно той же меркой, что и триггер базы. */
+export function guideText(body) {
+  return String(body ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Адрес гайда. Присланный руками остаётся как есть (модерация вправе задать
+ * адрес словом); пустой строится из заголовка.
+ * @param {string} raw
+ * @param {string} title
+ * @returns {string}
+ */
+export function guideSlug(raw, title) {
+  const given = String(raw ?? '').toLowerCase().trim();
+  if (given) return given.slice(0, 80);
+  const built = String(title ?? '').toLowerCase()
+    .replace(/[^a-z0-9а-яё]/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return built.slice(0, 80).replace(/^-+|-+$/g, '');
+}
+
+/** Те же фразы, что поднимает триггер `forum_guide_author_guard`. */
+export const GUIDE_BODY_SHORT = 'Гайд короче двухсот символов — это заметка, а не гайд';
+export const GUIDE_BODY_LONG = 'Гайд длиннее двадцати тысяч символов — разбей его на два';
+export const GUIDE_DAILY_LIMIT = 'Сегодня ты уже опубликовал два гайда — больше двух в сутки';
+
+/**
+ * Единственная проверка тела гайда, которую знает форма.
+ *
+ * Слова написаны буквами и повторяют отказы триггера дословно: человек
+ * должен получить одну и ту же фразу и в черновом режиме, и на живой базе,
+ * а числа при этом стоят в обоих местах отдельно — их сходство сторожит
+ * тест, а не текст сообщения.
+ *
+ * @param {string} body HTML из редактора
+ * @returns {string} пустая строка — всё в порядке
+ */
+export function guideBodyProblem(body) {
+  const len = guideText(body).length;
+  if (len < L.guideBodyMin) return GUIDE_BODY_SHORT;
+  if (len > L.guideBodyMax) return GUIDE_BODY_LONG;
+  return '';
+}

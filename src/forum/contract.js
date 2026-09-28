@@ -454,7 +454,7 @@
  * @property {(tournamentId: string, winnerId: string|null, notes?: string) => Promise<void>} [addTournamentRound]
  * @property {() => Promise<ForumGuide[]>} [listGuides]
  * @property {(slug: string) => Promise<ForumGuide|null>} [getGuide]
- * @property {(draft: {slug: string, title: string, category?: string, body: string}) => Promise<ForumGuide>} [createGuide]
+ * @property {(draft: {slug?: string, title: string, category?: string, body: string}) => Promise<ForumGuide>} [createGuide]  Пустой slug — адрес строит база из заголовка.
  * @property {(id: string, patch: {title?: string, category?: string, body?: string, status?: string}) => Promise<ForumGuide>} [updateGuide]
  * @property {(id: string) => Promise<void>} [deleteGuide]
  * @property {(id: string, status: 'none'|'verified'|'outdated', note?: string) => Promise<void>} [reviewGuide]  Ставит отметку модерации; для игрока — отказ.
@@ -512,6 +512,11 @@
  * @property {string} reviewNote  Что именно поправили или почему гайд устарел.
  * @property {Date|null} reviewedAt
  * @property {ForumGuideSignal[]} signals  Открытые сигналы об устаревании: свои, а модерации — все.
+ * @property {{id: string, url: string}[]} attachments  Скриншоты гайда — те же
+ *                                    вложения форума, что у тем и ответов
+ *                                    (target_type 'guide'). Их нет в теле:
+ *                                    ссылка на файл живёт отдельной строкой,
+ *                                    и удаление гайда не трогает картинку.
  */
 
 /**

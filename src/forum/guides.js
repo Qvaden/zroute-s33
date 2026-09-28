@@ -2,12 +2,16 @@
  * ГАЙДЫ (wiki) — поведение.
  *
  * Состояние в одном объекте, разметку возвращает строкой pages/guides.js.
- * Живое поведение: фильтр по категориям, создание, удаление.
+ * Живое поведение: фильтр по категориям, создание, удаление, картинки и поиск
+ * по справочнику, который лежит на этой же вкладке.
  */
 import { forum } from './index.js';
 import { renderGuides } from '../pages/guides.js';
-import { sanitizeHtml, textOf } from './format.js';
+import { sanitizeHtml } from './format.js';
+import { guideBodyProblem } from './rules.js';
+import { attachImage } from './profile.js';
 import { editorFor, applyFormat, wireRichEditor } from './editor.js';
+import { CONFIG } from '../../config.js';
 
 const state = {
   me: null,
@@ -17,6 +21,17 @@ const state = {
   requestsNote: null,
   category: 'all',
   query: '',
+  /** Только свои гайды: кнопка «Мои» рядом с категориями. */
+  mine: false,
+  /**
+   * Запрос поиска по справочнику. Состоит не здесь, а в адресе страницы:
+   * на него смотрит поле, перерисовывающее только свой контейнер, и полная
+   * перерисовка вкладки обязана восстановить те же результаты, а не молча
+   * вернуть список разделов.
+   */
+  hbQuery: '',
+  /** Видят ли записи другие люди: в черновом режиме грузить картинки некуда. */
+  shared: false,
   selected: null,
   composing: false,
   staleOpen: false,
@@ -25,6 +40,82 @@ const state = {
 
 let host = null;
 let wired = false;
+
+/*
+  Картинки выбранной формы. Живут вне состояния и вне разметки: ссылка на Blob
+  есть только в памяти браузера, а в строку она превратиться не может.
+  Превью дорисовывается после каждой перерисовки, иначе выбранное исчезает
+  при клике на категорию.
+*/
+const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;
+let pendingShots = [];
+
+function clearShots() {
+  for (const item of pendingShots) URL.revokeObjectURL(item.preview);
+  pendingShots = [];
+}
+
+function paintShots() {
+  const list = host?.querySelector('[data-attach-list="new"]');
+  if (!list) return;
+  list.innerHTML = pendingShots
+    .map((f, i) => `<div class="forum-attach__item">
+      <img src="${f.preview}" alt="">
+      <button type="button" class="forum-attach__drop" data-attach-drop="${i}" title="Убрать">✕</button>
+    </div>`)
+    .join('');
+}
+
+function shotError(message) {
+  const box = host?.querySelector('[data-attach-error="new"]');
+  if (!box) return;
+  box.textContent = message;
+  box.hidden = !message;
+}
+
+/** Выбранные файлы превью: тот же предел, что у поста форума, и те же слова о нём. */
+function takeShots(files) {
+  const room = MAX_SHOTS - pendingShots.length;
+  if (room <= 0) {
+    shotError(`К гайду можно приложить не больше ${MAX_SHOTS} картинок`);
+    return;
+  }
+  const taken = [...files].slice(0, room);
+  for (const file of taken) {
+    if (!String(file.type).startsWith('image/')) {
+      shotError(`«${file.name}» не картинка`);
+      continue;
+    }
+    pendingShots.push({ file, preview: URL.createObjectURL(file) });
+  }
+  if (taken.length < files.length) {
+    shotError(`Взято ${pendingShots.length}: к гайду можно приложить не больше ${MAX_SHOTS} картинок`);
+  } else {
+    shotError('');
+  }
+  paintShots();
+}
+
+/**
+ * Загрузить выбранное к уже созданному гайду.
+ *
+ * Неудача одной картинки не отменяет публикацию: текст уже написан и виден
+ * другим, и терять его из-за третьего скриншота нельзя.
+ */
+async function uploadShots(targetId, onProgress) {
+  if (!pendingShots.length) return '';
+  const failed = [];
+  for (let i = 0; i < pendingShots.length; i++) {
+    onProgress?.(i + 1, pendingShots.length);
+    try {
+      await attachImage('guide', targetId, pendingShots[i].file);
+    } catch (err) {
+      failed.push(String(err?.message ?? err));
+    }
+  }
+  clearShots();
+  return failed.length ? `Не загрузились картинки: ${failed[0]}` : '';
+}
 
 /*
   Перерисовка по клику на раздел или по букве в поиске пересоздаёт весь блок.
@@ -60,6 +151,13 @@ function keptKey(el) {
 
 function paint() {
   if (!host) return;
+  /*
+    Запрос поиска по справочнику живёт в адресе, поэтому берётся оттуда, а не
+    из состояния: поле печатает само через replaceState, и любая перерисовка
+    вкладки вернула бы список разделов вместо найденного.
+  */
+  state.hbQuery = new URLSearchParams(location.hash.split('?')[1] || '').get('q') || '';
+
   const prev = [];
   for (const sel of KEPT_FIELDS) {
     for (const el of host.querySelectorAll(sel)) {
@@ -84,9 +182,11 @@ function paint() {
       try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {}
     }
   }
+  paintShots();
 }
 
 async function load() {
+  state.shared = Boolean(forum.capabilities?.isShared);
   try {
     state.me = await forum.currentUser();
   } catch { state.me = null; }
@@ -208,6 +308,18 @@ function wire() {
     paint();
   });
 
+  /*
+    Файлы приходят событием change, а не click: поле выбора картинки отдаёт их
+    только так. Поле очищается сразу — иначе второй выбор тех же файлов не дал
+    бы события, и человек решил бы, что кнопка сломалась.
+  */
+  document.addEventListener('change', (e) => {
+    const input = e.target.closest?.('[data-attach-input]');
+    if (!input || !host?.contains(input)) return;
+    takeShots(input.files ?? []);
+    input.value = '';
+  });
+
   document.addEventListener('click', async (e) => {
     if (!host || !host.contains(e.target)) return;
     const t = e.target;
@@ -239,9 +351,33 @@ function wire() {
       return;
     }
 
+    if (t.closest('[data-guide-mine]')) {
+      state.mine = !state.mine;
+      paint();
+      return;
+    }
+
     if (t.closest('[data-guide-cancel]')) {
       state.composing = false;
+      /*
+        Отмена формы отпускает выбранные картинки: иначе они висели бы в памяти
+        до перезагрузки страницы, хотя человека, который их выбирал, на этой
+        форме уже нет.
+      */
+      clearShots();
       paint();
+      return;
+    }
+
+    const drop = t.closest('[data-attach-drop]');
+    if (drop) {
+      const i = Number(drop.dataset.attachDrop);
+      if (pendingShots[i]) {
+        URL.revokeObjectURL(pendingShots[i].preview);
+        pendingShots.splice(i, 1);
+        shotError('');
+        paintShots();
+      }
       return;
     }
 
@@ -344,43 +480,54 @@ function wire() {
     e.preventDefault();
     const err = form.querySelector('[data-guide-error]');
     if (err) err.hidden = true;
-    const slug = String(form.elements.slug.value || '').toLowerCase().trim();
-    const title = String(form.elements.title.value || '').trim();
-    if (slug && !/^[a-z0-9а-яё-]{2,80}$/.test(slug)) {
-      if (err) { err.textContent = 'Slug: только буквы, цифры и дефис'; err.hidden = false; }
-      return;
-    }
-    if (title.length < 2) {
-      if (err) { err.textContent = 'Заголовок слишком короткий'; err.hidden = false; }
-      return;
-    }
+    const fail = (message) => {
+      if (err) { err.textContent = message; err.hidden = false; }
+    };
+
     /*
-      Тело — HTML из редактора, как в форуме: на хранение уходит разметка,
-      а показывает её postBody через тот же белый список. Пустой редактор
-      браузер оставляет с служебными тегами, поэтому проверяем видимый текст.
+      Проверяем в том же порядке, в котором отказывает база: сначала тело
+      (trigger forum_guide_author_guard идёт раньше по алфавиту), потом
+      заголовок (forum_guide_before). Форма, которая ругается в другом порядке,
+      показала бы одну причину там, где человек услышал бы другую.
+
+      Slug в форме больше не спрашивается: адрес строит база из заголовка,
+      и два одинаково названных гайда получают «-2», а не ошибку.
     */
     const editor = form.querySelector('[data-editor]');
     const body = sanitizeHtml(editor?.innerHTML ?? '');
-    if (textOf(body).length < 10) {
-      if (err) { err.textContent = 'Текст гайда слишком короткий'; err.hidden = false; }
-      return;
-    }
+    const problem = guideBodyProblem(body);
+    if (problem) return fail(problem);
+
+    const title = String(form.elements.title.value || '').trim();
+    if (title.length < 2) return fail('Заголовок гайда короче двух символов');
+
     const btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
     try {
       const created = await forum.createGuide({
-        slug,
         title,
         category: String(form.elements.category?.value ?? 'strategy'),
         body,
       });
+      /*
+        Картинки уходят после создания: вложение ссылается на запись, значит
+        запись должна существовать. Неудача загрузки не отменяет гайд — он уже
+        опубликован и виден другим.
+      */
+      const shotFail = state.shared
+        ? await uploadShots(created.id, (i, n) => {
+          if (btn) btn.textContent = `Картинка ${i}/${n}…`;
+        })
+        : '';
+      if (!state.shared) clearShots();
       state.composing = false;
       state.guides = await forum.listGuides();
       state.selected = created;
       paint();
+      if (shotFail) showError('[data-guide-error]', shotFail);
     } catch (ex) {
-      if (err) { err.textContent = String(ex?.message ?? ex); err.hidden = false; }
-      if (btn) btn.disabled = false;
+      fail(String(ex?.message ?? ex));
+      if (btn) { btn.disabled = false; btn.textContent = 'Опубликовать'; }
     }
   });
 }
@@ -409,4 +556,7 @@ export function unmountGuides() {
   state.composing = false;
   state.staleOpen = false;
   state.query = '';
+  state.mine = false;
+  // Превью выбранных файлов живут в памяти браузера — при уходе их отпускаем.
+  clearShots();
 }

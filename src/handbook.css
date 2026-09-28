@@ -89,20 +89,19 @@
 .hb-page > .panel__head .back:hover { text-decoration: underline; }
 .hb-page > .panel__head code { font-size: 12px; opacity: .75; }
 
-/* ── Мостик со страницы «Гайды» ──────────────────────────────────────────── */
-.guide-official { margin-top: 22px; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); padding-top: 14px; }
-.guide-official h2 { font-size: 17px; margin: 4px 0 0; }
-.guide-official__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 0; }
-.guide-official__hint { font-size: 12.5px; }
-.guide-official__cats { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; }
-.guide-official__cats li { display: flex; align-items: baseline; gap: 6px; font-size: 13.5px; }
-.guide-official__cats a { color: var(--accent); text-decoration: none; }
-.guide-official__cats a:hover { text-decoration: underline; }
-.guide-official__cats .muted { font-size: 11.5px; }
+/* ── Справочник внутри вкладки «Гайды» ───────────────────────────────────── */
+/*
+  Отдельной вкладки у справочника больше нет: поиск по словам и список
+  разделов живут под авторскими гайдами, в одной полосе с ними. Разделитель
+  сверху и нужен, чтобы было видно где кончаются чужие советы и начинается
+  текст игры.
+*/
+.guide-handbook { margin-top: 22px; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); padding-top: 14px; }
+.guide-handbook h2 { font-size: 17px; margin: 4px 0 0; }
+.guide-handbook .hb-search { max-width: 560px; }
 
 /* ── Адаптив: плитка на телефоне в одну колонку ──────────────────────────── */
 @media (max-width: 520px) {
   .hb-grid { grid-template-columns: 1fr; }
   .hb-siblings ul { grid-template-columns: 1fr; }
-  .guide-official__cats { grid-template-columns: 1fr; }
 }

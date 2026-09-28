@@ -18,11 +18,19 @@
   на каждый нажатый знак назад не ходят, и история из двадцати состояний
   одного слова была бы вредна.
 */
-import { renderResults, renderSections } from '../pages/handbook.js?v=70';
+import { renderResults, renderSections } from '../pages/handbook.js?v=71';
 
-/** Адрес справочника с текущим запросом — ровно то, что кинут в чат. */
+/**
+ * Адрес с текущим запросом — ровно то, что кинут в чат.
+ *
+ * Путь берётся из теперешнего адреса, а не пишется заново: поиск по
+ * справочнику живёт теперь внутри вкладки «Гайды», и жёсткий «#/handbook»
+ * уводил бы человека на другую страницу прямо во время набора буквы.
+ */
 function writeQuery(query) {
-  const hash = query.trim() ? `#/handbook?q=${encodeURIComponent(query.trim())}` : '#/handbook';
+  const path = location.hash.split('?')[0] || '#/guides';
+  const q = query.trim();
+  const hash = q ? `${path}?q=${encodeURIComponent(q)}` : path;
   try {
     history.replaceState(null, '', hash);
   } catch (_) {
@@ -33,7 +41,7 @@ function writeQuery(query) {
 
 /** Перерисовка только контейнера: с результатами или с разделами. */
 function refresh(input) {
-  const box = input.closest('.hb-page')?.querySelector('[data-hb-results]')
+  const box = input.closest('[data-hb-wrap]')?.querySelector('[data-hb-results]')
     || document.querySelector('[data-hb-results]');
   if (!box) return;
   const query = input.value;

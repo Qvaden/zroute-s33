@@ -5163,7 +5163,12 @@ console.log('\nU. Гайды: отметка и сигнал');
   const adapterStatuses = (localSrc.match(/\['none', 'verified', 'outdated'\]/)?.[0] ?? '')
     .match(/'[a-z]+'/g)?.map((x) => x.replace(/'/g, '')) ?? [];
   const labelSrc = pageSrc.match(/const REVIEW_LABEL = \{([^}]*)\}/)?.[1] ?? '';
-  const pageStatuses = ['none', ...(labelSrc.match(/(\w+):/g) || []).map((x) => x.slice(0, -1))];
+  /*
+    «Не проверен» — не пустое место, а отдельная надпись: гайд выходит сразу, и
+    без неё совет участника выглядел бы прочитанным модерацией. Поэтому ключей в
+    подсказке ровно три, и none среди них не «дополнение», а первое состояние.
+  */
+  const pageStatuses = (labelSrc.match(/(\w+):/g) || []).map((x) => x.slice(0, -1));
   equal('отметка принимает ровно три значения — и в базе, и в коде',
     [sqlStatuses.join('/'), adapterStatuses.join('/'), pageStatuses.join('/')].join(' | '),
     'none/verified/outdated | none/verified/outdated | none/verified/outdated');
@@ -7587,7 +7592,7 @@ console.log('\nAC. Заявки на гайды');
 
   /* ── Экран ── */
   check('блок стоит под списком гайдов, а не над ним',
-    /<div class="guide-list-wrap">\$\{list\}<\/div>\s*\$\{renderHandbookTeaser\(\)\}\s*\$\{guideRequestsBlock\(s\)\}/.test(pagesSrc));
+    /<div class="guide-list-wrap">\$\{list\}<\/div>\s*\$\{handbookBlock\(s\)\}\s*\$\{guideRequestsBlock\(s\)\}/.test(pagesSrc));
   check('гостю форму не показывают, а открытые заявки показывают',
     pagesSrc.includes('const canAsk = Boolean(s.me) && !s.me.banned && !isMuted(s.me);')
       && pagesSrc.includes('${canAsk ? requestForm(L) :')
@@ -9191,42 +9196,69 @@ console.log('\nAJ. Справочник официальных гайдов иг
   check('текст перенесён без сокращений',
     HANDBOOK.reduce((s, g) => s + g.blocks.reduce((x, b) => x + (b.text || '').length, 0), 0) > 50000);
 
-  /* Раздел подключён к сайту, а не просто лежит рядом. */
-  check('маршрут и пункт меню зарегистрированы',
-    /\{ id: 'handbook', label: 'Справочник игры' \}/.test(mainSrc));
+  /*
+    Раздел подключён к сайту, а не просто лежит рядом. Своей вкладки у него
+    больше нет: справочник живёт внутри «Гайдов», поэтому проверяем маршрут,
+    меню и блок на странице гайдов.
+  */
+  check('маршрут остался, а пункт меню — нет: вкладка одна',
+    /\{ id: 'handbook', label: 'Справочник игры', hidden: true, navAs: 'guides' \}/.test(mainSrc)
+      && /const shown = ROUTES\.filter\(\(r\) => !r\.hidden\);/.test(mainSrc));
+  check('открытый справочник подсвечивает вкладку «Гайды»',
+    /const navId = \(r\) => r\.navAs \|\| r\.id;/.test(mainSrc)
+      && /renderNav\(route\.navAs \|\| route\.id\)/.test(mainSrc));
   check('справочник открывается до ответа хранилища',
     /id === 'updates' \|\| id === 'handbook' \|\| \(id === 'user' && param\)/.test(mainSrc));
-  const branch = /\} else if \(route\.id === 'handbook'\) \{([\s\S]*?)path = param/.exec(mainSrc);
+  const branch = /\} else if \(route\.id === 'handbook'\) \{([\s\S]*?)path = '\/handbook\/node'/.exec(mainSrc);
   check('ветка маршрута выгружает все живые разделы перед отрисовкой',
     branch && (branch[1].match(/unmount\w+\(\);/g) || []).length === 6);
+  /*
+    Старая ссылка из меню или из чата (#/handbook, в том числе с запросом) не
+    должна вести на половину страницы: узел по своему адресу открывается целиком,
+    а пустой адрес переезжает на вкладку вместе со словом поиска.
+  */
+  check('пустой адрес справочника переводит на вкладку гайдов',
+    branch && /if \(!param\) \{[\s\S]{0,120}location\.replace\(/.test(branch[1])
+      && branch[1].includes('#/guides${search'));
   check('стили справочника подключены к странице',
     /<link rel="stylesheet" href="\.\/src\/handbook\.css/.test(indexSrc));
   check('стили справочника попали в офлайн-копию',
     swSrc.includes("'./src/handbook.css'"));
   check('классы, которые рисует страница, описаны в её stylesheet',
-    ['hb-page', 'hb-tile', 'hb-fig', 'hb-crumbs', 'hb-search', 'hb-hits', 'guide-official']
+    ['hb-page', 'hb-tile', 'hb-fig', 'hb-crumbs', 'hb-search', 'hb-hits', 'guide-handbook']
       .every((cls) => cssSrc.includes(`.${cls}`)));
 
   /* Поиск: поле, отражение запроса в адресе и клавиши. */
   check('модуль поиска слушает ввод и клавиши',
     /addEventListener\('input'/.test(controlsSrc) && /addEventListener\('keydown'/.test(controlsSrc));
+  /*
+    Путь адреса берётся из текущего, а не пишется заново: жёсткий «#/handbook»
+    уводил бы человека на другую вкладку прямо во время набора буквы.
+  */
   check('запрос пишется в адрес, чтобы ссылку можно было скинуть в чат',
-    /replaceState/.test(controlsSrc) && /#\/handbook\?q=/.test(controlsSrc));
+    /replaceState/.test(controlsSrc)
+      && controlsSrc.includes("location.hash.split('?')[0]")
+      && /\?q=\$\{encodeURIComponent\(q\)\}/.test(controlsSrc)
+      && !/#\/handbook\?q=/.test(controlsSrc));
   check('Escape очищает поле', /Escape/.test(controlsSrc));
   check('модуль поиска подключён в main.js',
     /import '\.\/ui\/handbook-controls\.js/.test(mainSrc));
 
-  /* Разметка страниц. */
-  const overview = hb.renderHandbook({});
-  check('на обзорной странице есть поле поиска', /data-hb-query/.test(overview));
-  equal('обзор показывает восемь разделов', (overview.match(/class="hb-section"/g) || []).length, 8);
+  /* Разметка: поле с разделами — часть вкладки «Гайды», а не отдельная страница. */
+  const sections = hb.renderSections();
+  check('поле поиска встроено во вкладку гайдов',
+    /renderHandbookSearch\(s\.hbQuery \?\? ''\)/.test(guidesPageSrc)
+      && /data-hb-query/.test(hb.renderHandbookSearch(''))
+      && /class="guide-handbook"/.test(guidesPageSrc));
+  equal('под полем видно восемь разделов',
+    (sections.match(/class="hb-section"/g) || []).length, 8);
   equal('обзор показывает 22 плитки первого уровня',
-    (overview.match(/class="hb-tile"/g) || []).length, 22);
-  const hrefs = [...overview.matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+    (sections.match(/class="hb-tile"/g) || []).length, 22);
+  const hrefs = [...sections.matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   check('каждая плитка ведёт в существующий узел', hrefs.length > 0 && hrefs.every((id) => byId.has(id)),
     hrefs.filter((id) => !byId.has(id)).join(', '));
   check('ссылка с запросом открывает список найденного',
-    /hb-hits/.test(hb.renderHandbook({ query: 'броня' })));
+    /hb-hits/.test(hb.renderHandbookSearch('броня')));
 
   const detail = hb.renderHandbook({ guideId: 'mythic_gear_create' });
   check('гайд показывает картинки лениво и с размерами',
@@ -9235,13 +9267,15 @@ console.log('\nAJ. Справочник официальных гайдов иг
     /hb-crumbs/.test(detail) && /aria-current="page"/.test(detail) && /hb-siblings/.test(detail));
   check('битая ссылка не роняет страницу, а объясняет',
     /Такого гайда нет/.test(hb.renderHandbook({ guideId: '%zz' })));
+  check('со страницы узла можно вернуться к гайдам',
+    /href="#\/guides"/.test(hb.renderHandbook({ guideId: '%zz' }))
+      && /href="#\/guides"/.test(detail));
 
-  /* Мостик со страницы «Гайды». */
-  check('со страницы гайдов есть вход в справочник',
-    /renderHandbookTeaser/.test(guidesPageSrc) && /guide-official/.test(hb.renderHandbookTeaser()));
-  const teaserIds = [...hb.renderHandbookTeaser().matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => m[1]);
-  check('каждая плашка мостика ведёт в существующий раздел',
-    teaserIds.length === 8 && teaserIds.every((id) => byId.has(id)));
+  /* Мостик со страницы «Гайды» больше не мостик: справочник стоит на той же вкладке. */
+  check('блок справочника стоит под списком гайдов и перед заявками',
+    /class="guide-handbook"/.test(guidesPageSrc)
+      && /hb-search/.test(hb.renderHandbookSearch(''))
+      && !/renderHandbookTeaser/.test(guidesPageSrc));
 
   /* Смысл поиска: два слова — оба обязаны встретиться, «ё» равно «е». */
   equal('два слова ищутся как «и», а не как «или»',
@@ -9256,6 +9290,170 @@ console.log('\nAJ. Справочник официальных гайдов иг
   check('найденное слово подсвечено', /<mark>/.test(hb.renderResults('броня')));
   check('без запроса показаны разделы, а не «ничего не найдено»',
     /hb-section/.test(hb.resultsSlot('')) && !/hb-none/.test(hb.resultsSlot('')));
+}
+
+console.log('\nAK. Гайды пишут участники');
+{
+  /*
+    Право писать гайд — не одна строка в политике: к нему идут лимиты, страх
+    чужой подписи, адрес из заголовка, скриншоты и отказы, которые в черновом
+    режиме обязаны прозвучать теми же словами, что и база. Проверяется цепочка
+    целиком, потому что расхождение в ней невидимо: форма примет текст, база
+    отвергнет его, и человек потеряет то, что набирал.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const L = CONFIG.forum.limits;
+  const sql = await readFile('supabase/20260929-player-guides.sql', 'utf8');
+  const { guideBodyProblem, GUIDE_BODY_SHORT, GUIDE_BODY_LONG, GUIDE_DAILY_LIMIT } =
+    await import('../src/forum/rules.js');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const pageSrc = await readFile('src/pages/guides.js', 'utf8');
+  const behavSrc = await readFile('src/forum/guides.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+
+  /* ── Право ── */
+  check('гайд вносит любой, кто может писать на форум, а не только лидер',
+    /create policy forum_guides_insert on public\.forum_guides\s+for insert with check \(public\.forum_can_write\(\)\)/.test(sql));
+  check('прежнего требования лидерства в политике не осталось',
+    !/forum_guides_insert[\s\S]{0,200}forum_is_leader/.test(sql));
+  check('почему у игрока нет подписи модерации, записано комментарием в базе',
+    /comment on policy forum_guides_insert[\s\S]{0,220}отметку модерации при этом не получает/.test(sql));
+  check('лимиты и страх действуют только для не-модерации',
+    /if not public\.forum_is_staff\(\) then/.test(sql)
+      && localSrc.includes('const staff = isStaff(me);')
+      && /if \(!staff\) \{\s*\n\s*const midnight/.test(localSrc));
+  check('вставить чужую подпись нельзя: колонки обзора под страхом на самой вставке',
+    /if new\.review_status is distinct from 'none'[\s\S]{0,260}raise exception 'Отметку «проверен \/ устарел» ставит модерация'/.test(sql));
+  check('адрес строит база, а занятый снимает суффиксом до 74 знаков',
+    /if new\.slug = '' then[\s\S]{0,200}regexp_replace\(lower\(new\.title\)/.test(sql)
+      && /while exists \([\s\S]{0,240}\) loop[\s\S]{0,240}left\(v_base, 74\) \|\| '-' \|\| v_n::text/.test(sql));
+  check('повторный прогон файла приводит схему к одному виду: триггер пересоздаётся',
+    /drop trigger if exists forum_guide_before on public\.forum_guides;\s*create trigger forum_guide_before/.test(sql));
+
+  /* ── Числа: одни в config.js, в базе и в форме ── */
+  check('границы тела гайда называет config.js, а база их исполняет буквально',
+    sql.includes(`char_length(v_text) < ${L.guideBodyMin}`)
+      && sql.includes(`char_length(v_text) > ${L.guideBodyMax}`)
+      && new RegExp(`\\) >= ${L.guideDailyMax} then`).test(sql));
+  check('ту же мерку держит форма: поле обещает числа из config.js',
+    pageSrc.includes('data-limit="${L.guideBodyMax}"')
+      && pageSrc.includes('${L.guideBodyMin}–${L.guideBodyMax} символов видимого текста')
+      && pageSrc.includes('Не больше ${L.guideDailyMax} гайдов в сутки'));
+  check('длину меряют по тексту без разметки — и база, и правила',
+    sql.includes("'<[^>]*>', ' ', 'g'")
+      && localSrc.includes('guideBodyProblem(body)')
+      && guideBodyProblem('<p>коротко</p>') === GUIDE_BODY_SHORT);
+
+  /* ── Отказы звучат одними словами в трёх местах ── */
+  const raised = new Set([...sql.matchAll(/raise exception '([^']*)'/g)].map((m) => m[1]));
+  check('база поднимает ровно те фразы, которые знают правила',
+    [GUIDE_BODY_SHORT, GUIDE_BODY_LONG, GUIDE_DAILY_LIMIT].every((t) => raised.has(t)),
+    [...raised].join(' / '));
+
+  /* ── Черновой режим: те же развилки и те же слова, проверенные делом ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  await local.signUp('Владелец');
+  await local.signUp('Автор');
+  await local.signUp('Автор2');
+
+  const said = async (fn) => {
+    try { await fn(); return ''; } catch (e) { return String(e?.message ?? e); }
+  };
+  const okBody = `<p>${'разбор'.repeat(Math.ceil(L.guideBodyMin / 6))}</p>`;
+
+  await local.signIn('Автор');
+  equal('короткое тело: черновой режим отказывает фразой базы',
+    await said(() => local.createGuide({ title: 'Заметка', body: '<p>пару слов</p>' })),
+    GUIDE_BODY_SHORT);
+  equal('длинное тело: та же фраза, что поднимает триггер',
+    await said(() => local.createGuide({ title: 'Энциклопедия', body: `<p>${'с'.repeat(L.guideBodyMax + 5)}</p>` })),
+    GUIDE_BODY_LONG);
+
+  const first = await local.createGuide({ title: 'Как ставить лагерь на холме', body: okBody });
+  check('адрес гайда строится из заголовка, а не выпрашивается у автора',
+    first.slug === 'как-ставить-лагерь-на-холме', first.slug);
+  equal('свежий гайд выходит без подписи модерации', first.reviewStatus, 'none');
+
+  await local.createGuide({ title: 'Как добывать серебро', body: okBody });
+  equal('третий гайд за сутки отказывает фразой базы',
+    await said(() => local.createGuide({ title: 'Третий сегодня', body: okBody })),
+    GUIDE_DAILY_LIMIT);
+
+  await local.signIn('Автор2');
+  const twin = await local.createGuide({ title: 'Как ставить лагерь на холме', body: okBody });
+  check('одинаковые заголовки не спорят за адрес: второй получает суффикс',
+    twin.slug === 'как-ставить-лагерь-на-холме-2', twin.slug);
+  equal('явно просивший занятый адрес получает отказ, а не суффикс',
+    await said(() => local.createGuide({ title: 'Чужое слово', slug: first.slug, body: okBody })),
+    'Такой slug уже занят');
+  const stamped = await local.createGuide({ title: 'Штамп не проходит', body: okBody, reviewStatus: 'verified' });
+  equal('присланный вместе с гайдом штамп модерации некуда положить', stamped.reviewStatus, 'none');
+  await local.signIn('Владелец');
+  check('модерация суточным лимитам не подчиняется: работа, а не привилегия',
+    (await local.createGuide({ title: 'Служебная запись модерации', body: '<p>коротко</p>' })).title
+      === 'Служебная запись модерации');
+
+  /* ── Скриншоты ── */
+  check('скриншот гайда — то же вложение форума: констрейнт получил третье значение',
+    /add constraint forum_attachments_target_type_check\s+check \(target_type in \('post', 'comment', 'guide'\)\)/.test(sql));
+  check('картинки гайда читают вторым запросом и не тормозят список',
+    supaSrc.includes('target_type=eq.guide') && /const \[sigs, shots\] = await Promise\.all/.test(supaSrc));
+  check('загрузка общая: attachImage вызывают с типом guide',
+    behavSrc.includes("attachImage('guide', targetId"));
+  check('поле с картинками видно только там, где их куда сохранить',
+    pageSrc.includes("${s.shared ? attachRow('new') : ''}")
+      && behavSrc.includes('state.shared = Boolean(forum.capabilities?.isShared)'));
+  check('картинки уходят после создания гайда: вложение ссылается на запись',
+    behavSrc.indexOf('await forum.createGuide(') < behavSrc.indexOf('await uploadShots(created.id'));
+  check('недогрузившаяся картинка не отменяет публикацию, а называется отказом',
+    behavSrc.includes('Не загрузились картинки: ') && /if \(shotFail\) showError\('\[data-guide-error\]'/.test(behavSrc));
+  check('выбранные картинки отпускают память при отмене и уходе со страницы',
+    /if \(t\.closest\('\[data-guide-cancel\]'\)\)[\s\S]{0,300}clearShots\(\)/.test(behavSrc)
+      && /export function unmountGuides\(\)[\s\S]{0,300}clearShots\(\)/.test(behavSrc));
+
+  /* ── Экран ── */
+  check('форму пишет любой вошедший без запрета — бан и тишина прячут её, а не обещают отказ',
+    pageSrc.includes('const canPublish = (me) => Boolean(me) && !me.banned && !isMuted(me);')
+      && pageSrc.includes('const canWrite = canPublish(s.me);')
+      && /canWrite && !s\.composing\s*\?\s*'<button[^>]*data-guide-new/.test(pageSrc));
+  check('гостю показывают вход, а не неработающую кнопку',
+    pageSrc.includes('guides-page__signin') && pageSrc.includes('Войдите</a> — и сможете добавить свой гайд'));
+  const composer = /function composeForm\(s\)[\s\S]*?\n\}/.exec(pageSrc)?.[0] ?? '';
+  check('в форме больше нет поля адреса',
+    composer.length > 200 && !/name="slug"/.test(composer)
+      && composer.includes('По заголовку страница получит адрес'));
+  check('форма ругается в том же порядке, что база: сначала тело, потом заголовок',
+    behavSrc.indexOf('guideBodyProblem(body)') < behavSrc.indexOf('Заголовок гайда короче двух символов'));
+  check('не проверенный гайд подписан явно — и в списке, и в шапке',
+    pageSrc.includes("none: 'Не проверен'") && /guide-badge--\$\{esc\(kind\)\}/.test(pageSrc)
+      && pageSrc.includes('guide-review--') && cssSrc.includes('.guide-badge--none')
+      && cssSrc.includes('.guide-review--none'));
+  check('«Мои гайды» — отдельная кнопка с состоянием, а не четвёртая категория',
+    /data-guide-mine aria-pressed=/.test(pageSrc)
+      && pageSrc.includes('.filter((g) => !s.mine || (s.me && g.authorId === s.me.id))')
+      && behavSrc.includes('state.mine = !state.mine;')
+      && cssSrc.includes('.guide-chip--mine'));
+
+  /* ── Документы ── */
+  check('миграция названа в базе, в документах форума и в порядке запуска',
+    sql.includes('── ПРАВИЛО ──') && docsSrc.includes('20260929-player-guides.sql')
+      && readmeSrc.includes('20260929-player-guides.sql'));
+  check('документ говорит, что без миграции до пуша нельзя, и называет её молчаливые отказы',
+    docsSrc.includes('**До пуша кода эта миграция обязательна**')
+      && readmeSrc.includes('До пуша кода эта миграция обязательна'));
+  check('документ называет, чего в гайдах игроков нет намеренно',
+    docsSrc.includes('## Гайд пишет любой игрок')
+      && docsSrc.includes('- **Очереди на публикацию.**')
+      && docsSrc.includes('- **Своей вкладки у справочника.**'));
 }
 
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);

@@ -1863,7 +1863,7 @@ export async function addTournamentRound(tournamentId, winnerId = null, notes = 
 
 /* ── Гайды (wiki) ─────────────────────────────────────────────────────────── */
 
-function guideOut(row, signals = []) {
+function guideOut(row, signals = [], attachments = []) {
   return {
     id: row.id,
     slug: row.slug,
@@ -1877,6 +1877,7 @@ function guideOut(row, signals = []) {
     reviewNote: row.review_note || '',
     reviewedAt: toDate(row.reviewed_at),
     signals,
+    attachments,
     createdAt: toDate(row.created_at) ?? new Date(),
     updatedAt: toDate(row.updated_at) ?? new Date(),
   };
@@ -1900,31 +1901,61 @@ function signalsFor(rows, guideId) {
     .map((r) => ({ note: r.note, createdAt: toDate(r.created_at) ?? new Date(), userId: r.user_id }));
 }
 
+/*
+  Скриншоты гайда лежат в той же таблице вложений, что картинки тем и ответов,
+  и связи с таблицей гайдов у них нет: target_id — просто uuid, а не внешний
+  ключ. Поэтому PostgREST не умеет вложить их в строку гайда, и мы тянем их
+  отдельным запросом на весь список. Тот же приём, что с сигналами об
+  устаревании: без колонки картинок страница обязана открываться, а не падать.
+*/
+async function guideShots(ids) {
+  const byGuide = new Map();
+  if (!ids.length) return byGuide;
+  const inList = ids.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+  const rows = await rest(
+    `/forum_attachments?select=id,url,target_id&target_type=eq.guide&target_id=in.(${inList})`,
+  ).catch(() => []);
+  (Array.isArray(rows) ? rows : []).forEach((r) => {
+    if (!byGuide.has(r.target_id)) byGuide.set(r.target_id, []);
+    byGuide.get(r.target_id).push({ id: r.id, url: r.url });
+  });
+  return byGuide;
+}
+
 export async function listGuides() {
-  const [rows, sigs] = await Promise.all([
-    rest('/forum_guides?select=*&status=eq.published&order=published_at.desc'),
-    guideSignals().catch(() => []),
-  ]);
+  const rows = await rest('/forum_guides?select=*&status=eq.published&order=published_at.desc');
   const list = Array.isArray(rows) ? rows : [];
-  return list.map((row) => guideOut(row, signalsFor(sigs, row.id)));
+  const ids = list.map((row) => row.id);
+  const [sigs, shots] = await Promise.all([
+    guideSignals().catch(() => []),
+    guideShots(ids),
+  ]);
+  return list.map((row) => guideOut(row, signalsFor(sigs, row.id), shots.get(row.id) ?? []));
 }
 
 export async function getGuide(slug) {
-  const [rows, sigs] = await Promise.all([
-    rest(`/forum_guides?select=*&slug=eq.${encodeURIComponent(slug)}&limit=1`),
-    guideSignals().catch(() => []),
-  ]);
+  const rows = await rest(`/forum_guides?select=*&slug=eq.${encodeURIComponent(slug)}&limit=1`);
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row) return null;
-  return guideOut(row, signalsFor(sigs, row.id));
+  const [sigs, shots] = await Promise.all([
+    guideSignals().catch(() => []),
+    guideShots([row.id]),
+  ]);
+  return guideOut(row, signalsFor(sigs, row.id), shots.get(row.id) ?? []);
 }
 
+/*
+  Slug не передаётся: адрес гайда строит база из заголовка и сама разбирается
+  с занятостью (шаг 4 в supabase/20260929-player-guides.sql). Пустая строка —
+  это не «гайд без адреса», а именно «построй адрес сам»: колонка not null, и
+  без неё вставку не принять.
+*/
 export async function createGuide(draft) {
   const rows = await rest('/forum_guides', {
     method: 'POST',
     prefer: 'return=representation',
     body: {
-      slug: String(draft.slug),
+      slug: String(draft.slug || ''),
       title: String(draft.title),
       category: String(draft.category || 'strategy'),
       body: String(draft.body),
