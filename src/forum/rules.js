@@ -232,6 +232,297 @@ export function updateKindLabel(id) {
   return kind ? kind.label : id;
 }
 
+/* ── Подсказка модерации: разбор вставленного «Что нового» ──────────────────
+ *
+ * РАЗДЕЛ НЕ ЧИТАЕТ ЧУЖИЕ САЙТЫ, И ЭТО НЕ ЛЕНЬ. Браузер не может открыть
+ * страницу Google Play из-за same-origin, а обещание «мы сами всё читаем»
+ * означает, что заметку пишет машина и никто не проверяет, прежде чем её
+ * прочитает весь форум. Поэтому автоматизирована ровно механическая половина
+ * работы: модератор приносит текст обновления сам (скопировал со страницы магазина — там же, где человек
+ * сам читает патч), а код разбирает его на поля.
+ *
+ * НИЧЕГО НЕ ДОДУМЫВАЕТСЯ. Поле, для которого в тексте нет опоры, остаётся
+ * пустым и попадает в `missing`: тип заметки выбирает человек, дату он
+ * ставит сам, если разработчик её не написал. Подсказка, которая угадывает,
+ * — это второй источник выдуманных изменений, а ровно их раздел и боится.
+ *
+ * Разбор ничего не сохраняет и никуда не ходит: получил строку, вернул
+ * набор полей. Поэтому он живёт здесь, рядом с правилами формы, и те же числа
+ * лимитов.
+ */
+
+/** Месяцы по-русски и по-английски — страницы магазинов бывают на двух. */
+const UPDATE_MONTHS = {
+  янв: 0, фев: 1, мар: 2, апр: 3, май: 4, мая: 4, июн: 5, июл: 6,
+  авг: 7, сен: 8, окт: 9, ноя: 10, дек: 11,
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7,
+  sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/*
+  Строки-подписи интерфейса магазина. Человек копирует страницу целиком, и
+  вместе с текстом патча в форму прилетает «Что нового», «Рейтинг»,
+  «Скриншоты» и «Показать всё». Это не содержательные строки, и заголовок
+  заметки по первой из них был бы всегда одним и тем же словом.
+*/
+const UPDATE_INTERFACE_LINE = /^(?:что нового|what'?s new|об этом приложении|описание|показать (?:все|всё)|подробнее|see more|read more|отзывы|оценки(?: и отзывы)?|рейтинг|скриншоты|версия|обновлено|размер|возраст|язык|издание|разработчик|дата выхода|скачать|установить|app ?store|google play)\s*[:\-—]?\s*$/i;
+
+/** Строка из одних украшений: буллеты, звёзды рейтинга, тире-разделители. */
+const UPDATE_DECORATION = /^[\s•·*\-–—=_….,!★☆]+$/;
+
+/*
+  Строка, в которой только адрес. Ссылка у заметки есть в отдельном поле, и
+  повторять её в содержании незачем. Опаснее другое: адрес из адресной строки
+  обычно приклеивается первой строкой вставки, и без этого фильтра он становился
+  заголовком каждой заметки — человек получал «https://play.google.com/...»
+  там, где должно быть написано, что изменилось.
+*/
+const UPDATE_URL_LINE = /^[»"«'`•·*\s]*https?:\/\/\S+?[,;:.\s]*$/i;
+
+/*
+  Строка-метка магазина: подпись и значение в одной строке — «Версия 2.14.0»,
+  «Обновлено 5 сент. 2026 г.», «Размер 128 МБ». Это не текст патча: версия и
+  дата у заметки есть отдельные поля, и печатать их ещё и в содержании —
+  значит умножать то, что может разойтись.
+
+  Разбор по формам, а не одна широкая регилка, потому что широкая съедает
+  настоящие строки: «Возраст игроков в чате пересмотрен» начинается с того же
+  слова, что служебная метка «Возраст 12+». Значит, после подписи обязано
+  стоять значение понятного вида — число, версия, дата, — и ничего больше.
+*/
+const UPDATE_META_PATTERNS = [
+  /^(?:версия|version|ver\.?)\s*[:\-—]?\s*v?\d+(?:\.\d+){1,3}\b\s*(?:\(\d+\))?\s*$/i,
+  /^(?:обновлено|опубликовано|вышло|updated|released|release date|дата выхода)\s*[:\-—]?\s*(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s+[a-zа-яё]{3,10}\.?\s+\d{4}\s*г?\.?)\s*$/i,
+  /^(?:размер|size)\s*[:\-—]?\s*[\d.,]+\s*(?:КБ|МБ|ГБ|KB|MB|GB)?\s*$/i,
+  /^(?:возраст|age)\s*[:\-—]?\s*\d{1,2}\s*\+?\s*$/i,
+  /^(?:язык|language)\s*[:\-—]?\s*[a-zа-яё\s]{1,20}$/i,
+];
+
+/** Служебная ли это строка страницы магазина, а не текст обновления. */
+function isStoreMetaLine(line) {
+  return UPDATE_META_PATTERNS.some((re) => re.test(line));
+}
+
+/** Номер версии: ищет явные упоминания, а не первую точку в тексте. */
+const UPDATE_VERSION_EXPLICIT = /(?:верси(?:и|я|ю)|version|ver\.?|обновление)\s*[vV]?\s*(\d+(?:\.\d+){1,3})/i;
+/** Строка, состоящая только из номера версии: так оформляют заголовок патча. */
+const UPDATE_VERSION_LINE = /^v?\s*(\d+(?:\.\d+){1,3})\b[)\s\-(]*.{0,40}$/;
+
+const UPDATE_DATE_LABEL = /(?:обновлено|опубликовано|дата выхода|вышло|updated|released)\s*:?\s*(\d{1,2})\s+([a-zа-яё]{3,10})\.?\s*(\d{4})/i;
+const UPDATE_DATE_ISO = /(?:обновлено|опубликовано|вышло|updated|released)\s*:?\s*(\d{4})-(\d{2})-(\d{2})/i;
+
+/** Тип по словам разработчика. Сначала проблема: её нельзя спутать с патчем. */
+const UPDATE_ISSUE_WORDS = /(известн\w+ проблем|не работает|возникает|возникло|сбои|баг[а-я]*|принос\w+ извинен|работаем над (?:исправл|устран)|временно (?:отключ|недоступ))/i;
+const UPDATE_NOTICE_WORDS = /(скоро|в ближайш\w+ обновлени|планируем|ожидает|появится в|мы готовим|следующем обновлении)/i;
+
+/**
+ * Откуда текст — только по домену ссылки. Пустая строка значит, что источник
+ * модератор обязан назвать сам: угадать его по тексту патча нельзя.
+ * @param {string} link
+ */
+export function updateSourceFromLink(link) {
+  const s = String(link ?? '').trim().toLowerCase();
+  if (/^https:\/\/play\.google\.[a-z.]{2,}/.test(s)) return 'Google Play';
+  if (/^https:\/\/(www\.|apps\.)?apple\.[a-z.]{2,}/.test(s) || /^https:\/\/apps\.apple\.com/.test(s)) return 'App Store';
+  return '';
+}
+
+/** https-ссылка без пробелов — ровно та, которую примет и база, и карточка. */
+function cleanUpdateUrl(raw) {
+  const s = String(raw ?? '').trim();
+  return /^https:\/\/\S+$/i.test(s) ? s : '';
+}
+
+/**
+ * Ссылка на страницу магазина, прилиплившая к вставленному тексту.
+ *
+ * Страницу копиют целиком, и адрес иногда приезжает вместе с ним. Берём только
+ * тот, что ведёт в Google Play или App Store: первая попавшаяся ссылка из
+ * чужого текста не имеет права становиться первоисточником заметки.
+ */
+export function updateStoreLinkFromText(text) {
+  for (const match of String(text ?? '').matchAll(/https:\/\/\S+/g)) {
+    const url = cleanUpdateUrl(match[0].replace(/[),.;!»"'`]+$/, ''));
+    if (url && updateSourceFromLink(url)) return url;
+  }
+  return '';
+}
+
+/** Дата из текста в формате поля datetime-local; пустая строка — даты нет. */
+function parseUpdateDate(text, now) {
+  const iso = text.match(UPDATE_DATE_ISO);
+  if (iso) {
+    const [y, m, d] = [Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])];
+    return formatDateField(y, m, d, now);
+  }
+  const m = text.match(UPDATE_DATE_LABEL);
+  if (!m) return '';
+  const month = UPDATE_MONTHS[m[2].slice(0, 3).toLowerCase()];
+  if (month === undefined) return '';
+  return formatDateField(Number(m[3]), month, Number(m[1]), now);
+}
+
+/*
+  Полдень, а не полночь: у магазина дата без часов, и заметка о вчерашнем
+  патче не должна оказываться «из будущего» из-за разницы часов. Границы те
+  же, что у формы и у базы, — подсказка не имеет права предложить то, что
+  потом отвергнет publish.
+*/
+function formatDateField(year, month, day, now) {
+  if (!(year >= 2000) || !(month >= 0 && month <= 11) || !(day >= 1 && day <= 31)) return '';
+  const d = new Date(Date.UTC(year, month, day, 12, 0, 0));
+  if (Number.isNaN(d.getTime())) return '';
+  const reference = now instanceof Date ? now : new Date(now ?? Date.now());
+  if (d.getTime() > reference.getTime() + L.updateFutureGraceMinutes * 60 * 1000) return '';
+  if (year < L.updateSourceYearFloor) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${year}-${pad(month + 1)}-${pad(day)}T12:00`;
+}
+
+/** Обрезка по границе слова: подсказка не оставляет в заголовке полслова. */
+function cutWords(text, max) {
+  const s = String(text ?? '').trim();
+  if (s.length <= max) return s;
+  const head = s.slice(0, max);
+  const at = head.lastIndexOf(' ');
+  return (at > max * 0.6 ? head.slice(0, at) : head).trimEnd().replace(/[,;:.\s]+$/, '');
+}
+
+/**
+ * Разобрать вставленный текст обновления в поля заметки.
+ *
+ * Ни одно поле не заполняется тем, чего в тексте не было. Пустое значение
+ * означает «смотри сам», и оно же попадает в `missing` — форма показывает
+ * список по-русски, чтобы модератор не искал глазами, чего не хватает.
+ *
+ * @param {string} raw текст «Что нового» из магазина
+ * @param {string} link ссылка на страницу магазина (необязательная)
+ * @param {Date|number} now текущий момент — для проверки даты из будущего
+ * @returns {{title: string, summary: string, kind: string, sourceName: string,
+ *            sourceUrl: string, sourceAt: string, gameVersion: string,
+ *            missing: string[]}}
+ */
+export function parseUpdateSource(raw, link = '', now = Date.now()) {
+  const text = String(raw ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u00A0\u2007\u202F\uFEFF]/g, ' ');
+
+  const url = cleanUpdateUrl(link) || updateStoreLinkFromText(text);
+  const sourceName = updateSourceFromLink(url);
+  const sourceAt = parseUpdateDate(text, now);
+
+  const versionMatch = text.match(UPDATE_VERSION_EXPLICIT);
+  const gameVersion = versionMatch ? versionMatch[1].slice(0, L.updateVersionMax) : '';
+
+  /*
+    Мусор вырезается до разбора, а не после: «Версия» и «Обновлено» — строки
+    интерфейса магазина, и первая из них иначе стала бы заголовком каждой
+    второй заметки.
+  */
+  const lines = text
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .filter((line) => line
+      && !UPDATE_INTERFACE_LINE.test(line)
+      && !isStoreMetaLine(line)
+      && !UPDATE_URL_LINE.test(line)
+      && !UPDATE_DECORATION.test(line));
+
+  /*
+    Заголовок — первая настоящая строка: не номер версии (он встанет в своё
+    поле) и не маркер списка. Буллет в карточке смотрится мусором, а в
+    содержании он нужен: список правок читается построчно.
+  */
+  const firstLine = lines.find((line) => !UPDATE_VERSION_LINE.test(line)) || '';
+  const title = cutWords(
+    firstLine
+      .replace(/^[»"«'`•·*\s]+/, '')
+      .replace(/^(?:патч|обновление|update|версия)\s*\d+(?:\.\d+)*\s*[:\-—]\s*/i, '')
+      .replace(/[:;.\s]+$/, ''),
+    L.updateTitleMax,
+  );
+
+  /* Содержание — весь разобранный текст, построчно: карточка держит
+     pre-line, и список правок читается списком, а не абзацем. */
+  let summary = lines.join('\n').trim();
+  if (summary.length > L.updateSummaryMax) {
+    /*
+      Обрезка обязана оставить целую строку или целое слово: подсказка,
+      кончившая фразу на полуслове, выглядит так, будто она её и придумала.
+      Сначала пробуем границу строки, потом — слова, и только если в отрезке
+      нет ни того, ни другого, режем жёстко.
+    */
+    const head = summary.slice(0, L.updateSummaryMax);
+    const line = head.lastIndexOf('\n');
+    const word = head.lastIndexOf(' ');
+    const at = line > L.updateSummaryMax * 0.5 ? line : (word > L.updateSummaryMax * 0.6 ? word : head.length);
+    summary = head.slice(0, at).trimEnd();
+  }
+
+  const kind = UPDATE_ISSUE_WORDS.test(text)
+    ? 'issue'
+    : UPDATE_NOTICE_WORDS.test(text)
+      ? 'notice'
+      : lines.length >= 2
+        ? 'patch'
+        : '';
+
+  const fields = {
+    title: title.length >= L.updateTitleMin ? title : '',
+    summary: summary.length >= L.updateSummaryMin ? summary : '',
+    kind,
+    sourceName,
+    sourceUrl: url,
+    sourceAt,
+  };
+
+  return {
+    ...fields,
+    /* Номер версии полем не считается: он ищется в тексте, но его отсутствие
+       ни о чём не говорит — игра часто не называет его вовсе. */
+    gameVersion,
+    missing: Object.keys(UPDATE_FIELD_LABELS)
+      .filter((key) => !fields[key])
+      .map((key) => UPDATE_FIELD_LABELS[key]),
+  };
+}
+
+/**
+ * Подписи полей для одного и того же списка в двух местах: в отказе подсказки
+ * и в подсчёте, чего не хватает. Названия совпадают с подписями формы, чтобы
+ * человек искал глазами по форме, а не переводил смысл.
+ */
+const UPDATE_FIELD_LABELS = {
+  title: 'заголовок',
+  summary: 'что изменилось',
+  kind: 'тип заметки',
+  sourceName: 'название источника',
+  sourceUrl: 'ссылка на первоисточник',
+  sourceAt: 'дата у первоисточника',
+};
+
+/**
+ * Что подсказка смогла, а чего не придумала — одной строкой для формы.
+ *
+ * Про пустое поле сказано прямо: подсказка, которая молча оставила дату
+ * пустой, выглядит сломанной, а не честной. И названо именно «не нашёл в
+ * тексте», а не «вы забыли»: чего не написал разработчик, того код знать не
+ * может и придумывать не вправе.
+ */
+export function updateParseNotice(parsed) {
+  if (!parsed) return '';
+  const keys = Object.keys(UPDATE_FIELD_LABELS);
+  const filled = keys.filter((key) => parsed[key]).map((key) => UPDATE_FIELD_LABELS[key]);
+  const left = (parsed.missing || []).slice();
+  if (!filled.length) {
+    return 'В этом тексте я не нашёл ничего, что переносится в поля: заполняйте сами.';
+  }
+  const head = `Перенёс в форму: ${filled.join(', ')}.`;
+  return left.length
+    ? `${head} Не нашёл в тексте и оставил вам: ${left.join(', ')}.`
+    : `${head} Всё нужное было в тексте — проверьте и публикуйте.`;
+}
+
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id);
 
 /**

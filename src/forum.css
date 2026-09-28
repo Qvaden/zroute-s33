@@ -3007,6 +3007,25 @@
 .upd-field-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .upd-field-row .upd-field { flex: 1 1 180px; }
 
+/*
+  Подсказка модерации: вставленный текст обновления и результат его разбора.
+  Поле отделено от семи полей заметки, а не перемешано с ними: это не восьмое
+  содержимое, а сырьё, из которого восемь остальных полей наполняются.
+  Ответ подсказки стоит под кнопкой и не окрашен в цвет отказа — «без вас
+  остаются дата» не означает, что кто-то ошибся.
+*/
+.upd-paste textarea { min-height: 92px; }
+.upd-paste__actions { margin: 0; }
+.upd-paste__notice {
+  margin: 0;
+  padding: 7px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
 .upd-form__actions { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 
 .upd-error {

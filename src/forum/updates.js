@@ -11,6 +11,7 @@
 import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
 import { renderUpdates } from '../pages/updates.js';
+import { parseUpdateSource, updateParseNotice } from './rules.js';
 
 const state = {
   ready: false,
@@ -23,6 +24,8 @@ const state = {
   loading: true,
   error: '',
   composing: false,
+  /** Что подсказка сказала после последнего «Разобрать». */
+  notice: '',
 };
 
 let host = null;
@@ -30,6 +33,22 @@ let wired = false;
 /** Поколение монтирования — тот же приём, что у форума: поздний ответ базы не
  *  должен нарисовать этот список поверх другой страницы. */
 let mountToken = 0;
+
+/*
+  Поля формы одним списком, а не семью строками: разметка обязана называть
+  ровно эти `name=`, и расхождение между двумя файлами не видно глазу, зато
+  видно тесту.
+*/
+const DRAFT_FIELDS = ['kind', 'title', 'summary', 'sourceName', 'gameVersion', 'sourceUrl', 'sourceAt', 'paste'];
+
+/*
+  Поля, которые подсказка вправе заполнять: всё, кроме самого вставленного
+  текста — он исходный материал, а не содержимое заметки.
+*/
+const PARSED_FIELDS = DRAFT_FIELDS.filter((name) => name !== 'paste');
+
+/** Имена полей, к которым человек прикасался сам, — с них подсказка руки убирает. */
+let touched = new Set();
 
 function canManageAs(me) {
   return Boolean(me) && (me.role === 'admin' || me.role === 'moderator');
@@ -65,11 +84,41 @@ function readForm() {
   const form = host?.querySelector('[data-upd-form]');
   if (!form) return null;
   const out = {};
-  for (const name of ['kind', 'title', 'summary', 'sourceName', 'gameVersion', 'sourceUrl', 'sourceAt']) {
+  for (const name of DRAFT_FIELDS) {
     const el = form.elements[name];
     if (el) out[name] = el.value;
   }
   return out;
+}
+
+/*
+  Подсказка модерации: разложить вставленный текст обновления по полям формы.
+
+  НИЧЕГО НЕ ПЕРЕЗАПИСЫВАЕТ. Поле, в которое человек уже что-то поставил или
+  которое он трогал, остаётся его: иначе одна лишняя кнопка превращалась бы в
+  «форма стёрла то, что я писал». Поэтому пустое — заполняем, написанное —
+  бережём, а нехватки называем вслух в строке под кнопкой.
+
+  Публикации здесь нет: разбор меняет только содержимое полей. Решение
+  «публиковать» по-прежнему принимает человек одной кнопкой формы.
+*/
+function fillFromPaste() {
+  const form = host?.querySelector('[data-upd-form]');
+  if (!form) return;
+  const paste = form.elements.paste?.value || '';
+  const link = form.elements.sourceUrl?.value || '';
+  const parsed = parseUpdateSource(paste, link);
+
+  for (const name of PARSED_FIELDS) {
+    const el = form.elements[name];
+    const value = parsed[name];
+    if (!el || !value || touched.has(name)) continue;
+    /* Пустое значение поля — единственное, куда подсказка имеет право. */
+    if (String(el.value).trim() && name !== 'kind') continue;
+    el.value = value;
+  }
+
+  state.notice = updateParseNotice(parsed);
 }
 
 async function load() {
@@ -174,6 +223,8 @@ function wire() {
 
     if (t.closest('[data-upd-new]')) {
       state.composing = true;
+      state.notice = '';
+      touched = new Set();
       paint();
       host.querySelector('[data-upd-form] [name="title"]')?.focus({ preventScroll: true });
       return;
@@ -181,6 +232,14 @@ function wire() {
 
     if (t.closest('[data-upd-cancel]')) {
       state.composing = false;
+      state.notice = '';
+      touched = new Set();
+      paint();
+      return;
+    }
+
+    if (t.closest('[data-upd-parse]')) {
+      fillFromPaste();
       paint();
       return;
     }
@@ -196,6 +255,20 @@ function wire() {
       await runNoteAction(restore, () => forum.setUpdateNoteArchived(restore.dataset.updRestore, false));
     }
   });
+
+  /*
+    Что человек трогал сам. Подсказка заполняет пустое, но поле, в которое
+    модератор уже что-то поставил или которое выбрал из списка, — его, и
+    перерисовка формы не имеет права на это претендовать.
+  */
+  const markTouched = (e) => {
+    if (!host || !state.composing) return;
+    const el = e.target;
+    const form = host.querySelector('[data-upd-form]');
+    if (form && el && el.name && form.contains(el)) touched.add(el.name);
+  };
+  document.addEventListener('input', markTouched);
+  document.addEventListener('change', markTouched);
 
   document.addEventListener('submit', async (e) => {
     const form = e.target.closest('[data-upd-form]');
@@ -223,6 +296,8 @@ function wire() {
         gameVersion: values.gameVersion || '',
       });
       state.composing = false;
+      state.notice = '';
+      touched = new Set();
       await reload();
     } catch (err) {
       showFormError(String(err?.message ?? err));

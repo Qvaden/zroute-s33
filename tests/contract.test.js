@@ -8430,12 +8430,24 @@ console.log('\nAF. Пульс обновлений игры');
       && page({ canManage: true, notes: [archivedNote] }).includes('вернуть в список')
       && !page({ notes: [archivedNote] }).includes('Убрано из списка'));
   const form = page({ canManage: true, composing: true });
-  const FORM_FIELDS = JSON.parse(`[${updSrc.match(/for \(const name of \[([^\]]+)\]/)[1].replace(/'/g, '"')}]`);
+  /*
+    Список полей формы живёт в поведении одной строкой, а разметка обязана
+    называть те же `name=`. Раньше проверка вычитывала массив прямо из
+    readForm; теперь полей два набора — что переживает перерисовку и что
+    подсказка вправе заполнить, — и расхождение между ними невидимо, зато
+    заметно человеку: потерянное при перерисовке поле означает стёртый текст.
+  */
+  const draftList = (updSrc.match(/const DRAFT_FIELDS = \[([^\]]+)\]/) || ['', ''])[1].replace(/'/g, '"');
+  const FORM_FIELDS = JSON.parse(`[${draftList}]`);
   equal('форма называет ровно те поля, что читает поведение',
     [...form.matchAll(/name="([A-Za-z]+)"/g)].map((m) => m[1]).sort().join(','),
     [...FORM_FIELDS].sort().join(','));
+  check('вставленный текст остаётся в форме и не лезет в заметку',
+    FORM_FIELDS.includes('paste')
+      && !/paste/.test((updSrc.match(/forum\.publishUpdateNote\(\{[\s\S]*?\}\)/) || [''])[0])
+      && /const PARSED_FIELDS = DRAFT_FIELDS\.filter/.test(updSrc));
   check('и у текстовых полей есть потолок длины',
-    (form.match(/maxlength="/g) || []).length === 5);
+    (form.match(/maxlength="/g) || []).length === 6);
   check('поля не пустят дату из будущего и из доисторических времён',
     form.includes(`min="${L.updateSourceYearFloor}-01-01T00:00"`) && form.includes('max="'));
   check('правок нет ни в разметке, ни в поведении',
@@ -9250,13 +9262,37 @@ console.log('\nAJ. Справочник официальных гайдов иг
     /renderHandbookSearch\(s\.hbQuery \?\? ''\)/.test(guidesPageSrc)
       && /data-hb-query/.test(hb.renderHandbookSearch(''))
       && /class="guide-handbook"/.test(guidesPageSrc));
+  /*
+    Раздел под списком гайдов — навигация, а не читалка правил: восемь плиток и
+    ни одного текста из игры. Проверка на количество знаков стоит здесь, а не
+    только на имена классов, потому что раньше под полем печатались ещё и
+    текстовые блоки всех корней, и вкладка разрасталась до восемнадцати тысяч
+    знаков: правки, «улучшающие» справочник, очень легко снова превращают
+    список правил в простыню, и человек этого не заметит на своем экране.
+  */
   equal('под полем видно восемь разделов',
-    (sections.match(/class="hb-section"/g) || []).length, 8);
-  equal('обзор показывает 22 плитки первого уровня',
-    (sections.match(/class="hb-tile"/g) || []).length, 22);
+    (sections.match(/class="hb-tile"/g) || []).length, 8);
+  check('разделы — компактный список, а не семь страниц правил',
+    /class="hb-grid hb-roots"/.test(sections)
+      && !/class="hb-text"/.test(sections)
+      && sections.length < 3000,
+    `список весит ${sections.length} знаков`);
   const hrefs = [...sections.matchAll(/href="#\/handbook\/([^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   check('каждая плитка ведёт в существующий узел', hrefs.length > 0 && hrefs.every((id) => byId.has(id)),
     hrefs.filter((id) => !byId.has(id)).join(', '));
+  check('в плитках есть счёт гайдов и первая строка — без них список немой',
+    (sections.match(/class="hb-tile__kind"/g) || []).length === 8
+      && (sections.match(/class="hb-tile__lead"/g) || []).length >= 6);
+  /*
+    Текст раздела начинается с его же названия заглавными буквами, и подпись
+    под плиткой без этого среза печатала бы заголовок дважды.
+  */
+  const doubled = sections.split('<li class="hb-tile">').slice(1).filter((tile) => {
+    const title = ((tile.match(/<b>([^<]*)<\/b>/) || ['', ''])[1]).trim().toUpperCase();
+    const lead = ((tile.match(/class="hb-tile__lead">([^<]*)</) || ['', ''])[1]).trim().toUpperCase();
+    return title !== '' && lead.startsWith(title);
+  });
+  equal('подпись плитки не повторяет её собственный заголовок', doubled.length, 0);
   check('ссылка с запросом открывает список найденного',
     /hb-hits/.test(hb.renderHandbookSearch('броня')));
 
@@ -9289,7 +9325,7 @@ console.log('\nAJ. Справочник официальных гайдов иг
     !/<img src=x/.test(hb.renderResults('<img src=x onerror=alert(1)>')));
   check('найденное слово подсвечено', /<mark>/.test(hb.renderResults('броня')));
   check('без запроса показаны разделы, а не «ничего не найдено»',
-    /hb-section/.test(hb.resultsSlot('')) && !/hb-none/.test(hb.resultsSlot('')));
+    /hb-roots/.test(hb.resultsSlot('')) && !/hb-none/.test(hb.resultsSlot('')));
 }
 
 console.log('\nAK. Гайды пишут участники');
@@ -9454,6 +9490,149 @@ console.log('\nAK. Гайды пишут участники');
     docsSrc.includes('## Гайд пишет любой игрок')
       && docsSrc.includes('- **Очереди на публикацию.**')
       && docsSrc.includes('- **Своей вкладки у справочника.**'));
+}
+
+console.log('\nAL. Пульс обновлений: подсказка модерации');
+{
+  /*
+    Человек просил, чтобы сведения об игре попадали в раздел «по мере нового»
+    сами. Автомата нет, и он не появится: браузер не открывает чужие страницы
+    (same-origin), а обещание «читаем сами» означает заметку, которую никто не
+    проверил перед тем, как её прочитает весь форум. Поэтому снята только
+    механическая часть работы — разложить скопированный текст по семи полям
+    формы.
+
+    Проверяем в первую очередь то, чего в такой подсказке легче всего испугаться:
+    что она не додумывает. Пустое поле честнее угаданного, а выдуманная дата или
+    «тип» превращают помощник в источник слухов. Дальше — что поля формы
+    гарантированно проходят ту же проверку, что и публикация: расхождение
+    означает отказ базы после того, как человек уже нажал «Опубликовать».
+  */
+  const { readFile } = await import('node:fs/promises');
+  const rulesSrc = await readFile('src/forum/rules.js', 'utf8');
+  const pageSrc = await readFile('src/pages/updates.js', 'utf8');
+  const updSrc = await readFile('src/forum/updates.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const L = CONFIG.forum.limits;
+  const { parseUpdateSource, updateParseNotice, updateSourceFromLink, updateStoreLinkFromText } =
+    await import('../src/forum/rules.js');
+
+  /* Сейчас — фиксированный момент: подсказка не должна зависеть от часов теста. */
+  const NOW = new Date('2026-09-20T12:00:00Z').getTime();
+  const PLAY = 'https://play.google.com/store/apps/details?id=com.zroute.r33&hl=ru';
+  const play = parseUpdateSource(`Что нового
+Версия 2.14.0
+Обновлено 12 сент. 2026 г.
+
+• Добавлены новые карты в ротацию перечисления
+• Переработана грузоподъёмность караванов
+• Исправлены ошибки отображения рейтинга альянсов
+Показать всё`, PLAY, NOW);
+
+  equal('заголовок берётся из первой настоящей строки, без маркера списка',
+    play.title, 'Добавлены новые карты в ротацию перечисления');
+  equal('содержание остаётся списком построчно', play.summary.split('\n').length, 3);
+  check('служебные строки магазина не попадают в содержание',
+    !/Что нового|Показать всё|Версия|Обновлено/.test(play.summary));
+  equal('версия ушла в своё поле', play.gameVersion, '2.14.0');
+  equal('дата первоисточника — в формате поля формы', play.sourceAt, '2026-09-12T12:00');
+  equal('источник назван по домену ссылки', play.sourceName, 'Google Play');
+  equal('тип определён по списку правок', play.kind, 'patch');
+  check('и ничего не осталось незаполненным', play.missing.length === 0, play.missing.join(', '));
+
+  /* Чего в тексте нет — того в заметке нет. */
+  const bare = parseUpdateSource('обновили игру', '', NOW);
+  equal('из одной фразы содержание не собирается', bare.summary, '');
+  equal('и тип не угадывается', bare.kind, '');
+  check('пустое поле названо вслух, а не оставлено молча',
+    bare.missing.includes('дата у первоисточника') && bare.missing.includes('что изменилось'));
+  const noVersion = parseUpdateSource('• Переработана карта пустыни\n• Убрана ошибка прохода', '', NOW);
+  equal('если версия не названа, её поля нет', noVersion.gameVersion, '');
+
+  /* Тип по словам разработчика: признание проблемы важнее списка правок. */
+  equal('извинения за проблему — это известная проблема, а не патч',
+    parseUpdateSource('Мы знаем о сбое при загрузке базы и работаем над исправлением. Приносим извинения.', '', NOW).kind, 'issue');
+  equal('обещание «скоро» — объявление: изменения ещё нет',
+    parseUpdateSource('Скоро в ближайшем обновлении появится новый министр экономики.', '', NOW).kind, 'notice');
+
+  /* Ссылка: только страница магазина, и только настоящая. */
+  equal('страница App Store называется App Store',
+    updateSourceFromLink('https://apps.apple.com/ru/app/id1234567890'), 'App Store');
+  equal('чужой домен источником не становится',
+    updateSourceFromLink('https://zroutehub.bond/'), '');
+  equal('из вставленного текста берётся только ссылка магазина',
+    updateStoreLinkFromText(`Смотри https://discord.gg/zzz и https://play.google.com/store/apps/details?id=x`),
+    'https://play.google.com/store/apps/details?id=x');
+  equal('http-ссылка не проходит: база её не примет',
+    parseUpdateSource('• Правки', 'http://play.google.com/store/apps/details?id=x', NOW).sourceUrl, '');
+  /*
+    Адрес из адресной строки человек вставляет первой строкой чаще всего, и
+    разбор не имеет права превращать его в заголовок заметки.
+  */
+  const linkFirst = parseUpdateSource(`https://play.google.com/store/apps/details?id=com.zroute.r33&hl=ru
+Обновлено 26 сент. 2026 г.
+• Ускорена загрузка карты сезонного события
+• Убрана ошибка двойного найма министра`, '', NOW);
+  equal('адрес отдельной строкой не становится заголовком заметки',
+    linkFirst.title, 'Ускорена загрузка карты сезонного события');
+  check('и адрес не остаётся в содержании: у него своё поле',
+    !linkFirst.summary.includes('http')
+      && linkFirst.sourceUrl.startsWith('https://play.google.com')
+      && linkFirst.sourceName === 'Google Play');
+
+  /* Границы: то, что подсказка ставит в поле, обязано пройти публикацию. */
+  const longSource = `${'Очень длинный заголовок обновления игры, '.repeat(12)}
+${'Строка изменений списка патча. '.repeat(120)}`;
+  const long = parseUpdateSource(longSource, '', NOW);
+  check('заголовок не длиннее предела формы', long.title.length <= L.updateTitleMax, String(long.title.length));
+  check('содержание не длиннее предела формы', long.summary.length <= L.updateSummaryMax, String(long.summary.length));
+  /*
+    Сравниваем с нормализованным текстом: подсказка убирает переводы строк и
+    лишние пробелы, и требовать от неё дословной копии вставленной страницы
+    значило бы требовать, чтобы она копировала мусор магазина.
+  */
+  const norm = longSource.split('\n').map((line) => line.trim()).join('\n');
+  check('обрезка идёт по границе слова и строки, а не посередине',
+    !/[,;:\s]$/.test(long.title)
+      && norm.startsWith(long.summary)
+      && (norm[long.summary.length] === undefined || /\s/.test(norm[long.summary.length])),
+    `хвост: ${JSON.stringify(long.summary.slice(-12))}`);
+  check('и в поле не попадает ничего, чего не было в тексте',
+    norm.includes(long.title) && norm.includes(long.summary));
+  equal('дата из будущего отвергается той же меркой, что и базой',
+    parseUpdateSource('Обновлено 30 дек. 2030 г.\n• Правка карты\n• Правка баланса', '', NOW).sourceAt, '');
+  equal('и дата раньше прошлого века тоже',
+    parseUpdateSource('Обновлено 3 мая 1999 г.\n• Правка карты\n• Правка баланса', '', NOW).sourceAt, '');
+
+  /* Разговор с модератором: что перенесли и что остались делать ему. */
+  check('подсказка говорит, что перенесла, и называет остаток по-русски',
+    updateParseNotice(parseUpdateSource('', '', NOW)).startsWith('В этом тексте я не нашёл ничего')
+      && /Перенёс в форму:/.test(updateParseNotice(noVersion))
+      && /Не нашёл в тексте и оставил вам:/.test(updateParseNotice(noVersion)));
+  check('в коде разбора нет ни одного обращения наружу',
+    !/fetch\(|XMLHttpRequest|import\(/.test(rulesSrc.slice(rulesSrc.indexOf('/* ── Подсказка модерации'), rulesSrc.indexOf('export const CATEGORY_IDS'))));
+
+  /* Форма: вставка — отдельное поле, а не восьмое содержимое заметки. */
+  check('поле вставки и кнопка разбора стоят над полями заметки',
+    pageSrc.indexOf('name="paste"') < pageSrc.indexOf('name="title"')
+      && pageSrc.includes('data-upd-parse') && pageSrc.includes('data-upd-notice'));
+  check('вставленный текст переживает перерисовку формы',
+    /const DRAFT_FIELDS = \[[^\]]*'paste'/.test(updSrc) && updSrc.includes('for (const name of DRAFT_FIELDS)'));
+  check('чужое поле не перезаписывается: подсказка берёт только пустое',
+    /if \(String\(el\.value\)\.trim\(\) && name !== 'kind'\) continue;/.test(updSrc)
+      && updSrc.includes('touched.add(el.name)'));
+  check('ответ подсказки экранируется, как и всё, что принёс человек',
+    /<p class="upd-paste__notice" data-upd-notice>\$\{esc\(s\.notice\)\}/.test(pageSrc));
+  check('поле, кнопка и ответ одеты стилем',
+    cssSrc.includes('.upd-paste textarea') && cssSrc.includes('.upd-paste__notice'));
+
+  /* Документ: раздел обязан вслух сказать, что автоматом он не стал.
+     Фразу ищем по всему документу, переносы строк не в счёт. */
+  check('документ описывает подсказку и отказ от автомата',
+    docsSrc.includes('### Подсказка в форме')
+      && docsSrc.replace(/\s+/g, ' ').includes('сам раздел автоматом не стал')
+      && docsSrc.includes('same-origin'));
 }
 
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);

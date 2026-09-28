@@ -80,6 +80,23 @@ function renderForm(s) {
         ошиблись — уберите в архив и напишите новую.
       </p>
 
+      <label class="upd-field upd-paste">
+        <span>Текст обновления из магазина</span>
+        <textarea name="paste" rows="4" maxlength="${L.updatePasteMax}"
+                  placeholder="Вставьте сюда «Что нового» со страницы Google Play или App Store — разложу по полям."></textarea>
+        <small class="muted">
+          Форум не открывает чужие страницы сам: текст приносит человек, а код
+          только раскладывает его по полям формы. Ничего не придумываю — чего нет
+          в тексте, того не будет в заметке. То, что вы уже написали сами, не
+          перезаписывается.
+        </small>
+      </label>
+
+      <p class="upd-paste__actions">
+        <button type="button" class="forum-btn" data-upd-parse>Разобрать по полям</button>
+      </p>
+      ${s.notice ? `<p class="upd-paste__notice" data-upd-notice>${esc(s.notice)}</p>` : '<p class="upd-paste__notice" data-upd-notice hidden></p>'}
+
       <label class="upd-field">
         <span>Что это</span>
         <select name="kind">${kinds}</select>

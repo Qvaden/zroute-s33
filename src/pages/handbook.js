@@ -26,7 +26,7 @@
  * renderResults(), чтобы и при заходе по ссылке с запросом, и при наборе
  * рисовался один и тот же код.
  */
-import { esc } from '../ui/helpers.js';
+import { esc, plural } from '../ui/helpers.js';
 import { postBody } from '../forum/format.js';
 import { HANDBOOK, HANDBOOK_ROOTS } from '../handbook/guides.js';
 
@@ -232,7 +232,18 @@ function childTiles(node) {
 function leadOf(node) {
   const first = node.blocks.find((b) => b.text) || node.blocks.find((b) => b.caption);
   if (!first) return '';
-  const flat = flatten(first.text || first.caption || '');
+  let flat = flatten(first.text || first.caption || '');
+  /*
+    Текст раздела часто начинается с его же названия, набранного заглавными:
+    «📅 СОБЫТИЯ Выберите событие…». Подпись под плиткой с заголовком
+    «📅 События» читалась бы дважды, и этот повтор снимаем: под списком
+    плиток не должен вырастать второй заголовок того же раздела.
+  */
+  const title = String(node.title ?? '').trim().toUpperCase();
+  if (title && flat.toUpperCase().startsWith(title)) {
+    const rest = flat.slice(title.length).replace(/^[\s:.,;—–-]+/, '');
+    if (rest) flat = rest;
+  }
   return flat.length > 120 ? `${flat.slice(0, 120).trimEnd()}…` : flat;
 }
 
@@ -310,23 +321,26 @@ export function resultsSlot(query) {
   return `<div id="hb-results" class="hb-results" data-hb-results>${q ? renderResults(q) : renderSections()}</div>`;
 }
 
-/** Список разделов — то, что видно, пока человек не начал искать. */
+/**
+ * Разделы справочника — то, что видно, пока человек не начал искать.
+ *
+ * Плитки, а не текст правил. Раньше сюда печатались ещё и текстовые блоки
+ * каждого корня, и вкладка «Гайды» разрасталась до восемнадцати тысяч знаков
+ * игры: человек шёл за одним разделом и пролистывал семь чужих. Полные тексты
+ * остались там, где их читают, — на странице раздела; здесь название, счёт и
+ * первая строка, и ровно столько же места, сколько занимает список разборов.
+ */
 export function renderSections() {
-  return ROOTS
-    .map((id) => {
-      const root = byId.get(id);
-      const intro = root.blocks.filter((b) => b.text).map((b) => blockHtml(b)).join('');
-      return `
-        <section class="hb-section">
-          <header class="hb-section__head">
-            <h2>${esc(root.title)}</h2>
-            <span class="hb-section__count muted">${guideCount(root)} гайдов</span>
-          </header>
-          ${intro}
-          ${childTiles(root)}
-        </section>`;
-    })
-    .join('');
+  const tiles = ROOTS.map((id) => {
+    const root = byId.get(id);
+    const lead = leadOf(root);
+    return `<li class="hb-tile"><a href="#/handbook/${esc(root.id)}">
+      <b>${esc(root.title)}</b>
+      <span class="hb-tile__kind">${plural(guideCount(root), 'гайд', 'гайда', 'гайдов')}</span>
+      ${lead ? `<span class="hb-tile__lead">${esc(lead)}</span>` : ''}
+    </a></li>`;
+  });
+  return `<ul class="hb-grid hb-roots">${tiles.join('')}</ul>`;
 }
 
 /* ── Страница ──────────────────────────────────────────────────────────── */
