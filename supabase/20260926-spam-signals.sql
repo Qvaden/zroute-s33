@@ -123,6 +123,16 @@
 -- Если после удачного Run панель всё равно говорит, что функции нет, — это кэш
 -- схемы API, а не база: выполните `notify pgrst, 'reload schema';` и вернитесь
 -- на вкладку заново.
+--
+-- ── ПЕРЕПРОГОН 2026-09-28 ───────────────────────────────────────────────────
+--
+-- Первая версия этого файла проходил без ошибки, а панель на нём показывала
+-- «structure of query does not match function result type»: все семь счётчиков
+-- были оставлены как count(*), то есть bigint, при объявленных integer колонках.
+-- Создаётся такую функцию Postgres позволяет, падает она при чтении. Сейчас
+-- каждый счётчик приведён к integer явно, и шаг 0 снимает прежнюю версию, так
+-- что достаточно выполнить файл целиком ещё раз — с той же учётной записи
+-- владельца в SQL Editor.
 
 -- ── Шаг 0. Снять всё, что уже стоит под этим именем ────────────────────────
 
@@ -186,10 +196,14 @@ begin
   return query
   with
   -- Темы за сутки: короткое окно выдержки и суточный масштаб одним проходом.
+  -- Каждое count() здесь обязано быть приведено к integer: count(*) отдаёт
+  -- bigint, а plpgsql при `return query` не приводит bigint к объявленному
+  -- integer — прогон такой функции создаётся молча и падает уже на чтении
+  -- («structure of query does not match function result type»).
   pace as (
     select author_id as uid,
-           count(*) filter (where created_at > now() - interval '20 minutes') as p20,
-           count(*) as p24,
+           (count(*) filter (where created_at > now() - interval '20 minutes'))::int as p20,
+           count(*)::int as p24,
            max(created_at) as last_p
       from public.forum_posts
      where created_at > now() - interval '24 hours'
@@ -199,8 +213,8 @@ begin
   -- Ответы за сутки: то же самое, но в двухминутном окне.
   cpace as (
     select author_id as uid,
-           count(*) filter (where created_at > now() - interval '2 minutes') as c2,
-           count(*) as c24,
+           (count(*) filter (where created_at > now() - interval '2 minutes'))::int as c2,
+           count(*)::int as c24,
            max(created_at) as last_c
       from public.forum_comments
      where created_at > now() - interval '24 hours'
@@ -211,7 +225,7 @@ begin
   -- поэтому автор берётся из той записи, а не из жалобы: жалующийся тут —
   -- свидетель, а не подозреваемый.
   rep as (
-    select x.uid, count(*) as n from (
+    select x.uid, count(*)::int as n from (
       select p.author_id as uid
         from public.forum_reports r
         join public.forum_posts p on p.id = r.target_id
@@ -230,7 +244,7 @@ begin
   -- модератор обязан был отреагировать, и висящая отметка старше этого срока
   -- значит только одно — её забыли снять.
   hid as (
-    select x.uid, count(*) as n from (
+    select x.uid, count(*)::int as n from (
       select author_id as uid from public.forum_posts
        where auto_hidden = true and deleted_at > now() - interval '7 days'
       union all
@@ -242,7 +256,7 @@ begin
     -- Активные тишины по разделам. Имя колонки названо таблицей, а не просто
     -- `user_id`: так запрос читается одинаково и сегодня, и после того, как у
     -- списка появятся свои колонки с теми же именами.
-    select sm.user_id as uid, count(*) as n
+    select sm.user_id as uid, count(*)::int as n
       from public.forum_section_mutes sm
      where sm.muted_until > now()
      group by sm.user_id

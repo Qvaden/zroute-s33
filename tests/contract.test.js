@@ -7797,6 +7797,18 @@ console.log('\nAD. Сигналы о спаме');
   check('право исполнения только у вошедших: гостю смотреть не на что',
     flat.includes(`revoke all on function public.forum_spam_signals() from public, anon;`)
       && flat.includes('grant execute on function public.forum_spam_signals() to authenticated;'));
+  /*
+    Ошибка, которую глазами в таком файле не найти: count(*) возвращает bigint,
+    а колонки объявлены integer, и plpgsql при `return query` приведения не
+    делает. Прогон при этом создаётся молча — падает он на чтении, «structure of
+    query does not match function result type», и модератор видит отказ базы там,
+    где список обязан быть пустым или живым. Поэтому каждый счётчик обязан
+    приходить с явным ::int, и их число здесь зафиксировано.
+  */
+  const countLines = sql.split('\n').map((l) => l.trim())
+    .filter((l) => l.includes('count(*)') && !l.startsWith('--'));
+  check('каждое count(*) приведено к integer — иначе функция падает на чтении',
+    countLines.length === 7 && countLines.every((l) => l.includes('::int')));
 
   /* ── Числа: выдержка, сигнал и черновик обязаны сходиться ── */
   check('окна выдержки в сигнале — те же строки, что в триггерах отказа',
