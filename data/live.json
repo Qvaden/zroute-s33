@@ -94,6 +94,12 @@
       "number": 8,
       "endDate": "2026-09-20",
       "startDate": "2026-09-14"
+    },
+    {
+      "id": "W9",
+      "number": 9,
+      "endDate": "2026-09-27",
+      "startDate": "2026-09-21"
     }
   ],
   "events": [
@@ -1308,7 +1314,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-09-28T10:05:03+00",
+  "pulledAt": "2026-09-29T10:03:31+00",
   "alliances": [
     {
       "id": "a01",
