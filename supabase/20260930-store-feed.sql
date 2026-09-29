@@ -221,8 +221,13 @@ create table if not exists public.forum_store_state (
   ios_at           timestamptz,
 
   /* Что планировщик сказал о последнем запуске. Коротко и по-русски: это
-     увидит модератор на странице, когда автомат молчит неделю. */
-  last_run_at      timestamptz not null default now(),
+     увидит модератор на странице, когда автомат молчит неделю.
+
+     Пусто, а не «сейчас»: колонка обязана оставаться null до первого
+     настоящего обхода. Строка «Планировщик заходил 29 сент., 22:38» — это слово
+     о прогоне, а время миграции прогоном не было: читатель поверил бы, что
+     магазины уже проверены, хотя автомат не запускался ни разу. */
+  last_run_at      timestamptz,
   last_run_text    text not null default ''
                    check (char_length(last_run_text) <= 400),
 
@@ -248,6 +253,25 @@ grant select on public.forum_store_state to anon, authenticated;
 */
 insert into public.forum_store_state (id) values (true)
   on conflict (id) do nothing;
+
+/*
+  Правка для тех баз, где этот файл уже прогоняли, когда колонка имела значение
+  по умолчанию: там строка состояния получила время запуска миграции, и с того
+  дня страница говорит «планировщик заходил», хотя обходов не было ни одного.
+  Первая пара команд возвращает колонке право быть пустой, вторая убирает
+  выдавшуюся дату. Условия выбирают именно строку без настоящего обхода: у
+  обхода бывает текст отчёта, а обычно ещё версия площадки и номер заметки.
+*/
+alter table public.forum_store_state alter column last_run_at drop default;
+alter table public.forum_store_state alter column last_run_at drop not null;
+
+update public.forum_store_state
+   set last_run_at = null
+ where last_run_at is not null
+   and last_run_text = ''
+   and android_version = ''
+   and ios_version = ''
+   and last_note_id is null;
 
 -- ── Шаг 3. Дверь: принести событие ──────────────────────────────────────────
 

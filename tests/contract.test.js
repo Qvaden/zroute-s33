@@ -9958,6 +9958,20 @@ console.log('\nAM. Фид магазина: обновление и событи
     flat.includes('id boolean primary key default true check (id)'));
   check('единственная строка заведена миграцией: иначе отчёт пропал бы молча',
     flat.includes('insert into public.forum_store_state (id) values (true) on conflict (id) do nothing;'));
+  /*
+    Время прогона миграции — не слово планировщика: строка «Планировщик
+    заходил …» обязана появляться только после настоящего обхода, поэтому
+    колонка остаётся пустой, а файл правит и те строки, что завел более ранний
+    запуск этого же файла.
+  */
+  check('до первого обхода состояние молчит: дата прогона не выдаётся за запуск',
+    flat.includes('last_run_at timestamptz,')
+      && !flat.includes('last_run_at timestamptz not null'));
+  check('а уже заведённую неправдой строку миграция лечит повторным запуском',
+    flat.includes('alter table public.forum_store_state alter column last_run_at drop default;')
+      && flat.includes('alter table public.forum_store_state alter column last_run_at drop not null;')
+      && flat.includes('set last_run_at = null where last_run_at is not null and last_run_text = \'\'')
+      && flat.includes('and android_version = \'\' and ios_version = \'\' and last_note_id is null;'));
   check('убранное автоматом возвращается, а не удаляется',
     !/delete from/i.test(sql) && flat.includes(`status = case when p_archived then 'archived' else 'published' end`));
   check('представления спрашивают права читателя',

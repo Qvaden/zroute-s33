@@ -261,6 +261,7 @@ function report({ android, ios, known, note, dated, undated, wrote }) {
   head('Что уже знает база');
   say(`опубликовано: Android ${known.android || '—'}, iOS ${known.ios || '—'}`);
   if (known.lastRunAt) say(`последний обход: ${known.lastRunAt} — ${known.lastText}`);
+  else say('последнего обхода ещё не было: состояние заведено миграцией, автомат молчал');
   if (known.why) say(`оговорка: ${known.why}`);
 
   head('Пост на обе площадки');
