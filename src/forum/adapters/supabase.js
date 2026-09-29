@@ -2145,6 +2145,67 @@ export async function setUpdateNoteArchived(id, archived) {
   });
 }
 
+/* ── Фид магазина: события из Google Play и состояние обхода ───────────────── */
+
+function storeEventOut(row) {
+  return {
+    id: row.id,
+    feedKey: row.feed_key || '',
+    title: row.title,
+    summary: row.summary || '',
+    platform: row.platform || 'other',
+    startsAt: toDate(row.starts_at) ?? new Date(),
+    endsAt: toDate(row.ends_at),
+    sourceUrl: row.source_url || '',
+    status: row.status || 'published',
+    firstSeenAt: toDate(row.first_seen_at) ?? new Date(),
+    lastSeenAt: toDate(row.last_seen_at) ?? new Date(),
+    archivedAt: toDate(row.archived_at),
+    archivedByNick: row.archived_by_nick || null,
+  };
+}
+
+/*
+  Берём последние по началу, а не ближайшие: живое событие по определению
+  стоит среди самых свежих, тогда как «ближайшие сверху» при limit вынули бы
+  десять пережитых карточек и выбросили то, что идёт сейчас. Порядок на экране
+  расставляет страница — ей сначала нужно отбросить закончившееся.
+*/
+export async function listStoreEvents() {
+  const limit = CONFIG.forum.limits.storeEventListMax;
+  const rows = await rest(
+    `/forum_store_event_list?select=*&order=starts_at.desc&limit=${limit}`,
+    { retryOnAbort: true },
+  );
+  return (Array.isArray(rows) ? rows : []).map(storeEventOut);
+}
+
+export async function setStoreEventArchived(id, archived) {
+  await rest('/rpc/forum_set_store_event_archive', {
+    method: 'POST',
+    body: { p_target: id, p_archived: Boolean(archived) },
+  });
+}
+
+/*
+  Состояние — одна строка, и её читают по одному полю: страница показывает
+  «автомат проверял …», а молчание объясняет словами самого планировщика из
+  last_run_text. null значит «представления ещё нет», и это не ноль запусков.
+*/
+export async function getStoreStatus() {
+  const rows = await rest('/forum_store_status?select=*&limit=1', { retryOnAbort: true });
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) return null;
+  return {
+    lastRunAt: toDate(row.last_run_at),
+    lastRunText: row.last_run_text || '',
+    androidVersion: row.android_version || '',
+    iosVersion: row.ios_version || '',
+    androidAt: toDate(row.android_at),
+    iosAt: toDate(row.ios_at),
+  };
+}
+
 /* ── Push-настройки (посты форума) ────────────────────────────────────────── */
 
 export async function getPushPrefs() {

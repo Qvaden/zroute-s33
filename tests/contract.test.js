@@ -3674,8 +3674,8 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /retryOnAbort = false/.test(clientJs));
   check('повтор по таймауту включён у чтения ленты',
     /retryOnAbort: true/.test(forumDbJs));
-  check('повтор по таймауту у ленты, поста, комментариев, чатов, календаря и пульса — семь мест',
-    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 7);
+  check('повтор по таймауту у ленты, поста, комментариев, чатов, календаря, пульса и фида магазина — девять мест',
+    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 9);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
   check('живые вкладки — форум, чаты, календарь, пульс обновлений, справочник и страница участника',
@@ -9496,11 +9496,12 @@ console.log('\nAL. Пульс обновлений: подсказка моде�
 {
   /*
     Человек просил, чтобы сведения об игре попадали в раздел «по мере нового»
-    сами. Автомата нет, и он не появится: браузер не открывает чужие страницы
-    (same-origin), а обещание «читаем сами» означает заметку, которую никто не
-    проверил перед тем, как её прочитает весь форум. Поэтому снята только
-    механическая часть работы — разложить скопированный текст по семи полям
-    формы.
+    сами. Из браузера так не сделать: он не открывает чужие страницы
+    (same-origin), и обещание «читаем сами» означало бы заметку, которую никто
+    не проверил перед тем, как её прочитает весь форум. Автомат есть, но он
+    живёт вне браузера и по расписанию — см. раздел «AM». Здесь же осталась
+    механическая половина ручного пути, которым приносят ВК: разложить
+    скопированный текст по семи полям формы.
 
     Проверяем в первую очередь то, чего в такой подсказке легче всего испугаться:
     что она не додумывает. Пустое поле честнее угаданного, а выдуманная дата или
@@ -9627,12 +9628,473 @@ ${'Строка изменений списка патча. '.repeat(120)}`;
   check('поле, кнопка и ответ одеты стилем',
     cssSrc.includes('.upd-paste textarea') && cssSrc.includes('.upd-paste__notice'));
 
-  /* Документ: раздел обязан вслух сказать, что автоматом он не стал.
-     Фразу ищем по всему документу, переносы строк не в счёт. */
-  check('документ описывает подсказку и отказ от автомата',
-    docsSrc.includes('### Подсказка в форме')
-      && docsSrc.replace(/\s+/g, ' ').includes('сам раздел автоматом не стал')
-      && docsSrc.includes('same-origin'));
+  /* Документ не имеет права утверждать, что автомата не стало меньше: подсказка
+     формы — ручной путь для ВК, а магазины читает планировщик. Фразу ищем по
+     всему документу, переносы строк не в счёт. */
+  check('документ описывает и подсказку формы, и планировщик вне браузера',
+    docsSrc.includes('### Подсказка в форме') && docsSrc.includes('## Фид магазина')
+      && docsSrc.replace(/\s+/g, ' ').includes('из браузера в магазин не сходить')
+      && docsSrc.includes('same-origin')
+      && !docsSrc.includes('Автоматического чтения чужих страниц'));
+}
+
+// ── AM. Фид магазина: разбор страницы и планировщик ──────────────────────────
+
+console.log('\nAM. Фид магазина: обновление и события автоматом');
+{
+  /*
+    Человек просил, чтобы обновления из Google Play и App Store сами складывались
+    в один пост на обе площадки, а события из Плей Маркета приходили туда же.
+    Проверяем по границе, которую этот автомат обязан держать:
+
+      1. Разбор чужой вёрстки не ходит наружу. Ходит планировщик, и только он.
+      2. Автомат не додумывает: ни даты, ни содержания, ни «подробностей».
+         Площадка, которая промолчала, из поста выпадает, а не заполняется
+         заглушкой, и её молчание видит модерация, а не читатель.
+      3. Событие без начальной даты в базу не едет: column starts_at обязателен
+         именно потому, что «идёт сейчас» датой быть не может.
+      4. Числа, тексты отказов и их порядок в базе, в черновом режиме и в
+         разборе — одни и те же.
+
+    Фикстуры взяты с живой страницы: карточка события с настоящей припиской
+    jslog, настоящий служебный JSON с версией и датой, настоящий заголовок
+    страницы события. Ожидаемые значения получены прогоном на этих фикстурах,
+    а не на глаз: разбор чужой вёрстки живёт именно на них.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const feedSrc = await readFile('src/forum/feed.js', 'utf8');
+  const scriptSrc = await readFile('scripts/store-feed.mjs', 'utf8');
+  const flowSrc = await readFile('.github/workflows/store-feed.yml', 'utf8');
+  const sql = await readFile('supabase/20260930-store-feed.sql', 'utf8');
+  const pulseSql = await readFile('supabase/20260926-update-pulse.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const pageSrc = await readFile('src/pages/updates.js', 'utf8');
+  const updSrc = await readFile('src/forum/updates.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const hostingSrc = await readFile('docs/HOSTING.md', 'utf8');
+  const feed = await import('../src/forum/feed.js');
+  const { renderUpdates } = await import('../src/pages/updates.js');
+  const L = CONFIG.forum.limits;
+  const NOW = Date.parse('2026-09-30T12:00:00Z');
+
+  /* Кусок служебного JSON живой страницы: версия и метка обновления. */
+  const PLAY_META = '[[["1.36.05"]],[[[35]],[[[23,"6.0"]]]]],null,null,null,null,'
+    + '[["23 сент. 2026 г.",[1790178118,131000000]]]';
+
+  /* Настоящая карточка события со страницы приложения. */
+  const EVENT_ID = '4829466076333755096';
+  const EVENT_JSLOG_B64 = 'CCGqAnEabwgAShMIzuCi+N6UlwMVvJP9Bx3jvDbAsgRVClEKFwoR'
+    + 'Y29tLnpyb3V0ZS5nbG9iYWwQARgDEhkKEzQ4Mjk0NjYwNzYzMzM3NTUwOTYQURgDGAMgAiiA'
+    + 'mvatjjQwgOqOpZA0QAFIAVoCCAGAAQMwEA==';
+  const EVENT_TITLE = 'Событие «Готовность экипажа» началось';
+  const PLAY_CARD = `role="listitem"><div class="VfPpkd-WsjYwc" jslog="38003; 1:598|`
+    + `${EVENT_JSLOG_B64}; track:click,impression"><div class="VfPpkd-aGsRMb">`
+    + `<a class="Si6A0c" href="/store/apps/eventdetails/${EVENT_ID}">`
+    + '<div class="O45KTd"><div class="DU6Edd">Доступно обновление</div></div>'
+    + '<div class="EM9ELc"><img src="https://play-lh.googleusercontent.com/x=w648" /></div>'
+    + `<div class="BEJvHf"><div class="gFWm9b">${EVENT_TITLE}</div></div></a></div></div>`;
+
+  /* Старая вёрстка: заголовок раздела и строки названия с датами. */
+  const OLD_PAGE = '<div>Трасса Z: Искупление</div><div>События</div>'
+    + '<div>Сезон караванов</div><div>3 окт. — 12 окт. 2026</div>'
+    + '<div>Подробнее</div><div>Отзывы</div><div>Данные разработчика</div>';
+
+  /* Страница самого события: заголовок ответа и служебная метка описания. */
+  const EVENT_PAGE = `<html><head><title>${EVENT_TITLE}</title>`
+    + '<meta content="Экипажи, общий сбор! Событие ограничено по времени."'
+    + ' property="og:description" /></head><body>Трасса Z</body></html>';
+
+  const flat = sql.replace(/\s+/g, ' ');
+  const recSql = sql.slice(sql.indexOf('create or replace function public.forum_record_store_event'),
+    sql.indexOf('-- ── Шаг 4.')).replace(/\s+/g, ' ');
+  const archSql = sql.slice(sql.indexOf('create or replace function public.forum_set_store_event_archive'),
+    sql.indexOf('-- ── Шаг 5.')).replace(/\s+/g, ' ');
+  const localFeed = localSrc.slice(localSrc.indexOf('/* ── Фид магазина в локальном режиме'));
+  const supaFeed = supaSrc.slice(supaSrc.indexOf('function storeEventOut(row)'));
+  /* Заголовок обращения к чужому сайту: нашего ключа базы там быть не должно. */
+  const externalCall = scriptSrc.slice(scriptSrc.indexOf('async function fetchExternal'),
+    scriptSrc.indexOf('const DEBUG_HEADS'));
+  /* Только представление списка, без его grant: в нём фильтров быть не должно. */
+  const listViewSql = flat.slice(flat.indexOf('create or replace view public.forum_store_event_list'),
+    flat.indexOf('grant select on public.forum_store_event_list'));
+
+  /** Фразы идут в тексте именно в этом порядке. */
+  function inOrder(src, phrases) {
+    let from = 0;
+    for (const phrase of phrases) {
+      const at = src.indexOf(phrase, from);
+      if (at < 0) return false;
+      from = at + 1;
+    }
+    return true;
+  }
+
+  /* ── 1. Разбор страницы: что читается и чем ── */
+  equal('версия Android читается из служебного JSON страницы',
+    feed.extractPlayMeta(PLAY_META).version, '1.36.05');
+  equal('дата обновления — секундами оттуда же, а не переводом надписи',
+    feed.extractPlayMeta(PLAY_META).at, '2026-09-23');
+  equal('и строка для человека называется',
+    feed.extractPlayMeta(PLAY_META).dateLine, 'Последнее обновление: 23 сент. 2026 г.');
+  equal('на странице не того содержания — ни версии, ни даты',
+    feed.extractPlayMeta('<html><body>Трасса Z</body></html>'),
+    { version: '', dateLine: '', at: '' });
+  equal('метка вне разумного поля датой не становится',
+    feed.extractPlayMeta('[["1 янв. 2001 г.",[978307200,0]]]').at, '');
+  equal('адрес страницы собирается из идентификатора и страны, а не пишется руками',
+    feed.playPageUrl({ playId: 'com.example.app', country: 'ru' }),
+    'https://play.google.com/store/apps/details?id=com.example.app&hl=ru');
+  equal('у iOS источник — официальный JSON, а не вёрстка',
+    feed.itunesLookupUrl({ appStoreId: '6762269117', country: 'ru' }),
+    'https://itunes.apple.com/lookup?id=6762269117&country=ru');
+
+  /* Страница Play целиком: раздела «Что нового» в новой вёрстке нет вовсе. */
+  const silentPlay = feed.readPlayPage(PLAY_META, NOW);
+  equal('но страница не считается пустой: версия и дата есть', silentPlay.how, 'meta');
+  equal('и из них собирается половина поста', silentPlay.gameVersion, '1.36.05');
+  equal('текста обновления при этом нет, и он не выдумывается', silentPlay.summary, '');
+  equal('заглушка вместо приложения называется отказом, а не пустотой',
+    feed.readPlayPage('<html><body>Сервер недоступен</body></html>', NOW).how, 'no-page');
+
+  /* ── 2. События: даты есть только в служебной приписке карточки ── */
+  equal('начало события читается из приписки карточки',
+    feed.decodeEventWindow(EVENT_JSLOG_B64, EVENT_ID).startsAt, '2026-09-28T02:00:00Z');
+  equal('и его конец тоже', feed.decodeEventWindow(EVENT_JSLOG_B64, EVENT_ID).endsAt,
+    '2026-10-04T02:00:00Z');
+  equal('способ назван: планировщик отличает «дат нет» от «разбор сломан»',
+    feed.decodeEventWindow(EVENT_JSLOG_B64, EVENT_ID).how, 'jslog');
+  equal('чужой id чужие даты не получает',
+    feed.decodeEventWindow(EVENT_JSLOG_B64, '9007199254740993').startsAt, '');
+  equal('кривое основание не роняет разбор и не выдаёт дат',
+    feed.decodeEventWindow('@@@###$$$!!!', EVENT_ID),
+    { startsAt: '', endsAt: '', how: '' });
+  {
+    /* Поле 5 = начало, поле 6 = конец; зазор в 500 дней — не событие года. */
+    const varint = (n) => {
+      const out = [];
+      for (;;) {
+        const b = n % 128;
+        n = Math.floor(n / 128);
+        out.push(b | (n ? 0x80 : 0));
+        if (!n) return out;
+      }
+    };
+    const far = Buffer.from([...varint(5 << 3), ...varint(1790000000000),
+      ...varint(6 << 3), ...varint(1790000000000 + 500 * 86400000)]).toString('base64');
+    equal('дата дальше года вперёд окном события не становится',
+      feed.decodeEventWindow(far, '').startsAt, '');
+  }
+
+  const cards = feed.extractStoreEvents(PLAY_CARD, NOW);
+  equal('карточка события на странице приложения — основной путь разбора',
+    cards.how, 'cards');
+  equal('название — самая длинная строка карточки, а не плашка рода события',
+    cards.events[0].title, EVENT_TITLE);
+  equal('плашка остаётся подписью рядом с названием', cards.events[0].label, 'Доступно обновление');
+  equal('у события есть адрес его собственной страницы',
+    cards.events[0].sourceUrl, `https://play.google.com/store/apps/eventdetails/${EVENT_ID}`);
+  equal('ключ строки считает та же функция, что читает его база',
+    cards.events[0].feedKey, feed.storeEventKey('android', EVENT_TITLE));
+  check('короткое имя события ключом короче нижнего порога базы не становится',
+    feed.storeEventKey('other', 'А').length >= L.storeEventKeyMin,
+    feed.storeEventKey('other', 'А'));
+  check('а длинное не выходит за верхний порог',
+    feed.storeEventKey('android', `Событие ${'готовность экипажа '.repeat(12)}`).length <= L.storeEventKeyMax,
+    String(feed.storeEventKey('android', `Событие ${'готовность экипажа '.repeat(12)}`).length));
+  equal('тот же текст с чужими пробелами и регистром — тот же ключ, а не второе событие',
+    feed.storeEventKey('android', `  ${EVENT_TITLE.toUpperCase()}  `),
+    feed.storeEventKey('android', EVENT_TITLE));
+  equal('старая вёрстка без карточек читается запасным путём',
+    feed.extractStoreEvents(OLD_PAGE, NOW).how, 'lines');
+  {
+    const old = feed.extractStoreEvents(OLD_PAGE, NOW).events;
+    equal('и строка, в которой одна дата, вторым событием не становится',
+      old.map((e) => e.title), ['Сезон караванов']);
+    equal('даты из текстовых строк разбираются тем же полем',
+      [old[0].startsAt, old[0].endsAt], ['2026-10-03T12:00', '2026-10-12T12:00']);
+  }
+  equal('на странице без раздела событий нет и выдуманных событий',
+    feed.extractStoreEvents('<div>Трасса Z</div>', NOW), { events: [], how: 'no-head' });
+  equal('описание события берётся с его собственной страницы',
+    feed.extractEventPage(EVENT_PAGE).summary,
+    'Экипажи, общий сбор! Событие ограничено по времени.');
+  equal('название страницы события не подставляется вместо карточного',
+    feed.extractEventPage(EVENT_PAGE).title, EVENT_TITLE);
+  equal('страница без служебной метки возвращается без описания',
+    feed.extractEventPage('<html><head><title>Событие</title></head></html>').summary, '');
+  equal('дата уходит в базу полным ISO, а не недоразумением «2026-09-25:00Z»',
+    feed.toStoreIso('2026-09-23'), '2026-09-23T12:00:00Z');
+  equal('и уже готовое ISO проходит через то же поле неизменённым',
+    feed.toStoreIso('2026-09-28T02:00:00Z'), '2026-09-28T02:00:00Z');
+
+  /* ── 3. Пост на обе площадки: молчание — не содержание ── */
+  equal('если обе площадки молчат, поста нет',
+    feed.composeStoreNote({ android: {}, ios: {} }, NOW),
+    { fields: null, why: 'Ни один магазин не ответил за этот обход.' });
+  {
+    const half = feed.composeStoreNote({
+      android: { gameVersion: '1.36.05', at: '2026-09-23', text: '' },
+      ios: { version: '1.36.05', releaseNotes: 'Обновление версии', at: '2026-09-25' },
+      known: {},
+    }, NOW);
+    check('пост один, и в нём обе площадки: Android над iOS',
+      /^Android 1\.36\.05, 23 сент\. 2026 г\.:/m.test(half.fields.summary)
+        && /\n\niOS 1\.36\.05, 25 сент\. 2026 г\.:/m.test(half.fields.summary),
+      half.fields.summary);
+    equal('пустое поле релизных заметок iOS текстом поста не становится',
+      /описания изменений магазин не печатает/.test(half.fields.summary), true);
+    check('в посте нет ни слова о нашем сбое',
+      !/не ответила|ошибк|сбой|не нашло/.test(half.fields.summary), half.fields.summary);
+    equal('номер версии в посте назван для обеих площадок',
+      half.fields.gameVersion, 'Android 1.36.05 · iOS 1.36.05');
+    equal('датой поста становится день первоисточника, а не день запуска',
+      half.fields.sourceAt, '2026-09-25');
+    equal('источник поста назван обеими площадками', half.fields.sourceName, 'Google Play и App Store');
+    equal('и ничего не осталось незаполненным', half.missing, []);
+  }
+  {
+    const oneSided = feed.composeStoreNote({
+      android: {}, ios: { version: '1.40.0', releaseNotes: '', at: '2026-09-28' },
+    }, NOW);
+    equal('молчавшая площадка называется в отчёте, а не в посте',
+      oneSided.missing, ['Android']);
+    check('её половина в содержание не попала',
+      !oneSided.fields.summary.includes('Android'), oneSided.fields.summary);
+  }
+  equal('уже опубликованная версия поста не повторяет',
+    feed.composeStoreNote({
+      android: { gameVersion: '1.36.05', at: '2026-09-23', text: '' },
+      ios: { version: '1.36.05', releaseNotes: ' '.repeat(40), at: '2026-09-25' },
+      known: { android: '1.36.05', ios: '1.36.05' },
+    }, NOW).why, 'Обе площадки стоят на уже опубликованных версиях.');
+  equal('регистр буквы в номере версии для повтора не аргумент',
+    feed.composeStoreNote({
+      android: { gameVersion: '1.36.05B', at: '2026-09-23', text: '' },
+      ios: {}, known: { android: '1.36.05b', ios: '' },
+    }, NOW).why, 'Android не менялся, iOS ничего не принёс.');
+  equal('ни у одной площадки даты нет — и в посте её нет',
+    feed.pickLatestDate('', '', NOW), '');
+  equal('«Обновление версии» — не содержание', feed.cleanIosNotes('Обновление версии.'), '');
+  equal('но живая строка релизных заметок остаётся',
+    feed.cleanIosNotes('Переработана грузоподъёмность караванов.'),
+    'Переработана грузоподъёмность караванов.');
+
+  /* ── 4. Границы: разбор не имеет права выдать то, что база не примет ── */
+  const SQL_NUMBERS = [
+    ['название события', `char_length(title) between ${L.storeEventTitleMin} and ${L.storeEventTitleMax}`],
+    ['описание события', `char_length(summary) <= ${L.storeEventSummaryMax}`],
+    ['ключ события', `char_length(feed_key) between ${L.storeEventKeyMin} and ${L.storeEventKeyMax}`],
+    ['отчёт об обходе', `char_length(last_run_text) <= ${L.storeRunTextMax}`],
+    ['длина ссылки события', `char_length(source_url) <= ${L.updateUrlMax}`],
+  ];
+  for (const [label, needle] of SQL_NUMBERS) {
+    check(`число «${label}» в базе и в конфиге одно и то же`, flat.includes(needle), needle);
+  }
+  check('начало события обязано самой базой: без даты строка не существует',
+    flat.includes('starts_at timestamptz not null'));
+  check('конец события необязателен, а пережитый порядок дат — ошибка',
+    recSql.includes('if p_ends_at is not null and p_ends_at <= p_starts_at then'));
+  check('ссылка события либо настоящая, либо пустая строка',
+    flat.includes("source_url text not null default '' check (source_url = '' or (source_url ~ '^https://[^[:space:]]+$'")
+      && flat.includes('and char_length(source_url) <= 500))'));
+  check('дверь записывает ровно то, что разрешила: строки не обрезаются молча',
+    recSql.includes(`left(v_title, ${L.storeEventTitleMax})`)
+      && recSql.includes(`left(v_text, ${L.storeEventSummaryMax})`));
+  check('сколько карточек показывать и когда прятать пережитое — выбор страницы, а не базы',
+    listViewSql.length > 100 && !/\blimit\b|\boffset\b|\bwhere\b/i.test(listViewSql)
+      && feedSrc.includes('L.storeEventListMax') && feedSrc.includes('L.storeEventHideAfterDays'));
+  check('разбор называет границы теми же числами, что и публикация',
+    /L\.storeEvent/.test(feedSrc) && !/= 120\b/.test(feedSrc.split('readEventCards')[1]?.split('\n}')[0] ?? ''));
+
+  /* ── 5. Право и порядок отказов: одна база, один черновой режим ── */
+  const RECORD_REFUSALS = [
+    'Событие из магазина приносит модерация',
+    'Ключ события короче',
+    'Ключ события длиннее',
+    'Неизвестная площадка события',
+    'Название события короче',
+    'Название события длиннее',
+    'Описание события длиннее',
+    'У события нет начала',
+    'У события конец раньше начала',
+    'Ссылка на событие не начинается с https://',
+    'Ссылка на событие не может содержать пробелы',
+    'Ссылка на событие длиннее',
+  ];
+  check('дверь события отказывает в названном порядке и своими словами',
+    inOrder(recSql, RECORD_REFUSALS));
+  const ARCHIVE_REFUSALS = [
+    'Событие из магазина убирает и возвращает модерация',
+    'Событие не найдено',
+    'Это событие уже в архиве',
+    'Это событие и так опубликовано',
+  ];
+  check('архив события — те же слова и тот же порядок в обоих режимах',
+    inOrder(archSql, ARCHIVE_REFUSALS) && inOrder(localFeed, ARCHIVE_REFUSALS));
+  check('отказ гонки знает одна база: в черновом режиме бросать его некому',
+    archSql.includes('Событие уже изменено')
+      && !/throw new Error\(['"`]Событие уже изменено/.test(localFeed));
+  check('ни одной политики на запись: браузер в таблицы фида не пишет',
+    !/for insert|for update|for delete/i.test(sql));
+  check('читает список и гость, и вошедший — таблицей и представлением',
+    flat.includes('grant select on public.forum_store_events to anon, authenticated;')
+      && flat.includes('grant select on public.forum_store_event_list to anon, authenticated;')
+      && flat.includes('grant select on public.forum_store_status to anon, authenticated;'));
+  check('публикованное видит невошедший, архив — только модерация',
+    flat.includes(`for select using (status = 'published' or public.forum_is_staff());`));
+  check('три двери, и каждая спрашивает роль сама',
+    (sql.match(/language plpgsql security definer/g) || []).length === 3
+      && recSql.includes('if not public.forum_is_staff() then'));
+  check('двери закрыты от гостя и открыты вошедшему',
+    flat.includes('revoke all on function public.forum_record_store_event(')
+      && flat.includes('grant execute on function public.forum_mark_store_run('));
+  check('автором остаётся тот, кто вошёл: просить чужой ник не о чем',
+    !/p_author|p_nick/.test(sql) && archSql.includes('auth.uid()'));
+  check('состояние обхода — одна строка, и это проверяет база, а не договорённость',
+    flat.includes('id boolean primary key default true check (id)'));
+  check('единственная строка заведена миграцией: иначе отчёт пропал бы молча',
+    flat.includes('insert into public.forum_store_state (id) values (true) on conflict (id) do nothing;'));
+  check('убранное автоматом возвращается, а не удаляется',
+    !/delete from/i.test(sql) && flat.includes(`status = case when p_archived then 'archived' else 'published' end`));
+  check('представления спрашивают права читателя',
+    flat.includes('create or replace view public.forum_store_event_list with (security_invoker = on) as')
+      && flat.includes('create or replace view public.forum_store_status with (security_invoker = on) as'));
+  check('ник убравшего берётся из вью профилей, второй копии имён нет',
+    flat.includes('left join public.forum_profiles p_arch on p_arch.id = e.archived_by'));
+
+  /* ── 6. Граница «кто ходит наружу» ── */
+  check('в разборе страницы нет ни одного обращения наружу',
+    !/fetch\(|XMLHttpRequest|import\(|require\(/.test(feedSrc));
+  check('и на странице форума тоже: браузер показывает то, что уже в базе',
+    !/fetch\(/.test(pageSrc + updSrc));
+  check('наружу ходит только планировщик — по двум адресам и без нашего ключа в чужих заголовках',
+    scriptSrc.includes('fetchExternal(')
+      && scriptSrc.includes('playPageUrl(') && scriptSrc.includes('itunesLookupUrl(')
+      && externalCall.length > 100 && !/apikey|anonKey|Authorization/.test(externalCall));
+  check('служебного ключа базы в проекте нет: бот входит как игрок',
+    !/service_role|SERVICE_KEY/i.test(sql + scriptSrc + flowSrc + feedSrc)
+      && scriptSrc.includes('/auth/v1/token?grant_type=password'));
+  check('пароль берётся только из переменных окружения и в репозитории не лежит',
+    scriptSrc.includes('process.env.STORE_FEED_PASSWORD')
+      && !/STORE_FEED_PASSWORD\s*=\s*['"`][^'"`]/.test(flowSrc + scriptSrc));
+  check('сухой прогон — поведение по умолчанию, пишет только флаг',
+    scriptSrc.includes("process.argv.includes('--писать')"));
+  check('без учётных данных запуск не падает, а остаётся сухим',
+    scriptSrc.includes('Нет STORE_FEED_NICK или STORE_FEED_PASSWORD — в базу не пишем.'));
+  check('планировщик зовётся по расписанию и руками',
+    flowSrc.includes('schedule:') && flowSrc.includes("cron: '15 4,12,20 * * *'")
+      && flowSrc.includes('workflow_dispatch'));
+  check('два запуска не пишут один пост дважды',
+    flowSrc.includes('concurrency:') && flowSrc.includes('cancel-in-progress: false'));
+  check('права воркфлоу — только чтение репозитория', flowSrc.includes('contents: read'));
+  check('разбор чинится по журналу: при отказе печатается вёрстка вокруг заголовков',
+    scriptSrc.includes('страница не разобрана') && scriptSrc.includes('headsAudit('));
+
+  /* ── 7. Контракт, адаптеры и то, что видит читатель ── */
+  check('контракт обещает два чтения и одно решение по событию',
+    ['listStoreEvents', 'getStoreStatus', 'setStoreEventArchived']
+      .every((n) => contractSrc.includes(`[${n}]`))
+      && contractSrc.includes('@typedef {Object} ForumStoreEvent'));
+  check('боевой режим читает представления и зовёт функции базы',
+    supaFeed.includes('/forum_store_event_list?select=*&order=starts_at.desc')
+      && supaFeed.includes("'/rpc/forum_set_store_event_archive'")
+      && supaFeed.includes('/forum_store_status?select=*&limit=1'));
+  check('поля строки приходят из столбцов базы, а не выдумываются',
+    supaFeed.includes('feedKey: row.feed_key') && supaFeed.includes('archivedByNick: row.archived_by_nick'));
+  check('черновой режим называет границы тем же числом списка',
+    localFeed.includes('L.storeEventListMax') && supaFeed.includes('limits.storeEventListMax'));
+  {
+    const live = {
+      id: 'e1', title: EVENT_TITLE, summary: 'Экипажи, общий сбор!', platform: 'android',
+      startsAt: new Date('2026-09-28T02:00:00Z'), endsAt: new Date('2026-10-04T02:00:00Z'),
+      status: 'published', sourceUrl: `https://play.google.com/store/apps/eventdetails/${EVENT_ID}`,
+    };
+    const removed = {
+      ...live, id: 'e2', title: 'Ночной заезд', status: 'archived',
+      startsAt: new Date('2026-09-19T02:00:00Z'), endsAt: new Date('2026-09-27T02:00:00Z'),
+    };
+    /* Пережитое дальше срока не видно никому: ни читателю, ни модератору. */
+    const farEnded = {
+      ...live, id: 'e3', title: 'Конвой в пустыне',
+      startsAt: new Date('2026-07-01T02:00:00Z'), endsAt: new Date('2026-08-09T02:00:00Z'),
+    };
+    const page = (over) => renderUpdates({
+      ready: true, shared: true, me: null, canManage: false, notes: [], loading: false,
+      error: '', composing: false, storeEvents: [], storeStatus: null, feedError: '',
+      now: NOW, ...over,
+    });
+    const feedPage = (over) => page({ storeEvents: [live, removed, farEnded], ...over });
+
+    check('блок назван и объяснён: карточки принесли магазины, разговор — на форуме',
+      feedPage().includes('События игры') && feedPage().includes('href="#/forum"'));
+    check('событие отдаёт читателю название, даты и стадию',
+      feedPage().includes(EVENT_TITLE) && feedPage().includes('идёт')
+        && feedPage().includes('28 сент. — 4 окт.') && feedPage().includes('осталось 4 дня'));
+    check('пережитое дальше срока со экрана уходит, а не висит',
+      !feedPage().includes('Конвой в пустыне')
+        && !feedPage({ canManage: true }).includes('Конвой в пустыне'));
+    check('ссылка ведёт на страницу события в магазине и не оставляет следов для него',
+      feedPage().includes(`href="https://play.google.com/store/apps/eventdetails/${EVENT_ID}"`)
+        && feedPage().includes('rel="noreferrer noopener nofollow"'));
+    check('ссылка вне https ссылкой не становится',
+      !page({ storeEvents: [{ ...live, sourceUrl: 'javascript:alert(1)' }] })
+        .includes('href="javascript'));
+    check('данные магазина экранируются, как и всё, что принёс человек',
+      page({ storeEvents: [{ ...live, title: '<img src=x onerror=alert(1)>' }] })
+        .includes('&lt;img'));
+    check('невошедший не видит ни кнопки убрать, ни убранное',
+      !feedPage().includes('data-feed-archive') && !feedPage().includes('Убрано автоматом')
+        && !feedPage().includes('Ночной заезд'));
+    check('модератор видит кнопку убрать и свежее убранное, а не всё подряд',
+      feedPage({ canManage: true }).includes('data-feed-archive')
+        && feedPage({ canManage: true }).includes('Убрано автоматом')
+        && feedPage({ canManage: true }).includes('Ночной заезд')
+        && !feedPage({ canManage: true }).includes('Конвой в пустыне'));
+    check('пустой блок не врёт про игру: он называет две возможные причины',
+      page({}).includes('автомат ещё ни разу не заходил'));
+    check('отказ списка называется именем нужной миграции',
+      page({ feedError: 'relation "forum_store_event_list" does not exist' })
+        .includes('20260930-store-feed.sql'));
+    check('а отказ состояния блок не ломает: живой список остаётся живым',
+      feedPage({ feedError: '' }).includes(EVENT_TITLE));
+    check('молчание автомата названо вслух строкой обхода',
+      feedPage({ storeStatus: { lastRunAt: new Date('2026-09-30T04:15:00Z'), lastRunText: 'нового нет' } })
+        .includes('Планировщик заходил'));
+    check('подпись стадии и срок прячутся по числам, а не по догадке разметки',
+      pageSrc.includes('pickStoreEvents(') && feedSrc.includes('storeEventPhase'));
+    check('поле, карточка и строка обхода одеты стилем',
+      cssSrc.includes('.feed-card__source') && cssSrc.includes('.feed-list')
+        && cssSrc.includes('.feed__run'));
+    check('список и состояние читаются двумя запросами, и отказ одного не убивает другой',
+      inOrder(updSrc.slice(updSrc.indexOf('async function loadFeed')),
+        ['state.storeEvents = (await forum.listStoreEvents())', 'state.feedError = String',
+          'state.storeStatus = (await forum.getStoreStatus())'])
+        && /catch \{\s*\n\s*state\.storeStatus = null;/.test(updSrc));
+  }
+
+  /* ── 8. Документы ── */
+  check('миграция названа в документах форума, в порядке запуска и в планировщике',
+    docsSrc.includes('20260930-store-feed.sql')
+      && readmeSrc.includes('20260930-store-feed.sql')
+      && readmeSrc.replace(/\s+/g, ' ').includes('`20260929-player-guides.sql`, `20260930-store-feed.sql`'));
+  check('документ объясняет, почему автомат живёт вне браузера, и как его включить',
+    docsSrc.includes('## Фид магазина') && docsSrc.includes('STORE_FEED_NICK')
+      && docsSrc.includes('.github/workflows/store-feed.yml'));
+  check('документ называет, чего автомат не делает намеренно',
+    docsSrc.includes('- **не додумывает.**') && docsSrc.includes('- **не переводит**')
+      && docsSrc.includes('- **не знает служебного ключа базы.**'));
+  check('и что событие без даты в базу не едет',
+    docsSrc.replace(/\s+/g, ' ').includes('Карточка без читаемой даты в отчёте названа вслух и в базу не идёт'));
+  check('документы хостинга называют планировщик и его секреты',
+    hostingSrc.includes('store-feed.yml') && hostingSrc.includes('STORE_FEED_PASSWORD'));
+  check('прежний запрет на чтение магазинов снят словами, а не молча',
+    !pulseSql.includes('Автоматического чтения чужих страниц')
+      && pulseSql.includes('20260930-store-feed.sql')
+      && docsSrc.includes('- **Чтения чужих страниц из браузера посетителя.**'));
 }
 
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);

@@ -26,6 +26,12 @@ const state = {
   composing: false,
   /** Что подсказка сказала после последнего «Разобрать». */
   notice: '',
+  /** Строки ForumStoreEvent: их принёс планировщик, а не человек. */
+  storeEvents: [],
+  /** Одна строка состояния обхода — «когда автомат приходил в последний раз». */
+  storeStatus: null,
+  /** Отказ списка событий; состояние обхода молчит отдельно и молча. */
+  feedError: '',
 };
 
 let host = null;
@@ -121,6 +127,31 @@ function fillFromPaste() {
   state.notice = updateParseNotice(parsed);
 }
 
+/**
+ * События магазина и строка состояния — два отдельных запроса и два разных
+ * отношения к отказу.
+ *
+ * Список без миграции страница обязана назвать: пустые «событий нет» звучали бы
+ * как правда про игру, а не про наш прогон SQL. Состояние обхода — украшение
+ * одной строки, и его отказ не имеет права превращать живой блок в ошибку,
+ * поэтому он глушится намеренно и ничему не противоречит: просто строки не
+ * будет.
+ */
+async function loadFeed() {
+  try {
+    state.storeEvents = (await forum.listStoreEvents()) || [];
+    state.feedError = '';
+  } catch (err) {
+    state.storeEvents = [];
+    state.feedError = String(err?.message ?? err);
+  }
+  try {
+    state.storeStatus = (await forum.getStoreStatus()) || null;
+  } catch {
+    state.storeStatus = null;
+  }
+}
+
 async function load() {
   const token = mountToken;
   try {
@@ -161,6 +192,8 @@ async function load() {
     state.error = String(err?.message ?? err);
   }
 
+  await loadFeed();
+
   if (token !== mountToken) return;
   state.loading = false;
   paint();
@@ -175,6 +208,7 @@ async function reload() {
     state.notes = [];
     state.error = String(err?.message ?? err);
   }
+  await loadFeed();
   paint();
 }
 
@@ -210,6 +244,27 @@ async function runNoteAction(btn, fn) {
       card.insertAdjacentHTML('beforeend', `<p class="upd-card__error">${esc(String(err?.message ?? err))}</p>`);
     }
     if (btn) btn.disabled = false;
+  }
+}
+
+/*
+  Одно действие над одним событием. Отказ, как и у заметки, показываем в
+  карточке: «это событие уже в архиве» относится ровно к одной строке, а блок
+  событий при этом живой и никуда не денется.
+*/
+async function runFeedAction(btn, archived) {
+  if (!forum.setStoreEventArchived) return;
+  const id = btn.dataset[archived ? 'feedArchive' : 'feedRestore'];
+  btn.disabled = true;
+  try {
+    await forum.setStoreEventArchived(id, archived);
+    await reload();
+  } catch (err) {
+    const card = btn.closest('.feed-card');
+    if (card) {
+      card.insertAdjacentHTML('beforeend', `<p class="feed-card__error">${esc(String(err?.message ?? err))}</p>`);
+    }
+    btn.disabled = false;
   }
 }
 
@@ -253,7 +308,17 @@ function wire() {
     const restore = t.closest('[data-upd-restore]');
     if (restore && forum.setUpdateNoteArchived) {
       await runNoteAction(restore, () => forum.setUpdateNoteArchived(restore.dataset.updRestore, false));
+      return;
     }
+
+    const feedOff = t.closest('[data-feed-archive]');
+    if (feedOff) {
+      await runFeedAction(feedOff, true);
+      return;
+    }
+
+    const feedBack = t.closest('[data-feed-restore]');
+    if (feedBack) await runFeedAction(feedBack, false);
   });
 
   /*
@@ -311,6 +376,12 @@ export async function mountUpdates(container) {
   mountToken++;
   state.loading = true;
   state.composing = false;
+  /*
+    «Сейчас» для стадии события берётся в момент входа на страницу: событие,
+    которое кончилось, пока человек листал форум, обязан показаться кончившимся,
+    а не вчерашним.
+  */
+  state.now = Date.now();
   paint();
   wire();
   await load();
@@ -324,4 +395,7 @@ export function unmountUpdates() {
   state.composing = false;
   state.canManage = false;
   state.me = null;
+  state.storeEvents = [];
+  state.storeStatus = null;
+  state.feedError = '';
 }

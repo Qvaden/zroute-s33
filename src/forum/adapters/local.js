@@ -76,6 +76,7 @@ function emptyState() {
     reservedNicks: [],
     nickHistory: [],
     updateNotes: [],
+    storeEvents: [],
   };
 }
 
@@ -3558,6 +3559,67 @@ export async function setUpdateNoteArchived(id, archived) {
   if (!row) throw new Error('Заметка не найдена');
   if (archived && row.status === 'archived') throw new Error('Эта заметка уже в архиве');
   if (!archived && row.status === 'published') throw new Error('Эта заметка и так опубликована');
+
+  row.status = archived ? 'archived' : 'published';
+  row.archivedAt = archived ? new Date().toISOString() : null;
+  row.archivedBy = archived ? me.id : null;
+  row.archivedByNick = archived ? me.nick : null;
+  write(s);
+}
+
+/* ── Фид магазина в локальном режиме ───────────────────────────────────────── */
+
+/*
+  События приносит планировщик, а планировщик ходит в боевую базу: в
+  localStorage ему брать нечего. Пока строки сюда не положены, список пуст, а
+  подпись «автомат ещё не приходил» объясняет читателю пустоту — ровно то же
+  он увидит до первой миграции.
+  Слова archive-отказа повторяют forum_set_store_event_archive в том же порядке
+  и без «Событие уже изменено»: в localStorage два клика не пересекаются по
+  сети, а выдумывать гонку значило бы проверять фразу, которой здесь не бывает.
+*/
+function storeEventOut(r) {
+  return {
+    id: r.id,
+    feedKey: r.feedKey || '',
+    title: r.title,
+    summary: r.summary || '',
+    platform: r.platform || 'other',
+    startsAt: toDate(r.startsAt) ?? new Date(),
+    endsAt: toDate(r.endsAt),
+    sourceUrl: r.sourceUrl || '',
+    status: r.status,
+    firstSeenAt: toDate(r.firstSeenAt) ?? new Date(),
+    lastSeenAt: toDate(r.lastSeenAt) ?? new Date(),
+    archivedAt: toDate(r.archivedAt),
+    archivedByNick: r.archivedByNick || null,
+  };
+}
+
+export async function listStoreEvents() {
+  const L = CONFIG.forum.limits;
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me) || null;
+  return (s.storeEvents || [])
+    .filter((e) => e.status === 'published' || isStaff(me))
+    .sort((a, b) => String(b.startsAt).localeCompare(String(a.startsAt)))
+    .slice(0, L.storeEventListMax)
+    .map(storeEventOut);
+}
+
+export async function getStoreStatus() {
+  return null;
+}
+
+export async function setStoreEventArchived(id, archived) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me) || null;
+  if (!isStaff(me)) throw new Error('Событие из магазина убирает и возвращает модерация');
+
+  const row = (s.storeEvents || []).find((e) => e.id === id);
+  if (!row) throw new Error('Событие не найдено');
+  if (archived && row.status === 'archived') throw new Error('Это событие уже в архиве');
+  if (!archived && row.status === 'published') throw new Error('Это событие и так опубликовано');
 
   row.status = archived ? 'archived' : 'published';
   row.archivedAt = archived ? new Date().toISOString() : null;

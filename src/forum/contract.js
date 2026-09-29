@@ -465,11 +465,18 @@
  * @property {(id: string, status: 'linked'|'closed', answer: string, guideId?: string|null) => Promise<void>} [resolveGuideRequest]  Решение модерации; для игрока — отказ.
  *
  * Пульс обновлений игры (см. supabase/20260926-update-pulse.sql). Заметку
- * пишет модерация руками: автоматического чтения чужих страниц у сайта нет ни
- * в каком режиме, и быть не может — серверной части нет вовсе.
+ * кладёт модерация руками — либо планировщик, который входит в форум обычным
+ * аккаунтом. Браузер посетителя наружу не ходит ни в каком режиме: серверной
+ * части у сайта нет вовсе, и этот рубеж не двигается.
  * @property {() => Promise<ForumUpdateNote[]>} [listUpdateNotes]  Свежие сверху; опубликованные видят и невошедшие, архив — только модерация. Ошибку вызывающий не глушит: по ней страница называет файл миграции.
  * @property {(draft: {kind: string, title: string, summary: string, sourceName: string, sourceUrl: string, sourceAt: string, gameVersion?: string}) => Promise<ForumUpdateNote>} [publishUpdateNote]  Порядок отказов одинаков в обоих режимах: право → тип → заголовок → содержание → источник → дата → версия.
  * @property {(id: string, archived: boolean) => Promise<void>} [setUpdateNoteArchived]  Убрать и вернуть одной функцией: правка текста после публикации не разрешена намеренно.
+ *
+ * Фид магазина (см. supabase/20260930-store-feed.sql): события из Google Play,
+ * которые приносит планировщик, и одна строка о том, когда он их приносил.
+ * @property {() => Promise<ForumStoreEvent[]>} [listStoreEvents]  Ближайшие сверху; пережитое страница прячет сама, архив видит только модерация.
+ * @property {(id: string, archived: boolean) => Promise<void>} [setStoreEventArchived]  Убрать и вернуть одной функцией: у события нет правки, магазин перепишет его сам на следующем обходе.
+ * @property {() => Promise<ForumStoreStatus|null>} [getStoreStatus]  Строка состояния обхода; null — миграции ещё нет, и страница по этому молчанию не врёт про «автомат не работал».
  * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean, quietStart: number|null, quietEnd: number|null}>} [getPushPrefs]  Окно тихих часов — минуты от полуночи локального времени игрока; null в обеих — окно не задано.
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean, quietStart?: number|null, quietEnd?: number|null}) => Promise<void>} [setPushPrefs]  null здесь значит «стереть», поэтому выключить окно можно одной записью; база не примет половину окна и совпавшие границы.
  * @property {() => Promise<ForumActivityDay[]|null>} [getServerActivity]  Последняя неделя: посты, комментарии, сообщения в чатах по дням.
@@ -572,6 +579,45 @@
  * @property {Date} createdAt
  * @property {Date|null} archivedAt
  * @property {string|null} archivedByNick  Кто убрал; пусто, пока заметка открыта.
+ */
+
+/**
+ * Событие из магазина. Это не календарь форума: у него нет автора, обсуждения
+ * и RSVP, потому что его не обсуждают — на него смотрят. Даты принесены со
+ * страницы магазина, а `firstSeenAt` и `lastSeenAt` отвечают на вопрос, который
+ * иначе никто не задаст: автомат видел это событие или видит каждый обход.
+ *
+ * Событие, у которого нет начальной даты, в базу не попадает: «идёт сейчас»
+ * без числа превратилось бы в событие, которое никогда не кончается.
+ *
+ * @typedef {Object} ForumStoreEvent
+ * @property {string} id
+ * @property {string} feedKey  По нему планировщик между обходами узнаёт эту же строку.
+ * @property {string} title
+ * @property {string} summary  Пустое поле — норма: магазин подписывает карточку названием.
+ * @property {'android'|'ios'|'other'} platform
+ * @property {Date} startsAt
+ * @property {Date|null} endsAt  null — магазин не назвал конец, а не «бессрочно».
+ * @property {string} sourceUrl  Пустое — ссылка на страницу приложения, а не на событие.
+ * @property {'published'|'archived'} status
+ * @property {Date} firstSeenAt  Первый обход, который принёс это событие.
+ * @property {Date} lastSeenAt  Последний обход, где оно ещё стоит в магазине.
+ * @property {Date|null} archivedAt
+ * @property {string|null} archivedByNick
+ */
+
+/**
+ * Строка состояния обхода — одна на весь автомат. Нужна не для статистики, а
+ * для честного «автомат молчит»: без неё пропущенный запуск выглядит как
+ * «нового не было», и отличить одно от другого модератору нечем.
+ *
+ * @typedef {Object} ForumStoreStatus
+ * @property {Date|null} lastRunAt  Когда планировщик приходил в последний раз.
+ * @property {string} lastRunText  Что он об этом сказал, по-русски и коротко.
+ * @property {string} androidVersion  Пустая строка — страница не ответила.
+ * @property {string} iosVersion
+ * @property {Date|null} androidAt  Дата обновления у площадки.
+ * @property {Date|null} iosAt
  */
 
 /**
