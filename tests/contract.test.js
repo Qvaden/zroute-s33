@@ -6063,9 +6063,10 @@ console.log('\nX. Тишина в одном разделе');
     sectionMuteOf(seat, 'vs') !== null && sectionMuteOf(seat, 'help') === null);
   check('в списке разделов формы закрытый помечен, а не спрятан',
     /sectionMuteOf\(s, c\.id\)[\s\S]{0,160}вам здесь нельзя/.test(pagesSrc));
-  check('лента читает тишины вместе с собой и ошибкой не роняет страницу',
-    /state\.sectionMutes = state\.me \? await forum\.listSectionMutes\(state\.me\.id\) : \[\]/.test(mountSrc)
-      && mountSrc.includes('state.sectionMutes = [];'));
+  check('тишины читает отдельный слой ленты, а не сама лента, и без них лента живёт',
+    /async function loadSectionMutes\(\)[\s\S]{0,700}state\.sectionMutes = Array\.isArray\(list\) \? list : \[\]/.test(mountSrc)
+      && /state\.sectionMutes = \[\];/.test(mountSrc)
+      && /loadSectionMutes\(\)/.test(mountSrc));
   check('блок одет своим стилем, а не красной полосой общего бана',
     cssSrc.includes('.forum-blocked--section'));
 
@@ -10000,8 +10001,18 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('без учётных данных запуск не падает, а остаётся сухим',
     scriptSrc.includes('Нет STORE_FEED_NICK или STORE_FEED_PASSWORD — в базу не пишем.'));
   check('планировщик зовётся по расписанию и руками',
-    flowSrc.includes('schedule:') && flowSrc.includes("cron: '15 4,12,20 * * *'")
+    flowSrc.includes('schedule:') && flowSrc.includes("cron: '17 * * * *'")
       && flowSrc.includes('workflow_dispatch'));
+  /*
+    Расписание часовое, а не «три раза в сутки»: GitHub отдаёт слоты
+    планировщика без гарантии и 30 сентября просто не вызвал автомат в 04:15
+    UTC. При трёх слотах такой пропуск означает молчание до следующего окна,
+    при часовом — один час. Проверка сторожит именно это: вернуть редкое
+    расписание так же легко, как на вид безобидную минутку в cron.
+  */
+  const feedCron = ((flowSrc.match(/- cron: '([^']+)'/) || [, ''])[1]);
+  check('проверка магазина ходит каждый час',
+    /^[0-5]?\d \* \* \* \*$/.test(feedCron));
   check('два запуска не пишут один пост дважды',
     flowSrc.includes('concurrency:') && flowSrc.includes('cancel-in-progress: false'));
   check('права воркфлоу — только чтение репозитория', flowSrc.includes('contents: read'));
@@ -10124,6 +10135,268 @@ console.log('\nAM. Фид магазина: обновление и событи
     !pulseSql.includes('Автоматического чтения чужих страниц')
       && pulseSql.includes('20260930-store-feed.sql')
       && docsSrc.includes('- **Чтения чужих страниц из браузера посетителя.**'));
+
+  /* ── 9. Вход на форум: один монтаж, ранняя лента, память первого экрана ──
+     *
+     * Проверки этого раздела сторожат не красиво выглядящие строки, а
+     * порядок, в котором страница успевает что-то показать человеку:
+     * перемонтаж живой вкладки, ожидание «кто вошёл» перед запросом ленты и
+     * память прошлого экрана — всё это видно только по времени прихода первого
+     * кадра, и вернуть прежнее поведение здесь так же легко, как убрать одну
+     * строчку.
+     */
+  const bootMain = await readFile('src/main.js', 'utf8');
+  const feedMount = await readFile('src/forum/mount.js', 'utf8');
+  const feedPages = await readFile('src/pages/forum.js', 'utf8');
+  const feedCss = await readFile('src/forum.css', 'utf8');
+  const feedCfg = await readFile('config.js', 'utf8');
+  const feedSupa = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const feedLocal = await readFile('src/forum/adapters/local.js', 'utf8');
+
+  check('живую вкладку на том же адресе не перемонтируют',
+    /function liveKeyOf\(id, param, search\)/.test(bootMain)
+      && bootMain.includes('if (live && live === liveMountKey) {')
+      && bootMain.includes('syncForumView(view)'));
+  check('данные сайта форум принимает без перерисовки ленты',
+    /export function syncForumView\(view\)[\s\S]{0,400}siteView = view;[\s\S]{0,120}paint\(\);/.test(feedMount));
+  check('лента стартует до ответа на вопрос, кто вошёл',
+    feedMount.indexOf('const whoIAm = forum.currentUser()')
+      < feedMount.indexOf('postId ? loadThread(postId) : loadFeed()')
+      && feedMount.indexOf('postId ? loadThread(postId) : loadFeed()')
+      < feedMount.indexOf('state.me = await whoIAm'));
+  check('всё про вошедшего собирается одним пакетом и одной перерисовкой',
+    /await Promise\.all\(\[\s*\n\s*loadNotifications\(\{ repaint: false \}\)/.test(feedMount)
+      && /if \(token !== mountToken\) return;[\s\S]{0,900}paint\(\);\s*await content;/.test(feedMount));
+  check('плашку «Загружаем ленту…» показывают только когда экрана нет',
+    feedMount.includes('state.loading = !append && !state.posts.length;'));
+  check('список ленту красит сразу, а довески догоняют отдельно',
+    /state\.loading = false;[\s\S]{0,20}paint\(\);[\s\S]{0,120}if \(!append\) loadFeedExtras\(token\);/.test(feedMount));
+  check('три довеска идут одновременно и не ждут друг друга',
+    /async function loadFeedExtras\(token\)[\s\S]{0,200}await Promise\.all\(\[/.test(feedMount)
+      && (feedMount.match(/forum\.listPosts\(\{ sort: '(talked|fresh)'/g) || []).length === 2);
+
+  check('память первого экрана живёт в sessionStorage, а не в localStorage',
+    feedMount.includes('sessionStorage.setItem(`${FEED_CACHE_PREFIX}:${feedSignature()}`')
+      && !/localStorage\.(set|get)Item\(`\$\{FEED_CACHE_PREFIX\}/.test(feedMount));
+  check('снимок подписан зрителем: прошлый экран чужого аккаунта не подмешивается',
+    /typeof forum\.viewerKey === 'function' \? forum\.viewerKey\(\) : 'зритель'/.test(feedMount)
+      && feedSupa.includes('export function viewerKey()')
+      && feedLocal.includes('export function viewerKey()'));
+  check('срок памяти — число в config, а не слово в коде',
+    /feedCacheMinutes: \d+/.test(feedCfg)
+      && feedMount.includes('Date.now() - at > minutes * 60_000'));
+  check('пустой список памятью не становится: «постов нет» решает свежий ответ',
+    /if \(!minutes \|\| !state\.posts\.length\) return;/.test(feedMount));
+  check('и тяжёлый экран память не держит, вместо того чтобы рвать её на части',
+    feedMount.includes('json.length > FEED_CACHE_MAX_CHARS'));
+  check('даты из памяти оживают: строка вместо даты уронила бы ленту',
+    /state\.posts = posts\.map\(reviveDates\)/.test(feedMount)
+      && /function reviveDates\(value\)/.test(feedMount)
+      && /\/\(At\|Until\)\$/.test(feedMount));
+  check('память — только первый кадр: свой запрос всё равно уходит',
+    /restoreFeedSnapshot\(\);[\s\S]{0,400}postId \? loadThread\(postId\) : loadFeed\(\)/.test(feedMount));
+  check('пришедший список заменяет память и обновляет её',
+    /if \(!append\) rememberFeedSnapshot\(\);/.test(feedMount)
+      && feedMount.includes('state.fromCache = false;'));
+  check('с уходом с форума помнящиеся темы снимают, фильтры читают из адреса',
+    /state\.posts = \[\];\s*\n\s*state\.total = 0;\s*\n\s*state\.fromCache = false;/.test(feedMount));
+
+  check('прошлый экран назван строкой, а не молчанием',
+    feedPages.includes('Показываем последний вид ленты, обновляем…')
+      && feedCss.includes('.forum-feed__stale--soft'));
+  check('сбой обновления при видимой ленте — строка с кнопкой, а не полоса на весь экран',
+    /if \(s\.error && !s\.posts\?\.length\)/.test(feedPages)
+      && /data-forum-retry>повторить</.test(feedPages));
+
+  const { renderForum: renderFeedFrame } = await import('../src/pages/forum.js');
+  const cachedCard = {
+    id: 'p_memory',
+    authorId: 'u_1',
+    authorNick: 'Ковыль',
+    title: 'Тема из памяти',
+    body: 'Текст темы',
+    category: 'general',
+    tags: [],
+    createdAt: new Date(),
+    commentCount: 2,
+    score: 1,
+  };
+  const staleFrame = renderFeedFrame({ events: [], texts: [], alliances: [] }, {
+    ready: true, loading: false, fromCache: true, posts: [cachedCard], total: 1,
+  });
+  check('кадр из памяти показывает тему, а не ожидание',
+    staleFrame.includes('Тема из памяти') && !staleFrame.includes('Загружаем ленту')
+      && staleFrame.includes('Показываем последний вид ленты'));
+  const brokenFrame = renderFeedFrame({ events: [], texts: [], alliances: [] }, {
+    ready: true, loading: false, error: 'база молчит', posts: [cachedCard], total: 1,
+  });
+  check('при отказе базы прошлые темы остаются на экране',
+    brokenFrame.includes('Тема из памяти') && brokenFrame.includes('Ленту обновить не удалось')
+      && !brokenFrame.includes('Форум не отвечает'));
+}
+
+/* ── 10. Раздача: сеть не держит белый экран ─────────────────────────────
+
+   Жалоба «открываю с телефона — бесконечная загрузка и белый экран» живёт не
+   в коде страницы, а в правиле «ждать сеть сколько угодно». Проверить это
+   глазами нельзя, а сломать можно молча: достаточно вернуть в обработчик
+   запроса один await без отсчёта, и сайт снова на подвешенном соединении
+   висит до миллиона. Поэтому здесь тело обработчика вырезано из sw.js и
+   исполняется с подставными кэшем и сетью — ровно так, как прогоняют тишину
+   часов.
+────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const swSrc = await readFile('sw.js', 'utf8');
+
+  const open = swSrc.indexOf('(async () => {', swSrc.indexOf('event.respondWith('));
+  const body = swSrc.slice(open, swSrc.indexOf('})()', open) + 4);
+  check('тело обработчика запроса удалось вырезать из файла',
+    open > 0 && body.includes('const backup = await caches.match(request'));
+
+  check('отсчёт ожидания сети — число в файле, а не догадка',
+    /const NETWORK_WAIT_MS = (\d+);/.test(swSrc)
+      && Number(swSrc.match(/const NETWORK_WAIT_MS = (\d+);/)[1]) >= 3000
+      && Number(swSrc.match(/const NETWORK_WAIT_MS = (\d+);/)[1]) <= 15000);
+  check('копия по просрочке не возвращается в кэш как свежая',
+    swSrc.includes('fresh !== backup'));
+  check('страница отказа называет причину и что делать, словами на русском',
+    swSrc.includes('Сайт не открылся') && swSrc.includes('сменить сеть')
+      && swSrc.includes('Повторить') && /status:\s*503/.test(swSrc));
+  const hostingSrc = await readFile('docs/HOSTING.md', 'utf8');
+  check('запасной адрес хостинга назван и в документе о раздаче',
+    hostingSrc.includes('zroutehub.onrender.com'));
+  check('документ о раздаче описывает отсчёт сети и шаги для телефона',
+    hostingSrc.includes('Сайт не открывается с телефона')
+      && hostingSrc.includes('NETWORK_WAIT_MS')
+      && hostingSrc.includes('Экономия трафика') && hostingSrc.includes('Приватный DNS')
+      && hostingSrc.includes('Маскировка IP-адреса'));
+
+  const run = new Function('request', 'caches', 'fetch', 'Response', 'setTimeout',
+    'NETWORK_WAIT_MS', 'CACHE', 'OFFLINE_HTML', `return ${body};`);
+
+  const mkCaches = (map) => ({
+    match: async (req) => map.get(typeof req === 'string' ? req : req.url) ?? null,
+    open: async () => ({ put: () => Promise.resolve() }),
+  });
+  const hang = () => new Promise(() => {});
+  const boom = () => Promise.reject(new Error('нет связи'));
+  const Resp = function (text, init) { Object.assign(this, { text, init }); };
+  const now = (fn) => { fn(); return 0; };
+  const later = () => 0;
+  const OFFLINE = 'ГЛУШКА-БЕЗ-СЕТИ';
+
+  /* 1. Сеть висит, копия есть → отдаём копию и ничего не пишем в кэш. */
+  const backupRes = { ok: true, status: 200, tag: 'копия' };
+  const puts = [];
+  const cachesWith = (map) => {
+    const c = mkCaches(map);
+    c.open = async () => ({ put: () => { puts.push(1); return Promise.resolve(); } });
+    return c;
+  };
+  const stalled = await run(
+    { url: './src/main.js', mode: 'no-cors' },
+    cachesWith(new Map([['./src/main.js', backupRes]])),
+    hang, Resp, now, 5000, 'cache', OFFLINE
+  );
+  check('подвешенная сеть уступает сохранённой копии, а не держит белый экран',
+    stalled === backupRes);
+  check('копия, отданная по просрочке, не притворяется свежим ответом',
+    puts.length === 0);
+
+  /* 2. Сеть отвечает быстро → она по-прежнему первая и попадает в запас. */
+  const freshRes = { ok: true, status: 200, tag: 'живой', clone: () => freshRes };
+  puts.length = 0;
+  const fast = await run(
+    { url: './src/main.js', mode: 'no-cors' },
+    cachesWith(new Map([['./src/main.js', backupRes]])),
+    () => Promise.resolve(freshRes), Resp, later, 5000, 'cache', OFFLINE
+  );
+  check('пока сеть отвечает — она первая, и ответ ложится в запас',
+    fast === freshRes && puts.length === 1);
+
+  /* 3. Копии нет → сеть ждут до конца, без преждевременной подмены. */
+  const noBackup = await run(
+    { url: './src/forum.css', mode: 'no-cors' },
+    mkCaches(new Map()),
+    () => Promise.resolve(freshRes), Resp, later, 5000, 'cache', OFFLINE
+  );
+  check('без сохранённой копии сеть не обрывают раньше времени',
+    noBackup === freshRes);
+
+  /* 4. Отказ сети, перехода по адресу и пустой кэш → внятная страница. */
+  const dead = await run(
+    { url: 'https://zroutehub.bond/', mode: 'navigate' },
+    mkCaches(new Map()), boom, Resp, later, 5000, 'cache', OFFLINE
+  );
+  check('переход без сети и без запаса даёт страницу с объяснением',
+    dead instanceof Resp && dead.text === OFFLINE && dead.init.status === 503
+      && String(dead.init.headers['Content-Type']).includes('charset=utf-8'));
+
+  /* 5. Отказ для файла (не перехода) — честная ошибка, а не подмена. */
+  let fileFailed = false;
+  try {
+    await run({ url: './src/forum.css', mode: 'no-cors' }, mkCaches(new Map()),
+      boom, Resp, later, 5000, 'cache', OFFLINE);
+  } catch { fileFailed = true; }
+  check('отказ без запаса для файла остаётся отказом, а не пустой выдачей',
+    fileFailed);
+
+  /*
+    Вторая половина той же жалобы: страница ждёт данные сайта столько, сколько
+    база соизволит проснуться. Правки в sw.js тут мало — молчание таблицы
+    человек видит как «вечная загрузка», и страница обязана назвать причину.
+  */
+  const bootSrc = await readFile('src/main.js', 'utf8');
+  const cfgSrc = await readFile('config.js', 'utf8');
+  const cssAll = await readFile('src/styles-v8.css', 'utf8');
+
+  check('срок, после которого ожидание называют вслух, — число в config',
+    /slowBootSeconds:\s*\d+/.test(cfgSrc) && bootSrc.includes('CONFIG.slowBootSeconds * 1000'));
+  check('объяснение показывает и плашка первого захода, и заглушка страницы',
+    bootSrc.includes('boot-loader__slow') && /app\.querySelector\('\.loading'\)/.test(bootSrc));
+  check('пришедшие данные уже не объясняют чужое молчание',
+    /function showSlowBootNotice\(\)\s*\{\s*if \(dataArrived\) return;/.test(bootSrc)
+      && /const data = await loadAll\(\);\s*\r?\n\s*dataArrived = true;/.test(bootSrc));
+  check('у объяснения есть повтор, и он идёт тем же путём, что открытие страницы',
+    bootSrc.includes('data-boot-retry')
+      && /data-boot-retry\]'\)\)\s*\r?\n?\s*boot\(\);/.test(bootSrc));
+  check('честное объяснение выключает крутящиеся точки «ещё ждём»',
+    cssAll.includes('.loading.is-honest::after') && bootSrc.includes("classList.add('is-honest')"));
+  check('текст объяснения говорит про сон базы и не обещает лишнего',
+    bootSrc.includes('база на бесплатном тарифе засыпает')
+      && bootSrc.includes('Форум, календарь') && bootSrc.includes('SLOW_BOOT_TEXT'));
+  /* Исполняем само объяснение на подставных узлах: глазами это не проверить. */
+  const noticeSrc = bootSrc.slice(
+    bootSrc.indexOf('function showSlowBootNotice()'),
+    bootSrc.indexOf('function armSlowBootNotice()')
+  );
+  const core = { html: '', insertAdjacentHTML(_where, html) { this.html = html; } };
+  const loaderEl = {
+    classList: { contains: () => false },
+    querySelector: (sel) => (sel === '.boot-loader__core' ? core : null),
+  };
+  const box = {
+    innerHTML: '', added: [], querySelector: () => null,
+    classList: { add(cls) { box.added.push(cls); } },
+  };
+  const appEl = { querySelector: (sel) => (sel === '.loading' ? box : null) };
+  const makeNotice = new Function('app', 'bootLoader', 'esc', 'SLOW_BOOT_TEXT', 'dataArrived',
+    `${noticeSrc}; return showSlowBootNotice;`);
+
+  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', false)();
+  check('объяснение вставляется в оба места ожидания',
+    core.html.includes('ТЕКСТ-ОБЪЯСНЕНИЕ') && box.innerHTML.includes('ТЕКСТ-ОБЪЯСНЕНИЕ')
+      && box.innerHTML.includes('Повторить') && box.added.includes('is-honest'));
+  check('повтор зовет загрузку, а не перекрашивает заглушку',
+    box.innerHTML.includes('data-boot-retry'));
+  check('объяснение в оба места проходит через экранирование',
+    (noticeSrc.match(/esc\(SLOW_BOOT_TEXT\)/g) || []).length === 2);
+
+  core.html = ''; box.innerHTML = '';
+  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', true)();
+  check('если данные всё-таки пришли, объяснение не появляется',
+    core.html === '' && box.innerHTML === '');
 }
 
 console.log(`Пройдено: ${passed}   Провалено: ${failed}`);

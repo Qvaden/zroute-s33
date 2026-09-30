@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=73';
-import { loadAll, capabilities, db } from './data/index.js?v=73';
-import { validateDataset } from './data/contract.js?v=73';
+import { CONFIG } from '../config.js?v=74';
+import { loadAll, capabilities, db } from './data/index.js?v=74';
+import { validateDataset } from './data/contract.js?v=74';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,31 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=73';
-import { renderHome } from './pages/home.js?v=73';
-import { renderLadder } from './pages/ladder.js?v=73';
-import { renderQuarter } from './pages/quarter-final.js?v=73';
-import { renderTimeline } from './pages/timeline.js?v=73';
-import { renderGuide } from './pages/guide.js?v=73';
-import { renderBot } from './pages/bot.js?v=73';
-import { renderHandbook } from './pages/handbook.js?v=73';
-import { renderAbout } from './pages/about.js?v=73';
-import { renderAlliance } from './pages/alliance.js?v=73';
-import { computeAchievements } from './logic/achievements.js?v=73';
-import { esc } from './ui/helpers.js?v=73';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=73';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=73';
+} from './logic/standings.js?v=74';
+import { renderHome } from './pages/home.js?v=74';
+import { renderLadder } from './pages/ladder.js?v=74';
+import { renderQuarter } from './pages/quarter-final.js?v=74';
+import { renderTimeline } from './pages/timeline.js?v=74';
+import { renderGuide } from './pages/guide.js?v=74';
+import { renderBot } from './pages/bot.js?v=74';
+import { renderHandbook } from './pages/handbook.js?v=74';
+import { renderAbout } from './pages/about.js?v=74';
+import { renderAlliance } from './pages/alliance.js?v=74';
+import { computeAchievements } from './logic/achievements.js?v=74';
+import { esc } from './ui/helpers.js?v=74';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=74';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=74';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=73';
-import './ui/timeline-controls.js?v=73';
+import './ui/ladder-controls.js?v=74';
+import './ui/timeline-controls.js?v=74';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=73';
-import { mountForum, mountUser, unmountForum } from './forum/mount.js?v=73';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=73';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=73';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=73';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=73';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=73';
+import './ui/handbook-controls.js?v=74';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=74';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=74';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=74';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=74';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=74';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=74';
 
 /*
   РАЗДЕЛЫ.
@@ -123,6 +123,55 @@ function finishBootLoader() {
     window.setTimeout(() => bootLoader.remove(), 340);
   }, wait);
 }
+
+/*
+  ЕСЛИ ДАННЫЕ НЕ ИДУТ — НАДО НАЗВАТЬ ПРИЧИНУ, А НЕ КРУТИТЬ ТОЧКИ.
+
+  Молчание базы на бесплатном тарифе (проекты засыпают без запросов и
+  просыпаются десятью секундами будки) человек читает ровно так, как ему
+  сказано в жалобе: «бесконечная загрузка и белый экран». Сайт в этот момент
+  жив — форум, календарь, справочник и обновления не обращаются к таблице
+  результатов, — но со стороны это выглядит как смерть страницы.
+
+  Поэтому через CONFIG.slowBootSeconds ожидания waiting UI говорит правду и
+  предлагает повтор. Объяснение появляется в двух местах, потому что их видно
+  в разных случаях: плашка первого захода поверх всей страницы и заглушка
+  «Загружаем данные…» внутри страницы, когда плашки уже не было.
+*/
+let slowBootTimer = 0;
+let dataArrived = false;
+
+const SLOW_BOOT_TEXT = 'Данные не идут: база на бесплатном тарифе засыпает без '
+  + 'запросов, и первый заход будит её десять секунд и больше. Форум, календарь, '
+  + 'справочник и обновления работают — они эти данные не ждут.';
+
+function showSlowBootNotice() {
+  if (dataArrived) return;
+
+  if (bootLoader && !bootLoader.classList.contains('is-hidden')
+    && !bootLoader.querySelector('[data-boot-slow]')) {
+    bootLoader.querySelector('.boot-loader__core')?.insertAdjacentHTML('beforeend',
+      `<p class="boot-loader__slow" data-boot-slow>${esc(SLOW_BOOT_TEXT)}</p>`);
+  }
+
+  const box = app.querySelector('.loading');
+  if (box && !box.querySelector('[data-boot-slow]')) {
+    box.classList.add('is-honest');
+    box.innerHTML = `<span data-boot-slow>${esc(SLOW_BOOT_TEXT)}</span>
+      <button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button>`;
+  }
+}
+
+function armSlowBootNotice() {
+  dataArrived = false;
+  window.clearTimeout(slowBootTimer);
+  slowBootTimer = window.setTimeout(showSlowBootNotice, CONFIG.slowBootSeconds * 1000);
+}
+
+document.addEventListener('click', (e) => {
+  // Повтор — тот же путь, что при открытии страницы: он заново вооружает ожидание.
+  if (e.target.closest?.('[data-boot-retry]')) boot();
+});
 
 /** @type {any} */
 let view = null;
@@ -284,6 +333,35 @@ let scrollRevealObserver = null;
 let parallaxFrame = 0;
 let parallaxReady = false;
 
+/*
+  АДРЕС ЖИВОЙ ВКЛАДКИ, КОТОРАЯ УЖЕ СМОНТИРОВАНА.
+
+  Живые вкладки (форум, чаты, календарь, обновления, гайды, страница
+  участника) монтируются один раз и живут сами: ждут ответа базы, перекрашиваются
+  от нажатий. Обычный render() после прихода данных сайта перемонтировал их
+  заново — а это значит сбросить незавершённые запросы базы, показать «Загружаем
+  ленту…» там, где лента уже была на экране, и потом нарисовать её вторично.
+  На телефоне, где база просыпается десять секунд, это и были те самые рывки.
+
+  Поэтому повторный вход на тот же адрес не монтирует страницу заново, а только
+  отдаёт ей свежие данные сайта — там, где они вообще нужны.
+*/
+let liveMountKey = '';
+
+/**
+ * Ключ живой вкладки для её адреса: пустая строка — страница статичная,
+ * её перерисовка ничего не сбрасывает и спорить с монтированием не может.
+ */
+function liveKeyOf(id, param, search) {
+  if (id === 'forum') return `forum:${param || ''}:${search}`;
+  if (id === 'user' && param) return `user:${param}`;
+  if (id === 'calendar') return `calendar:${search}`;
+  if (id === 'guides') return `guides:${param || ''}:${search}`;
+  if (id === 'updates') return 'updates';
+  if (id === 'chats') return `chats:${location.hash.replace(/^#\/?chats\/?/, '')}`;
+  return '';
+}
+
 function setupParallax() {
   const hasHero = Boolean(app.querySelector('.hero'));
   if (!hasHero || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
@@ -351,6 +429,22 @@ function render() {
   if (!view) return;
   const { id, param, search } = parseHash();
   renderPresidentBoard(view.texts);
+
+  /*
+    Повторный вход на адрес живая вкладка пропускает: она уже на экране и
+    сама себя рисует. Форума это касается в первую очередь — ему от данных
+    сайта нужна только плашка хроники, её отдаём отдельным установщиком, и
+    лента продолжает грузиться тем же запросом, который уже ушёл в базу.
+
+    Статичные страницы под этим условием перерисовываются как раньше: им
+    нечего терять, они и есть строка из данных.
+  */
+  const live = liveKeyOf(id, param, search);
+  if (live && live === liveMountKey) {
+    if (id === 'forum') syncForumView(view);
+    return;
+  }
+  liveMountKey = live;
 
   let path;
   if (id === 'alliance' && param) {
@@ -582,8 +676,11 @@ async function boot() {
     render();
   }
 
+  armSlowBootNotice();
+
   try {
     const data = await loadAll();
+    dataArrived = true;
 
     // В разработке сразу ругаемся на кривые данные, а не показываем пустые клетки.
     const problems = validateDataset(data);
@@ -630,6 +727,8 @@ async function boot() {
     finishBootLoader();
   } catch (err) {
     console.error(err);
+    // Ответ получен, пусть и с ошибкой: объяснять молчание больше нечего.
+    dataArrived = true;
 
     /*
       ДАННЫЕ ОТВАЛИЛИСЬ, А ФОРУМ ОБЯЗАН РАБОТАТЬ.

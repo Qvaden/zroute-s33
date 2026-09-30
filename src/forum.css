@@ -1314,6 +1314,39 @@
 
 .forum-feed { display: grid; gap: 14px; }
 
+/*
+  Строка над лентой про то, насколько список свежий: «это последний вид,
+  обновляем» или «обновить не удалось, вот прошлые темы». Тихая и без мигания:
+  человек и так ждёт, а подпрыгивающая сверху плашка выглядит поломкой сильнее,
+  чем ожидание.
+*/
+.forum-feed__stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--gold) 7%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+/* Спокойный случай: данные просто помнятся с прошлого входа, а не потеряны. */
+.forum-feed__stale--soft {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.forum-feed__stale .forum-btn {
+  padding: 2px 9px;
+  font-size: 12px;
+}
+
 .forum-post { margin-bottom: 0; }
 .forum-post--pinned { border-color: rgba(255,201,60,.28); }
 .forum-post--trail {

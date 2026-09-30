@@ -1934,7 +1934,7 @@ function renderShots(item) {
 function renderFeed(s) {
   if (!s.ready) return '';
 
-  if (s.error) {
+  if (s.error && !s.posts?.length) {
     return `<section class="panel error forum-feed__error">
       <h2>Форум не отвечает</h2>
       <p>${esc(s.error)}</p>
@@ -1946,7 +1946,7 @@ function renderFeed(s) {
     return '<div class="loading" data-forum-loading>Загружаем ленту…</div>';
   }
 
-  if (!s.posts.some((p) => !p.deleted)) {
+  if (!s.error && !s.posts.some((p) => !p.deleted)) {
     /*
       Пустые закладки — не «пустой форум»: человек не опоздал на новинки, а
       ещё не воспользовался приёмом. Поэтому здесь объяснение, где кнопка, а
@@ -1998,7 +1998,26 @@ function renderFeed(s) {
     </section>`;
   }
 
+  /*
+    ТОНКАЯ СТРОКА НАД ЛЕНТОЙ — ЧЕСТЬ ПЕРЕД КРАСОТОЙ.
+
+    Два случая, когда список на экране есть, но он не ответ базы: память
+    прошлого входа (обновление ещё в пути) и сбой обновления (прошлые темы
+    видны, а полоса ошибки на весь экран только кричала бы). И там, и там
+    человек должен понимать, насколько ему показывают свежее: одна строка
+    вместо паники и вместо молчаливой лжи.
+  */
+  const notice = s.error
+    ? `<p class="forum-feed__stale" role="status">
+        Ленту обновить не удалось: ${esc(s.error)}
+        <button type="button" class="forum-btn forum-btn--ghost" data-forum-retry>повторить</button>
+      </p>`
+    : s.fromCache
+      ? '<p class="forum-feed__stale forum-feed__stale--soft" role="status">Показываем последний вид ленты, обновляем…</p>'
+      : '';
+
   return `
+    ${notice}
     <div class="forum-feed" data-forum-feed>
       ${s.posts.map((p) => renderPostCard(p, s)).join('')}
     </div>
