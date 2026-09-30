@@ -61,6 +61,15 @@ async function raw() {
   return cache;
 }
 
+/**
+ * Каким часом снят этот файл. Нужна не разбор ради, а единственная честная
+ * фраза на экране: «показан снимок от 14:23». Без отметки читатель видел бы
+ * вчерашние цифры, подписанные сегодняшним днём.
+ */
+export async function getPulledAt() {
+  return (await raw()).pulledAt ?? null;
+}
+
 export async function getAlliances() {
   return mapAlliances((await raw()).alliances);
 }

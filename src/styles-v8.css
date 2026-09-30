@@ -1529,6 +1529,25 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 .boot-loader__mirror a { color: var(--win); text-decoration: underline; text-underline-offset: 3px; }
 @keyframes s33-loading-dots { 0% { content: ' ·'; } 33% { content: ' ··'; } 66% { content: ' ···'; } }
 
+/*
+  Полоска «показан снимок» или «данные не дошли». Стоит над содержимым и на
+  широком, и на узком экране: её смысл — объяснить пустые таблицы, поэтому
+  прятать её в подвал нельзя. Кнопка «Повторить» внутри обязана доставаться
+  пальцем, а текст — читаться без лупы.
+*/
+.data-notice {
+  margin: 14px auto 0; padding: 12px 16px; max-width: var(--wrap);
+  border: 1px solid var(--line); border-left: 3px solid var(--win);
+  border-radius: 12px; background: var(--raised);
+  color: var(--dim); font: 400 14px/1.55 Inter, sans-serif;
+}
+.data-notice[hidden] { display: none; }
+.data-notice .forum-btn { margin-left: 10px; }
+@media (max-width: 560px) {
+  .data-notice { font-size: 13px; }
+  .data-notice .forum-btn { display: block; margin: 10px 0 0; width: 100%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

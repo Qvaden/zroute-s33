@@ -63,7 +63,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=75">
+  <link rel="modulepreload" href="./src/main.js?v=76">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -199,6 +199,16 @@
   <!-- Затемнение под выдвинутой панелью: нажатие мимо меню его закрывает. -->
   <div class="side-veil" id="side-veil" hidden></div>
 
+  <!--
+    Полоска о том, откуда данные на экране.
+
+    Рейтинг без цифр человек с телефона читает как «сайт умер», и молчать в
+    этот момент — значит самому создавать эту мысль. Сайт говорит правду сам:
+    показан снимок таблицы или не пришло ничего. Разбирается в src/main.js
+    (dataNotice), подробности — в docs/ARCHITECTURE.md.
+  -->
+  <div id="data-notice" class="data-notice wrap" role="status" aria-live="polite" hidden></div>
+
   <main id="app" class="wrap"></main>
 
   <footer class="site-foot wrap">
@@ -208,7 +218,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=75"></script>
+  <script type="module" src="./src/main.js?v=76"></script>
 
   <script>
     /*

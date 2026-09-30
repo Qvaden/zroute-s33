@@ -10468,5 +10468,221 @@ console.log('\nAM. Фид магазина: обновление и событи
     core.html === '' && box.innerHTML === '');
 }
 
-console.log(`Пройдено: ${passed}   Провалено: ${failed}`);
-process.exit(failed === 0 ? 0 : 1);
+/* ── 11. Снимок вместо базы: пустая таблица обязана быть подписана ────────
+
+   Оболочка сайта приходит с GitHub и Render, а данные — из базы, которая
+   висит за Cloudflare. Российская сеть без VPN иногда не доходит ровно до
+   базы, и тогда человек видел пустой рейтинг молча: «сайт умер», хотя дело
+   было в одном запросе. Проверка держит две вещи — что сайт действительно
+   берёт копию двухчасовой давности, когда основной источник промолчал, и что
+   он об этом говорит словами. Тело loadAll и полоска объяснения вырезаны из
+   настоящих файлов и исполнены с подставными адаптерами и узлами. Глазами
+   это не проверить: чтобы увидеть снимок, надо оказаться в сети, которая не
+   пускает к базе, — а такого места у того, кто правит код, обычно нет.
+────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const dataSrc = await readFile('src/data/index.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const jsonAdapterSrc = await readFile('src/data/adapters/json.js', 'utf8');
+  const workflowSrc = await readFile('.github/workflows/backup-from-db.yml', 'utf8');
+  const cfgSrc = await readFile('config.js', 'utf8');
+
+  const readAllStart = dataSrc.indexOf('async function readAll(');
+  const loadAllStart = dataSrc.indexOf('export async function loadAll()');
+  const readAllSrc = dataSrc.slice(readAllStart, loadAllStart);
+  const loadAllSrc = dataSrc.slice(loadAllStart).replace('export ', '');
+  check('readAll и loadAll удалось вырезать из точки переключения',
+    readAllStart > 0 && loadAllStart > readAllStart
+      && loadAllSrc.includes('await readAll(json)'));
+
+  /*
+    Отметка снятия взята ровно в том виде, в каком её отдаёт база: хвост
+    «+00» без минут. Конструктор Date такой хвост не понимает и возвращает
+    «не дата» молча — проверка на это споткнулась бы сразу, если бы полоска
+    начала показывать «снимок от Invalid Date» или, что хуже, вовсе без часа.
+  */
+  const STAMP = '2026-10-01T08:00:00+00';
+  const payload = {
+    alliances: [{ id: 'a1' }], weeks: [], results: [], events: [], texts: [],
+    pulledAt: STAMP,
+  };
+
+  function fakeAdapter(name, shouldFail) {
+    let reads = 0;
+    const get = (key) => async () => {
+      if (shouldFail) throw new Error(name + ': сети нет');
+      reads++;
+      return payload[key];
+    };
+    return {
+      name,
+      get reads() {
+        return reads;
+      },
+      getAlliances: get('alliances'),
+      getWeeks: get('weeks'),
+      getResults: get('results'),
+      getEvents: get('events'),
+      getTexts: get('texts'),
+      getPulledAt: async () => payload.pulledAt,
+    };
+  }
+
+  function runLoadAll(selected, snapshot) {
+    const harness = new Function('selected', 'json',
+      "let lastLoad = { source: selected.name, snapshotAt: null, primaryError: '' };"
+      + readAllSrc + loadAllSrc
+      + '; return { loadAll, peek: () => lastLoad };');
+    return harness(selected, snapshot);
+  }
+
+  const liveBase = fakeAdapter('supabase', false);
+  const deadBase = fakeAdapter('supabase', true);
+  const liveSnapshot = fakeAdapter('json', false);
+  const deadSnapshot = fakeAdapter('json', true);
+
+  const okRun = runLoadAll(liveBase, liveSnapshot);
+  const okData = await okRun.loadAll();
+  check('пока база отвечает, до копии дело не доходит',
+    okData.alliances.length === 1 && okRun.peek().source === 'supabase'
+      && liveSnapshot.reads === 0);
+
+  const snapRun = runLoadAll(deadBase, liveSnapshot);
+  const snapData = await snapRun.loadAll();
+  check('когда база молчит, данные приходят из копии',
+    snapData.alliances.length === 1 && snapRun.peek().source === 'снимок');
+  check('копия помнит, каким часом она снята',
+    snapRun.peek().snapshotAt === STAMP);
+  check('причина обращения к копии сохраняется, чтобы объяснить её словами',
+    snapRun.peek().primaryError.includes('supabase: сети нет'));
+
+  const bothRun = runLoadAll(deadBase, deadSnapshot);
+  const bothError = await bothRun.loadAll().then(() => '', (e) => String(e.message));
+  check('если не ответил никто, пустота не выдаётся за данные',
+    bothError.includes('json: сети нет') && bothRun.peek().source === '');
+
+  /*
+    Копия и есть json-адаптер: когда основной источник — он же, звать его же
+    спасать некого, и ошибка обязана остаться исходной, а не превратиться в
+    «второй попытки не было».
+  */
+  const onlySnapshot = fakeAdapter('json', true);
+  const onlyRun = runLoadAll(onlySnapshot, onlySnapshot);
+  const onlyError = await onlyRun.loadAll().then(() => '', (e) => String(e.message));
+  check('когда копия — единственный источник, она не зовётся сама себя спасать',
+    onlyError.includes('json: сети нет') && onlyRun.peek().source === '');
+
+  check('час снятия читается из того же файла, что и данные',
+    /export async function getPulledAt\(\)/.test(jsonAdapterSrc)
+      && jsonAdapterSrc.includes('(await raw()).pulledAt'));
+
+  /* ── Полоска объяснения: исполняем её на подставных узлах ── */
+  const noticeStart = mainSrc.indexOf('function dataNotice()');
+  const bootStart = mainSrc.indexOf('async function boot() {');
+  const noticeSrc = mainSrc.slice(noticeStart, bootStart);
+  check('dataNotice и помощники удалось вырезать из main.js',
+    noticeStart > 0 && bootStart > noticeStart
+      && noticeSrc.includes('function snapshotStamp(')
+      && noticeSrc.includes('function sourceBadge('));
+
+  const runNotice = new Function('lastLoad', 'document', 'esc', 'db',
+    noticeSrc + '; return { dataNotice, snapshotStamp, sourceBadge };');
+
+  function paint(state, sourceName) {
+    const box = { hidden: true, innerHTML: '' };
+    const badge = { textContent: '' };
+    const doc = { getElementById: (id) => (id === 'data-notice' ? box : badge) };
+    const run = runNotice(state, doc, (s) => '[' + String(s) + ']', { name: sourceName });
+    run.dataNotice();
+    run.sourceBadge();
+    return { box, badge, run };
+  }
+
+  const shown = paint(
+    { source: 'снимок', snapshotAt: STAMP, primaryError: 'база молчит' },
+    'supabase'
+  );
+  check('на копии сайт говорит об этом прямо, а не молчит пустым рейтингом',
+    shown.box.hidden === false && shown.box.innerHTML.includes('Показан снимок таблицы от ['));
+  check('час снятия показан числом, а не исходным адресом даты',
+    /\[\d{2}\.\d{2}/.test(shown.box.innerHTML));
+  check('объяснение копии не обещает, что форум и запись постов живы',
+    shown.box.innerHTML.includes(' Форум, вход и ')
+      && shown.box.innerHTML.includes('только в живой базе'));
+  check('в объяснении есть кнопка повтора, которая зовёт загрузку',
+    shown.box.innerHTML.includes('data-boot-retry')
+      && shown.box.innerHTML.includes('Повторить'));
+  check('подвал на копии врёт меньше: источник подписан копией',
+    shown.badge.textContent === 'снимок');
+
+  const none = paint(
+    { source: '', snapshotAt: null, primaryError: '<script>bad</script>' },
+    'supabase'
+  );
+  check('когда не пришло ничего, полоска появляется и называет причину',
+    none.box.hidden === false && none.box.innerHTML.includes('Данные не дошли'));
+  check('если и причина не известна, полоска говорит про базу и про копию словами',
+    (() => {
+      const blind = paint({ source: '', snapshotAt: null, primaryError: '' }, 'supabase');
+      return blind.box.innerHTML.includes('ни база, ни снимок');
+    })());
+  check('чужой текст ошибки проходит через экранирование',
+    none.box.innerHTML.includes('[<script>bad</script>]'));
+  check('объяснение не склеивает две точки: хвост чужого сообщения снимается',
+    (() => {
+      const dotted = paint(
+        {
+          source: '',
+          snapshotAt: null,
+          primaryError: 'Не удалось связаться с базой. Проверьте интернет.',
+        },
+        'supabase'
+      );
+      return dotted.box.innerHTML.includes('интернет]. Рейтинг');
+    })());
+  check('в исправном состоянии полоска скрыта, а подвал называет базу',
+    (() => {
+      const clean = paint(
+        { source: 'supabase', snapshotAt: null, primaryError: '' }, 'supabase'
+      );
+      return clean.box.hidden === true && clean.box.innerHTML === ''
+        && clean.badge.textContent === 'supabase';
+    })());
+  check('полоску зовут и в успехе, и в падении — молчаливой пустоты не остаётся',
+    (mainSrc.match(/\bdataNotice\(\);/g) || []).length === 2
+      && mainSrc.includes("import { loadAll, capabilities, db, lastLoad }"));
+
+  check('отметка читается из формата базы и молчит, если даты нет',
+    (() => {
+      const run = runNotice(
+        { source: 'снимок', snapshotAt: null, primaryError: '' },
+        { getElementById: () => ({ hidden: false, innerHTML: '' }) },
+        (s) => String(s),
+        { name: 'supabase' }
+      );
+      return run.snapshotStamp('') === '' && run.snapshotStamp('не дата') === ''
+        && run.snapshotStamp(STAMP) !== ''
+        && run.snapshotStamp('2026-10-01T08:00:00Z') !== '';
+    })());
+
+  /* ── Раздача и документы ── */
+  const siteHtml = await readFile('index.html', 'utf8');
+  check('на странице есть место под полоску, и оно объявлено живой областью',
+    /<div id="data-notice" class="data-notice wrap" role="status"/.test(siteHtml));
+  check('полоска о копии описана стилем, которым нарисовано остальное',
+    (await readFile('src/styles-v8.css', 'utf8')).includes('.data-notice'));
+  check('копия собирается каждые два часа, а не раз в сутки',
+    /- cron: '5 \*\/2 \* \* \*'/.test(workflowSrc)
+      && !/- cron: '30 3 \* \* \*'/.test(workflowSrc));
+  check('воркфлоу знает, что у файла появился читатель на странице',
+    workflowSrc.includes('второй читатель') && workflowSrc.includes('Cloudflare'));
+  check('причина копии объяснена в конфиге словами, а не только кодом',
+    cfgSrc.includes('Cloudflare')
+      && dataSrc.includes('ПОЧЕМУ ЗДЕСЬ ЕСТЬ ВТОРАЯ ПОПЫТКА'));
+  check('копия описана в документах: архитектура и раздача',
+    (await readFile('docs/ARCHITECTURE.md', 'utf8')).includes('Запасное чтение')
+      && (await readFile('docs/HOSTING.md', 'utf8')).includes('Показан снимок'));
+}
+
+

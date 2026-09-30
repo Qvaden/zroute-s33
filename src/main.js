@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=75';
-import { loadAll, capabilities, db } from './data/index.js?v=75';
-import { validateDataset } from './data/contract.js?v=75';
+import { CONFIG } from '../config.js?v=76';
+import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=76';
+import { validateDataset } from './data/contract.js?v=76';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,31 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=75';
-import { renderHome } from './pages/home.js?v=75';
-import { renderLadder } from './pages/ladder.js?v=75';
-import { renderQuarter } from './pages/quarter-final.js?v=75';
-import { renderTimeline } from './pages/timeline.js?v=75';
-import { renderGuide } from './pages/guide.js?v=75';
-import { renderBot } from './pages/bot.js?v=75';
-import { renderHandbook } from './pages/handbook.js?v=75';
-import { renderAbout } from './pages/about.js?v=75';
-import { renderAlliance } from './pages/alliance.js?v=75';
-import { computeAchievements } from './logic/achievements.js?v=75';
-import { esc } from './ui/helpers.js?v=75';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=75';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=75';
+} from './logic/standings.js?v=76';
+import { renderHome } from './pages/home.js?v=76';
+import { renderLadder } from './pages/ladder.js?v=76';
+import { renderQuarter } from './pages/quarter-final.js?v=76';
+import { renderTimeline } from './pages/timeline.js?v=76';
+import { renderGuide } from './pages/guide.js?v=76';
+import { renderBot } from './pages/bot.js?v=76';
+import { renderHandbook } from './pages/handbook.js?v=76';
+import { renderAbout } from './pages/about.js?v=76';
+import { renderAlliance } from './pages/alliance.js?v=76';
+import { computeAchievements } from './logic/achievements.js?v=76';
+import { esc } from './ui/helpers.js?v=76';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=76';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=76';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=75';
-import './ui/timeline-controls.js?v=75';
+import './ui/ladder-controls.js?v=76';
+import './ui/timeline-controls.js?v=76';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=75';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=75';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=75';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=75';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=75';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=75';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=75';
+import './ui/handbook-controls.js?v=76';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=76';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=76';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=76';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=76';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=76';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=76';
 
 /*
   РАЗДЕЛЫ.
@@ -664,6 +664,86 @@ function emptyView(loadError = '') {
   };
 }
 
+/**
+ * ПОЛОСКА «ОТКУДА ДАННЫЕ НА ЭКРАНЕ».
+ *
+ * Прошлое поведение на пустом рейтинге было молчаливым: сайт вставлял пустой
+ * кадр и человек оставался один на один с таблицей без цифр. Для читателя это
+ * не «источник недоступен», а «сайт умер», и он закрывает вкладку.
+ *
+ * Теперь источник говорит сам: снимок — так и написано, каким часом снят и что
+ * именно он замораживает (форум, вход и запись постов живут только в базе).
+ * Кнопка «Повторить» дёргает тот же обработчик, что и в объяснении долгого
+ * ожидания: [data-boot-retry] уже слушается на странице.
+ */
+function dataNotice() {
+  const box = document.getElementById('data-notice');
+  if (!box) return;
+
+  if (lastLoad.source === 'снимок') {
+    const at = snapshotStamp(lastLoad.snapshotAt);
+    box.hidden = false;
+    box.innerHTML =
+      '<b>Показан снимок таблицы' + (at ? ' от ' + esc(at) : '') + '</b>. '
+      + 'База сейчас не отвечает, а это автоматическая копия данных, снятая в '
+      + 'это время: рейтинг, кварты и летопись верны на неё. Форум, вход и '
+      + 'новые посты живут только в живой базе — они появятся, как только она '
+      + 'ответит. '
+      + '<button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button>';
+    return;
+  }
+
+  if (lastLoad.source === '') {
+    /*
+      Хвостовая точка убирается, а не оставляется: сообщения адаптера приходят
+      уже с точкой, и без этой чистки страница выдавала «Проверьте интернет..».
+      Два знака подряд читаются как опечатка, а опечатка в тексте про аварию
+      выглядит так, будто ей не верят.
+    */
+    const reason = (lastLoad.primaryError || 'ни база, ни снимок рядом с сайтом не ответили')
+      .replace(/[.\s]+$/, '');
+    box.hidden = false;
+    box.innerHTML =
+      '<b>Данные не дошли</b>: '
+      + esc(reason)
+      + '. Рейтинг и летопись пусты, справочник и правила работают. '
+      + '<button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button>';
+    return;
+  }
+
+  box.hidden = true;
+  box.innerHTML = '';
+}
+
+/**
+ * Отметка снимка для человека: «30.09, 09:56» вместо полного ISO-адреса.
+ * Пустая строка, если в файле даты нет или она не читается — показывать
+ * «снимок от null» честнее не делает.
+ *
+ * Формат даты приходится подправлять. Отметку в снимок пишет база, а она
+ * отдаёт часовой пояс коротким хвостом: «2026-09-30T09:56:20+00». Конструктор
+ * Date такой хвост не понимает и молча возвращает «не дата», поэтому без
+ * замены на «+00:00» полоска всегда показывала бы снимок без часа — а именно
+ * час в ней и есть главная часть правды.
+ */
+function snapshotStamp(value) {
+  if (!value) return '';
+  const date = new Date(String(value).replace(/([+-]\d{2})$/, '$1:00'));
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+/** Надпись в подвале про источник данных: база, снимок или никого. */
+function sourceBadge() {
+  const badge = document.getElementById('source-badge');
+  if (!badge) return;
+  badge.textContent = lastLoad.source === 'снимок' ? 'снимок'
+    : lastLoad.source === '' ? 'недоступен'
+      : db.name;
+}
+
 async function boot() {
   /*
     ФОРУМ НЕ ЖДЁТ ДАННЫХ САЙТА — ОН ИХ И НЕ ИСПОЛЬЗУЕТ.
@@ -740,7 +820,8 @@ async function boot() {
       problems,
     };
 
-    document.getElementById('source-badge').textContent = db.name;
+    sourceBadge();
+    dataNotice();
     render();
     finishBootLoader();
   } catch (err) {
@@ -764,6 +845,7 @@ async function boot() {
 
     const badge = document.getElementById('source-badge');
     if (badge) badge.textContent = 'недоступен';
+    dataNotice();
 
     render();
     finishBootLoader();
