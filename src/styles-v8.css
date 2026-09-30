@@ -1519,6 +1519,14 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 */
 .loading.is-honest { display: grid; gap: 14px; justify-items: center; color: var(--dim); font-size: 14px; line-height: 1.6; }
 .loading.is-honest::after { content: none; animation: none; }
+/*
+  Запасной адрес в честном ожидании: ссылка обязана быть крупнее текста
+  объяснения и доставаться пальцем — человек нажимает на неё с телефона,
+  когда основной домен не открылся.
+*/
+.loading.is-honest [data-boot-mirror] { margin: 0; }
+.boot-loader__mirror { margin: 10px 0 0; text-align: center; font: 700 13px/1.4 Inter, sans-serif; }
+.boot-loader__mirror a { color: var(--win); text-decoration: underline; text-underline-offset: 3px; }
 @keyframes s33-loading-dots { 0% { content: ' ·'; } 33% { content: ' ··'; } 66% { content: ' ···'; } }
 
 @media (prefers-reduced-motion: reduce) {

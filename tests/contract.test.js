@@ -10271,6 +10271,10 @@ console.log('\nAM. Фид магазина: обновление и событи
       && hostingSrc.includes('NETWORK_WAIT_MS')
       && hostingSrc.includes('Экономия трафика') && hostingSrc.includes('Приватный DNS')
       && hostingSrc.includes('Маскировка IP-адреса'));
+  check('зеркало описано как боевое: документ знает свой адрес и шаги для телефона',
+    hostingSrc.includes('Что настроено в GitHub Pages')
+      && hostingSrc.includes('qvaden.github.io/zroute-s33')
+      && hostingSrc.includes('с VPN грузит идеально'));
 
   const run = new Function('request', 'caches', 'fetch', 'Response', 'setTimeout',
     'NETWORK_WAIT_MS', 'CACHE', 'OFFLINE_HTML', `return ${body};`);
@@ -10371,6 +10375,50 @@ console.log('\nAM. Фид магазина: обновление и событи
     bootSrc.indexOf('function showSlowBootNotice()'),
     bootSrc.indexOf('function armSlowBootNotice()')
   );
+  /*
+    Запасной адрес вынесен в отдельную функцию того же файла и исполняется
+    здесь же: проверка «на зеркале ссылку не показывать» без хоста не
+    проверяется глазами, а сломать её можно одной строчкой.
+  */
+  const mirrorSrc = bootSrc.slice(
+    bootSrc.indexOf('function mirrorLinkHtml()'),
+    bootSrc.indexOf('function showSlowBootNotice()')
+  );
+  check('запасной адрес собирается из данных репозитория, а не вписан словами',
+    /get mirrorUrl\(\)/.test(cfgSrc)
+      && /`https:\/\/\$\{this\.github\.owner\.toLowerCase\(\)\}\.github\.io\/\$\{this\.github\.repo\}\/`/
+        .test(cfgSrc));
+  check('объяснение ждёт адрес из config, а не хардкодит его в странице',
+    mirrorSrc.includes('CONFIG.mirrorUrl'));
+  check('ссылка на зеркало есть и на странице отказа в сервисном работнике',
+    /qvaden\.github\.io\/zroute-s33/.test(swSrc));
+  /*
+    Файл CNAME заставлял GitHub Pages редиректить на домен, и зеркало
+    оказывалось мёртвой ступенькой: где не открывается .bond, не открывалось
+    и github.io. Тест не даёт вернуть редирект по невнимательности.
+  */
+  let cnameGone = false;
+  try { await readFile('CNAME'); } catch { cnameGone = true; }
+  check('CNAME удалён: Pages отдаёт сайт, а не разворот на домен', cnameGone);
+  const mirrorRun = new Function('CONFIG', 'location', 'esc',
+    `${mirrorSrc}; return mirrorLinkHtml;`);
+  const mirrorOnDomain = mirrorRun(
+    { mirrorUrl: 'https://qvaden.github.io/zroute-s33/' },
+    { hostname: 'zroutehub.bond', hash: '#/forum' },
+    (s) => String(s)
+  )();
+  check('на основном домене объяснение держит зеркало при себе',
+    mirrorOnDomain.includes('qvaden.github.io/zroute-s33/#/forum')
+      && mirrorOnDomain.includes('data-boot-mirror'));
+  check('адрес зеркала проходит через экранирование, как и любой текст',
+    mirrorSrc.includes('esc(url)'));
+  const mirrorOnPages = mirrorRun(
+    { mirrorUrl: 'https://qvaden.github.io/zroute-s33/' },
+    { hostname: 'qvaden.github.io', hash: '' },
+    (s) => String(s)
+  )();
+  check('на самом зеркале второй ссылки на зеркало не появляется',
+    mirrorOnPages === '');
   const core = { html: '', insertAdjacentHTML(_where, html) { this.html = html; } };
   const loaderEl = {
     classList: { contains: () => false },
@@ -10381,10 +10429,19 @@ console.log('\nAM. Фид магазина: обновление и событи
     classList: { add(cls) { box.added.push(cls); } },
   };
   const appEl = { querySelector: (sel) => (sel === '.loading' ? box : null) };
+  const mirrorFn = mirrorRun(
+    { mirrorUrl: 'https://qvaden.github.io/zroute-s33/' },
+    { hostname: 'zroutehub.bond', hash: '#/forum' },
+    (s) => String(s)
+  );
   const makeNotice = new Function('app', 'bootLoader', 'esc', 'SLOW_BOOT_TEXT', 'dataArrived',
-    `${noticeSrc}; return showSlowBootNotice;`);
+    'CONFIG', 'location', 'mirrorLinkHtml',
+    `${noticeSrc}${mirrorSrc}; return showSlowBootNotice;`);
+  const noticeLocation = { hostname: 'zroutehub.bond', hash: '#/forum' };
+  const noticeConfig = { mirrorUrl: 'https://qvaden.github.io/zroute-s33/' };
 
-  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', false)();
+  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', false,
+    noticeConfig, noticeLocation, mirrorFn)();
   check('объяснение вставляется в оба места ожидания',
     core.html.includes('ТЕКСТ-ОБЪЯСНЕНИЕ') && box.innerHTML.includes('ТЕКСТ-ОБЪЯСНЕНИЕ')
       && box.innerHTML.includes('Повторить') && box.added.includes('is-honest'));
@@ -10392,9 +10449,21 @@ console.log('\nAM. Фид магазина: обновление и событи
     box.innerHTML.includes('data-boot-retry'));
   check('объяснение в оба места проходит через экранирование',
     (noticeSrc.match(/esc\(SLOW_BOOT_TEXT\)/g) || []).length === 2);
+  check('пока ждём данные на домене, в обоих местах виден запасной адрес',
+    core.html.includes('data-boot-mirror') && box.innerHTML.includes('data-boot-mirror'));
 
   core.html = ''; box.innerHTML = '';
-  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', true)();
+  noticeLocation.hostname = 'qvaden.github.io';
+  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', false,
+    noticeConfig, noticeLocation, mirrorFn)();
+  check('на зеркале объяснение не предлагает то же зеркало',
+    core.html.includes('ТЕКСТ-ОБЪЯСНЕНИЕ') && !core.html.includes('data-boot-mirror')
+      && !box.innerHTML.includes('data-boot-mirror'));
+  noticeLocation.hostname = 'zroutehub.bond';
+
+  core.html = ''; box.innerHTML = '';
+  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', true,
+    noticeConfig, noticeLocation, mirrorFn)();
   check('если данные всё-таки пришли, объяснение не появляется',
     core.html === '' && box.innerHTML === '');
 }

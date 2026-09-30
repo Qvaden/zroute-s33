@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=74';
-import { loadAll, capabilities, db } from './data/index.js?v=74';
-import { validateDataset } from './data/contract.js?v=74';
+import { CONFIG } from '../config.js?v=75';
+import { loadAll, capabilities, db } from './data/index.js?v=75';
+import { validateDataset } from './data/contract.js?v=75';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,31 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=74';
-import { renderHome } from './pages/home.js?v=74';
-import { renderLadder } from './pages/ladder.js?v=74';
-import { renderQuarter } from './pages/quarter-final.js?v=74';
-import { renderTimeline } from './pages/timeline.js?v=74';
-import { renderGuide } from './pages/guide.js?v=74';
-import { renderBot } from './pages/bot.js?v=74';
-import { renderHandbook } from './pages/handbook.js?v=74';
-import { renderAbout } from './pages/about.js?v=74';
-import { renderAlliance } from './pages/alliance.js?v=74';
-import { computeAchievements } from './logic/achievements.js?v=74';
-import { esc } from './ui/helpers.js?v=74';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=74';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=74';
+} from './logic/standings.js?v=75';
+import { renderHome } from './pages/home.js?v=75';
+import { renderLadder } from './pages/ladder.js?v=75';
+import { renderQuarter } from './pages/quarter-final.js?v=75';
+import { renderTimeline } from './pages/timeline.js?v=75';
+import { renderGuide } from './pages/guide.js?v=75';
+import { renderBot } from './pages/bot.js?v=75';
+import { renderHandbook } from './pages/handbook.js?v=75';
+import { renderAbout } from './pages/about.js?v=75';
+import { renderAlliance } from './pages/alliance.js?v=75';
+import { computeAchievements } from './logic/achievements.js?v=75';
+import { esc } from './ui/helpers.js?v=75';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=75';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=75';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=74';
-import './ui/timeline-controls.js?v=74';
+import './ui/ladder-controls.js?v=75';
+import './ui/timeline-controls.js?v=75';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=74';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=74';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=74';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=74';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=74';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=74';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=74';
+import './ui/handbook-controls.js?v=75';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=75';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=75';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=75';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=75';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=75';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=75';
 
 /*
   РАЗДЕЛЫ.
@@ -137,6 +137,10 @@ function finishBootLoader() {
   предлагает повтор. Объяснение появляется в двух местах, потому что их видно
   в разных случаях: плашка первого захода поверх всей страницы и заглушка
   «Загружаем данные…» внутри страницы, когда плашки уже не было.
+
+  Там же появляется запасной адрес. Ждать данных бессмысленно, когда режет не
+  база, а путь до хостинга: у `.bond` в мобильном интернете бывают устаревший
+  DNS и оборванный TLS, и в этот момент сайт жив ровно на зеркале.
 */
 let slowBootTimer = 0;
 let dataArrived = false;
@@ -145,19 +149,33 @@ const SLOW_BOOT_TEXT = 'Данные не идут: база на бесплат
   + 'запросов, и первый заход будит её десять секунд и больше. Форум, календарь, '
   + 'справочник и обновления работают — они эти данные не ждут.';
 
+/**
+ * Ссылка на запасной адрес: пустая строка, если человек уже на зеркале
+ * (предлагать ему тот же путь — значит предлагать то, что не открылось).
+ */
+function mirrorLinkHtml() {
+  const here = String(location.hostname || '');
+  if (here.endsWith('.github.io')) return '';
+  const url = CONFIG.mirrorUrl + (location.hash || '');
+  return `<p class="boot-loader__mirror" data-boot-mirror>`
+    + `<a href="${esc(url)}" rel="noopener">Запасной адрес сайта</a></p>`;
+}
+
 function showSlowBootNotice() {
   if (dataArrived) return;
+  const mirror = mirrorLinkHtml();
 
   if (bootLoader && !bootLoader.classList.contains('is-hidden')
     && !bootLoader.querySelector('[data-boot-slow]')) {
     bootLoader.querySelector('.boot-loader__core')?.insertAdjacentHTML('beforeend',
-      `<p class="boot-loader__slow" data-boot-slow>${esc(SLOW_BOOT_TEXT)}</p>`);
+      `<p class="boot-loader__slow" data-boot-slow>${esc(SLOW_BOOT_TEXT)}</p>${mirror}`);
   }
 
   const box = app.querySelector('.loading');
   if (box && !box.querySelector('[data-boot-slow]')) {
     box.classList.add('is-honest');
     box.innerHTML = `<span data-boot-slow>${esc(SLOW_BOOT_TEXT)}</span>
+      ${mirror}
       <button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button>`;
   }
 }
