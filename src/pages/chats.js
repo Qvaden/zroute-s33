@@ -11,6 +11,8 @@
 import { esc, plural } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial, avatarHtml, excerpt } from '../forum/format.js';
 import { roleBadge, verifiedBadge } from '../forum/roles.js';
+import { renderMdBar } from './forum.js';
+import { CONFIG } from '../../config.js';
 
 /**
  * Рендер тела сообщения с @упоминаниями.
@@ -46,6 +48,7 @@ function renderBody(raw) {
  * @property {boolean} menuOpen
  * @property {boolean} createOpen
  * @property {boolean} pollOpen
+ * @property {boolean} formatOpen  Раскрыта ли панель форматирования над вводом.
  * @property {boolean} hasMore
  * @property {number} unread        Непрочитанных в открытом чате (для кнопки «К новым»).
  * @property {Date|null} readAt     Отметка прочтения открытого чата; граница «Новые сообщения».
@@ -654,6 +657,12 @@ export function renderComposer(s, c) {
     .filter((m) => m.userId !== s.me?.id && m.typingAt && (now - new Date(m.typingAt).getTime()) < 5000)
     .map((m) => m.nick);
 
+  /*
+    Панель форматирования — та же функция, что у формы темы (renderMdBar), и
+    прячется она атрибутом hidden, а не отсутствием в разметке: раскрытие по
+    клику не должно пересобирать композер — пересборка уронила бы каретку и
+    закрыла клавиатуру на телефоне.
+  */
   return `
     <div class="chat-compose-wrap">
       ${typists.length ? `<div class="chat-typing">${esc(typists.join(', '))} ${typists.length === 1 ? 'печатает' : 'печатают'}…</div>` : ''}
@@ -674,6 +683,7 @@ export function renderComposer(s, c) {
         `).join('')}
       </div>
 
+      <div class="chat-format" data-chat-format${s.formatOpen ? '' : ' hidden'}>${renderMdBar()}</div>
       <form class="chat-compose" data-chat-send>
         <div class="chat-compose__acts-left">
           <label class="chat-compose__btn" title="Прикрепить фото, видео или файл">
@@ -684,10 +694,14 @@ export function renderComposer(s, c) {
           <button type="button" class="chat-compose__btn" data-chat-poll-toggle title="Создать опрос">
             📊
           </button>
+          <button type="button" class="chat-compose__btn chat-compose__btn--format" data-chat-format-toggle
+                  aria-pressed="${s.formatOpen ? 'true' : 'false'}"
+                  title="Форматирование текста — как в посте форума">Аа</button>
         </div>
 
-        <div class="chat-compose__input" contenteditable="true" role="textbox"
-             data-chat-input data-placeholder="Сообщение или вставьте скриншот (Ctrl+V)…" aria-label="Сообщение"></div>
+        <div class="chat-compose__input is-empty" contenteditable="true" role="textbox"
+             aria-multiline="true" data-chat-input data-editor data-limit="${CONFIG.forum.limits.commentMax}"
+             data-placeholder="Сообщение или вставьте скриншот (Ctrl+V)…" aria-label="Сообщение"></div>
 
         <button type="submit" class="chat-compose__send" aria-label="Отправить" ${s.sending ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>

@@ -19,6 +19,7 @@
 import { CONFIG } from '../../../config.js';
 import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
 import { normalizeQuietWindow } from '../quiet.js';
+import { textOf } from '../sanitize.js';
 
 export const name = 'локальный (только этот браузер)';
 
@@ -2751,14 +2752,22 @@ export async function sendChatMessage(chatId, body, opts = {}) {
   if (!memberOf(s, chatId, me.id) && !isStaff(me)) throw new Error('Вы не участник этого чата');
   const c = s.chats.find((x) => x.id === chatId);
   if (!c || c.closed) throw new Error('Чат закрыт');
-  const text = String(body || '').slice(0, 2000);
-  if (!text.trim() && !opts.attachments?.length && !opts.poll) throw new Error('Пустое сообщение');
+  /*
+    Сообщение чата — разметка, а не плоская строка: резать HTML по длине
+    нельзя, обрезок посреди тега читался бы буквами «<b». Считают видимые
+    символы — тот же предел, что у ответа на форуме и у поля ввода.
+  */
+  const visible = textOf(String(body || ''));
+  if (visible.length > CONFIG.forum.limits.commentMax) {
+    throw new Error(`Сообщение длиннее ${CONFIG.forum.limits.commentMax} символов`);
+  }
+  if (!visible.trim() && !opts.attachments?.length && !opts.poll) throw new Error('Пустое сообщение');
   const m = {
     id: newId('m'),
     chatId,
     authorId: me.id,
     authorNick: me.nick,
-    body: text,
+    body: String(body || ''),
     attachments: Array.isArray(opts.attachments) ? opts.attachments : [],
     poll: opts.poll || null,
     replyTo: opts.replyTo || null,

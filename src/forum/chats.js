@@ -11,12 +11,18 @@
  *
  * ЧЕРНОВИКИ ПО ЧАТАМ. Начал писать в одном чате, перешёл в другой —
  * текст сохранён и вернётся при переключении назад.
+ *
+ * ВВОД — ТОТ ЖЕ РЕДАКТОР, ЧТО У ТЕМЫ ФОРУМА. Общая панель форматирования
+ * и общее поведение (лимит, чистая вставка, состояние кнопок) живут в
+ * src/forum/editor.js; в базу уходит разметка, пропущенная через тот же
+ * белый список, что тема и ответ.
  */
 import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
 import { renderChats, renderScrollArea, renderChatList, renderMessage, dayLabel } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
-import { excerpt } from './format.js';
+import { excerpt, sanitizeHtml, textOf } from './format.js';
+import { applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { quietMutesNow } from './quiet.js';
 import { uploadFile, currentUserId } from '../db/client.js';
 
@@ -40,6 +46,7 @@ const state = {
   menuOpen: false,
   createOpen: false,
   pollOpen: false,
+  formatOpen: false,
   hasMore: false,
   newMessages: 0,
   unread: 0,
@@ -156,6 +163,7 @@ function paintFull({ stick = false } = {}) {
   if (nextInput) {
     nextInput.innerHTML = state.openId ? (chatDrafts.get(state.openId) || '') : '';
     autosize(nextInput);
+    syncEditorEmpty(nextInput);
     if (wasFocused) {
       nextInput.focus({ preventScroll: true });
       // contenteditable: ставим курсор в конец.
@@ -691,16 +699,14 @@ async function loadOlder() {
 
 async function send(form) {
   const input = form.querySelector('[data-chat-input]');
-  // contenteditable div: innerHTML сохраняет <span style="color:…">.
-  // textContent для проверки пустоты (игнорируем <br>, &nbsp;).
-  const rawHtml = input?.innerHTML ?? '';
-  const body = rawHtml
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .trim()
-    ? rawHtml
-    : '';
+  /*
+    contenteditable div хранит разметку: <strong>, <span style="color:…">,
+    <blockquote>. Перед отправкой она проходит тот же белый список, что тема
+    и ответ (sanitizeHtml), — в базу уходит чистый HTML, а «пусто или нет»
+    решают видимые символы, а не теги: «<b></b>» от пустоты не отличить.
+  */
+  const clean = sanitizeHtml(input?.innerHTML ?? '');
+  const body = textOf(clean).trim() ? clean : '';
   const files = [...state.pendingFiles];
   const poll = state.pollDraft;
   if ((!body && !files.length && !poll) || state.sending || !state.openId) return;
@@ -729,6 +735,7 @@ async function send(form) {
     chatDrafts.set(id, '');
     if (input) {
       input.innerHTML = '';
+      syncEditorEmpty(input);
       requestAnimationFrame(() => autosize(input));
     }
     /*
@@ -863,6 +870,14 @@ function wire() {
   if (wired) return;
   wired = true;
 
+  /*
+    Поведение редактора общее с форумом и гайдом: лимит без maxlength, вставка
+    только текстом (иначе из Discord вместе со словами приедет чужая вёрстка),
+    кнопки не забирают фокус, состояние «жирный включён». Своих копий этой
+    логики в чате нет — копия расходится с оригиналом при первой же правке.
+  */
+  wireRichEditor(() => host);
+
   document.addEventListener('submit', async (e) => {
     if (!host || !host.contains(e.target)) return;
     const form = e.target;
@@ -939,6 +954,31 @@ function wire() {
       host.querySelectorAll('.chat-msg__reactions-pop.is-open').forEach((el) => el.classList.remove('is-open'));
     }
     if (!host.contains(t)) return;
+
+    /*
+      Кнопки форматирования — тот же механизм, что у форума и гайда: команда
+      применяется к полю ввода. editorFor() здесь не зовётся: редактор в чате
+      один, а панель стоит вне формы — иначе её раскрытие пересобрало бы форму
+      и уронило каретку.
+    */
+    const cmdBtn = t.closest('[data-editor-cmd]');
+    if (cmdBtn) {
+      applyFormat(host.querySelector('[data-chat-input]'), cmdBtn.dataset.editorCmd, cmdBtn.dataset.editorValue);
+      return;
+    }
+    const colorBtn = t.closest('[data-editor-color]');
+    if (colorBtn) {
+      applyFormat(host.querySelector('[data-chat-input]'), 'color', colorBtn.dataset.editorColor || 'inherit');
+      return;
+    }
+    const formatToggle = t.closest('[data-chat-format-toggle]');
+    if (formatToggle) {
+      state.formatOpen = !state.formatOpen;
+      const panel = host.querySelector('[data-chat-format]');
+      if (panel) panel.hidden = !state.formatOpen;
+      formatToggle.setAttribute('aria-pressed', state.formatOpen ? 'true' : 'false');
+      return;
+    }
 
     /* Лайтбокс: открыть по картинке, закрыть по фону или кнопке. */
     const lightOpen = t.closest('[data-chat-lightbox]');
@@ -1435,6 +1475,9 @@ function wire() {
     if (!host || !host.contains(e.target)) return;
     if (e.target.matches?.('[data-chat-input]')) {
       autosize(e.target);
+      // Плейсхолдер держится на классе is-empty: браузер оставляет в поле
+      // служебный <br>, и «пусто» глазами не совпадает с «пусто в DOM».
+      syncEditorEmpty(e.target);
       // Индикатор набора: отправляем не на каждое нажатие, а с задержкой.
       if (state.openId) {
         clearTimeout(state._typingTimer);

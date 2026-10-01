@@ -872,6 +872,49 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-msg__body p:last-child { margin-bottom: 0; }
 .chat-msg__body a { color: var(--accent); }
 
+/*
+  Разметка сообщения чата. Набор тегов тот же, что на форуме (белый список
+  sanitize.js), но размеры плотнее: общие правила forum.css дают отступы в 9px,
+  а в пузыре сообщения такой воздух выше самого текста, и реплика перестаёт
+  выглядеть репликой.
+*/
+.chat-msg__body blockquote,
+.chat-msg__body pre,
+.chat-msg__body ul,
+.chat-msg__body ol,
+.chat-msg__body h3 { margin: 0 0 4px; }
+.chat-msg__body :last-child { margin-bottom: 0; }
+.chat-msg__body blockquote {
+  padding: 4px 9px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: rgba(255,106,43,.06);
+  color: var(--dim);
+}
+.chat-msg__body blockquote p { margin: 0; }
+.chat-msg__body pre {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(0,0,0,.32);
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-msg__body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: .9em;
+}
+.chat-msg__body pre code { padding: 0; background: none; font-size: 1em; }
+.chat-msg__body ul { padding-left: 17px; list-style: disc; }
+.chat-msg__body ol { padding-left: 17px; list-style: decimal; }
+.chat-msg__body li { margin-bottom: 2px; }
+.chat-msg__body h3 { font-size: 14px; font-weight: 700; }
+
 .chat-msg__del {
   padding: 1px 5px;
   border: 0;
@@ -923,7 +966,13 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-compose__input {
   flex: 1;
   min-width: 0;
+  /*
+    Поле растёт до 160px и дальше прокручивается: цитата, список или код-блок
+    делают набранный текст выше, чем был обычный однострочный, — без прокрутки
+    он полез бы за пределы композера.
+  */
   max-height: 160px;
+  overflow-y: auto;
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -947,12 +996,70 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(255,106,43,.12);
 }
-/* Плейсхолдер для contenteditable — как в редакторе форума. */
-.chat-compose__input:empty::before {
+/*
+  Плейсхолдер для contenteditable — как в редакторе форума. Держится и на
+  :empty, и на классе is-empty: браузер оставляет в поле служебный <br>,
+  после чего «пусто» глазами не совпадает с «пусто в DOM».
+*/
+.chat-compose__input:empty::before,
+.chat-compose__input.is-empty::before {
   content: attr(data-placeholder);
   color: var(--mute);
   pointer-events: none;
 }
+
+/*
+  Разметка прямо в поле ввода: человек видит жирный, цитату и список до
+  отправки, а не после. Компактные поля — как у готового сообщения.
+*/
+.chat-compose__input p,
+.chat-compose__input blockquote,
+.chat-compose__input pre,
+.chat-compose__input ul,
+.chat-compose__input ol,
+.chat-compose__input h3 { margin: 0 0 4px; }
+.chat-compose__input :last-child { margin-bottom: 0; }
+.chat-compose__input blockquote {
+  padding: 2px 8px;
+  border-left: 2px solid var(--accent);
+  color: var(--dim);
+}
+.chat-compose__input pre {
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(0,0,0,.32);
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+}
+.chat-compose__input code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: .9em;
+}
+.chat-compose__input pre code { padding: 0; background: none; font-size: 1em; }
+.chat-compose__input ul { padding-left: 17px; list-style: disc; }
+.chat-compose__input ol { padding-left: 17px; list-style: decimal; }
+.chat-compose__input h3 { font-size: 14px; font-weight: 700; }
+
+/*
+  Панель форматирования — та же разметка .forum-md, что у темы и гайда.
+  Свой слой нужен только ради отступов: .forum-md рассчитан стоять под полем
+  и несёт верхний margin, а здесь кнопки встали над вводом.
+*/
+.chat-format {
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.chat-format .forum-md { margin: 0; }
+.chat-compose__btn[aria-pressed='true'] {
+  color: var(--accent);
+  background: rgba(255,106,43,.14);
+}
+.chat-compose__btn--format { font-size: 13px; font-weight: 700; letter-spacing: -.5px; }
 .chat-compose__send {
   display: grid;
   place-items: center;

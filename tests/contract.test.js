@@ -11044,5 +11044,182 @@ console.log('\nAM. Фид магазина: обновление и событи
       namedMigrations.length > 3 && namedMigrations.every((n) => applied.includes(n))],
     [true, true]);
 }
+/* ── 14. Чат: то же форматирование, что у темы ─────────────────────────────
 
+   Сообщение чата было плоской строкой: «проверять до 21:00» нельзя ни
+   выделить, ни процитировать, поэтому важное уносили на форум, а в чат кидали
+   ссылку. Кнопки формата — не косметика, но и не повод писать второй редактор:
+   копия расходится с оригиналом при первой же правке. Значит проверять надо
+   не «есть ли кнопки», а «взял ли чат общий».
 
+     1. панель собрана той же функцией, что форма темы: тот же набор команд и
+        та же палитра, а не список, переписанный в chats.js;
+     2. поле ввода живёт по общему контракту редактора, и его лимит — то же
+        число, что у ответа на форуме. Вторая цифра означала бы, что чат
+        пускает то, что отвергает база, или режет то, что база приняла бы;
+     3. панель стоит ВНЕ формы и прячется атрибутом hidden: пересборка
+        композера уронила бы каретку и закрыла клавиатуру на телефоне;
+     4. в базу уходит разметка, пропущенная через белый список темы, а «пусто
+        или нет» решают видимые символы: «<b></b>» от пустоты не отличить;
+     5. черновой режим не режет тело по длине HTML — обрезок посреди тега
+        читался бы буквами «<b».
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const chatPageSrc = await readFile('src/pages/chats.js', 'utf8');
+  const chatLogicSrc = await readFile('src/forum/chats.js', 'utf8');
+  const editorSrc = await readFile('src/forum/editor.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const cssSrc = await readFile('src/refine.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+
+  const { renderComposer, renderMessage } = await import('../src/pages/chats.js');
+  const { renderMdBar } = await import('../src/pages/forum.js');
+  const { postBody, sanitizeHtml, excerpt, textOf } = await import('../src/forum/format.js');
+  const L = CONFIG.forum.limits;
+
+  /* ── Панель и поле ввода: одна копия на троих ── */
+  const me = { id: 'u1', nick: 'Лидер', banned: false };
+  const room = { id: 'c1', closed: false, myRole: 'owner' };
+  const base = {
+    me, members: [], replyingTo: null, pollDraft: null, pollOpen: false,
+    pendingFiles: [], sending: false, formatOpen: false,
+  };
+  const closedBar = renderComposer(base, room);
+  const openBar = renderComposer({ ...base, formatOpen: true }, room);
+
+  check('панель формата в чате собрана той же функцией, что форма темы',
+    chatPageSrc.includes(`import { renderMdBar } from './forum.js';`)
+      && closedBar.includes(renderMdBar()));
+  const cmdCount = (html) => (html.match(/data-editor-cmd="/g) || []).length;
+  const colorCount = (html) => (html.match(/data-editor-color="/g) || []).length;
+  equal('команды чата — ровно те же, что под полем темы',
+    cmdCount(closedBar), cmdCount(renderMdBar()));
+  equal('палитра чата — ровно та же, что у темы',
+    colorCount(closedBar), colorCount(renderMdBar()));
+
+  check('в закрытом виде панель скрыта атрибутом, а не вырезана из разметки',
+    /class="chat-format" data-chat-format hidden/.test(closedBar)
+      && !/class="chat-format" data-chat-format hidden/.test(openBar));
+  check('панель стоит над формой ввода и вне её: раскрытие не пересобирает композер',
+    openBar.indexOf('data-chat-format') < openBar.indexOf('<form class="chat-compose"'));
+  check('переключатель держит состояние, а не только вид',
+    /data-chat-format-toggle[\s\S]{0,90}aria-pressed="false"/.test(closedBar)
+      && /aria-pressed="true"/.test(openBar));
+
+  const inputTag = /<div class="chat-compose__input[^>]*data-chat-input[^>]*>/.exec(openBar)?.[0] ?? '';
+  check('поле ввода чата стало редактором общего контракта',
+    /\bdata-editor\b/.test(inputTag) && /aria-multiline="true"/.test(inputTag));
+  equal('лимит поля — то же число, что у ответа на форуме',
+    /data-limit="(\d+)"/.exec(inputTag)?.[1], String(L.commentMax));
+  check('плейсхолдер держится на классе: браузер оставляет в поле служебный br',
+    /class="chat-compose__input is-empty"/.test(openBar)
+      && cssSrc.includes('.chat-compose__input.is-empty::before'));
+
+  /* ── Поведение: общее, а не похожее ── */
+  check('чат берёт поведение редактора из editor.js, а не переписывает его',
+    /import \{ applyFormat, syncEditorEmpty, wireRichEditor \} from '\.\/editor\.js';/.test(chatLogicSrc)
+      && chatLogicSrc.includes('wireRichEditor(() => host);'));
+  check('команды и цвета применяются к полю чата, а не к первому редактору страницы',
+    chatLogicSrc.includes(`applyFormat(host.querySelector('[data-chat-input]'), cmdBtn.dataset.editorCmd`)
+      && /applyFormat\(host\.querySelector\('\[data-chat-input\]'\), 'color'/.test(chatLogicSrc));
+  check('скрытие панели делает атрибут, а не перерисовка композера',
+    chatLogicSrc.includes('panel.hidden = !state.formatOpen'));
+  check('состояние пустоты синхронизируется везде, где поле меняет код: набор, черновик, отправка',
+    (chatLogicSrc.match(/syncEditorEmpty\(/g) || []).length >= 3);
+
+  /* ── Что уходит в базу и что видит читатель ── */
+  const dirty = '<b>срочно</b> <span style="COLOR:#FF6B6B">горящее</span>'
+    + '<script>документы</script><img src="x" onerror=" украсть()">'
+    + '<blockquote>цитата темы</blockquote><a href="javascript:boom()">яд</a>';
+  const clean = sanitizeHtml(dirty);
+  /* Браузер ставит в contenteditable <b>, канон общего списка превращает его в strong. */
+  check('в базу уходит разметка, пропущенная через белый список темы',
+    clean.includes('<strong>срочно</strong>') && clean.includes('color:#ff6b6b')
+      && clean.includes('<blockquote>цитата темы</blockquote>'));
+  check('опасное не уезжает в базу вместе с текстом',
+    !clean.includes('<script') && !clean.includes('onerror') && !clean.includes('javascript:'));
+  /*
+    Цвет, выбранный на жирном слове, браузер кладёт на тот же <b>, а не в
+    отдельный span: разрешать цвет только span значило бы молча выбрасывать
+    половину цветов, которые человек видел в редакторе.
+  */
+  check('цвет держится на любом разрешённом строчном теге, а не только на span',
+    sanitizeHtml('<b style="color: rgb(79, 217, 138)">сбор в 21:00</b>')
+      === '<strong style="color:rgb(79, 217, 138)">сбор в 21:00</strong>');
+  check('редактор просит у браузера стили вместо <font>, которого нет в списке',
+    /execCommand\('styleWithCSS', false, true\)/.test(editorSrc)
+      && /execCommand\('styleWithCSS', false, false\)/.test(editorSrc));
+  check('«пусто» решают видимые символы, а не теги',
+    textOf(sanitizeHtml('<b></b><br><span style="color:#ffffff"></span>')).trim() === '');
+  check('сырой innerHTML в базу больше не уходит и теги не срезаются наивным regex',
+    chatLogicSrc.includes(`const clean = sanitizeHtml(input?.innerHTML ?? '');`)
+      && !chatLogicSrc.includes('<[^>]+>'));
+
+  const bubble = renderMessage({
+    id: 'm1', chatId: 'c1', authorId: 'u2', authorNick: 'Разведчик',
+    body: clean, createdAt: new Date('2026-10-01T10:00:00Z'), reactions: {},
+  }, { me, members: [] }, false, false);
+  check('сообщение показывает форматирование, а не буквы тегов',
+    bubble.includes('<strong>срочно</strong>') && !bubble.includes('&lt;strong&gt;'));
+  check('выжимка остаётся плоским текстом: её читают в цитате ответа и в уведомлениях',
+    !excerpt(clean).includes('<'));
+  check('чужую разметку при показе всё равно чистит тот же список, что и на форуме',
+    postBody('<b>жирный</b><iframe src="x"></iframe>').includes('<strong>жирный</strong>')
+      && !postBody('<b>жирный</b><iframe src="x"></iframe>').includes('iframe'));
+
+  /* ── Стили: пузырь сообщения и панель над вводом ── */
+  check('разметка сообщения плотнее форумной: пузырь не должен быть выше реплики',
+    cssSrc.includes('.chat-msg__body blockquote') && cssSrc.includes('.chat-msg__body pre')
+      && /margin: 0 0 4px/.test(cssSrc));
+  check('панель получила свой слой: .forum-md рассчитан стоять под полем, а не над ним',
+    cssSrc.includes('.chat-format .forum-md'));
+  check('поле ввода растёт и прокручивается, а не распирает композер',
+    /\.chat-compose__input \{[\s\S]{0,300}?max-height: 160px;\s*\n\s*overflow-y: auto;/.test(cssSrc));
+  check('раскрытый переключатель помечен цветом, чтобы было видно, что панель живая',
+    /\.chat-compose__btn\[aria-pressed='true'\]/.test(cssSrc));
+
+  /* ── Черновой режим: предел по видимому тексту, а не по длине HTML ── */
+  check('черновой режим больше не режет тело по символам',
+    !/String\(body \|\| ''\)\.slice\(0, 2000\)/.test(localSrc));
+
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const local = await import('../src/forum/adapters/local.js');
+  await local.signUp('Лидер штаба');
+  const chat = await local.createChat({ title: 'Штаб формата' });
+
+  /* Видимых символов — ровно предел, а HTML вместе с тегами за него уходит. */
+  const marked = '<strong>' + 'раз '.repeat(Math.floor(L.commentMax / 4)) + '</strong>';
+  check('набранное сообщение влезает по видимому тексту, хотя HTML длиннее предела',
+    textOf(marked).length <= L.commentMax && marked.length > L.commentMax);
+  const accepted = await local.sendChatMessage(chat.id, marked);
+  check('принятое сообщение доходит целиком: обрезок посреди тега читался бы буквами «<b»',
+    accepted.body === marked);
+
+  let tooLong = '';
+  try {
+    await local.sendChatMessage(chat.id, '<p>' + 'с '.repeat(L.commentMax + 2) + '</p>');
+  } catch (e) { tooLong = String(e.message); }
+  check('длиннее предела не проходит, и сказано, чем именно',
+    tooLong.includes(`длиннее ${L.commentMax} символов`), tooLong);
+  let emptyMsg = '';
+  try {
+    await local.sendChatMessage(chat.id, '<b></b><br>');
+  } catch (e) { emptyMsg = String(e.message); }
+  check('разметка без слов сообщением не считается',
+    emptyMsg === 'Пустое сообщение', emptyMsg);
+
+  /* ── Документы ── */
+  const chatsDoc = docsSrc.slice(docsSrc.indexOf('## Закрытые чаты альянсов'),
+    docsSrc.indexOf('## Как устроена модерация'));
+  check('документы больше не обещают чат без форматирования',
+    !docsSrc.includes('Всё, что нужно оформить, пишут на форуме')
+      && /форматировани/i.test(chatsDoc));
+  check('документы называют общую природу редактора, а не список кнопок',
+    /редактор/i.test(chatsDoc) && chatsDoc.includes('тот же'));
+}

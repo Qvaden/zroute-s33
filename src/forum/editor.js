@@ -49,8 +49,18 @@ export function applyFormat(editor, cmd, value) {
   editor.focus({ preventScroll: true });
 
   if (cmd === 'color') {
+    /*
+      Без этой строки Chromium вставляет <font color=…>, а белый список
+      санитайзера знает span — выбранный цвет исчезал при сохранении и на
+      форуме, и в чате. Firefox даёт span сам. Просим браузер писать стили
+      и сбрасываем flag после команды: состояние документа глобальное,
+      а чужие execCommand (например, редактор названия гайда) должны
+      остаться по умолчанию.
+    */
+    document.execCommand('styleWithCSS', false, true);
     // Сброс через 'inherit': санитайзер такую обёртку выбросит на сохранении.
     document.execCommand('foreColor', false, value || 'inherit');
+    document.execCommand('styleWithCSS', false, false);
     return;
   }
   if (cmd === 'code') {
