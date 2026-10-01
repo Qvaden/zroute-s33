@@ -27,7 +27,7 @@ import {
   CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines, EVENT_TAG_ID,
   EVENT_RSVP_IDS,
 } from './rules.js';
-import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
+import { filtersFromSearch, searchFromFilters, composeIntentFromSearch, SERVER_MIN, SERVER_MAX } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { normalizeQuietWindow, parseQuietTime, saveQuietWindow } from './quiet.js';
@@ -65,6 +65,21 @@ const state = {
   query: '',
   /** Лента сужена до «В закладках»; обычная лента — это false. */
   saved: false,
+  /*
+    Мультиаренда: список игровых серверов этой базы и номер сервера, чью ленту
+    показывают.
+
+    `servers` пуст — это «миграции 20261001-server-scope.sql нет»: переключатель
+    не показывается, а лента читается без фильтра, ровно как читалась до шага.
+
+    `serverId` — названный человеком выбор: он из адреса или из сохранённого.
+    Пока человек сервер не выбирал, поля нет вовсе, и лента идёт без фильтра.
+    Подставлять в пустое поле номер сайта нельзя: до миграции это убило бы весь
+    форум неизвестным столбцом, а после — выглядело бы как выбор, которого
+    человек не делал.
+  */
+  servers: [],
+  serverId: null,
   /**
    * Пять первых шагов вошедшего (supabase/20260926-starter-checklist.sql).
    * Пустой список — блока нет: шаги либо уже сделаны, либо срок новичка прошёл.
@@ -677,9 +692,19 @@ async function withBusy(button, label, action) {
 
 /** @param {string} search Хвост адреса после «?», без знака вопроса. */
 function readFilters(search) {
-  Object.assign(state, filtersFromSearch(search, {
+  const { server, ...filters } = filtersFromSearch(search, {
     categories: CATEGORY_IDS, tags: TOPIC_TAG_IDS, sorts: SORT_IDS,
-  }));
+  });
+  Object.assign(state, filters);
+  /*
+    Сервер в адресе важнее сохранённого, и он же — единственная причина
+    посмотреть чужую ленту, не трогая переключатель. Пустого сервера в адресе
+    нет намеренно: ссылка `#/forum?cat=vs`, данная человеку с 44-го, обязана
+    открыть ему 44-й в разделе VS, а не сбросить на общий. Адрес описывает вид,
+    а про данные знает ровно то, что в него вписано.
+  */
+  const named = server ?? readServerChoice();
+  state.serverId = Number.isInteger(named) ? named : null;
   /*
     «Создать встречу» из календаря ведёт сюда же, на форум: встреча у нас и
     есть тема. Отдельного редактора ради неё нет, поэтому адрес говорит форме,
@@ -697,9 +722,104 @@ function readFilters(search) {
 
 function writeFilters() {
   if (state.openPostId) return;
-  const search = searchFromFilters(state);
+  const search = searchFromFilters({
+    ...state, server: state.serverId, defaultServer: Number(CONFIG.server),
+  });
   const hash = `#/forum${search ? `?${search}` : ''}`;
   if (location.hash !== hash) history.replaceState(null, '', hash);
+}
+
+/* ── Выбор сервера ────────────────────────────────────────────────────────
+ *
+ * Сервер помнится браузеру, а не человеку: это настройка просмотра, того же
+ * ряда, что и тихие часы. Ключ отдельный от черновика и от памяти ленты —
+ * выбор должен пережить закрытую вкладку и не обязан переезжать вместе с
+ * ними.
+ *
+ * Порядок выбора: адрес > сохранённое > сервер сайта. Адрес важнее всего,
+ * потому что его пишет человек, которому дали ссылку; сохранённое важнее
+ * номера сайта, потому что человек однажды сказал «мне нужен 44-й» и не должен
+ * говорить это на каждой странице.
+ */
+
+const SERVER_CHOICE_KEY = 'zr33.forum.server';
+
+/** Сохранённый выбор сервера или null, когда человек его никогда не делал. */
+function readServerChoice() {
+  try {
+    const raw = localStorage.getItem(SERVER_CHOICE_KEY);
+    if (raw == null || raw === '') return null;
+    const id = Number(raw);
+    return Number.isInteger(id) && id >= SERVER_MIN && id <= SERVER_MAX ? id : null;
+  } catch {
+    // Хранилище недоступно — не беда: просто лента без сохранённого выбора.
+    return null;
+  }
+}
+
+function writeServerChoice(id) {
+  try {
+    if (id == null) localStorage.removeItem(SERVER_CHOICE_KEY);
+    else localStorage.setItem(SERVER_CHOICE_KEY, String(id));
+  } catch {
+    /* Приватный режим: выбор действует до перезагрузки и это честно. */
+  }
+}
+
+/**
+ * Список серверов базы. Стартует рядом с лентой, а не перед ней: таблица из
+ * двух строк не должна становиться тем, из-за чего человек ждёт форум дольше.
+ *
+ * Пустой список — миграции нет, и тогда ничего не меняется: фильтра в запросе
+ * не было, переключателя на экране тоже.
+ */
+async function loadServers(feedPromise) {
+  if (typeof forum.listServers !== 'function') return;
+  const token = mountToken;
+  const rows = await forum.listServers().catch(() => []);
+  if (token !== mountToken) return;
+  state.servers = Array.isArray(rows) ? rows : [];
+  if (!state.servers.length || state.serverId != null) {
+    applyServerTitle();
+    paint();
+    return;
+  }
+  /*
+    Человек сервер не выбирал, а база уже различает ленты: первый запрос
+    поэтому шёл без фильтра и показал бы темы всех серверов разом. Догоняем
+    его лентой сервера сайта — это один лишний запрос у того, кто зашёл впервые
+    и никогда не трогал переключатель, вместо молчаливой смеси серверов у всех.
+
+    Первый ответ при этом дожидается: он уже в пути, и раньше него ставить на
+    экран другой список значило бы мигание двумя лентами подряд.
+  */
+  await Promise.resolve(feedPromise).catch(() => {});
+  if (token !== mountToken) return;
+  state.serverId = resolveSiteServer();
+  applyServerTitle();
+  paint();
+  await loadFeed();
+}
+
+/** Номер сервера по умолчанию из тех, что есть в базе. */
+function resolveSiteServer() {
+  const configured = Number(CONFIG.server);
+  if (state.servers.some((row) => row.id === configured)) return configured;
+  const open = state.servers.find((row) => row.enabled !== false);
+  return open ? open.id : state.servers[0].id;
+}
+
+/*
+  Заголовок вкладки говорит, чей форум человек читает, — он единственный, что
+  видно при десяти открытых вкладках. Берётся заготовленный страницей и
+  меняет в нём только номер сервера: название сайта принадлежит index.html, и
+  переписывать его отсюда значило бы однажды иметь два разных.
+*/
+const BASE_TITLE = document.title;
+
+function applyServerTitle() {
+  const server = state.servers.find((row) => row.id === state.serverId);
+  document.title = server ? BASE_TITLE.replace(/^Сервер \d+/, server.title) : BASE_TITLE;
 }
 
 /* ── Память первого экрана ленты ──────────────────────────────────────────
@@ -738,6 +858,12 @@ function feedSignature() {
     state.sort,
     state.saved ? 'saved' : 'all',
     state.query.trim().toLowerCase(),
+    /*
+      Сервер — часть подписи, а не деталь запроса. Без него память ленты 44-го
+      открылась бы человеку на 33-м как его собственный первый экран, и это
+      был бы не прошлый список, а чужой.
+    */
+    state.serverId ?? 'все',
   ].join('|');
 }
 
@@ -856,6 +982,7 @@ async function loadFeed({ append = false } = {}) {
       sort: state.sort,
       q: state.query,
       saved: state.saved,
+      serverId: state.serverId,
       limit: CONFIG.forum.pageSize,
       offset: append ? state.posts.length : 0,
     });
@@ -907,7 +1034,7 @@ async function loadFeedExtras(token) {
     */
     (async () => {
       try {
-        const hot = await forum.listPosts({ sort: 'talked', limit: 3 });
+        const hot = await forum.listPosts({ sort: 'talked', limit: 3, serverId: state.serverId });
         state.hot = (hot.posts ?? []).filter((p) => !p.deleted && p.commentCount > 0);
       } catch {
         /* горячие темы — витрина, а не договор: остаёмся с прошлыми */
@@ -921,7 +1048,7 @@ async function loadFeedExtras(token) {
     */
     (async () => {
       try {
-        const wide = await forum.listPosts({ sort: 'fresh', limit: 300 });
+        const wide = await forum.listPosts({ sort: 'fresh', limit: 300, serverId: state.serverId });
         state.lead = {
           week: leaderboardOf(wide.posts ?? [], { period: 'week' }),
           all: leaderboardOf(wide.posts ?? [], { period: 'all' }),
@@ -1953,9 +2080,26 @@ function wire() {
       return;
     }
 
+    /*
+      Сервер. Те же кнопки, что разделы и порядок: лента другого сервера — это
+      эта же страница с другим фильтром, а не другой сайт и не другая вкладка.
+      Выбор помнится браузеру, а адрес перепишет сама лента: она одна знает,
+      какой запрос ушёл на самом деле.
+    */
+    const serverBtn = t.closest('[data-forum-server]');
+    if (serverBtn && host.contains(serverBtn)) {
+      const id = Number(serverBtn.dataset.forumServer);
+      if (!Number.isInteger(id) || id === state.serverId) return;
+      state.serverId = id;
+      writeServerChoice(id);
+      applyServerTitle();
+      state.openPostId = null;
+      await loadFeed();
+      return;
+    }
+
     // Раздел.
-    const cat = t.closest('[data-forum-cat]');
-    if (cat && host.contains(cat)) {
+    const cat = t.closest('[data-forum-cat]');    if (cat && host.contains(cat)) {
       // Выбор в выпадающем списке закрывает его; на сегментах безвредно.
       closePicks();
       state.category = cat.dataset.forumCat;
@@ -2751,6 +2895,14 @@ function wire() {
       if (!checked.ok) return showError('[data-forum-new-error]', checked.error);
 
       const draft = { ...checked.value, poll };
+      /*
+        Тема принадлежит серверу, чью ленту человек читает, — а когда сервер не
+        выбран (миграции нет или это самый первый заход), поля в запросе нет
+        вовсе и ставит его база по умолчанию. Молча подставить номер сайта
+        нельзя: до прогона миграции PostgREST отверг бы тему целиком из-за
+        неизвестного столбца.
+      */
+      if (state.serverId != null) draft.serverId = state.serverId;
       draft.tags = [...form.querySelectorAll('input[name="tags"]:checked')].map((input) => input.value);
       /*
         Дата считается от «сейчас», а не от выбранной человеком строки
@@ -3216,6 +3368,13 @@ export async function mountForum(container, view, postId = null, search = '') {
     loadActivity();
   }
   const content = postId ? loadThread(postId) : loadFeed();
+  /*
+    Серверы базы спрашиваем рядом с лентой, а не перед ней: список из трёх
+    строк не должен становиться тем, из-за чего человек ждёт форум дольше.
+    Перезапрос ленты внутри него всё равно дожидается первого ответа — два
+    ответа не должны переспорить один экран.
+  */
+  if (!postId) loadServers(content);
 
   try {
     state.me = await whoIAm;
@@ -3337,6 +3496,12 @@ export async function mountUser(container, nick) {
 /** Ушли на другую вкладку: держать чужую разметку в руках незачем. */
 export function unmountForum() {
   stopQuarterTimer();
+  /*
+    Название сервера в заголовке — про форум, а не про сайт: на «Хронологии»
+    или в «Обновлениях» человек читает весь сайт целиком, и висящее там «44»
+    было бы обещанием фильтра, которого на тех страницах нет.
+  */
+  document.title = BASE_TITLE;
   host = null;
   mode = 'feed';
   state.openPostId = null;

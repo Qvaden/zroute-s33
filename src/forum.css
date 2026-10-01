@@ -1305,6 +1305,12 @@
   margin-bottom: 16px;
 }
 .ctl--forum .seg { flex-wrap: wrap; }
+/*
+  Ряд серверов — первый в управлении лентой и отвечает не на «как сортировать»,
+  а на «чью ленту я смотрю». Поэтому он не прижимается вправо, как порядок, и
+  названия серверов читаются с краю.
+*/
+.seg--server { font-weight: 600; }
 .seg--sort { margin-left: auto; }
 @media (max-width: 620px) {
   .seg--sort { margin-left: 0; }

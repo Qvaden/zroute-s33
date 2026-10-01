@@ -77,6 +77,7 @@ function emptyState() {
     nickHistory: [],
     updateNotes: [],
     storeEvents: [],
+    servers: [],
   };
 }
 
@@ -94,6 +95,28 @@ function write(state) {
 /** Идентификатор без внешних библиотек: времени достаточно, гонок тут нет. */
 function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/*
+  Сервер по умолчанию — тот же номер, что ставит база в колонку `server_id`
+  (20261001-server-scope.sql), и берётся он из CONFIG.server. Нужен он здесь
+  ровно для одного случая: темы, написанные до этого шага, лежат в
+  localStorage без номера, и для них «номера нет» значит «наш общий сервер»,
+  а не «ничейная строка, которую не видно ни в одной ленте».
+*/
+function defaultServerId() {
+  return CONFIG.server != null && Number.isInteger(Number(CONFIG.server)) ? Number(CONFIG.server) : null;
+}
+
+/*
+  Номер сервера из руки, а не из головы: `Number(null)` — это ноль, а не «числа
+  нет», и проверка одной только конечностью превратила бы пустой выбор в
+  несуществующий сервер 0. Пустое поле так и остаётся пустым.
+*/
+function toServerId(value) {
+  if (value == null || value === '') return null;
+  const id = Number(value);
+  return Number.isInteger(id) ? id : null;
 }
 
 const toDate = (v) => (v ? new Date(v) : null);
@@ -299,6 +322,14 @@ function postOut(state, p) {
   const author = state.users.find((u) => u.id === p.authorId);
   return {
     id: p.id,
+    /*
+      Номер сервера. Пустым он не остаётся никогда, кроме случая, когда в
+      CONFIG.server нет числа: в базе колонка с значением по умолчанию, и
+      темы, написанные до мультиаренды, принадлежат именно этому серверу.
+      Оставить их без номера значило бы, что лента любого сервера их не
+      показывает, а «старых тем нет» — неправда.
+    */
+    serverId: toServerId(p.serverId) ?? defaultServerId(),
     authorId: p.authorId,
     authorNick: p.authorNick,
     /*
@@ -380,19 +411,49 @@ function pollOut(state, postId) {
   };
 }
 
+/*
+  Тот же список, что отдаёт `forum_servers` после 20261001-server-scope.sql:
+  один сервер по умолчанию, пока разработчик не дописал в localStorage строку
+  `servers` руками. Без этого шага переключатель в черновом режиме не
+  проверить: он показывается только когда серверов больше одного.
+*/
+export async function listServers() {
+  const state = read();
+  const rows = Array.isArray(state.servers) ? state.servers : [];
+  if (rows.length) {
+    return rows
+      .filter((row) => toServerId(row?.id) != null)
+      .map((row) => ({
+        id: Number(row.id),
+        title: String(row.title || `Сервер ${row.id}`),
+        enabled: row.enabled !== false,
+      }));
+  }
+  const id = defaultServerId();
+  return id == null ? [] : [{ id, title: `Сервер ${id}`, enabled: true }];
+}
+
 /**
  * Лента.
  *
  * Удалённые посты из ленты исчезают: причина удаления нужна модерации,
  * а не читателям.
  *
- * @param {{category?: string, sort?: string, limit?: number, offset?: number}} [opts]
+ * @param {{category?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}} [opts]
  */
 export async function listPosts(opts = {}) {
   const s = read();
-  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false } = opts;
+  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false, serverId = null } = opts;
 
   let list = s.posts.filter((p) => !p.deleted).map((p) => postOut(s, p));
+  /*
+    Лента одного сервера — тот же фильтр, что ставит рабочий адаптер колонкой
+    `server_id`. Темы, написанные до мультиаренды, относятся к серверу по
+    умолчанию (см. postOut), поэтому старый черновик не исчезает из ленты.
+  */
+  if (serverId != null && Number.isInteger(Number(serverId))) {
+    list = list.filter((p) => p.serverId === Number(serverId));
+  }
   if (category !== 'all') list = list.filter((p) => p.category === category);
   if (tag !== 'all') list = list.filter((p) => p.tags.includes(tag));
   /*
@@ -666,6 +727,10 @@ export async function createPost(draft) {
 
   const post = {
     id: newId('p'),
+    // Чьей ленты тема: номер назвала страница, а когда она его не знает
+    // (миграции ещё нет в боевом режиме, сервер не выбран) — дефолт CONFIG,
+    // ровно как NOT NULL default 33 в базе.
+    serverId: toServerId(draft.serverId) ?? defaultServerId(),
     authorId: me.id,
     authorNick: me.nick,
     category: draft.category,

@@ -246,6 +246,9 @@ function postOut(row) {
   }
   return {
     id: row.id,
+    // Поля нет в запросе, пока представление не пересоздано миграцией
+    // 20261001-server-scope.sql, — и придумывать за базу номер нельзя.
+    serverId: row.server_id == null ? null : Number(row.server_id),
     authorId: row.author_id,
     authorNick: row.author_nick,
     /*
@@ -349,9 +352,29 @@ function pollOut(p) {
   };
 }
 
-/** @param {{category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean}} [opts] */
+/*
+  Список серверов читается до всякого входа и без права на запись: гость тоже
+  выбирает, чью ленту читать. Пустой ответ здесь означает не «серверов нет», а
+  «миграции нет» — таблицы `forum_servers` просто не существует, и база отвечает
+  отказом. Молча проглатываем его в пустой список намеренно: переключатель по
+  пустому списку не показывается, и сайт остаётся ровно тем, чем был до этого
+  шага, вместо ошибки на весь экран у тех, кого мультиаренда не касается.
+*/
+export async function listServers() {
+  const rows = await rest('/forum_servers?select=id,title,enabled&order=id.asc&limit=100')
+    .catch(() => null);
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row.id != null && Number.isInteger(Number(row.id)))
+    .map((row) => ({
+      id: Number(row.id),
+      title: String(row.title || `Сервер ${row.id}`),
+      enabled: row.enabled !== false,
+    }));
+}
+
+/** @param {{category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}} [opts] */
 export async function listPosts(opts = {}) {
-  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false } = opts;
+  const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false, serverId = null } = opts;
 
   const ORDER = {
     fresh: 'pinned.desc,created_at.desc',
@@ -369,6 +392,20 @@ export async function listPosts(opts = {}) {
   // кончилась ли лента.
   params.set('limit', String(limit + 1));
   params.set('offset', String(offset));
+  /*
+    Лента одного сервера — тот же запрос, что и общая лента, только с фильтром
+    по колонке. Колонка появилась последней миграцией, а PostgREST отвергает
+    запрос с неизвестным столбцом целиком: прикладывать `server_id` у каждой
+    обычной ленты значило бы, что до прогона 20261001-server-scope.sql встанет
+    весь форум. Поэтому фильтр ставится только когда номер назвали.
+
+    Пустой ответ без фильтра — это «серверов не различаем», а не «сервер 33»:
+    адаптер не подставляет номер молча, и страница сама решает, просить ли
+    ленту своего сервера.
+  */
+  if (serverId != null && Number.isInteger(Number(serverId))) {
+    params.set('server_id', `eq.${Number(serverId)}`);
+  }
   if (category !== 'all' && CATEGORY_IDS.includes(category)) {
     params.set('category', `eq.${category}`);
   }
@@ -525,6 +562,19 @@ export async function createPost(draft) {
     */
     expires_at: draft.expiresAt ?? null,
   };
+
+  /*
+    Сервер, чьей ленты касается тема. Та же очередь, что у бартера и события:
+    колонка появилась последней миграцией, и послать её раньше — значит потерять
+    всю тему из-за неизвестного столбца, а не только её привязку.
+
+    Когда номер не назван, поля в запросе нет вовсе, и ставит его база по
+    умолчанию (33) — так окно между прогоном миграции и пушем кода остаётся
+    живым форумом, а не пустой страницей.
+  */
+  if (draft.serverId != null && Number.isInteger(Number(draft.serverId))) {
+    payload.server_id = Number(draft.serverId);
+  }
 
   /*
     Бартер: две стороны обмена. Как и момент встречи, это колонки темы, и их

@@ -44,6 +44,13 @@
  *
  * @typedef {Object} ForumPost
  * @property {string}  id
+ * @property {number}  [serverId]     Игровому серверу принадлежит тема — см.
+ *                                   ForumServer и 20261001-server-scope.sql.
+ *                                   Поля нет, пока миграция не прогнана или
+ *                                   пока лента читается без фильтра по серверу:
+ *                                   адаптер не подставляет №33 молча, иначе
+ *                                   «сервер не размечен» и «это сервер 33»
+ *                                   выглядели бы одинаково.
  * @property {string}  authorId
  * @property {string}  authorNick     Копией, чтобы лента не ходила за автором.
  * @property {boolean} [authorIsBlogger]  Автор ведёт блог: метка и ссылка на него.
@@ -300,6 +307,20 @@
  */
 
 /**
+ * Игровой сервер — один ряд таблицы `forum_servers`.
+ *
+ * Серверов может быть несколько лент в одной базе, и список нужен шапке до
+ * всякого входа: гость тоже выбирает, чью ленту читать. Поэтому `listServers`
+ * читается без права, а пустой ответ означает не «серверов нет», а «миграции
+ * нет» — переключатель по нему прячется, и сайт остаётся ровно тем, чем был.
+ *
+ * @typedef {Object} ForumServer
+ * @property {number}  id        Номер сервера в игре, он же номер в адресе.
+ * @property {string}  title     Как сервер подписан в шапке («Сервер 33»).
+ * @property {boolean} [enabled] Лента закрыта, но истории никуда не делась.
+ */
+
+/**
  * Контракт, который обязан реализовать каждый адаптер форума.
  * Все методы асинхронные — даже там, где localStorage ответил бы сразу.
  * Иначе при переезде на базу поедут все места вызова.
@@ -312,11 +333,12 @@
  * @property {(nick: string, password: string) => Promise<ForumUser>} signUp
  * @property {(nick: string, password: string) => Promise<ForumUser>} signIn
  * @property {() => Promise<void>} signOut
- * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean}) => Promise<{posts: ForumPost[], total: number}>} listPosts
+ * @property {() => Promise<ForumServer[]>} [listServers]  Пустой список — это «миграции 20261001-server-scope.sql нет», а не «серверов нет»: по пустому ответу переключатель не показывается, и лента читается без фильтра по серверу.
+ * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}) => Promise<{posts: ForumPost[], total: number}>} listPosts  serverId — фильтр ленты; пусто значит «не фильтровать» (так читается база до миграции).
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
- * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, barterGives?: string|null, barterWants?: string|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока.
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, barterGives?: string|null, barterWants?: string|null, serverId?: number|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока. serverId прикладывается к запросу только когда сервер известен (см. listServers): до миграции база отвергла бы всю тему из-за неизвестного столбца.
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned

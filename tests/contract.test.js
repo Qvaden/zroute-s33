@@ -4080,7 +4080,7 @@ console.log('\nS. Чистые функции');
   const userSource = await readFile('src/pages/user.js', 'utf8');
 
   check('лента тянет горячие темы через sort=talked',
-    /listPosts\(\{ sort: 'talked', limit: 3 \}\)/.test(mountSource));
+    /listPosts\(\{ sort: 'talked', limit: 3, serverId: state\.serverId \}\)/.test(mountSource));
   check('горячие темы не роняют ленту при ошибке',
     /sort: 'talked', limit: 3[\s\S]{0,220}\}\s*catch\s*\{/.test(mountSource));
   check('удалённые темы не попадают в горячие',
@@ -4390,7 +4390,8 @@ console.log('\nS. Чистые функции');
   const pagesSource = await readFile('src/pages/forum.js', 'utf8');
   check('лидерборд: mount считает через leaderboardOf по обеим периодам',
     /leaderboardOf\(.*period: 'week'/.test(mountSource) && /leaderboardOf\(.*period: 'all'/.test(mountSource));
-  check('лидерборд: широкая выборка для счёта', /listPosts\(\{ sort: 'fresh', limit: 300 \}\)/.test(mountSource));
+  check('лидерборд: широкая выборка для счёта',
+    /listPosts\(\{ sort: 'fresh', limit: 300, serverId: state\.serverId \}\)/.test(mountSource));
   check('лидерборд: переключение периода обрабатывается',
     /data-forum-lead-period/.test(mountSource) && /state\.leadPeriod/.test(mountSource));
 }
@@ -7071,7 +7072,7 @@ console.log('\nAA. Закладки тем');
   check('контракт знает обе двери и флаг ленты',
     contractSrc.includes('@property {(postId: string) => Promise<void>} bookmarkTopic')
       && contractSrc.includes('@property {(postId: string) => Promise<void>} unbookmarkTopic')
-      && contractSrc.includes('q?: string, saved?: boolean}')
+      && contractSrc.includes('q?: string, saved?: boolean')
       && /@property \{boolean\} \[saved\]/.test(contractSrc));
   check('черновик повторяет форму: строка, дата и удаление вместо отметки',
     /export async function bookmarkTopic\(postId\)[\s\S]{0,320}createdAt: new Date\(\)\.toISOString\(\)/.test(localSrc)
@@ -10750,6 +10751,218 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('копия описана в документах: архитектура и раздача',
     (await readFile('docs/ARCHITECTURE.md', 'utf8')).includes('Запасное чтение')
       && (await readFile('docs/HOSTING.md', 'utf8')).includes('Показан снимок'));
+}
+
+/* ── 12. Мультиаренда: у темы появляется сервер ─────────────────────────────
+
+   Копий сайта не будет: сервер становится колонкой в той же базе. Шаг дешёвый
+   по коду и дорогой по риску тихо сломать ленту:
+
+     1. `Number(null)` — это ноль. Проверка одной только конечностью числа
+        превращает «сервер не выбран» в «сервер 0» и показывает пустой экран
+        там, где лежат две темы. Это уже случилось при первой реализации.
+     2. PostgREST отвергает запрос с неизвестным столбцом целиком. Фильтр
+        `server_id` приложенный всегда, до прогона миграции роняет весь форум.
+     3. Колонки представления фиксируются при его создании: без пересоздания
+        `forum_post_list` фильтра в базе просто не существует.
+
+   Поэтому адрес и черновой адаптер прогоняют делом, а боевой адаптер читают по
+   строкам: его запрос уходит в базу, которой у теста нет.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20261001-server-scope.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const url = await import('../src/forum/feed-url.js');
+
+  /* ── Одно число сервера в базе, в адресе и в браузере ── */
+  const bounds = /create table if not exists public\.forum_servers \([\s\S]{0,200}?check \(id between (\d+) and (\d+)\)/
+    .exec(sql);
+  check('база проверяет номер ряда границами', bounds != null);
+  equal('адрес принимает ровно те же границы, что база',
+    [url.SERVER_MIN, url.SERVER_MAX], [Number(bounds[1]), Number(bounds[2])]);
+  equal('и сохранённый выбор проверяет их тем же',
+    [Number(/id >= SERVER_MIN/.test(mountSrc)), Number(/id <= SERVER_MAX/.test(mountSrc))], [1, 1]);
+
+  const dbDefault = Number(
+    /add column if not exists server_id integer\s+not null default (\d+)/.exec(sql)?.[1]
+  );
+  check('сервер у темы — колонка с значением по умолчанию, а не вторая таблица',
+    Number.isInteger(dbDefault));
+  equal('значение по умолчанию в базе и номер сайта в конфиге — одно число',
+    dbDefault, Number(CONFIG.server));
+  check('и оно названым рядом в списке серверов, а не висячим числом',
+    sql.includes('insert into public.forum_servers (id, title)')
+      && sql.includes(String(dbDefault)));
+
+  /* ── Миграция: без этих шагов фильтра в базе нет ── */
+  check('номер темы ссылается на список серверов, а не живёт сам по себе',
+    /foreign key \(server_id\) references public\.forum_servers \(id\)/.test(sql));
+  check('лента одного сервера читается индексом, где сервер первый',
+    /create index if not exists forum_posts_server_idx\s+on public\.forum_posts \(server_id, /.test(sql));
+  check('представление ленты пересоздано: старое не увидело бы новую колонку',
+    /drop view if exists public\.forum_post_list;/.test(sql)
+      && sql.indexOf('create view public.forum_post_list') > sql.indexOf('add column if not exists server_id'));
+  check('пересозданное определение осталось на стороне вызывающего',
+    /create view public\.forum_post_list with \(security_invoker = on\)/.test(sql));
+  check('кэш схемы API перезван, иначе PostgREST держал бы прежние колонки',
+    sql.includes("notify pgrst, 'reload schema';"));
+  check('список серверов читает и гость: выбирать ленту можно без входа',
+    sql.includes('grant select on public.forum_servers to anon, authenticated;')
+      && /create policy forum_servers_read[\s\S]{0,160}for select to anon, authenticated\s+using \(true\)/.test(sql));
+  check('и ни слова про запись: сервер в список вносит доступ к базе, не игрок',
+    !/forum_servers[\s\S]{0,200}?(for insert|for update|for delete)/.test(sql));
+  check('файл переживает второй прогон: ряд сервера вставляется без отказа',
+    sql.includes('on conflict (id) do nothing') && !/raise exception/.test(sql));
+
+  /* ── Адрес: выбор переживает перезагрузку и пересылку ссылки ── */
+  equal('номер из адреса прочитан', url.serverFromSearch('server=44'), 44);
+  equal('вне таблицы — не адрес',
+    [url.serverFromSearch('server=0'), url.serverFromSearch('server=1000')], [null, null]);
+  equal('не число в адресе — обычный вид ленты, а не ошибка',
+    [url.serverFromSearch('server=abc'), url.serverFromSearch('server=7.5'), url.serverFromSearch('cat=vs')],
+    [null, null, null]);
+
+  const known = { categories: ['vs'], tags: [], sorts: ['top'] };
+  const picked = url.filtersFromSearch('server=44&cat=vs&sort=top', known);
+  equal('адрес → состояние: сервер читается рядом с фильтрами',
+    [picked.server, picked.category, picked.sort], [44, 'vs', 'top']);
+  equal('обратно в адрес — тем же числом',
+    url.serverFromSearch(url.searchFromFilters({ ...picked, defaultServer: 33 })), 44);
+  equal('сервер сайта в адрес не пишется: общий вид остаётся общим',
+    url.searchFromFilters({ ...picked, server: 33, defaultServer: 33 }), 'cat=vs&sort=top');
+  equal('пустой выбор не оставляет в адресе несуществующий сервер',
+    url.searchFromFilters({ ...picked, server: null, defaultServer: 33 }), 'cat=vs&sort=top');
+
+  /* ── Черновой режим: те же развилки, что в базе ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const rawLocal = () => JSON.parse(store.get('zr33.forum.local'));
+
+  await local.signUp('Распорядитель');
+  const plain = await local.createPost({ title: 'Тема без выбора', body: 'Общий сервер.', category: 'vs' });
+  const other = await local.createPost({ title: 'Тема другого сервера', body: 'Написана на 44.', category: 'vs', serverId: 44 });
+
+  equal('тема без выбора получает сервер сайта, а не остаётся ничейной', plain.serverId, Number(CONFIG.server));
+  equal('названный сервер тема держит', other.serverId, 44);
+  equal('без фильтра лента видит обе темы', (await local.listPosts({})).posts.length, 2);
+  equal('пустой выбор — не «сервер 0»: лента остаётся',
+    (await local.listPosts({ serverId: null })).posts.length, 2);
+  equal('фильтр по серверу сайта оставляет одну',
+    (await local.listPosts({ serverId: Number(CONFIG.server) })).posts.map((p) => p.id), [plain.id]);
+  equal('фильтр по 44-му оставляет другую',
+    (await local.listPosts({ serverId: 44 })).posts.map((p) => p.id), [other.id]);
+  equal('лента сервера, которого нет, пуста, а не ошибочна',
+    (await local.listPosts({ serverId: 77 })).posts.length, 0);
+
+  /* Тема, лежавшая в хранилище до этого шага, не должна пропасть из ленты. */
+  const legacy = rawLocal();
+  legacy.posts = legacy.posts.map((p) => {
+    const { serverId, ...rest } = p;
+    return rest;
+  });
+  store.set('zr33.forum.local', JSON.stringify(legacy));
+  const legacyList = await local.listPosts({ serverId: Number(CONFIG.server) });
+  check('тема без номера в хранилище читается как тема своего сервера',
+    legacyList.posts.length === 2 && legacyList.posts.every((p) => p.serverId === Number(CONFIG.server)));
+
+  equal('пока сервер один, переключателю не из чего состоять',
+    (await local.listServers()).map((r) => r.id), [Number(CONFIG.server)]);
+  const two = rawLocal();
+  two.servers = [{ id: 33, title: 'Сервер 33' }, { id: 44, title: 'Сервер 44', enabled: false }];
+  store.set('zr33.forum.local', JSON.stringify(two));
+  equal('ряд серверов в хранилище — тот же список, что таблица',
+    (await local.listServers()).map((r) => [r.id, r.enabled]), [[33, true], [44, false]]);
+  const noServers = rawLocal();
+  delete noServers.servers;
+  store.set('zr33.forum.local', JSON.stringify(noServers));
+  const savedServer = CONFIG.server;
+  CONFIG.server = null;
+  equal('без номера сайта список пуст: это «миграции нет», а не «серверов нет»',
+    (await local.listServers()).length, 0);
+  CONFIG.server = savedServer;
+
+  /* ── Боевой адаптер: поля прикладываются, только когда их попросили ── */
+  check('фильтр ленты едет в базу только при названном сервере',
+    /if \(serverId != null && Number\.isInteger\(Number\(serverId\)\)\) \{\s*\n\s*params\.set\('server_id', `eq\.\$\{Number\(serverId\)\}`\);/.test(supaSrc));
+  check('и не проверяется одной конечностью: null — не сервер 0',
+    !/Number\.isFinite\(Number\(serverId\)\)/.test(supaSrc + localSrc));
+  check('новая тема отправляет колонку только когда сервер выбран',
+    /if \(draft\.serverId != null && Number\.isInteger\(Number\(draft\.serverId\)\)\) \{\s*\n\s*payload\.server_id = Number\(draft\.serverId\);/.test(supaSrc));
+  check('без колонки в ответе тема остаётся без сервера, а не с №33 из головы',
+    /serverId: row\.server_id == null \? null : Number\(row\.server_id\)/.test(supaSrc));
+  check('список серверов читается без права и без входа',
+    supaSrc.includes("/forum_servers?select=id,title,enabled&order=id.asc&limit=100"));
+  check('отказ вместо таблицы проглочен в пустой список: форум не обязан падать',
+    /const rows = await rest\('\/forum_servers[\s\S]{0,120}\.catch\(\(\) => null\)/.test(supaSrc));
+  check('контракт объявляет список необязательным — старый адаптер не сломан',
+    /@property \{\(\) => Promise<ForumServer\[\]>\} \[listServers\]/.test(contractSrc)
+      && contractSrc.includes('@typedef {Object} ForumServer')
+      && /Игровой сервер — один ряд таблицы `forum_servers`/.test(contractSrc));
+  equal('оба адаптера умеют отвечать на вопрос о серверах',
+    [/export async function listServers\(\)/.test(supaSrc), /export async function listServers\(\)/.test(localSrc)],
+    [true, true]);
+
+  /* ── Порядок выбора и память экрана ── */
+  check('адрес важнее сохранённого, сохранённое важнее номера сайта',
+    mountSrc.includes('const named = server ?? readServerChoice();'));
+  check('номер сайта передаётся в адрес как дефолт, а не пишется в ссылку',
+    mountSrc.includes('...state, server: state.serverId, defaultServer: Number(CONFIG.server)'));
+  check('выбор помнится браузеру своим ключом, отдельно от черновика',
+    mountSrc.includes("const SERVER_CHOICE_KEY = 'zr33.forum.server';"));
+  check('сервера спрашивают рядом с лентой, а не перед ней',
+    /const content = postId \? loadThread\(postId\) : loadFeed\(\);[\s\S]{0,400}if \(!postId\) loadServers\(content\);/.test(mountSrc));
+  check('перезапрос дожидается первого ответа: два ответа не переспорят экран',
+    /await Promise\.resolve\(feedPromise\)\.catch\(\(\) => \{\}\);/.test(mountSrc));
+  check('в теме списка серверов не спрашивают: перезапрос не превратит тему в ленту',
+    mountSrc.includes('if (!postId) loadServers(content);'));
+  check('сервер — часть подписи памяти ленты: чужой экран не подмешивается',
+    /state\.serverId \?\? 'все',/.test(mountSrc));
+  check('тему пишут на том сервере, который человек читает',
+    mountSrc.includes('if (state.serverId != null) draft.serverId = state.serverId;'));
+  check('заголовок вкладки говорит, чей форум открыт',
+    mountSrc.includes('BASE_TITLE.replace(/^Сервер \\d+/, server.title)'));
+  check('и снимается при уходе с форума: название сервера — про ленту',
+    /unmountForum\(\)[\s\S]{0,400}document\.title = BASE_TITLE;/.test(mountSrc));
+  check('клик по серверу перезапрашивает ленту и помнит выбор',
+    /data-forum-server[\s\S]{0,300}writeServerChoice\(id\);[\s\S]{0,120}await loadFeed\(\);/.test(mountSrc));
+
+  /* ── Экран: переключатель появляется только тогда, когда есть выбор ── */
+  const { renderForum: renderServerFrame } = await import('../src/pages/forum.js');
+  const frame = (servers, serverId) => renderServerFrame(
+    { events: [], texts: [], alliances: [] },
+    { ready: true, loading: false, posts: [], total: 0, servers, serverId }
+  );
+  check('над одной лентой переключателя нет — это шум, а не выбор',
+    !frame([{ id: 33, title: 'Сервер 33', enabled: true }], 33).includes('data-forum-server'));
+  const bar = frame([
+    { id: 33, title: 'Сервер 33', enabled: true },
+    { id: 44, title: 'Сервер 44', enabled: false },
+  ], 44);
+  check('оба сервера в ряду, выбранный помечен нажатой кнопкой',
+    /data-forum-server="44"\s+aria-pressed="true"/.test(bar)
+      && /data-forum-server="33"\s+aria-pressed="false"/.test(bar));
+  check('закрытый сервер остаётся в ленте, но назван закрытым для тем',
+    bar.includes('приём тем закрыт'));
+  check('ряд подписан стилем, которым нарисовано остальное',
+    cssSrc.includes('.seg--server'));
+
+  /* ── Документы ── */
+  check('миграция стоит в реестре и описана там, где её ищут',
+    readmeSrc.includes('20261001-server-scope.sql') && docsSrc.includes('20261001-server-scope.sql'));
+  check('документы называют то, чего шаг сознательно не делает',
+    docsSrc.includes('прав по серверу') && docsSrc.includes('следующий шаг'));
 }
 
 
