@@ -20,14 +20,14 @@
 ### 1. Схема профилей и вложений
 
 Supabase → **SQL Editor** → **New query** → вставить целиком
-[`supabase/profiles.sql`](../supabase/profiles.sql) → **Run**.
+[`supabase/applied/profiles.sql`](../supabase/applied/profiles.sql) → **Run**.
 
 Добавляет аватарку, подпись и альянс в профиль, вложения к постам, хранилища
 для картинок.
 
 ### 2. Схема данных сайта
 
-Тем же способом — [`supabase/site-data.sql`](../supabase/site-data.sql).
+Тем же способом — [`supabase/applied/site-data.sql`](../supabase/applied/site-data.sql).
 
 Создаёт таблицы под историю сервера, права на них, журнал правок и функцию
 `site_dataset`, которой сайт читает всё разом.
@@ -152,7 +152,7 @@ dataSource: 'json',
 
 | Что видно | В чём дело |
 |---|---|
-| «Не найдена функция site_dataset» | Не выполнен `supabase/site-data.sql` |
+| «Не найдена функция site_dataset» | Не выполнен `supabase/applied/site-data.sql` |
 | Панель просит токен GitHub | Старая версия кода, обнови страницу через Ctrl+Shift+R |
 | «Нет права редактора» | Право не выдано. Администратор → Игроки → «Сделать редактором» |
 | Сайт пустой, а в базе данные есть | В `config.js` остался `dataSource: 'json'` |

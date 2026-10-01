@@ -227,7 +227,7 @@ function renderRecoveries(recoveries) {
       <div class="adm-recoveries adm-recoveries--off">
         <p class="muted">Заявки на восстановление недоступны: этот режим входа
         паролей не имеет, а на боевой базе блок появится после применения
-        <code>supabase/20260925-self-recovery.sql</code>.</p>
+        <code>supabase/applied/20260925-self-recovery.sql</code>.</p>
       </div>`;
   }
 

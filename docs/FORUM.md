@@ -48,7 +48,7 @@
 ### 3. Создать таблицы
 
 **SQL Editor → New query** → вставить содержимое
-[`supabase/schema.sql`](../supabase/schema.sql) целиком → **Run**.
+[`supabase/applied/schema.sql`](../supabase/applied/schema.sql) целиком → **Run**.
 
 **Ничего в нём не правь.** Файл рассчитан на то, что его вставляют как есть.
 Правка внутри комментария рвёт строку, её хвост остаётся без `--` и становится
@@ -193,7 +193,7 @@ https://zroutehub.bond/, на вкладке **Форум** введи свой 
 и запись ушла в браузер, а не в базу.
 
 **5.3. Выдай себе роль.** Открой файл
-[`supabase/first-admin.sql`](../supabase/first-admin.sql), замени в нём
+[`supabase/applied/first-admin.sql`](../supabase/applied/first-admin.sql), замени в нём
 `ТВОЙ_НИК` на свой ник и выполни в **SQL Editor**.
 
 Ник на форуме — это тот, который ты придумал при регистрации. С логином
@@ -216,7 +216,7 @@ https://zroutehub.bond/, на вкладке **Форум** введи свой 
 ## Закрытые чаты альянсов
 
 Чаты живут в тех же аккаунтах, что и форум, и включаются одним файлом:
-открой SQL Editor в Supabase, вставь [`supabase/chats.sql`](../supabase/chats.sql)
+открой SQL Editor в Supabase, вставь [`supabase/applied/chats.sql`](../supabase/applied/chats.sql)
 целиком → **Run**. Запускать после `schema.sql`, `profiles.sql` и
 `rich-forum.sql`; повторный запуск безопасен.
 
@@ -226,12 +226,12 @@ https://zroutehub.bond/, на вкладке **Форум** введи свой 
 только кодом панели. Если обновлялась только статическая часть сайта, в
 Supabase нужно по порядку выполнить целиком следующие файлы:
 
-1. [`supabase/profiles.sql`](../supabase/profiles.sql)
-2. [`supabase/site-data.sql`](../supabase/site-data.sql)
-3. [`supabase/rich-forum.sql`](../supabase/rich-forum.sql)
-4. [`supabase/chats.sql`](../supabase/chats.sql)
-5. [`supabase/leaders.sql`](../supabase/leaders.sql)
-6. [`supabase/nicks-verified.sql`](../supabase/nicks-verified.sql)
+1. [`supabase/applied/profiles.sql`](../supabase/applied/profiles.sql)
+2. [`supabase/applied/site-data.sql`](../supabase/applied/site-data.sql)
+3. [`supabase/applied/rich-forum.sql`](../supabase/applied/rich-forum.sql)
+4. [`supabase/applied/chats.sql`](../supabase/applied/chats.sql)
+5. [`supabase/applied/leaders.sql`](../supabase/applied/leaders.sql)
+6. [`supabase/applied/nicks-verified.sql`](../supabase/applied/nicks-verified.sql)
 
 Каждый файл можно выполнить повторно. В частности, ошибка
 `column "leader_of" of relation "forum_users" does not exist` означает, что
@@ -297,7 +297,7 @@ Supabase нужно по порядку выполнить целиком сле
 Три вещи про это правило стоит знать заранее:
 
 - Держит его **база** — триггеры `forum_posts_hold` и `forum_comments_hold`
-  в [`supabase/20260925-spam-hold-and-topic-reads.sql`](../supabase/20260925-spam-hold-and-topic-reads.sql).
+  в [`supabase/applied/20260925-spam-hold-and-topic-reads.sql`](../supabase/applied/20260925-spam-hold-and-topic-reads.sql).
   Запрос, посланный мимо сайта, от тех же проверялок не отвертится.
 - Те же числа лежат в `config.js` (`postHoldMax`, `postHoldMinutes`,
   `commentHoldMax`, `commentHoldMinutes`, `repeatHoldMinutes`) — только ради
@@ -452,7 +452,7 @@ Supabase нужно по порядку выполнить целиком сле
   этого сообщения нет.
 
 Код: колонки и функции — в
-[`supabase/20260925-guide-review.sql`](../supabase/20260925-guide-review.sql),
+[`supabase/applied/20260925-guide-review.sql`](../supabase/applied/20260925-guide-review.sql),
 чтение и запись — в обоих адаптерах (`reviewGuide`, `reportGuideStale` в
 [`src/forum/adapters/supabase.js`](../src/forum/adapters/supabase.js) и их
 черновые двойники в `local.js`), разметка — `reviewNotice` и `reviewPanel` в
@@ -514,7 +514,7 @@ Supabase нужно по порядку выполнить целиком сле
   картинки.
 
 Код: политика, лимиты, страх отметки, `target_type = 'guide'` и построение адреса —
-[`supabase/20260929-player-guides.sql`](../supabase/20260929-player-guides.sql);
+[`supabase/applied/20260929-player-guides.sql`](../supabase/applied/20260929-player-guides.sql);
 `createGuide` и чтение скриншотов — в обоих адаптерах; та же развилка прав и те
 же слова отказа в черновом режиме — `createGuide` в `local.js`, а общие фразы —
 `guideBodyProblem`, `guideText` и `guideSlug` в
@@ -559,7 +559,7 @@ Supabase нужно по порядку выполнить целиком сле
 проспавшей месяц, дало бы иначе пару дней вместо месяца.
 
 Код: колонка, метка `sos` и триггер `forum_posts_expiry` — в
-[`supabase/20260925-announcement-expiry.sql`](../supabase/20260925-announcement-expiry.sql);
+[`supabase/applied/20260925-announcement-expiry.sql`](../supabase/applied/20260925-announcement-expiry.sql);
 та же миграция пересоздаёт представление `forum_post_list`, иначе лента не
 увидит новую колонку (см. «Важно про представление» в этом же файле).
 Чтение и продление — `setExpiry` в обоих адаптерах, поле формы и метки —
@@ -607,7 +607,7 @@ Supabase нужно по порядку выполнить целиком сле
   `search_path = public`, закрытые от `anon` и открытые вошедшим.
 
 Код: таблица, две функции и представление `forum_appeal_list` — в
-[`supabase/20260925-sanction-appeal.sql`](../supabase/20260925-sanction-appeal.sql).
+[`supabase/applied/20260925-sanction-appeal.sql`](../supabase/applied/20260925-sanction-appeal.sql).
 Миграция **не обязана** быть выполнена до пуша: очередь читается отдельным
 запросом, лента без неё живёт как жила, а панель модерации по отказу сама
 называет имя файла, которое владельцу нужно прогнать в SQL Editor.
@@ -659,7 +659,7 @@ Supabase нужно по порядку выполнить целиком сле
 Код: таблица `forum_section_mutes`, перегруженная `forum_can_write(p_category)`,
 триггер слов отказа `forum_section_mute_guard` и дверь модерации
 `forum_set_section_mute` — в
-[`supabase/20260925-section-mute.sql`](../supabase/20260925-section-mute.sql).
+[`supabase/applied/20260925-section-mute.sql`](../supabase/applied/20260925-section-mute.sql).
 Миграция **не обязана** быть выполнена до пуша: список тишин читается отдельным
 запросом, а без таблицы лента и панель живут как жили (панель по отказу называет
 имя файла). Пока файл не выполнен, в базе стоят прежние политики вставки и
@@ -723,7 +723,7 @@ Supabase нужно по порядку выполнить целиком сле
 `forum_post_list` (с `my_rsvp` и `my_remind_minutes`), функции
 `forum_answer_event`, `forum_event_going`, `forum_event_maybe` и
 `forum_send_event_reminders` — в
-[`supabase/20260925-event-rsvp.sql`](../supabase/20260925-event-rsvp.sql).
+[`supabase/applied/20260925-event-rsvp.sql`](../supabase/applied/20260925-event-rsvp.sql).
 Напоминания носит планировщик: Supabase → Integrations → Cron Jobs → New job →
 имя, выражение `*/15 * * * *`, тип **Database function**, схема `public`,
 функция `forum_send_event_reminders` → Create cron job (тот же способ, что у
@@ -793,7 +793,7 @@ Supabase нужно по порядку выполнить целиком сле
 `forum_thanks_count`, `forum_grant_reputation`, `forum_reputation_grant_list`,
 пересозданные `forum_post_list` и `forum_comment_list` (с `thanks_count` и
 `i_thanked`) и пять новых колонок в `forum_profiles` — в
-[`supabase/20260926-author-thanks.sql`](../supabase/20260926-author-thanks.sql).
+[`supabase/applied/20260926-author-thanks.sql`](../supabase/applied/20260926-author-thanks.sql).
 Вид `thanks` добавлен к проверке `kind` у уведомлений, иначе вставка в ленту
 падала бы на constraint.
 
@@ -859,7 +859,7 @@ Supabase нужно по порядку выполнить целиком сле
 обеим сторонам, индекс `(user_id, created_at desc)`), политики select/insert/
 delete без единой update-политики и триггер `forum_set_row_user()`, который
 берёт идентификатор человека из токена, а не из тела запроса — в
-[`supabase/20260926-post-bookmarks.sql`](../supabase/20260926-post-bookmarks.sql).
+[`supabase/applied/20260926-post-bookmarks.sql`](../supabase/applied/20260926-post-bookmarks.sql).
 Тот же триггер миграция вешает на `forum_topic_subscriptions` и
 `forum_alliance_subscriptions`: обе созданы с `user_id not null` без значения
 по умолчанию, клиент шлёт только `post_id`/`alliance_id`, и кнопка
@@ -934,7 +934,7 @@ delete без единой update-политики и триггер `forum_set_
 `barter_closed_at`), проверка длины обеих строк, частичный индекс
 `forum_posts_barter_idx`, пересозданные `forum_posts_tags_check`,
 `forum_expiry_required` и `forum_post_list` — в
-[`supabase/20260926-barter-board.sql`](../supabase/20260926-barter-board.sql).
+[`supabase/applied/20260926-barter-board.sql`](../supabase/applied/20260926-barter-board.sql).
 Миграция **переписывает** правило срока: список меток в `forum_expiry_required`
 и текст отказа в `forum_posts_expiry` живут в одном месте, и «Обмен» добавлен
 именно там, а не вторым текстом в триггере.
@@ -1012,7 +1012,7 @@ delete без единой update-политики и триггер `forum_set_
 индекс `(status, created_at)`, политика чтения и **три двери** —
 `forum_open_guide_request`, `forum_cancel_guide_request`,
 `forum_resolve_guide_request` — и представление `forum_guide_request_list` в
-[`supabase/20260926-guide-requests.sql`](../supabase/20260926-guide-requests.sql).
+[`supabase/applied/20260926-guide-requests.sql`](../supabase/applied/20260926-guide-requests.sql).
 
 Двери здесь нужны, а не политики, по той же причине, что у апелляций и сигналов
 об устаревании: правило «не больше трёх в сутки» и запрет повтора нельзя
@@ -1101,7 +1101,7 @@ delete без единой update-политики и триггер `forum_set_
 соседних таблиц, а темы и ответы читают все; право исполнения — только у
 `authenticated`, отказа для гостя не существует, потому что гость не узнает даже
 о причине. Таблицы, колонок, индексов и политик в
-[`supabase/20260926-spam-signals.sql`](../supabase/20260926-spam-signals.sql)
+[`supabase/applied/20260926-spam-signals.sql`](../supabase/applied/20260926-spam-signals.sql)
 нет вовсе: строку нельзя ни создать, ни изменить, ни удалить. Перед созданием
 файл снимает это же имя (перебор перегрузок по `pg_proc`): `create or replace`
 не меняет состав возвращаемых колонок, и прогон файла поверх прежней версии
@@ -1172,7 +1172,7 @@ delete без единой update-политики и триггер `forum_set_
   навсегда, — это ещё одна настройка, о которой человек забудет.
 
 Код: одна функция `forum_starter_checklist()` —
-[`supabase/20260926-starter-checklist.sql`](../supabase/20260926-starter-checklist.sql).
+[`supabase/applied/20260926-starter-checklist.sql`](../supabase/applied/20260926-starter-checklist.sql).
 Она `security invoker`, а не `definer`: читаются только свои строки, которые и
 так пропускают политики, — открывать чужое здесь не для чего. Таблицы, колонки,
 индексы и политики в миграции нет вовсе: шаг нельзя ни создать, ни снять, ни
@@ -1237,7 +1237,7 @@ delete без единой update-политики и триггер `forum_set_
 
 Код: таблица `forum_update_notes`, функции `forum_publish_update_note` и
 `forum_set_update_note_archive`, представление `forum_update_note_list` —
-[`supabase/20260926-update-pulse.sql`](../supabase/20260926-update-pulse.sql).
+[`supabase/applied/20260926-update-pulse.sql`](../supabase/applied/20260926-update-pulse.sql).
 Обе двери — `security definer`: публикация и архив меняют чужие строки, и у
 каждого отказа там есть своё слово («Нужна прямая HTTPS-ссылка на
 первоисточник»), которого политика не даст. Списка политик на запись нет вовсе: браузер в таблицу не
@@ -1385,7 +1385,7 @@ Android идёт над строкой iOS, и площадка, которая 
   ровно те права, которые ему выдала модерация.
 
 Как включить (разово, после прогона
-[`supabase/20260930-store-feed.sql`](../supabase/20260930-store-feed.sql)):
+[`supabase/applied/20260930-store-feed.sql`](../supabase/applied/20260930-store-feed.sql)):
 зарегистрировать на сайте учётную запись бота, выдать ей роль модератора в
 панели, и в GitHub → Settings → Secrets and variables → Actions завести два
 секрета — `STORE_FEED_NICK` и `STORE_FEED_PASSWORD`. Без секретов запуск
@@ -1452,7 +1452,7 @@ Android идёт над строкой iOS, и площадка, которая 
 
 Код: две колонки `quiet_start`/`quiet_end` у таблицы `forum_push_prefs` и
 проверка `forum_push_prefs_quiet_window` —
-[`supabase/20260926-quiet-hours.sql`](../supabase/20260926-quiet-hours.sql).
+[`supabase/applied/20260926-quiet-hours.sql`](../supabase/applied/20260926-quiet-hours.sql).
 Дверей (`security definer`) здесь нет ни одной: у таблицы уже есть политики,
 по которым владелец строки пишет сам себя. `send-push` про эти колонки не знает
 намеренно — доставленное считается доставленным, а будить или нет решает
@@ -1659,14 +1659,14 @@ node tests/contract.test.js
 | «Форум не подключён» | В `config.js` пусто в `url` или `anonKey`, либо `source` остался `'local'` |
 | «В config.js попал СЛУЖЕБНЫЙ ключ» | Скопирован `sb_secret_…` или `service_role`. Возьми публичный: `sb_publishable_…` или `anon` |
 | При регистрации просит подтвердить почту | Не выключен **Confirm email** (пункт 2). Почты у нас нет, письмо не придёт |
-| «Профиль не создан» | SQL-схема не выполнилась или прошла с ошибками. Запусти `supabase/schema.sql` целиком заново |
+| «Профиль не создан» | SQL-схема не выполнилась или прошла с ошибками. Запусти `supabase/applied/schema.sql` целиком заново |
 | `syntax error at or near` в конце схемы | Схему правили руками. Ничего в ней менять не надо: правка внутри комментария рвёт строку, и хвост становится SQL. Вставь файл заново, как есть |
 | Русский ник не регистрируется, «invalid email format» | Старая версия кода. Обнови сайт: превращение ника в адрес исправлено |
-| Лента пустая, хотя посты есть | Старая версия схемы. Запусти `supabase/schema.sql` заново |
+| Лента пустая, хотя посты есть | Старая версия схемы. Запусти `supabase/applied/schema.sql` заново |
 | Регистрация прошла, но в `forum_users` пусто | Записи ушли в браузер: `source` всё ещё `'local'` |
 | `0 rows affected` при выдаче роли | Ник не совпал. Ник форума — тот, что придумал при регистрации, а не логин GitHub. Посмотри написание в **Table Editor** → `forum_users` |
 | В шапке чужой ник вместо своего | Старая версия кода: «кто я» определялось первой строкой таблицы, а администратору видны все. Обнови сайт |
-| «more than one row returned by a subquery» при правке поста | Старая версия схемы. Запусти `supabase/schema.sql` заново |
+| «more than one row returned by a subquery» при правке поста | Старая версия схемы. Запусти `supabase/applied/schema.sql` заново |
 | Вкладки «Жалобы» и «Игроки» пишут «токен GitHub здесь не действует» | Ты не вошёл на форуме в этом браузере. Права форума — отдельная учётная запись |
 | Вкладки говорят «вы участник» | Роль выдана, но не перезашёл на сайте — она читается при входе |
 | «База отказала: недостаточно прав» | Правила доступа работают как надо, а действие для этой роли не разрешено |
@@ -1709,7 +1709,7 @@ node tests/contract.test.js
 Плата за копию: если однажды появится смена ника, старые посты придётся
 обновлять отдельно. Смены ника пока нет.
 
-**Что из этого следует для тебя.** Если ты уже выполнял `supabase/schema.sql`,
+**Что из этого следует для тебя.** Если ты уже выполнял `supabase/applied/schema.sql`,
 запусти его ещё раз — исправления придут вместе с ним, ничего не потеряется.
 
 ## Что ещё нашлось при проверке на живой базе
@@ -1754,7 +1754,7 @@ node tests/contract.test.js
 а не стирание. Поэтому чистка делается один раз, руками, служебными правами
 SQL-редактора.
 
-Открой [`supabase/cleanup-test-data.sql`](../supabase/cleanup-test-data.sql),
+Открой [`supabase/applied/cleanup-test-data.sql`](../supabase/applied/cleanup-test-data.sql),
 замени `ТВОЙ_НИК` на свой и выполни в **SQL Editor**.
 
 Запрос удаляет всех, кроме тебя, и всё, что они написали. Работает как одно

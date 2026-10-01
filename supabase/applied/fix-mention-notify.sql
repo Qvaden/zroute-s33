@@ -1,7 +1,7 @@
 /*
   ФИКС УВЕДОМЛЕНИЙ ОБ УПОМИНАНИЯХ В ПОСТАХ.
 
-  В однажды применённую к базе версию supabase/rich-forum.sql попала строка
+  В однажды применённую к базе версию supabase/applied/rich-forum.sql попала строка
   `lower(nick_lower(nick)) = lower(nick_lower(nick))` — обращение к функции
   public.nick_lower(), которой в базе нет. Вставка поста с «@ник» падала
   на триггере forum_notify_post, и уведомления не доходили.

@@ -904,7 +904,7 @@ function renderNotifications(s) {
  *
  * Слово «оспорить» ничего не обещает и ничего не отменяет: тишина идёт своим
  * чередом, бан на время разбора остаётся. Ответ обязателен — это держит база
- * (supabase/20260925-sanction-appeal.sql), а не этот файл.
+ * (supabase/applied/20260925-sanction-appeal.sql), а не этот файл.
  */
 export function renderSanctions(s) {
   const me = s.me;
@@ -1016,7 +1016,7 @@ function appealCooldownLeft(appeal) {
  * Тишина этого игрока в разделе; null — раздел открыт.
  *
  * Страница берёт те же строки, по которым отказывает база
- * (supabase/20260925-section-mute.sql), и по той же причине: форма, которая
+ * (supabase/applied/20260925-section-mute.sql), и по той же причине: форма, которая
  * молчит о закрытом разделе, разрешает то, что через минуту отвергнет запрос.
  */
 export function sectionMuteOf(s, category) {
@@ -1550,7 +1550,7 @@ function barterControl(p, s) {
  *
  * Истёкшую тему не прячем: под ней обсуждение, и вместе с объявлением
  * пропали бы ответы людей (рассуждение — в шапке
- * supabase/20260925-announcement-expiry.sql). Тема остаётся на месте и честно
+ * supabase/applied/20260925-announcement-expiry.sql). Тема остаётся на месте и честно
  * говорит, что призыв уже не действует.
  */
 function expiryBadge(p) {
@@ -1929,7 +1929,7 @@ function renderAllianceSubscriptions(view, s) {
  * при трёх в ряд на телефоне становится нечитаемым, и открывать его придётся
  * всё равно.
  *
- * Больше двенадцати не бывает: предел держит база (см. supabase/profiles.sql)
+ * Больше двенадцати не бывает: предел держит база (см. supabase/applied/profiles.sql)
  * и тот же предел стоит в config.js (CONFIG.forum.limits.attachmentsMax).
  */
 function renderShots(item) {
@@ -2310,7 +2310,7 @@ function renderReactions(targetType, item, s) {
  *
  * Рядом положено, а внутри списка: у реакций общее свойство — их снимают и
  * перевешивают, а благодарность нет. См. правило 3 в
- * supabase/20260926-author-thanks.sql.
+ * supabase/applied/20260926-author-thanks.sql.
  *
  * Имен благодаривших здесь нет нарочно: наружу выходит только число. Автору
  * приходит уведомление с ником — это его личный ящик, а не публичный список.

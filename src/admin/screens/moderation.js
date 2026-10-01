@@ -153,7 +153,7 @@ export function renderModeration(view) {
  * Заявка — это вопрос «правильно ли вы решили про меня», и отвечать на неё
  * обязан живой человек. Ответа без текста не бывает: база не примет короткое
  * «отклонено», и кнопки ниже держат то же правило, что и проверка в
- * supabase/20260925-sanction-appeal.sql.
+ * supabase/applied/20260925-sanction-appeal.sql.
  */
 
 /** Как мера называется в очереди: «ban» и «mute» игроку ничего не скажут. */
@@ -170,7 +170,7 @@ function renderAppeals(appeals) {
         <p class="adm-lead">
           Очередь заявок недоступна: в базе ещё нет таблицы
           <code>forum_appeals</code>. Выполните
-          <code>supabase/20260925-sanction-appeal.sql</code> — без неё игроки
+          <code>supabase/applied/20260925-sanction-appeal.sql</code> — без неё игроки
           не могут оспорить запрет, и жаловаться им некуда.
         </p>
       </section>`;
@@ -249,7 +249,7 @@ function renderAppealCard(a) {
 
 /* ── Сигналы о спаме ──────────────────────────────────────────────────────────
  *
- * Список считает база на каждый запрос (supabase/20260926-spam-signals.sql), и
+ * Список считает база на каждый запрос (supabase/applied/20260926-spam-signals.sql), и
  * здесь он просто напечатан. Поэтому у блока нет ни кнопок, ни форм: строчка
  * означает «посмотри», а не «наказано». Решение модератор принимает обычными
  * действиями этой панели — тишиной по разделу или запретом во вкладке
@@ -319,7 +319,7 @@ function renderSpamSignals(signals, reason = '') {
         ${hint ? `<p class="adm-lead">${esc(hint)}</p>` : ''}
         <p class="adm-lead">
           Список считает <code>forum_spam_signals()</code> из
-          <code>supabase/20260926-spam-signals.sql</code> — она ничего не хранит
+          <code>supabase/applied/20260926-spam-signals.sql</code> — она ничего не хранит
           и ничего не меняет в таблицах, только показывает модерации тех, кто
           сидит на пределе выдержки.
         </p>

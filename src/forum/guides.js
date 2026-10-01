@@ -215,7 +215,7 @@ async function loadRequests() {
   } catch {
     state.requests = [];
     state.requestsNote = 'Список заявок сейчас недоступен: в базе ещё не прогнана '
-      + 'миграция supabase/20260926-guide-requests.sql.';
+      + 'миграция supabase/applied/20260926-guide-requests.sql.';
   }
 }
 

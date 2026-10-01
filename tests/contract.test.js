@@ -2704,7 +2704,7 @@ console.log('\nQ. Форум');
 
   /* ── Схема базы: где живёт настоящая защита ── */
 
-  const schema = await readFile('supabase/schema.sql', 'utf8');
+  const schema = await readFile('supabase/applied/schema.sql', 'utf8');
 
   /*
     Проверки в браузере защитой не бывают: их обходит запрос мимо сайта.
@@ -2762,7 +2762,7 @@ console.log('\nQ. Форум');
     целиком, а recovery-миграция — переход. Проверки читают именно миграцию,
     потому что на боевой базе выполняется она.
   */
-  const recoverySql = await readFile('supabase/20260925-self-recovery.sql', 'utf8');
+  const recoverySql = await readFile('supabase/applied/20260925-self-recovery.sql', 'utf8');
 
   /*
     Неоткрытая скобка dollar-quoted тела — ошибка, которую Supabase показывает
@@ -2888,7 +2888,7 @@ console.log('\nQ. Форум');
   equal('каждое представление читает данные правами того, кто спросил',
     invokers.length, views.length);
 
-  const profilesSql = await readFile('supabase/profiles.sql', 'utf8');
+  const profilesSql = await readFile('supabase/applied/profiles.sql', 'utf8');
   check('предел картинок в триггере базы совпадает с конфигом',
     new RegExp(`>=\\s*${CONFIG.forum.limits.attachmentsMax}\\b`).test(profilesSql));
   const profileView = profilesSql.slice(
@@ -2968,7 +2968,7 @@ console.log('\nQ. Форум');
   check('счётчик просмотров есть и у старых баз (миграция)',
     /alter table public\.forum_posts add column if not exists views integer not null default 0/.test(schema));
   for (const name of ['schema.sql', 'profiles.sql', 'rich-forum.sql']) {
-    const src = await readFile(`supabase/${name}`, 'utf8');
+    const src = await readFile(`supabase/applied/${name}`, 'utf8');
     check(`${name}: лента отдаёт счётчик просмотров`,
       /p\.views,\s*\n\s*\(select count\(\*\) from public\.forum_comments/.test(src));
   }
@@ -3036,7 +3036,7 @@ console.log('\nQ. Форум');
 
     Обращение к jsonb такой проверки не требует: отсутствующий ключ даёт NULL.
   */
-  const siteData = await readFile('supabase/site-data.sql', 'utf8');
+  const siteData = await readFile('supabase/applied/site-data.sql', 'utf8');
   const auditFn = siteData.match(/create or replace function public\.site_write_audit[\s\S]*?\$\$;/)?.[0] ?? '';
   /*
     Комментарии выбрасываем: разбор этой самой ошибки написан внутри функции,
@@ -3122,7 +3122,7 @@ console.log('\nQ. Форум');
     !/ТВОЙ_НИК|Раскомментируй|раскомментируй/.test(schema));
 
   const { stat: statFile } = await import('node:fs/promises');
-  for (const f of ['supabase/first-admin.sql', 'supabase/cleanup-test-data.sql']) {
+  for (const f of ['supabase/applied/first-admin.sql', 'supabase/applied/cleanup-test-data.sql']) {
     let exists = true;
     try { await statFile(f); } catch { exists = false; }
     check(`одноразовое действие вынесено отдельно: ${f}`, exists);
@@ -3137,7 +3137,7 @@ console.log('\nQ. Форум');
     ник, то есть ровно за то, что файл и просит сделать. Проверять надо
     устройство файла, а не то, воспользовались им или нет.
   */
-  for (const f of ['supabase/first-admin.sql', 'supabase/cleanup-test-data.sql']) {
+  for (const f of ['supabase/applied/first-admin.sql', 'supabase/applied/cleanup-test-data.sql']) {
     const code = (await readFile(f, 'utf8')).replace(/^\s*--.*$/gm, '');
     const spots = (code.match(/lower\('[^']*'\)/g) ?? []).length;
     equal(`${f}: одно место для правки`, spots, 1);
@@ -3147,7 +3147,7 @@ console.log('\nQ. Форум');
     Очистка обязана останавливаться, если ник не совпал: без этого опечатка
     удаляет всех, включая владельца, и вернуть уже нечего.
   */
-  const cleanup = await readFile('supabase/cleanup-test-data.sql', 'utf8');
+  const cleanup = await readFile('supabase/applied/cleanup-test-data.sql', 'utf8');
   check('при несовпадении ника очистка останавливается и не удаляет ничего',
     /raise exception/.test(cleanup) && /Ничего не удалено/.test(cleanup));
   check('очистка удаляет и учётные записи, а не только посты',
@@ -3165,7 +3165,7 @@ console.log('\nQ. Форум');
     пробные записи, оказывался перед выбором между двумя непонятными
     вариантами — и любой из них выглядел рискованным.
   */
-  for (const f of ['supabase/first-admin.sql', 'supabase/cleanup-test-data.sql']) {
+  for (const f of ['supabase/applied/first-admin.sql', 'supabase/applied/cleanup-test-data.sql']) {
     const code = (await readFile(f, 'utf8')).replace(/^\s*--.*$/gm, '');
     check(`${f}: не создаёт таблиц — иначе редактор спросит про RLS`,
       !/create\s+(temporary\s+)?table/i.test(code));
@@ -3420,7 +3420,7 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   */
   check('без применённой миграции панель говорит об этом прямо',
     /Заявки на восстановление недоступны/.test(playersHtml)
-    && playersHtml.includes('supabase/20260925-self-recovery.sql'));
+    && playersHtml.includes('supabase/applied/20260925-self-recovery.sql'));
   check('в панели нет ни одного поля для пароля', !/type="password"/.test(playersHtml));
   check('панель объясняет, что паролей не видит никто',
     /Паролей вы не видите ни у кого/.test(playersHtml));
@@ -3552,7 +3552,7 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /\[data-leader-nick\]/.test(playersMainSource));
   check('в панели не осталось окна сброса пароля',
     !/data-reset-modal|data-reset-form|data-player-reset|suggestPassword/.test(playersMainSource));
-  for (const path of ['supabase/leaders.sql', 'supabase/nicks-verified.sql', 'supabase/fix-leader-ambiguity.sql']) {
+  for (const path of ['supabase/applied/leaders.sql', 'supabase/applied/nicks-verified.sql', 'supabase/applied/fix-leader-ambiguity.sql']) {
     const leaderSql = await readFile(path, 'utf8');
     check(`${path}: снятие прежнего лидера явно обращается к колонке, а не к параметру RPC`,
       /update public\.forum_users as previous_leader[\s\S]*?where previous_leader\.leader_of = v_tag[\s\S]*?previous_leader\.id <> target_user/.test(leaderSql));
@@ -4512,8 +4512,8 @@ console.log('\nS. Чистые функции');
   check('пустой журнал честно говорит «не менялся»',
     /Ник не менялся/.test(renderUserPage({ ...base, me: moderator, history: [] })));
 
-const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
-  const autoProtectedNicksSql = await readFile('supabase/auto-protected-nicks.sql', 'utf8');
+const nicksSql = await readFile('supabase/applied/nicks-verified.sql', 'utf8');
+  const autoProtectedNicksSql = await readFile('supabase/applied/auto-protected-nicks.sql', 'utf8');
   check('база автоматически резервирует прежний ник триггером',
     /create trigger forum_reserve_released_nick[\s\S]*?before update of nick/.test(nicksSql));
   check('отдельная миграция включает защиту и сохраняет свободные старые ники',
@@ -4524,7 +4524,7 @@ const nicksSql = await readFile('supabase/nicks-verified.sql', 'utf8');
       && /'авекмнорстухіїєοικερτχνàáâãäåą/.test(nicksSql)
       && /01l'/.test(nicksSql));
   check('миграция пересоздаёт уникальный индекс под новый ключ ника',
-    (/forum_users_nickkey_uniq/).test(await readFile('supabase/nick-confusables.sql', 'utf8')));
+    (/forum_users_nickkey_uniq/).test(await readFile('supabase/applied/nick-confusables.sql', 'utf8')));
   check('журнал переименований в базе открыт модерации, а не только владельцу',
     /forum_nick_history_list\(target_user uuid\)[\s\S]*?not public\.forum_is_staff\(\)/.test(nicksSql));
   check('подтверждение ника в базе разрешает лидеру своего альянса',
@@ -4817,7 +4817,7 @@ console.log(`\n${'─'.repeat(52)}`);
 {
   const { readFile } = await import('node:fs/promises');
   const L = CONFIG.forum.limits;
-  const holdSql = await readFile('supabase/20260925-spam-hold-and-topic-reads.sql', 'utf8');
+  const holdSql = await readFile('supabase/applied/20260925-spam-hold-and-topic-reads.sql', 'utf8');
 
   /*
     Числа живут в двух местах: в config.js (их называет форма) и в триггерах
@@ -4848,7 +4848,7 @@ console.log(`\n${'─'.repeat(52)}`);
     (holdSql.match(/user_id = auth\.uid\(\)/g) || []).length >= 4);
   check('счётчик не прочитанного — отдельное представление, а не колонка ленты',
     /create view public\.forum_topic_unread with \(security_invoker = on\) as/.test(holdSql)
-      && !/forum_topic_unread/.test(await readFile('supabase/schema.sql', 'utf8')));
+      && !/forum_topic_unread/.test(await readFile('supabase/applied/schema.sql', 'utf8')));
   check('в счётчике не считаем свои и стёртые ответы',
     /c\.author_id is distinct from auth\.uid\(\)/.test(holdSql)
       && /c\.deleted = false/.test(holdSql));
@@ -5148,7 +5148,7 @@ console.log('\nU. Гайды: отметка и сигнал');
   */
   const { readFile } = await import('node:fs/promises');
   const L = CONFIG.forum.limits;
-  const sql = await readFile('supabase/20260925-guide-review.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260925-guide-review.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const pageSrc = await readFile('src/pages/guides.js', 'utf8');
@@ -5346,15 +5346,15 @@ console.log('\nV. Срок действия темы');
   */
   const { readFile } = await import('node:fs/promises');
   const L = CONFIG.forum.limits;
-  const sql = await readFile('supabase/20260925-announcement-expiry.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260925-announcement-expiry.sql', 'utf8');
   /*
     Правило срока переопределено позже: метка «Обмен» добавлена в
     20260926-barter-board.sql, и он же пересоздаёт и проверку меток, и функцию
     списка, и триггер. Поэтому список меток и текст отказа сверяются с ПОСЛЕДНИМ
     файлом — с прежним они разойтись обязаны, и ниже есть проверка на это.
   */
-  const later = await readFile('supabase/20260926-barter-board.sql', 'utf8');
-  const oldSql = await readFile('supabase/20260916-forum-community.sql', 'utf8');
+  const later = await readFile('supabase/applied/20260926-barter-board.sql', 'utf8');
+  const oldSql = await readFile('supabase/applied/20260916-forum-community.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const mountSrc = await readFile('src/forum/mount.js', 'utf8');
@@ -5557,7 +5557,7 @@ console.log('\nW. Оспаривание запрета писать и тиши
   */
   const { readFile } = await import('node:fs/promises');
   const L = CONFIG.forum.limits;
-  const sql = await readFile('supabase/20260925-sanction-appeal.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260925-sanction-appeal.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -5822,7 +5822,7 @@ console.log('\nW. Оспаривание запрета писать и тиши
     decidedByNick: '', ...over,
   });
   check('без миграции панель называет файл, а не молчит пустой очередью',
-    screen(null).includes('supabase/20260925-sanction-appeal.sql'));
+    screen(null).includes('supabase/applied/20260925-sanction-appeal.sql'));
   const openCard = screen([row()]);
   check('открытая заявка: ник, мера, снимок причины и поле ответа',
     openCard.includes('Игрок') && openCard.includes('оспаривает: запрет писем')
@@ -5864,8 +5864,8 @@ console.log('\nX. Тишина в одном разделе');
     именно места, а не проверяется каждое само по себе.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260925-section-mute.sql', 'utf8');
-  const schemaSql = await readFile('supabase/schema.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260925-section-mute.sql', 'utf8');
+  const schemaSql = await readFile('supabase/applied/schema.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -6141,9 +6141,9 @@ console.log('\nY. Календарь встреч');
     каждое по отдельности.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260925-event-rsvp.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260925-event-rsvp.sql', 'utf8');
   /* Миграция, которая держала проверку kind до появления напоминаний. */
-  const notifSql = await readFile('supabase/20260916-forum-community.sql', 'utf8');
+  const notifSql = await readFile('supabase/applied/20260916-forum-community.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -6424,7 +6424,7 @@ console.log('\nY. Календарь встреч');
     calHtml.includes('#/forum?new=event'));
   check('без представления календаря страница называет файл миграции',
     renderCalendar({ ...calState(), error: 'Could not find the view public.forum_event_list' })
-      .includes('supabase/20260925-event-rsvp.sql'));
+      .includes('supabase/applied/20260925-event-rsvp.sql'));
   check('обычную ошибку миграцией не объясняют',
     !renderCalendar({ ...calState(), error: 'Нет сети' }).includes('SQL-редактор'));
 
@@ -6603,7 +6603,7 @@ console.log('\nZ. Благодарности автора и репутация'
     места между собой.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-author-thanks.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-author-thanks.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -6998,7 +6998,7 @@ console.log('\nAA. Закладки тем');
     только наличие слов.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-post-bookmarks.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-post-bookmarks.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -7220,9 +7220,9 @@ console.log('\nAB. Бартер-доска');
     Поэтому тесты ниже сверяют места между собой, а не только наличие слов.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-barter-board.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-barter-board.sql', 'utf8');
   /* Определение ленты до этого файла — эталон копии: её пересоздают копией. */
-  const prevSql = await readFile('supabase/20260926-author-thanks.sql', 'utf8');
+  const prevSql = await readFile('supabase/applied/20260926-author-thanks.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -7351,7 +7351,7 @@ console.log('\nAB. Бартер-доска');
     mountSrc.includes("t.closest('[data-forum-barter-close]')")
       && mountSrc.includes('await forum.closeBarter(id, closed)'));
   check('отказ без миграции называет файл, а не «операция не выполнена»',
-    mountSrc.includes('supabase/20260926-barter-board.sql'));
+    mountSrc.includes('supabase/applied/20260926-barter-board.sql'));
   check('блок одет своим стилем, и снятое объявление читается приглушённо',
     cssSrc.includes('.forum-barter-fields {') && cssSrc.includes('.forum-barter--closed > div'));
 
@@ -7458,7 +7458,7 @@ console.log('\nAC. Заявки на гайды');
     только браузер. Поэтому сверяем места между собой, а не наличие слов.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-guide-requests.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-guide-requests.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -7615,7 +7615,7 @@ console.log('\nAC. Заявки на гайды');
     behavSrc.includes("'[data-grq-form] [name=\"title\"]'")
       && behavSrc.includes("'[data-grq-answer]'"));
   check('без миграции блок называет файл, а не молчит',
-    behavSrc.includes('supabase/20260926-guide-requests.sql'));
+    behavSrc.includes('supabase/applied/20260926-guide-requests.sql'));
   check('блок одет своим стилем',
     cssSrc.includes('.guide-req-form {') && cssSrc.includes('.guide-req-list--staff .guide-req {')
       && cssSrc.includes('.guide-req__answer {'));
@@ -7764,8 +7764,8 @@ console.log('\nAD. Сигналы о спаме');
     что база, черновой режим и панель говорят одними числами и одними словами.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-spam-signals.sql', 'utf8');
-  const holdSrc = await readFile('supabase/20260925-spam-hold-and-topic-reads.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-spam-signals.sql', 'utf8');
+  const holdSrc = await readFile('supabase/applied/20260925-spam-hold-and-topic-reads.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -7878,7 +7878,7 @@ console.log('\nAD. Сигналы о спаме');
       && screenSrc.includes('renderSpamSignals(f.spamSignals, f.spamSignalsError)'));
   check('блок называет файл, а не объявляет форум чистым',
     screenSrc.includes('Список недоступен')
-      && screenSrc.includes('supabase/20260926-spam-signals.sql'));
+      && screenSrc.includes('supabase/applied/20260926-spam-signals.sql'));
   check('и цитирует базу дословно вместо «мигрируйте» на любой отказ',
     screenSrc.includes('База ответила так: <code>${esc(reason)}</code>'));
   check('перевод отказа различает три болезни, у которых разные руки',
@@ -8006,7 +8006,7 @@ console.log('\nAE. Чек-лист новичка');
     вычисляются по тем строкам, что форум и так хранит, и ничего не отмечают.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-starter-checklist.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-starter-checklist.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -8211,7 +8211,7 @@ console.log('\nAF. Пульс обновлений игры');
     кроме модерации.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-update-pulse.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-update-pulse.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -8643,7 +8643,7 @@ console.log('\nAG. Тихие часы');
     которые оба адаптера берут из одной функции.
   */
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20260926-quiet-hours.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260926-quiet-hours.sql', 'utf8');
   const swSrc = await readFile('sw.js', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
@@ -8927,7 +8927,12 @@ console.log('\nAH. Сроки ответа модерации');
     forumCss.includes('.guide-req__sla--soon') && forumCss.includes('.guide-req__sla--late'));
 
   /* ── Честное «миграции нет» ── */
-  const sqlFiles = await readdir('supabase');
+  /*
+    Файл миграции может лежать и в очереди наверху, и в applied/ — отказ
+    «миграции нет» должен проверять оба уровня, иначе список папки скроет
+    правду про историю.
+  */
+  const sqlFiles = [...await readdir('supabase'), ...await readdir('supabase/applied')];
   check('ни SQL-файла, ни колонки у срока нет — уровень считается на чтении',
     !sqlFiles.some((f) => /sla|response-time|deadline/i.test(f)));
   check('документ называет, чего в сроках нет намеренно',
@@ -9341,7 +9346,7 @@ console.log('\nAK. Гайды пишут участники');
   */
   const { readFile } = await import('node:fs/promises');
   const L = CONFIG.forum.limits;
-  const sql = await readFile('supabase/20260929-player-guides.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260929-player-guides.sql', 'utf8');
   const { guideBodyProblem, GUIDE_BODY_SHORT, GUIDE_BODY_LONG, GUIDE_DAILY_LIMIT } =
     await import('../src/forum/rules.js');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
@@ -9667,8 +9672,8 @@ console.log('\nAM. Фид магазина: обновление и событи
   const feedSrc = await readFile('src/forum/feed.js', 'utf8');
   const scriptSrc = await readFile('scripts/store-feed.mjs', 'utf8');
   const flowSrc = await readFile('.github/workflows/store-feed.yml', 'utf8');
-  const sql = await readFile('supabase/20260930-store-feed.sql', 'utf8');
-  const pulseSql = await readFile('supabase/20260926-update-pulse.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20260930-store-feed.sql', 'utf8');
+  const pulseSql = await readFile('supabase/applied/20260926-update-pulse.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -10963,6 +10968,77 @@ console.log('\nAM. Фид магазина: обновление и событи
     readmeSrc.includes('20261001-server-scope.sql') && docsSrc.includes('20261001-server-scope.sql'));
   check('документы называют то, чего шаг сознательно не делает',
     docsSrc.includes('прав по серверу') && docsSrc.includes('следующий шаг'));
+}
+
+/* ── 13. Папка миграций: очередь наверху, история в applied/ ────────────────
+
+   Файлов миграции много, и человек, который идёт в Supabase по списку,
+   путается: что прогнать сегодня, а что уже прогнано. Договорённость такая:
+   `supabase/*.sql` наверху — только то, чего на боевой базе ещё нет, а
+   `supabase/applied/` — история. Ошибка здесь не косметическая: лишний прогон
+   правит живую схему повторно, пропущенный роняет ленту. Порядок держат три
+   проверки.
+
+     1. каждый путь вида `supabase/….sql`, названный где угодно в проекте,
+        ведёт к существующему файлу: после переезда папки опечатка в пути
+        иначе молчит до того момента, когда человек пойдёт по ней в браузере;
+     2. наверху лежит ровно очередь, и каждый её файл назван в реестре;
+     3. панель печатает владельцу путь недостающей миграции там, где файл
+        действительно лежит, — этот текст читают и идут по нему.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile, readdir, stat } = await import('node:fs/promises');
+  const path = await import('node:path');
+  const exists = async (p) => {
+    try { await stat(p); return true; } catch { return false; }
+  };
+
+  const SKIP = new Set(['.git', 'node_modules', 'dist', 'data']);
+  const TEXT = new Set(['.js', '.mjs', '.cjs', '.md', '.html', '.css', '.json', '.sql', '.ts', '.yml', '.yaml']);
+  async function walk(dir, out = []) {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!SKIP.has(e.name)) await walk(full, out);
+      } else if (TEXT.has(path.extname(e.name))) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+
+  /* ── Каждый названный путь ведёт к файлу ── */
+  const broken = [];
+  let named = 0;
+  for (const file of await walk('.')) {
+    for (const m of (await readFile(file, 'utf8')).matchAll(/supabase\/[0-9A-Za-z._/-]+\.sql/g)) {
+      named++;
+      if (!(await exists(m[0]))) broken.push(`${m[0]} (в ${file})`);
+    }
+  }
+  check('ни одного пути миграции, которого больше нет на месте',
+    named > 50 && broken.length === 0, broken.slice(0, 4).join('; '));
+
+  /* ── Очередь и история не перемешаны ── */
+  const queue = (await readdir('supabase')).filter((f) => f.endsWith('.sql'));
+  const applied = await readdir('supabase/applied');
+  const readme = await readFile('supabase/README.md', 'utf8');
+  check('наверху лежит только то, что ждёт прогона, и всё это названо в реестре',
+    queue.length > 0 && queue.every((f) => readme.includes(f)));
+  check('прогнанное не валяется в очереди', !queue.some((f) => applied.includes(f)));
+  check('реестр объясняет разметку папки словами, по которым её ищут',
+    readme.includes('supabase/applied/') && readme.includes('ещё не выполнены'));
+  check('история полная: новой базе есть чему собираться',
+    applied.length > 30 && applied.includes('schema.sql'));
+
+  /* ── Путь, который панель показывает владельцу ── */
+  const adminSrc = await readFile('src/admin/main.js', 'utf8');
+  const namedMigrations = [...new Set([...adminSrc.matchAll(/['"](20\d{6}-[a-z-]+\.sql)['"]/g)]
+    .map((m) => m[1]))];
+  equal('панель называет недостающую миграцию по настоящему пути',
+    [adminSrc.includes('supabase/applied/${esc(migration)}'),
+      namedMigrations.length > 3 && namedMigrations.every((n) => applied.includes(n))],
+    [true, true]);
 }
 
 

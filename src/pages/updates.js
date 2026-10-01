@@ -63,7 +63,7 @@ function sourceHref(url) {
 function migrationHint(error) {
   const text = String(error ?? '');
   return /forum_update_note|relation .* does not exist|does not exist$/i.test(text)
-    ? 'Похоже, заметок ещё нет в базе: прогоните supabase/20260926-update-pulse.sql в SQL-редакторе.'
+    ? 'Похоже, заметок ещё нет в базе: прогоните supabase/applied/20260926-update-pulse.sql в SQL-редакторе.'
     : '';
 }
 
@@ -75,7 +75,7 @@ function migrationHint(error) {
 function feedMigrationHint(error) {
   const text = String(error ?? '');
   return /forum_store_event|forum_store_status/i.test(text)
-    ? 'Похоже, событий ещё нет в базе: прогоните supabase/20260930-store-feed.sql в SQL-редакторе.'
+    ? 'Похоже, событий ещё нет в базе: прогоните supabase/applied/20260930-store-feed.sql в SQL-редакторе.'
     : '';
 }
 

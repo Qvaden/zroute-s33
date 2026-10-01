@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=40';
-import { esc, plural } from '../ui/helpers.js?v=40';
-import { mapDataset } from '../data/adapters/_map.js?v=40';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=40';
-import { validateDataset } from '../data/contract.js?v=40';
+import { CONFIG } from '../../config.js?v=41';
+import { esc, plural } from '../ui/helpers.js?v=41';
+import { mapDataset } from '../data/adapters/_map.js?v=41';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=41';
+import { validateDataset } from '../data/contract.js?v=41';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=40';
-import { renderHome } from '../pages/home.js?v=40';
+} from '../logic/standings.js?v=41';
+import { renderHome } from '../pages/home.js?v=41';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=40';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=40';
+} from '../db/account.js?v=41';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=40';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=40';
-import { roleLabel } from '../forum/roles.js?v=40';
-import { prepareImage, uploadPath } from './image.js?v=40';
+} from './store.js?v=41';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=41';
+import { roleLabel } from '../forum/roles.js?v=41';
+import { prepareImage, uploadPath } from './image.js?v=41';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=40';
+} from './edit.js?v=41';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=40';
-import { renderShell } from './shell.js?v=40';
-import { renderLogin } from './login.js?v=40';
-import { renderOverview } from './screens/overview.js?v=40';
-import { renderWeek, describe } from './screens/week.js?v=40';
-import { renderAlliances } from './screens/alliances.js?v=40';
-import { renderEvents } from './screens/events.js?v=40';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=40';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=40';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=40';
-import { renderQuarter } from './screens/quarter.js?v=40';
-import { renderPresident } from './screens/president.js?v=40';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=40';
-import { renderModeration } from './screens/moderation.js?v=40';
-import { renderChatsAdmin } from './screens/chats.js?v=40';
-import { forum } from '../forum/index.js?v=40';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=40';
+} from './draft.js?v=41';
+import { renderShell } from './shell.js?v=41';
+import { renderLogin } from './login.js?v=41';
+import { renderOverview } from './screens/overview.js?v=41';
+import { renderWeek, describe } from './screens/week.js?v=41';
+import { renderAlliances } from './screens/alliances.js?v=41';
+import { renderEvents } from './screens/events.js?v=41';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=41';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=41';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=41';
+import { renderQuarter } from './screens/quarter.js?v=41';
+import { renderPresident } from './screens/president.js?v=41';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=41';
+import { renderModeration } from './screens/moderation.js?v=41';
+import { renderChatsAdmin } from './screens/chats.js?v=41';
+import { forum } from '../forum/index.js?v=41';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=41';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -1332,7 +1332,7 @@ function showPlayerActionError(selector, err, migration) {
   const message = String(err?.message ?? err);
   const schemaMismatch = /does not exist|could not find (?:the )?function|schema cache/i.test(message);
   const html = schemaMismatch
-    ? `В базе не применена миграция <code>supabase/${esc(migration)}</code>. Откройте SQL Editor в Supabase, выполните этот файл целиком и повторите действие.`
+    ? `В базе не применена миграция <code>supabase/applied/${esc(migration)}</code>. Откройте SQL Editor в Supabase, выполните этот файл целиком и повторите действие.`
     : esc(message);
   showForumResult(selector, html, 'err');
 }

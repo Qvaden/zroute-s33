@@ -449,7 +449,7 @@ export async function uploadFile({ bucket, path, bytes, contentType = 'applicati
 
     if (/Bucket not found/i.test(raw)) {
       throw new Error(
-        `В базе нет хранилища «${bucket}». Его создаёт supabase/site-data.sql — ` +
+        `В базе нет хранилища «${bucket}». Его создаёт supabase/applied/site-data.sql — ` +
           'запустите его заново.'
       );
     }

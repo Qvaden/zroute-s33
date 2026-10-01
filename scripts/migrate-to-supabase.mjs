@@ -68,7 +68,7 @@ say('--');
 say(`-- Собрано из ${inFile} скриптом scripts/migrate-to-supabase.mjs`);
 say(`-- Дата сборки: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`);
 say('--');
-say('-- Запускать ПОСЛЕ supabase/schema.sql и supabase/site-data.sql.');
+say('-- Запускать ПОСЛЕ supabase/applied/schema.sql и supabase/applied/site-data.sql.');
 say('-- Можно выполнять повторно: записи не двоятся, а обновляются.');
 say('--');
 say(`-- В переносе: ${data.alliances.length} альянсов, ${data.weeks.length} недель,`);

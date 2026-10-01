@@ -146,7 +146,7 @@
 /**
  * Уведомление участника: ответ, упоминание или согласие/несогласие.
  *
- * Пишет их база триггерами (см. supabase/rich-forum.sql), а не сайт —
+ * Пишет их база триггерами (см. supabase/applied/rich-forum.sql), а не сайт —
  * триггер срабатывает в той же транзакции, что и вставка записи: или
  * есть и пост, и уведомление, или ни того ни другого. Адаптеры лишь
  * читают свои строки и ставят read_at.
@@ -208,7 +208,7 @@
  * Строка модераторского списка «на этого стоит посмотреть».
  *
  * Ничего не хранится: строку считает база по темам, ответам, жалобам и
- * скрытому материалу за короткое окно (см. supabase/20260926-spam-signals.sql).
+ * скрытому материалу за короткое окно (см. supabase/applied/20260926-spam-signals.sql).
  * Поэтому у строки нет ни id, ни статуса — вчерашнего списка не существует, и
  * спорить о том, кто в него вчера попадал, не по чему.
  *
@@ -267,7 +267,7 @@
  * Строка календаря: тема с меткой «Событие» плюс её момент и числа.
  *
  * Событие намеренно не отдельная сущность, а тема (см. шаг 1 миграции
- * supabase/20260925-event-rsvp.sql), поэтому здесь нет ни «отменено», ни
+ * supabase/applied/20260925-event-rsvp.sql), поэтому здесь нет ни «отменено», ни
  * «перенесено»: отмена — это удаление темы, и работает тот же механизм, что у
  * любой удалённой записи.
  *
@@ -387,7 +387,7 @@
  * @property {() => Promise<ForumSpamSignal[]>} listSpamSignals  Кто сел на предел выдержки, у кого открытые жалобы и скрытое после пяти. Читает только модерация: игрок не узнаёт, что он в списке. Без функции в базе вызов падает, и панель называет недостающую миграцию.
  * @property {() => Promise<ForumStarterStep[]>} listStarterSteps  Пять первых шагов самого вызывающего: профиль, ответ, благодарность, закладка, подписка. Приватно — модерации этот список не показывается нигде. Вне окна новичка и гость получают пустой список, а не ошибку; без функции в базе вызов падает, и страница форума просто не рисует блок.
  *
- * Восстановление доступа (см. supabase/20260925-self-recovery.sql). Пароль
+ * Восстановление доступа (см. supabase/applied/20260925-self-recovery.sql). Пароль
  * придумывает игрок, а заявка открывает ему дверь сама через 12 часов —
  * владелец за это время может только возразить, поэтому ни один из этих
  * вызовов не несёт пароль через панель.
@@ -398,14 +398,14 @@
  * @property {(id: string, approve: boolean) => Promise<void>} reviewRecovery  Впустить досрочно или отклонить; права проверяет база.
  * @property {(userId: string, opts: {banned?: boolean, mutedUntil?: Date|null, reason?: string}) => Promise<void>} setRestriction
  *
- * Оспаривание меры (см. supabase/20260925-sanction-appeal.sql). Забаненный
+ * Оспаривание меры (см. supabase/applied/20260925-sanction-appeal.sql). Забаненный
  * игрок проходит здесь, хотя писать ему нельзя: право возразить против
  * запрета не является правом писать.
  * @property {() => Promise<ForumAppeal[]>} listAppeals  Себя видит игрок, всё — модерация; без таблицы падает ошибкой, и вызывающий решает, глушить её или показать.
  * @property {(kind: 'ban'|'mute', message: string) => Promise<void>} openAppeal  Одна открытая заявка на вид меры; тексты отказа приходят из базы и показываются как есть.
  * @property {(id: string, status: 'upheld'|'rejected', answer: string) => Promise<void>} reviewAppeal  Только модерация; «upheld» снимает ровно оспоренную меру и отвечает игроку текстом.
  *
- * Тишина в одном разделе (см. supabase/20260925-section-mute.sql). Она
+ * Тишина в одном разделе (см. supabase/applied/20260925-section-mute.sql). Она
  * закрывает текст в этом разделе — темы и ответы; реакции, жалобы и правка
  * своего старого поста остаются открыты. Закрыть последний раздел нельзя:
  * это общий запрет, а общий запрет обязан быть оспоримым.
@@ -413,7 +413,7 @@
  * @property {(userId: string, category: string, days: number, reason: string) => Promise<void>} setSectionMute  От 1 до 30 дней и с пояснением; тексты отказа приходят из базы и показываются как есть.
  * @property {(userId: string, category: string) => Promise<void>} clearSectionMute  Снять тишину в одном разделе; общая её не трогает.
  *
- * Календарь встреч (см. supabase/20260925-event-rsvp.sql). Тема с меткой
+ * Календарь встреч (см. supabase/applied/20260925-event-rsvp.sql). Тема с меткой
  * «Событие» и есть событие: обсуждение, реакции, жалобы и право оспорить
  * удаление у неё общие с остальным форумом, а у календаря свои три вещи —
  * момент, места и напоминание.
@@ -423,7 +423,7 @@
  * @property {(userId: string, isBlogger: boolean) => Promise<void>} setBlogger
  * @property {(userId: string) => Promise<void>} adminDeleteUser  Удалить аккаунт; посты и комментарии остаются.
  *
- * Защита ников и верификация (см. supabase/nicks-verified.sql).
+ * Защита ников и верификация (см. supabase/applied/nicks-verified.sql).
  * @property {(nick: string) => Promise<{status: 'free'|'taken'|'reserved'}>} checkNick  Свободен ли ник (живая проверка формы).
  * @property {(userId: string, verified: boolean) => Promise<void>} setVerified  Подтвердить/снять ник: лидер своего альянса, модератор или владелец.
  * @property {(newNick: string, reason?: string) => Promise<void>} renameNick  Игрок меняет свой ник; пишется в журнал.
@@ -439,7 +439,7 @@
  * @property {(ids: string[]) => Promise<void>} markNotificationsRead
  * @property {() => Promise<void>} markAllNotificationsRead
  *
- * Закрытые чаты (см. supabase/chats.sql). Создаёт лидер альянса
+ * Закрытые чаты (см. supabase/applied/chats.sql). Создаёт лидер альянса
  * (ForumUser.isLeader) или модерация; читают только участники и модерация.
  * @property {(userId: string, allianceTag: string) => Promise<void>} setLeader  Назначить лидера тега allianceTag; пустой тег — снять.
  * @property {() => Promise<ForumChat[]>} listChats
@@ -486,7 +486,7 @@
  * @property {(id: string) => Promise<void>} [cancelGuideRequest]  Отзыв своей открытой заявки.
  * @property {(id: string, status: 'linked'|'closed', answer: string, guideId?: string|null) => Promise<void>} [resolveGuideRequest]  Решение модерации; для игрока — отказ.
  *
- * Пульс обновлений игры (см. supabase/20260926-update-pulse.sql). Заметку
+ * Пульс обновлений игры (см. supabase/applied/20260926-update-pulse.sql). Заметку
  * кладёт модерация руками — либо планировщик, который входит в форум обычным
  * аккаунтом. Браузер посетителя наружу не ходит ни в каком режиме: серверной
  * части у сайта нет вовсе, и этот рубеж не двигается.
@@ -494,7 +494,7 @@
  * @property {(draft: {kind: string, title: string, summary: string, sourceName: string, sourceUrl: string, sourceAt: string, gameVersion?: string}) => Promise<ForumUpdateNote>} [publishUpdateNote]  Порядок отказов одинаков в обоих режимах: право → тип → заголовок → содержание → источник → дата → версия.
  * @property {(id: string, archived: boolean) => Promise<void>} [setUpdateNoteArchived]  Убрать и вернуть одной функцией: правка текста после публикации не разрешена намеренно.
  *
- * Фид магазина (см. supabase/20260930-store-feed.sql): события из Google Play,
+ * Фид магазина (см. supabase/applied/20260930-store-feed.sql): события из Google Play,
  * которые приносит планировщик, и одна строка о том, когда он их приносил.
  * @property {() => Promise<ForumStoreEvent[]>} [listStoreEvents]  Ближайшие сверху; пережитое страница прячет сама, архив видит только модерация.
  * @property {(id: string, archived: boolean) => Promise<void>} [setStoreEventArchived]  Убрать и вернуть одной функцией: у события нет правки, магазин перепишет его сам на следующем обходе.

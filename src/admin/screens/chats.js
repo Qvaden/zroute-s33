@@ -15,7 +15,7 @@ import { fullTime, timeAgo, textOf } from '../../forum/format.js';
  * обратно, удалить целиком, выгнать участника, удалить сообщение с причиной.
  * Кого назначать лидером — на вкладке «Игроки».
  *
- * Права держит база (supabase/chats.sql), панель только показывает кнопки.
+ * Права держит база (supabase/applied/chats.sql), панель только показывает кнопки.
  */
 export function renderChatsAdmin(view) {
   const forum = view.forum ?? {};

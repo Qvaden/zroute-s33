@@ -239,7 +239,7 @@ function eventCard(e, s, now) {
 function migrationHint(error) {
   const text = String(error ?? '');
   return /forum_event_list|relation .* does not exist|does not exist$/i.test(text)
-    ? 'Похоже, календарь ещё не создан: прогоните supabase/20260925-event-rsvp.sql в SQL-редакторе.'
+    ? 'Похоже, календарь ещё не создан: прогоните supabase/applied/20260925-event-rsvp.sql в SQL-редакторе.'
     : '';
 }
 

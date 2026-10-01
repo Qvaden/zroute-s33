@@ -81,7 +81,7 @@ const state = {
   servers: [],
   serverId: null,
   /**
-   * Пять первых шагов вошедшего (supabase/20260926-starter-checklist.sql).
+   * Пять первых шагов вошедшего (supabase/applied/20260926-starter-checklist.sql).
    * Пустой список — блока нет: шаги либо уже сделаны, либо срок новичка прошёл.
    */
   starter: [],
@@ -1614,7 +1614,7 @@ async function sendAppeal(form, submitter) {
 
 /*
   Предел вложений задан одним числом в config.js и повторён триггером базы
-  (supabase/profiles.sql). Здесь человек узнаёт о пределе ДО того, как напишет
+  (supabase/applied/profiles.sql). Здесь человек узнаёт о пределе ДО того, как напишет
   пост и нажмёт «Опубликовать», а база охраняет от запросов мимо сайта.
 */
 const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;
@@ -2537,7 +2537,7 @@ function wire() {
         paint();
       } catch (err) {
         notice(`${String(err?.message ?? err)}
-Если база ещё не обновлена, прогоните supabase/20260926-barter-board.sql.`.trim());
+Если база ещё не обновлена, прогоните supabase/applied/20260926-barter-board.sql.`.trim());
         barterBtn.disabled = false;
       }
       return;

@@ -21,7 +21,7 @@
  *
  * ГДЕ ЖИВУТ ПРАВА. В базе. Ни одна проверка в этом файле не является защитой:
  * запрос можно отправить мимо панели, и тогда откажут правила доступа
- * (см. site_can_edit в supabase/site-data.sql). Проверки нужны для понятных
+ * (см. site_can_edit в supabase/applied/site-data.sql). Проверки нужны для понятных
  * сообщений, а не вместо базы.
  */
 import { rest, uploadFile } from '../db/client.js';
@@ -41,7 +41,7 @@ export async function readDataset() {
 
   if (!raw || typeof raw !== 'object') {
     throw new Error(
-      'База не отдала данные сайта. Похоже, не выполнен supabase/site-data.sql.'
+      'База не отдала данные сайта. Похоже, не выполнен supabase/applied/site-data.sql.'
     );
   }
   return raw;

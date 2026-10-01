@@ -20,9 +20,9 @@
 -- РЕШЕНИЕ ПРИНИМАЕТ БАЗА, А НЕ ПАНЕЛЬ: и проверку ника, и смену, и верификацию
 -- панель пересказывает через RPC, права проверяются в функциях.
 --
--- Запускать ПОСЛЕ supabase/chats.sql (там forum_is_leader, forum_chats,
--- forum_profiles), supabase/profiles.sql, supabase/rich-forum.sql и
--- supabase/leaders.sql (там forum_set_leader и leader_of, которые здесь
+-- Запускать ПОСЛЕ supabase/applied/chats.sql (там forum_is_leader, forum_chats,
+-- forum_profiles), supabase/applied/profiles.sql, supabase/applied/rich-forum.sql и
+-- supabase/applied/leaders.sql (там forum_set_leader и leader_of, которые здесь
 -- переопределяются) — в самом конце цепочки миграций. Повторный запуск
 -- безопасен.
 
