@@ -1461,7 +1461,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-10-01T13:01:59+00",
+  "pulledAt": "2026-10-01T19:27:28+00",
   "alliances": [
     {
       "id": "a01",
@@ -1556,8 +1556,8 @@
     },
     {
       "id": "a14",
-      "tag": "INVI",
-      "name": "FightingKittens",
+      "tag": "КОР1",
+      "name": "KOPInviHome",
       "color": "#51e1aa",
       "active": true
     },
