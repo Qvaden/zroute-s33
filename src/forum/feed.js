@@ -544,6 +544,9 @@ export function readPlayPage(html, now = Date.now()) {
  * за этот обход» — правда про нас, но игрок узнает из неё только то, что у
  * сайта что-то сломалось, и будет прав: чинить должны мы, а не оправдываться
  * перед ним текстом заметки.
+ *
+ * Тем же правилом отсекается площадка, вернувшаяся к старой версии: её половина
+ * в пост не попадает, и описано это ниже у переменной androidLag.
  */
 export function composeStoreNote({ android = null, ios = null, known = {} } = {}, now = Date.now()) {
   const playUrl = playPageUrl();
@@ -554,14 +557,50 @@ export function composeStoreNote({ android = null, ios = null, known = {} } = {}
   const androidVersion = android?.gameVersion || parsed.gameVersion || '';
   const iosVersion = ios?.version || '';
   const iosText = cleanIosNotes(ios?.releaseNotes);
+  const androidSays = !!androidVersion || !!parsed.summary;
+  const iosSays = !!iosVersion || !!iosText;
+
+  /*
+    ПЛОЩАДКА ВЕРНУЛАСЬ В ПРОШЛОЕ — ЭТО НЕ НОВОЕ ОБНОВЛЕНИЕ.
+
+    30 сентября App Store отдал на одном обходе версию 1.37.01, на следующем —
+    1.36.05, а ещё через пять часов — снова 1.37.01. Так отвечает его кэш:
+    запросы планировщика попадают на разные края, и один держит вчерашний
+    снимок. Автомат, который сверял версии равенством, увидел в этом выход
+    нового патча, напечатал пост о версии, которая на сайте уже стояла, и
+    записал старую версию в своё состояние — после чего следующий обход был
+    обязан повторить то же самое. Три карточки одного патча вместо двух —
+    ровно эта цепочка.
+
+    Поэтому сверка стала порядковой: площадка, назвавшая версию старше
+    опубликованной, ничего нового не принесла. Её половина в пост не попадает,
+    её версия в состояние не пишется, и задержка называется словами в отчёте
+    обхода. Откат игры на старую версию здесь не лечится: выглядит он точно
+    так же, а молчать об откате дешевле, чем дважды будить игроков одним и тем
+    же патчем.
+  */
+  const androidLag = isVersionOlder(androidVersion, known.android);
+  const iosLag = isVersionOlder(iosVersion, known.ios);
+  const androidKnown = sameVersion(androidVersion, known.android);
+  const iosKnown = sameVersion(iosVersion, known.ios);
+  const androidState = platformState({ says: androidSays, knownEqual: androidKnown, lag: androidLag });
+  const iosState = platformState({ says: iosSays, knownEqual: iosKnown, lag: iosLag });
+
   const missing = [];
-  if (!androidVersion && !parsed.summary) missing.push('Android');
-  if (!iosVersion && !iosText) missing.push('iOS');
+  if (!androidSays) missing.push('Android');
+  if (!iosSays) missing.push('iOS');
+  const stale = [];
+  if (androidLag) stale.push('Android');
+  if (iosLag) stale.push('iOS');
+
+  if (androidState !== 'fresh' && iosState !== 'fresh') {
+    return { fields: null, why: settledWhy(androidState, iosState), stale };
+  }
 
   const lines = [];
-  if (androidVersion || parsed.summary) {
+  if (androidSays && !androidLag) {
     /*
-      Текста может и не быть: в новой вёрстке Play раздела «Что нового» нет
+      Текста может и не быть: в новой вёрстке Play раздела с описанием нет
       вовсе. Тогда половина поста — версия и день обновления, и это честный
       ответ, а не пустая строка.
     */
@@ -569,33 +608,38 @@ export function composeStoreNote({ android = null, ios = null, known = {} } = {}
     lines.push(`Android${androidVersion ? ` ${androidVersion}` : ''}${androidDate ? `, ${androidDate}` : ''}: ${
       parsed.summary || 'описания изменений магазин не печатает.'}`);
   }
-  if (iosVersion || iosText) {
+  if (iosSays && !iosLag) {
     const iosDate = shortRuDate(ios?.at);
     lines.push(`iOS${iosVersion ? ` ${iosVersion}` : ''}${iosDate ? `, ${iosDate}` : ''}: ${
       iosText || 'описания изменений магазин не печатает.'}`);
   }
-  if (!lines.length) return { fields: null, why: 'Ни один магазин не ответил за этот обход.' };
-
-  const androidKnown = !!androidVersion && known.android && androidKnownEqual(known, androidVersion);
-  const iosKnown = !!iosVersion && known.ios && iosKnownEqual(known, iosVersion);
-  if (androidKnown && iosKnown) return { fields: null, why: 'Обе площадки стоят на уже опубликованных версиях.' };
-  if (androidKnown && !iosVersion) return { fields: null, why: 'Android не менялся, iOS ничего не принёс.' };
-  if (iosKnown && !androidVersion) return { fields: null, why: 'Android молчит, iOS не менялся.' };
 
   const summary = lines.join('\n\n').slice(0, L.updateSummaryMax);
-  if (summary.length < L.updateSummaryMin) return { fields: null, why: 'Содержание вышло короче 20 знаков.' };
+  if (summary.length < L.updateSummaryMin) return { fields: null, why: 'Содержание вышло короче 20 знаков.', stale };
 
-  const title = (parsed.title || `Обновление ${androidVersion || iosVersion}`)
+  /*
+    Площадка, задержавшаяся в прошлой версии, не участвует ни в заголовке, ни
+    в бейдже поста: «Android 1.37.01 · iOS 1.36.05» — это слово про кэш
+    магазина, а игроку такие номера говорят, что патч вышел заново.
+  */
+  const tagAndroid = androidLag ? '' : androidVersion;
+  const tagIos = iosLag ? '' : iosVersion;
+
+  const title = (parsed.title || `Обновление ${tagAndroid || tagIos}`)
     .slice(0, L.updateTitleMax);
-  if (title.length < L.updateTitleMin) return { fields: null, why: 'Заголовок вышел короче 6 знаков.' };
+  if (title.length < L.updateTitleMin) return { fields: null, why: 'Заголовок вышел короче 6 знаков.', stale };
 
   /*
     Дату берём сперва из уже разобранного текста (parseUpdateDate прогоняет её
     через те же границы «не из будущего» и «не раньше 2020», что и база), а
     строка обхода — только запасной путь, когда в тексте даты нет.
   */
-  const at = pickLatestDate(android?.at || parsed.sourceAt, ios?.at, now);
-  const versionTag = [androidVersion && `Android ${androidVersion}`, iosVersion && `iOS ${iosVersion}`]
+  const at = pickLatestDate(
+    androidLag ? '' : (android?.at || parsed.sourceAt),
+    iosLag ? '' : ios?.at,
+    now,
+  );
+  const versionTag = [tagAndroid && `Android ${tagAndroid}`, tagIos && `iOS ${tagIos}`]
     .filter(Boolean).join(' · ');
 
   return {
@@ -610,19 +654,71 @@ export function composeStoreNote({ android = null, ios = null, known = {} } = {}
          двигает пост, то есть android. */
       gameVersion: versionTag.length <= L.updateVersionMax
         ? versionTag
-        : (androidVersion || iosVersion).slice(0, L.updateVersionMax),
+        : (tagAndroid || tagIos).slice(0, L.updateVersionMax),
     },
     missing,
+    stale,
     why: '',
   };
 }
 
-function androidKnownEqual(known, version) {
-  return known.android.toLowerCase() === String(version).toLowerCase();
+/** Номер версии — тот же, что уже опубликован? Регистр буквы не аргумент. */
+function sameVersion(candidate, published) {
+  const a = String(candidate ?? '').trim();
+  const b = String(published ?? '').trim();
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
 }
 
-function iosKnownEqual(known, version) {
-  return known.ios.toLowerCase() === String(version).toLowerCase();
+/**
+ * Порядок двух номеров версии: -1 — принесённая старше, 0 — одинаковые,
+ * 1 — новее, NaN — сравнивать нечего.
+ *
+ * Числа берутся частями, а не строкой: «1.10» рядом с «1.9» по алфавиту
+ * оказывается старше, и пост о настоящем обновлении пропал бы молча.
+ */
+export function versionOrder(candidate, published) {
+  const a = versionParts(candidate);
+  const b = versionParts(published);
+  if (!a || !b) return NaN;
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+function versionParts(value) {
+  const nums = String(value ?? '').match(/\d+/g);
+  return nums ? nums.slice(0, 8).map(Number) : null;
+}
+
+/** Версия, которую принёс магазин, старше уже опубликованной? */
+export function isVersionOlder(candidate, published) {
+  return versionOrder(candidate, published) === -1;
+}
+
+/** Чем для площадки кончился обход: новым, знакомым, молчанием или задержкой. */
+function platformState({ says, knownEqual, lag }) {
+  if (lag) return 'lag';
+  if (knownEqual) return 'known';
+  if (!says) return 'silent';
+  return 'fresh';
+}
+
+const SETTLED_WORDS = {
+  Android: { silent: 'Android молчит', known: 'Android не менялся', lag: 'Android отдал версию старше опубликованной' },
+  iOS: { silent: 'iOS ничего не принёс', known: 'iOS не менялся', lag: 'iOS отдал версию старше опубликованной' },
+};
+
+/** Почему поста нет — словами, которые читают журнал планировщика и модератор. */
+function settledWhy(androidState, iosState) {
+  if (androidState === 'silent' && iosState === 'silent') return 'Ни один магазин не ответил за этот обход.';
+  if (androidState === 'known' && iosState === 'known') return 'Обе площадки стоят на уже опубликованных версиях.';
+  if (androidState === 'lag' && iosState === 'lag') {
+    return 'Обе площадки отдали версии старше опубликованных: так отвечает кэш магазинов, поста нет.';
+  }
+  return `${SETTLED_WORDS.Android[androidState]}, ${SETTLED_WORDS.iOS[iosState]}.`;
 }
 
 /*

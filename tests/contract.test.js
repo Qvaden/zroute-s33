@@ -9835,7 +9835,7 @@ console.log('\nAM. Фид магазина: обновление и событи
   /* ── 3. Пост на обе площадки: молчание — не содержание ── */
   equal('если обе площадки молчат, поста нет',
     feed.composeStoreNote({ android: {}, ios: {} }, NOW),
-    { fields: null, why: 'Ни один магазин не ответил за этот обход.' });
+    { fields: null, why: 'Ни один магазин не ответил за этот обход.', stale: [] });
   {
     const half = feed.composeStoreNote({
       android: { gameVersion: '1.36.05', at: '2026-09-23', text: '' },
@@ -9877,6 +9877,73 @@ console.log('\nAM. Фид магазина: обновление и событи
       android: { gameVersion: '1.36.05B', at: '2026-09-23', text: '' },
       ios: {}, known: { android: '1.36.05b', ios: '' },
     }, NOW).why, 'Android не менялся, iOS ничего не принёс.');
+  /*
+    ── 3б. Задержка магазина: версия старше опубликованной ──
+
+    Три карточки одного патча 30 сентября родились вот из чего: App Store на
+    одном обходе отдал 1.37.01, на следующем — 1.36.05, ещё через пять часов —
+    снова 1.37.01. Автомат сверял версии равенством, поэтому каждую смену счёл
+    новым обновлением, а записав старую версию в состояние, гарантировал повтор
+    на следующем запуске. Проверки ниже гоняют именно ту последовательность.
+  */
+  {
+    const lag = feed.composeStoreNote({
+      android: { gameVersion: '1.37.01', at: '2026-09-29', text: '' },
+      ios: { version: '1.36.05', releaseNotes: '', at: '2026-09-25' },
+      known: { android: '1.37.01', ios: '1.37.01' },
+    }, NOW);
+    equal('версия старше опубликованной — не новое обновление', lag.fields, null);
+    equal('и отказ назван задержкой площадки, а не выходом патча', lag.why,
+      'Android не менялся, iOS отдал версию старше опубликованной.');
+    equal('задержавшаяся площадка названа в отчёте обхода', lag.stale, ['iOS']);
+  }
+  {
+    const both = feed.composeStoreNote({
+      android: { gameVersion: '1.36.05', at: '2026-09-23', text: '' },
+      ios: { version: '1.36.05', releaseNotes: '', at: '2026-09-25' },
+      known: { android: '1.37.01', ios: '1.37.01' },
+    }, NOW);
+    equal('обе площадки отстали — поста нет, и это сказано словами', both.why,
+      'Обе площадки отдали версии старше опубликованных: так отвечает кэш магазинов, поста нет.');
+    equal('и обе названы задержанными', both.stale, ['Android', 'iOS']);
+  }
+  {
+    const half = feed.composeStoreNote({
+      android: { gameVersion: '1.38.0', at: '2026-09-30', text: '' },
+      ios: { version: '1.36.05', releaseNotes: '', at: '2026-09-25' },
+      known: { android: '1.37.01', ios: '1.37.01' },
+    }, NOW);
+    check('задержка одной площадки не отменяет пост о другой', !!half.fields, half.why);
+    check('отставшая половина в содержание не попала',
+      !half.fields.summary.includes('iOS'), half.fields.summary);
+    equal('её номер не едет в бейдж версии', half.fields.gameVersion, 'Android 1.38.0');
+    equal('её старая дата не становится датой поста', half.fields.sourceAt, '2026-09-30');
+    equal('и она названа задержкой', half.stale, ['iOS']);
+  }
+  equal('1.10 после 1.9 — новее, а не старше: порядок считает числа, а не строку',
+    feed.versionOrder('1.10', '1.9'), 1);
+  equal('и наоборот — откат', feed.versionOrder('1.9', '1.10'), -1);
+  equal('номер с пустым хвостом равен короткому: 1.37.0 после 1.37 — не откат',
+    feed.versionOrder('1.37.0', '1.37'), 0);
+  check('номер без чисел сравнению не поддаётся и задержкой не считается',
+    Number.isNaN(feed.versionOrder('beta', '1.37.01')));
+  {
+    const odd = feed.composeStoreNote({
+      android: { gameVersion: 'beta', at: '2026-09-30', text: '' },
+      ios: {}, known: { android: '1.37.01', ios: '' },
+    }, NOW);
+    check('не читаемый номер задержкой не становится: пост о нём выходит',
+      !!odd.fields && odd.stale.length === 0, odd.why);
+  }
+  check('в состояние обхода отставшая площадка не пишет ни версии, ни даты',
+    scriptSrc.includes('const lagged = note.stale || [];')
+      && scriptSrc.includes("said('Android', android.gameVersion || ''")
+      && scriptSrc.includes("said('iOS', ios.version || ''"));
+  check('модератор видит задержку магазина в отчёте обхода и в журнале',
+    scriptSrc.includes('(задержка магазина)') && scriptSrc.includes('задержка магазина:'));
+  check('правило задержки описано в документе теми же словами, что работает',
+    docsSrc.includes('задержавшейся') && docsSrc.includes('порядков')
+      && docsSrc.includes('1.10'));
   equal('ни у одной площадки даты нет — и в посте её нет',
     feed.pickLatestDate('', '', NOW), '');
   equal('«Обновление версии» — не содержание', feed.cleanIosNotes('Обновление версии.'), '');

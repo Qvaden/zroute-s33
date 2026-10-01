@@ -266,6 +266,10 @@ function report({ android, ios, known, note, dated, undated, wrote }) {
 
   head('Пост на обе площадки');
   if (note.missing?.length) say(`без ответа: ${note.missing.join(', ')} — в пост эта половина не попадёт`);
+  if (note.stale?.length) {
+    say(`задержка магазина: ${note.stale.join(', ')} ${note.stale.length > 1 ? 'отдали' : 'отдал'} версию старше `
+      + 'опубликованной — отставшая половина не попадёт в пост и не запишется в состояние');
+  }
   if (note.fields) {
     say(`${APPLY ? 'публикуем' : 'опубликуем (сухой прогон)'}: [${note.fields.kind}] ${note.fields.title}`);
     say(note.fields.summary);
@@ -353,10 +357,19 @@ async function apply({ note, dated, android, ios }) {
     версии и своя дата, а состояние обхода одно. Порядок важнее экономии
     запроса: сначала Android, потом iOS, чтобы в состоянии последней оказалась
     фраза, которую читает страница.
+
+    Площадка, задержавшаяся в прошлой версии, отчёту отдаёт пустую строку и
+    пустую дату: база сохраняет прежнее значение, когда версия не принесена.
+    Иначе состояние само скатилось бы назад, и следующий обход опубликовал бы
+    тот же патч заново — именно так 30 сентября вышло три карточки вместо двух.
   */
+  const lagged = note.stale || [];
+  const said = (platform, version, at) => (lagged.includes(platform) ? ['', null] : [version, at]);
+  const [androidRun, androidAt] = said('Android', android.gameVersion || '', toStoreIso(android.at) || null);
+  const [iosRun, iosAt] = said('iOS', ios.version || '', toStoreIso(ios.at) || null);
   const runs = [
-    ['android', android.gameVersion || '', toStoreIso(android.at) || null],
-    ['ios', ios.version || '', toStoreIso(ios.at) || null],
+    ['android', androidRun, androidAt],
+    ['ios', iosRun, iosAt],
   ];
   for (const [platform, version, at] of runs) {
     try {
@@ -399,7 +412,16 @@ function summarizeRun(note) {
     потому что сломан».
   */
   const gone = note.missing?.length ? `; без ответа осталась ${note.missing.join(' и ')}` : '';
-  if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}`.trim();
+  /*
+    Задержка магазина — часть итога запуска, а не его отказ: модератор обязан
+    видеть, что половина поста не написана потому, что площадка вернулась в
+    прошлую версию. Иначе через неделю «iOS молчит» выглядит как поломка
+    автомата.
+  */
+  const lag = note.stale?.length
+    ? `; ${note.stale.join(' и ')} ${note.stale.length > 1 ? 'отдали' : 'отдал'} версию старше опубликованной (задержка магазина)`
+    : '';
+  if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}${lag}`.trim();
   return `${note.why || 'нового нет'}${gone}`;
 }
 
