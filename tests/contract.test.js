@@ -10776,7 +10776,7 @@ console.log('\nAM. Фид магазина: обновление и событи
 ────────────────────────────────────────────────────────────────────────────── */
 {
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20261001-server-scope.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20261001-server-scope.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const mountSrc = await readFile('src/forum/mount.js', 'utf8');
@@ -11024,7 +11024,11 @@ console.log('\nAM. Фид магазина: обновление и событи
   const applied = await readdir('supabase/applied');
   const readme = await readFile('supabase/README.md', 'utf8');
   check('наверху лежит только то, что ждёт прогона, и всё это названо в реестре',
-    queue.length > 0 && queue.every((f) => readme.includes(f)));
+    queue.every((f) => readme.includes(f)));
+  /* Пустая очередь — настоящее и правильное состояние: все миграции прогнаны.
+     Требовать её непустой значило бы подталкивать к лишнему прогону. */
+  check('пустую очередь реестр называет пустой: по устаревшей строке в базу не идут',
+    queue.length > 0 || readme.includes('Очередь пуста'));
   check('прогнанное не валяется в очереди', !queue.some((f) => applied.includes(f)));
   check('реестр объясняет разметку папки словами, по которым её ищут',
     readme.includes('supabase/applied/') && readme.includes('ещё не выполнены'));
