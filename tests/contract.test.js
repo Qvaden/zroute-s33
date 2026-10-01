@@ -2640,7 +2640,10 @@ console.log('\nQ. Форум');
   check('обработчик закрепления зовёт адаптер и перерисовывает ленту',
     /\[data-forum-pin\]/.test(mountSource) && /forum\.setPinned/.test(mountSource) && /loadFeed\(\)/.test(mountSource));
   check('адаптер базы спрашивает предел из конфига перед запросом',
-    /pinsMax/.test(supabaseSource) && /forum_posts\?select=id&pinned=eq\.true/.test(supabaseSource));
+    /pinsMax/.test(supabaseSource) && /pinned', 'eq\.true'/.test(supabaseSource));
+  check('предел закреплений считается по серверу темы, а не по всему сайту',
+    /server_id', `eq\.\$\{serverId\}`/.test(supabaseSource)
+      && /В этом сервере закреплено уже три темы — сначала открепите одну/.test(supabaseSource));
 
   /*
     Проводка восстановления в mount.js. Страницы и адаптеры проверяются
@@ -8117,7 +8120,7 @@ console.log('\nAE. Чек-лист новичка');
     /async function loadStarterSteps\(\)[\s\S]{0,400}catch \{\r?\n\s*list = \[\];/.test(mountSrc));
   check('смена человека спрашивает список заново, а выход стирает его совсем',
     /state\.me = mode === 'signup'[\s\S]{0,400}await loadStarterSteps\(\);\r?\n\s*await loadFeed\(\);/.test(mountSrc)
-      && /data-forum-signout[\s\S]{0,700}state\.starter = \[\];/.test(mountSrc));
+      && /data-forum-signout[\s\S]{0,900}state\.starter = \[\];/.test(mountSrc));
   check('правило описано в документах и стоит в списке миграций',
     docsSrc.includes('## Чек-лист новичка') && docsSrc.includes('20260926-starter-checklist.sql')
       && readmeSrc.includes('20260926-starter-checklist.sql'));
@@ -10966,8 +10969,8 @@ console.log('\nAM. Фид магазина: обновление и событи
   /* ── Документы ── */
   check('миграция стоит в реестре и описана там, где её ищут',
     readmeSrc.includes('20261001-server-scope.sql') && docsSrc.includes('20261001-server-scope.sql'));
-  check('документы называют то, чего шаг сознательно не делает',
-    docsSrc.includes('прав по серверу') && docsSrc.includes('следующий шаг'));
+  check('документы не обещают права по серверу в будущем времени: шаг назван файлом',
+    /Прав по серверу на этом шаге не было[\s\S]{0,240}supabase\/20261001-server-rights\.sql/.test(docsSrc));
 }
 
 /* ── 13. Папка миграций: очередь наверху, история в applied/ ────────────────
@@ -11222,4 +11225,389 @@ console.log('\nAM. Фид магазина: обновление и событи
       && /форматировани/i.test(chatsDoc));
   check('документы называют общую природу редактора, а не список кнопок',
     /редактор/i.test(chatsDoc) && chatsDoc.includes('тот же'));
+}
+
+/* ── 15. Права по серверу: чужая лента не своя кухня ────────────────────────
+
+   Шаг 1 разделил ленты, но право слова оставил общим: во второй сервер писал
+   кто угодно, и он был витриной, а не домом. Шаг 2 дороже первого ровно тем,
+   что трогает права, — и ломается по двум тихим сценариям:
+
+     1. пропущенная политика — и модератор чужого сервера распоряжается не своей
+        лентой; лишняя — и игрок получает «violates row-level security policy»
+        вместо «тебя нет в этом сервере»;
+     2. `null` и `'none'` — разные ответы. Из первого не следует ничего (гость,
+        миграции ещё нет), второе прячет форму. Подмена одного другим убрала бы
+        форму темы у всех, кто зашёл до прогона SQL.
+
+   Плюс две вещи, которые легко перестать держать вместе:
+
+     3. модература — территория. Три закреплённые темы одного сервера, положенные
+        в общий топ, вытеснили бы из него все остальные ленты, поэтому предел
+        меряют по серверу темы;
+     4. слова отказа живут в трёх местах (база, черновой адаптер, страница), и
+        порядок проверок тоже: закрытый приём тем раньше отсутствия участия —
+        иначе человеку советуют просить то, что всё равно не поможет.
+
+   Миграцию читают по строкам (базы у теста нет), правила прогоняют делом —
+   и в черновом адаптере, и в разметке страницы.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20261001-server-rights.sql', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const pageSrc = await readFile('src/pages/forum.js', 'utf8');
+  const calSrc = await readFile('src/pages/calendar.js', 'utf8');
+  const rightsSrc = await readFile('src/forum/server-rights.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const configSrc = await readFile('config.js', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+
+  const NO_MEMBER = 'В этот сервер пишут только его участники: попросите модератора сервера добавить вас';
+  const INTAKE_CLOSED = 'Приём новых тем в этот сервер закрыт модерацией';
+  const PINS_FULL = 'В этом сервере закреплено уже три темы — сначала открепите одну';
+
+  /* ── Членство и открытость ── */
+  check('новый сервер по умолчанию свой, а не общий: ошибка «забыл закрыть» невозможна',
+    /add column if not exists open_writing boolean\s*\n\s*not null default false;/.test(sql));
+  check('дом сайта этот же прогон оставляет открытым — миграция не отнимает слово у тех, кто пишет',
+    new RegExp(`update public\\.forum_servers set open_writing = true where id = ${CONFIG.server};`).test(sql));
+  check('ключ членства — пара «игрок и сервер», обе ссылки каскадные',
+    /primary key \(user_id, server_id\)/.test(sql)
+      && /references public\.forum_users \(id\) on delete cascade/.test(sql)
+      && /references public\.forum_servers \(id\) on delete cascade/.test(sql));
+  check('ролей ровно две, и их имена держит чек-констрейнт',
+    /check \(role in \('member', 'moderator'\)\)/.test(sql));
+  check('у списка одна политика — на чтение; пишет в него только дверь',
+    (sql.match(/create policy \w+ on public\.forum_server_members/g) || []).length === 1
+      && /create policy forum_server_members_read on public\.forum_server_members\s*\n\s*for select using/.test(sql)
+      && !/public\.forum_server_members\s*\n\s*for (insert|update|delete)/.test(sql));
+  check('вошедшему выдано только чтение таблицы: запись мимо двери невозможна',
+    /grant select on public\.forum_server_members to authenticated;/.test(sql)
+      && /revoke all on table public\.forum_server_members from public, anon;/.test(sql)
+      && !/grant (insert|update|delete) on (table )?public\.forum_server_members/.test(sql));
+
+  check('нынешнее сообщество заведено в список дома, модература сайта — его модераторами',
+    sql.includes(`select u.id, ${CONFIG.server}, 'member'`)
+      && sql.includes(`select u.id, ${CONFIG.server}, 'moderator'`)
+      && /where u\.role not in \('admin', 'moderator'\)/.test(sql));
+  check('повторный прогон не перетирает то, что модерация поправила руками',
+    (sql.match(/on conflict \(user_id, server_id\) do nothing/g) || []).length >= 2);
+  check('новичок сам попадает в каждый открытый сервер и только в открытый',
+    /create trigger forum_join_open_servers\s*\n\s*after insert on public\.forum_users/.test(sql)
+      && /from public\.forum_servers s\s*\n\s+where s\.open_writing/.test(sql));
+
+  /* ── Функции права ── */
+  check('право слова и право модературы — отдельные `security definer` функции',
+    /create or replace function public\.forum_can_write_server\(p_server integer\)[\s\S]{0,140}security definer/.test(sql)
+      && /create or replace function public\.forum_can_moderate_server\(p_server integer\)[\s\S]{0,140}security definer/.test(sql));
+  check('модерация сайта проходит обе функции первой веткой: территория её не ограничивает',
+    /create or replace function public\.forum_can_write_server[\s\S]{0,400}select public\.forum_is_staff\(\)/.test(sql)
+      && /create or replace function public\.forum_can_moderate_server[\s\S]{0,240}select public\.forum_is_staff\(\)/.test(sql));
+  check('карта ролей отвечает и «none»: отсутствие права — это ответ, а не пустота',
+    /create or replace function public\.forum_my_server_roles\(\)[\s\S]{0,900}else 'none'/.test(sql));
+  check('карту читают только вошедшие, а право слова открыто и гостю — ленту ему видно',
+    /grant execute on function public\.forum_my_server_roles\(\) to authenticated;/.test(sql)
+      && /revoke all on function public\.forum_my_server_roles\(\) from public, anon;/.test(sql)
+      && /grant execute on function public\.forum_can_write_server\(integer\) to anon, authenticated;/.test(sql));
+
+  /* ── Политики: чьё право слова и чья модература ── */
+  check('вставка темы смотрит на сервер строки, а вставка ответа — на сервер темы из подзапроса',
+    /create policy forum_posts_insert[\s\S]{0,400}public\.forum_can_write_server\(server_id\)/.test(sql)
+      && /forum_can_write_server\(\(select p\.server_id from public\.forum_posts p where p\.id = post_id\)\)/.test(sql));
+  check('закрытая на приём лента не принимает ни одной новой темы, кроме служебных тем модерации',
+    /create policy forum_posts_insert[\s\S]{0,700}\(public\.forum_is_staff\(\) or exists \(\s*\n\s*select 1 from public\.forum_servers s where s\.id = server_id and s\.enabled\s*\)/.test(sql));
+  check('модература тем ограничена территорией в обе стороны — ни снять, ни переложить в чужой дом',
+    /create policy forum_posts_moderate on public\.forum_posts\s*\n\s*for update using \(public\.forum_can_moderate_server\(server_id\)\)\s*\n\s*with check \(public\.forum_can_moderate_server\(server_id\)\);/.test(sql));
+  equal('модературе ленты служат и ответы, и жалобы, и чужие вложения, и опросы',
+    ['forum_comments_moderate', 'forum_reports_read', 'forum_reports_resolve', 'forum_attachments_delete', 'forum_polls_close']
+      .map((n) => new RegExp(`create policy ${n}[\\s\\S]{0,700}forum_can_moderate_server`).test(sql)),
+    [true, true, true, true, true]);
+
+  check('предел закреплений меряется по серверу темы тем же числом, что и страница',
+    /where pinned and not deleted and server_id = new\.server_id and id <> new\.id\) >= (\d+)/.test(sql)
+      && Number(/server_id = new\.server_id and id <> new\.id\) >= (\d+)/.exec(sql)[1]) === CONFIG.forum.limits.pinsMax);
+  check('номер ленты темы неподвижен для всех, кроме владельца сайта',
+    /if not public\.forum_is_admin\(\) then\s*\n\s*new\.server_id := old\.server_id;/.test(sql));
+  check('модератор сервера, снявший чужой ответ, не подписывается «Удалено автором»',
+    /create or replace function public\.forum_comments_guard\(\)[\s\S]{0,1000}if public\.forum_can_moderate_server\(v_server\) then/.test(sql));
+
+  /* ── Слова отказа: одна копия правила на три места ── */
+  check('отказ назван причиной, а не текстом нарушения политики',
+    sql.includes(`raise exception '${INTAKE_CLOSED}'`) && sql.includes(`raise exception '${NO_MEMBER}'`));
+  check('тему и ответ проверяет одна функция, висящая на обеих таблицах',
+    /TG_TABLE_NAME = 'forum_posts'/.test(sql)
+      && (sql.match(/create trigger forum_server_write_insert\s*\n\s*before insert on public\.forum_(posts|comments)/g) || []).length === 2);
+  check('слова дословно те же в черновом адаптере и на странице',
+    [NO_MEMBER, INTAKE_CLOSED].every((t) => localSrc.includes(t) && rightsSrc.includes(t)));
+  check('и больше нигде: разметка и боевой адаптер зовут общее, а не переписывают текст',
+    !pageSrc.includes(NO_MEMBER) && !pageSrc.includes(INTAKE_CLOSED)
+      && !mountSrc.includes(NO_MEMBER) && !supaSrc.includes(NO_MEMBER) && !supaSrc.includes(INTAKE_CLOSED));
+  check('и порядок тот же: закрытый приём тем отвечает раньше отсутствия участия',
+    [sql, localSrc, rightsSrc].every((src) => src.indexOf('Приём новых тем') < src.indexOf('пишут только его участники')));
+  check('текст про закрепления совпадает у базы, чернового и боевого адаптеров',
+    [sql, localSrc, supaSrc].every((src) => src.includes(PINS_FULL)));
+
+  /* ── Дверь членства ── */
+  check('дверь одна, открыта вошедшим, и таблица без неё не двигается',
+    /create or replace function public\.forum_set_server_member\(\s*\n\s*p_user_id\s+uuid,/.test(sql)
+      && /grant execute on function public\.forum_set_server_member\(uuid, integer, text\) to authenticated;/.test(sql)
+      && /revoke all on function public\.forum_set_server_member\(uuid, integer, text\) from public, anon;/.test(sql));
+  check('модератора сервера назначает модерация сайта, а чужой список не двигают',
+    sql.includes("raise exception 'Модератора сервера назначает модерация сайта'")
+      && sql.includes("raise exception 'В свой сервер добавляет его модератор, в чужой — модерация сайта'"));
+  check('право на шаг проверяется раньше причин отказа: устройство списка видят не все',
+    sql.indexOf('Модератора сервера назначает') < sql.indexOf('Это последний модератор сервера'));
+  check('последнего модератора закрытой ленты снять нельзя, а открытому это не нужно',
+    /if v_old = 'moderator' and p_role is distinct from 'moderator' and not v_open then[\s\S]{0,400}raise exception 'Это последний модератор сервера/.test(sql));
+  check('решение двери попадает в журнал модературы и в уведомление игроку',
+    /insert into public\.forum_moderation_actions/.test(sql)
+      && /insert into public\.forum_notifications/.test(sql)
+      && /'server_member_removed'/.test(sql));
+  check('помощники журнала вошедшему не выданы: их зовёт только дверь',
+    /revoke all on function public\.forum_log_server_action\(uuid, text, text, jsonb\) from public, anon, authenticated;/.test(sql));
+
+  /* ── Идемпотентность и кэш схемы ── */
+  check('файл переживает второй прогон: триггер снимается перед созданием, таблицы создаются «если нет»',
+    (sql.match(/^drop trigger if exists/gm) || []).length === (sql.match(/^create trigger/gm) || []).length
+      && (sql.match(/^create or replace function/gm) || []).length >= 8
+      && /create table if not exists public\.forum_server_members/.test(sql)
+      && sql.includes('on conflict (user_id, server_id)'));
+  check('представлений шаг не пересоздаёт, но кэш схемы API перезван',
+    !/create (or replace )?view /.test(sql) && sql.includes("notify pgrst, 'reload schema';"));
+
+  /* ── Черновой режим: те же развилки, что в базе ── */
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  store.set('zr33.forum.local', JSON.stringify({
+    servers: [
+      { id: 33, title: 'Дом', enabled: true, openWriting: true },
+      { id: 44, title: 'Чужой', enabled: true, openWriting: false },
+      { id: 55, title: 'Закрытый', enabled: false, openWriting: false },
+    ],
+  }));
+  const local = await import('../src/forum/adapters/local.js');
+  const raw = () => JSON.parse(store.get('zr33.forum.local'));
+  const grab = async (fn) => {
+    try { await fn(); return ''; } catch (e) { return String(e.message); }
+  };
+
+  const staffUser = await local.signUp('Хозяйка сайта');
+  const ownUser = await local.signUp('Свой человек');
+  await local.signUp('Чужой человек');
+
+  const foreignRoles = await local.myServerRoles();
+  equal('чужаку закрытые ленты отвечают «none», открытая — «member»',
+    [foreignRoles['33'], foreignRoles['44'], foreignRoles['55']], ['member', 'none', 'none']);
+  await local.signIn('Хозяйка сайта');
+  const staffRoles = await local.myServerRoles();
+  equal('модерация сайта — модератор в каждом сервере, отдельного знания про staff экрану не нужно',
+    [staffRoles['33'], staffRoles['44'], staffRoles['55']], ['moderator', 'moderator', 'moderator']);
+
+  await local.signIn('Чужой человек');
+  equal('тема в чужой закрытый сервер отвергнута названной причиной',
+    await grab(() => local.createPost({
+      title: 'Тема из чужого дома', body: 'Меня здесь нет в списке.', category: 'vs', serverId: 44,
+    })), NO_MEMBER);
+  equal('закрытая на приём лента отвечает раньше и другим текстом: просить добавление бесполезно',
+    await grab(() => local.createPost({
+      title: 'Срочно в закрытую ленту', body: 'Новых тем тут не заводят.', category: 'vs', serverId: 55,
+    })), INTAKE_CLOSED);
+
+  await local.signIn('Хозяйка сайта');
+  const abroad = await local.createPost({
+    title: 'Обсуждение в чужом доме', body: 'Служебная тема модературы.', category: 'vs', serverId: 44,
+  });
+  const deadTopic = await local.createPost({
+    title: 'Тема на закрытой ленте', body: 'Переписку это не отменяет.', category: 'vs', serverId: 55,
+  });
+  await local.setServerMember(ownUser.id, 55, 'member');
+  await local.signIn('Свой человек');
+  check('участник закрытой на приём ленты продолжает отвечать под её темами',
+    Boolean((await local.addComment(deadTopic.id, 'Ответ участника, новых тем не видно.')).id));
+  equal('а новую тему он там не заведёт — право участия не равно праву начинать',
+    await grab(() => local.createPost({
+      title: 'Новая тема на закрытой ленте', body: 'Я здесь участник, но приём закрыт.', category: 'vs', serverId: 55,
+    })), INTAKE_CLOSED);
+  await local.signIn('Чужой человек');
+  equal('ответ берёт сервер у темы, а не выбор в переключателе',
+    await grab(() => local.addComment(abroad.id, 'Мне тут не место?')), NO_MEMBER);
+  equal('чужой ленты не касаются и её закрепления',
+    await grab(() => local.setPinned(abroad.id, true)), 'Недостаточно прав');
+
+  await local.signIn('Хозяйка сайта');
+  const chujak = raw().users.find((u) => u.nick === 'Чужой человек');
+  await local.setServerMember(chujak.id, 44, 'moderator');
+  await local.signIn('Чужой человек');
+  await local.setServerMember(ownUser.id, 44, 'member');
+  check('своему модератору лента отдаёт и список участников',
+    (raw().serverMembers || []).some((m) => m.serverId === 44 && m.userId === ownUser.id && m.role === 'member'));
+  check('модератор ленты закрепляет её темы',
+    (await local.setPinned(abroad.id, true)).pinned === true);
+  await local.signIn('Хозяйка сайта');
+  const homeTopic = await local.createPost({
+    title: 'Тема дома', body: 'Своя лента, свой модератор.', category: 'vs', serverId: 33,
+  });
+  await local.signIn('Чужой человек');
+  equal('модератор 44-го не распоряжается лентой 33-го',
+    await grab(() => local.setPinned(homeTopic.id, true)), 'Недостаточно прав');
+
+  await local.signIn('Хозяйка сайта');
+  const moreHome = [];
+  for (let i = 0; i < 3; i++) {
+    moreHome.push(await local.createPost({
+      title: `Дома тема ${i + 1}`, body: `Закрепляем её, номер ${i + 1}.`, category: 'vs', serverId: 33,
+    }));
+  }
+  for (const p of moreHome) await local.setPinned(p.id, true);
+  await local.setServerMember(ownUser.id, 33, 'moderator');
+  await local.signIn('Свой человек');
+  equal('предел закреплений считается по серверу: дом заполнен',
+    await grab(() => local.setPinned(homeTopic.id, true)), PINS_FULL);
+  await local.signIn('Хозяйка сайта');
+  const abroadSecond = await local.createPost({
+    title: 'Вторая тема в чужом доме', body: 'Ленты независимы.', category: 'vs', serverId: 44,
+  });
+  await local.signIn('Чужой человек');
+  check('и чужая лента от этого не вытесняется: закрепление в 44-м проходит',
+    (await local.setPinned(abroadSecond.id, true)).pinned === true);
+
+  /* ── Дверь в черновом режиме: те же отказы ── */
+  equal('модератор ленты не назначает модератора ленты',
+    await grab(() => local.setServerMember(ownUser.id, 44, 'moderator')),
+    'Модератора сервера назначает модерация сайта');
+  equal('и не лезет в чужой список',
+    await grab(() => local.setServerMember(ownUser.id, 33, 'member')),
+    'В свой сервер добавляет его модератор, в чужой — модерация сайта');
+  await local.signIn('Хозяйка сайта');
+  equal('последнего модератора закрытой ленты не снимают',
+    await grab(() => local.setServerMember(chujak.id, 44, null)),
+    'Это последний модератор сервера — сначала назначьте другого');
+  check('добавление записано в журнал модературы и в уведомление игроку',
+    raw().moderationActions.some((a) => a.action === 'server_moderator' && a.targetId === chujak.id)
+      && raw().notifications.some((n) => n.userId === ownUser.id
+        && /добавил вас в участники сервера «Чужой»/.test(n.preview)));
+
+  const newbie = await local.signUp('Новичок');
+  const newbieRoles = await local.myServerRoles();
+  equal('новичок сам попадает в открытый сервер и не попадает в закрытые',
+    [newbieRoles['33'], newbieRoles['44'], newbieRoles['55']], ['member', 'none', 'none']);
+  await local.signOut();
+  equal('гость карты прав не получает — страница на null ничего не прячет',
+    await local.myServerRoles(), null);
+  check('своему серверу новичок не модератор: авточленство даёт участие, а не модературу',
+    newbie.role !== 'admin' && newbieRoles[String(CONFIG.server)] === 'member');
+
+  /* ── Экран: причину человек читает до отправки ── */
+  const { renderForum } = await import('../src/pages/forum.js');
+  const rights = await import('../src/forum/server-rights.js');
+  const site = { events: [], texts: [], alliances: [] };
+  const servers = [
+    { id: 33, title: 'Дом', enabled: true },
+    { id: 44, title: 'Чужой', enabled: true },
+    { id: 55, title: 'Закрытый', enabled: false },
+  ];
+  const player = { id: 'u9', nick: 'Чужой человек', role: 'member', banned: false, mutedUntil: null, createdAt: new Date() };
+  const card = {
+    id: 'p9', authorId: 'u8', authorNick: 'Хозяин', category: 'vs', title: 'Чужая лента',
+    body: 'текст темы', createdAt: new Date(), commentCount: 1, reactions: {}, myReaction: null,
+    score: 0, deleted: false, views: 1, pinned: false, serverId: 44,
+  };
+  const view = (over) => renderForum(site, {
+    ready: true, shared: true, loading: false, me: player, posts: [card], total: 1,
+    comments: [{ id: 'c9', authorId: 'u8', authorNick: 'Хозяин', authorRole: 'member', body: 'живой ответ',
+      createdAt: new Date(), deleted: false, deletedReason: '' }],
+    openPostId: 'p9', servers, serverId: 44, serverRoles: { 33: 'member', 44: 'none', 55: 'none' },
+    ...over,
+  });
+
+  check('участнику чужой ленты форма темы заменена той же строкой, что скажет база',
+    view({}).includes(NO_MEMBER) && !view({}).includes('data-forum-new'));
+  const noMigration = view({ serverRoles: null });
+  check('отсутствие миграции не прячет форму: null — это «прав не проверяем»',
+    noMigration.includes('data-forum-new') && !noMigration.includes(NO_MEMBER));
+  check('в своей ленте форма на месте, а чужая тема остаётся прочитанной: право слова не равно доступу',
+    view({ serverId: 33, serverRoles: { 33: 'member', 44: 'none' } }).includes('data-forum-new')
+      && view({}).includes('Чужая лента'));
+  check('поле ответа под чужой темой закрыто той же причиной, и «Цитировать» исчезает вместе с ним',
+    !view({}).includes('data-forum-comment-form') && !view({}).includes('data-forum-quote="post:p9"')
+      && view({}).includes('forum-reply__locked'));
+  check('своему участнику поле ответа оставлено: закрытая лента — не про него',
+    view({ serverRoles: { 44: 'member' } }).includes('data-forum-comment-form'));
+  check('участник, не модератор ленты, не видит ни «Закрепить», ни «Удалить» под чужой темой',
+    !view({}).includes('data-forum-pin="p9"') && !view({}).includes('data-forum-del-post="p9"'));
+  check('модератор ленты темы видит, а модератор чужого сервера — нет',
+    view({ serverRoles: { 44: 'moderator' } }).includes('data-forum-pin="p9"')
+      && !view({ serverRoles: { 33: 'moderator', 44: 'member' } }).includes('data-forum-pin="p9"'));
+  check('модерация сайта проходит прежней дверью: при null правило осталось прежним',
+    view({ serverRoles: null, me: { ...player, role: 'admin' } }).includes('data-forum-pin="p9"'));
+  check('закрытая на приём лента названа отдельной строкой и для участника',
+    view({ serverId: 55, serverRoles: { 55: 'member' } }).includes(INTAKE_CLOSED));
+
+  /* Помощник отвечает «как раньше» на каждый случай, где прав не спрашивали. */
+  equal('null и пустое состояние форму не прячут, а «none» прячет',
+    [
+      rights.serverWriteNotice({ me: player, serverRoles: null }, 44),
+      rights.serverWriteNotice({ me: null, serverRoles: { 44: 'none' } }, 44),
+      rights.serverWriteNotice({ me: player, serverRoles: { 44: 'none' } }, null),
+      rights.serverWriteNotice({ me: player, serverRoles: { 44: 'none' } }, 44),
+    ],
+    ['', '', '', NO_MEMBER]);
+  equal('темой пишет выбранная лента, а при общем виде — сервер сайта',
+    [rights.writingServerId({ serverId: 44 }), rights.writingServerId({ serverId: null })],
+    [44, Number(CONFIG.server)]);
+  equal('модература: роль ленты важнее роли человека, а при null работает прежнее правило',
+    [
+      rights.canModerateServer({ me: player, serverRoles: { 44: 'moderator' } }, 44),
+      rights.canModerateServer({ me: player, serverRoles: { 44: 'member' } }, 44),
+      rights.canModerateServer({ me: { ...player, role: 'moderator' }, serverRoles: null }, 44),
+      rights.canModerateServer({ me: { ...player, role: 'moderator' }, serverRoles: { 44: 'member' } }, 44),
+    ],
+    [true, false, true, false]);
+
+  /* ── Клиент: одно правило, а не три ── */
+  check('страница зовёт помощник, а не переписывает правило в разметке',
+    pageSrc.includes("import { canModerateServer, serverWriteNotice, writingServerId } from '../forum/server-rights.js';")
+      && pageSrc.includes('const canModerate = canModerateServer(s, p.serverId);')
+      && pageSrc.includes('canModerateServer(s, post.serverId)')
+      && (pageSrc.match(/canModerateServer\(s, /g) || []).length >= 4);
+  check('перенос чужой встречи решается лентой темы, а не ролью человека',
+    calSrc.includes('canModerateServer(s, item.serverId)'));
+  check('закрытая лента подписана стилем, которым нарисована тишина по разделу',
+    cssSrc.includes('.forum-blocked--server'));
+  check('роль сервера спрашивают при старте и при входе, а выход стирает её',
+    mountSrc.includes('loadServerRoles(),')
+      && /await loadServerRoles\(\);\s*\n\s*await loadStarterSteps\(\);/.test(mountSrc)
+      && /data-forum-signout[\s\S]{0,900}state\.serverRoles = null;/.test(mountSrc));
+  check('отказ функции читается как «прав не проверяем», а не как пустая карта',
+    /const rows = await rest\('\/rpc\/forum_my_server_roles'[\s\S]{0,160}\.catch\(\(\) => null\)/.test(supaSrc)
+      && /if \(!rows \|\| typeof rows !== 'object' \|\| Array\.isArray\(rows\)\) return null;/.test(supaSrc));
+  check('контракт объявляет обе двери необязательными: старый адаптер не сломан',
+    contractSrc.includes('@property {() => Promise<Record<string, string>|null>} [myServerRoles]')
+      && contractSrc.includes('@property {(userId: string, serverId: number, role: string|null) => Promise<void>} [setServerMember]')
+      && contractSrc.includes('миграции 20261001-server-rights.sql нет'));
+  check('оба адаптера умеют и карту ролей, и выдачу членства',
+    [/export async function myServerRoles\(\)/, /export async function setServerMember\(userId, serverId, role\)/]
+      .every((re) => re.test(localSrc) && re.test(supaSrc)));
+
+  /* ── Реестр и документы ── */
+  check('миграция стоит в очереди и названа в реестре по верхнему пути',
+    readmeSrc.includes('supabase/20261001-server-rights.sql') && readmeSrc.includes('ещё не выполнены'));
+  check('реестр даёт владельцу готовые строки вызова двери — экрана выдачи пока нет',
+    readmeSrc.includes('select public.forum_set_server_member(') && readmeSrc.includes("nick = 'НикИгрока'"));
+  check('документы описывают шаг, его отказ и то, чего в нём нет',
+    /## Права по серверу/.test(docsSrc)
+      && docsSrc.includes('forum_my_server_roles')
+      && docsSrc.includes('экрана панели'));
+  check('конфиг называет теперешнего хранителя предела закреплений, а не прежний триггер',
+    configSrc.includes('supabase/20261001-server-rights.sql')
+      && CONFIG.forum.limits.pinsMax === 3);
 }

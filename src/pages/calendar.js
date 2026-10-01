@@ -21,6 +21,7 @@
  */
 import { esc, plural } from '../ui/helpers.js';
 import { categoryLabel, EVENT_RSVP, EVENT_TAG_ID } from '../forum/rules.js';
+import { canModerateServer } from '../forum/server-rights.js';
 import {
   eventWhen, eventWhenFull, eventCountdown, eventIsPast,
   remindChoices, remindLabel, icsHref, localInputValue,
@@ -112,7 +113,12 @@ export function eventActions(item, s) {
   const hasWhen = Boolean(item.eventAt);
   const past = hasWhen && eventIsPast(item.eventAt);
   const isMine = Boolean(s.me) && (s.me.id === item.authorId);
-  const canMove = Boolean(s.me) && (isMine || s.me.role === 'admin' || s.me.role === 'moderator');
+  /*
+    Перенести встречу может модератор той ленты, где она живёт, а не только
+    модерация сайта. На самой странице календаря ролей сервера нет в состоянии,
+    и там функция отвечает прежним правилом — см. src/forum/server-rights.js.
+  */
+  const canMove = Boolean(s.me) && (isMine || canModerateServer(s, item.serverId));
 
   if (!s.me) {
     return `

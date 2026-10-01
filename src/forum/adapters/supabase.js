@@ -372,6 +372,46 @@ export async function listServers() {
     }));
 }
 
+/**
+ * Моя роль в каждом сервере: 'moderator' | 'member' | 'none', ключ — номер
+ * сервера строкой.
+ *
+ * Отказ здесь — не поломка, а «миграции нет», ровно как у списка серверов:
+ * функция появится вместе с правами по серверу, а страница обязана жить без
+ * них. Поэтому `null`, а не пустая карта: пустая карта значит «тебя нет ни в
+ * одном сервере» и спрятала бы форму темы у всех до прогона миграции, а null
+ * читается как «прав не проверяем, ничего не прячем».
+ *
+ * Карта сразу по всем серверам, а не вопрос по одному выбранному: переключатель
+ * показывает чужие ленты, и объяснение под кнопкой нужно до щелчка.
+ *
+ * @returns {Promise<Record<string, string>|null>}
+ */
+export async function myServerRoles() {
+  const rows = await rest('/rpc/forum_my_server_roles', { method: 'POST', body: {} })
+    .catch(() => null);
+  if (!rows || typeof rows !== 'object' || Array.isArray(rows)) return null;
+  const out = {};
+  for (const [id, role] of Object.entries(rows)) {
+    if (role === 'moderator' || role === 'member' || role === 'none') out[id] = role;
+  }
+  return out;
+}
+
+/**
+ * Выдача членства: роль 'member' | 'moderator' или снятие при `role === null`.
+ *
+ * Дверь одна, и право за ней решает база: модератор сервера добавляет
+ * участников только в свой список, модератора сервера назначает лишь модерация
+ * сайта. Слова отказа — оттуда же, панель показывает их как есть.
+ */
+export async function setServerMember(userId, serverId, role) {
+  await rest('/rpc/forum_set_server_member', {
+    method: 'POST',
+    body: { p_user_id: userId, p_server_id: Number(serverId), p_role: role ?? null },
+  });
+}
+
 /** @param {{category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}} [opts] */
 export async function listPosts(opts = {}) {
   const { category = 'all', tag = 'all', sort = 'fresh', limit = CONFIG.forum.pageSize, offset = 0, q = '', saved = false, serverId = null } = opts;
@@ -671,19 +711,40 @@ export async function deletePost(id, reason) {
 }
 
 /**
- * ЗАКРЕПЛЕНИЕ ТЕМЫ — модерация: свои темы так нельзя двигать в топ.
+ * ЗАКРЕПЛЕНИЕ ТЕМЫ — модература ленты: свои темы так нельзя двигать в топ.
  *
  * Проверка лимита здесь нужна для понятного сообщения, а не для защиты:
  * её можно обойти запросом мимо сайта, и тогда откажет триггер в базе
- * (supabase/applied/schema.sql), где живёт то же число CONFIG.forum.limits.pinsMax.
+ * (supabase/20261001-server-rights.sql), где живёт то же число
+ * CONFIG.forum.limits.pinsMax.
+ *
+ * Счёт по серверу, а не по сайту: три темы одного сервера, закреплённые в
+ * общий топ, вытеснили бы из него все остальные ленты — и навсегда, потому что
+ * откреплять чужое никто не обязан.
  */
 export async function setPinned(id, pinned) {
   pinned = Boolean(pinned);
   if (pinned) {
-    const rows = await rest('/forum_posts?select=id&pinned=eq.true&deleted=eq.false');
+    const me = await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}&select=server_id`)
+      .catch(() => null);
+    const serverId = Array.isArray(me) ? Number(me[0]?.server_id) : NaN;
+    const params = new URLSearchParams();
+    params.set('select', 'id');
+    params.set('pinned', 'eq.true');
+    params.set('deleted', 'eq.false');
+    /*
+      Фильтр по серверу прикладывается только когда номер известен: без
+      миграции шага 2 колонки нет, а отказ PostgREST от неизвестного столбца
+      убил бы весь запрос. Без фильтра счёт остаётся общим — ровно то
+      поведение, которое было до мультиаренды.
+    */
+    if (Number.isInteger(serverId)) params.set('server_id', `eq.${serverId}`);
+    const rows = await rest(`/forum_posts?${params}`);
     const count = Array.isArray(rows) ? rows.length : 0;
     if (count >= CONFIG.forum.limits.pinsMax) {
-      throw new Error('Закреплено уже три темы — сначала открепите одну');
+      throw new Error(Number.isInteger(serverId)
+        ? 'В этом сервере закреплено уже три темы — сначала открепите одну'
+        : 'Закреплено уже три темы — сначала открепите одну');
     }
   }
 

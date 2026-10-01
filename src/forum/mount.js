@@ -80,6 +80,17 @@ const state = {
   */
   servers: [],
   serverId: null,
+  /*
+    Моя роль в каждом сервере: { '33': 'moderator', '44': 'none' }. Право слова
+    по серверу держит база (supabase/20261001-server-rights.sql), а экрану нужна
+    та же картина до отправки: человек должен видеть, что ему отказали бы, а не
+    получить отказ кнопкой.
+
+    `null` — это не «нигде»: это «миграции нет, прав не проверяем». Разница
+    принципиальная: из пустой карты следовало бы спрятать форму темы у всех,
+    кто зашёл до прогона, а из null — ничего не следует.
+  */
+  serverRoles: null,
   /**
    * Пять первых шагов вошедшего (supabase/applied/20260926-starter-checklist.sql).
    * Пустой список — блока нет: шаги либо уже сделаны, либо срок новичка прошёл.
@@ -809,6 +820,28 @@ function resolveSiteServer() {
   return open ? open.id : state.servers[0].id;
 }
 
+/**
+ * Моя роль в каждом сервере — одним запросом, сразу после того как выяснилось,
+ * кто я.
+ *
+ * Отказ адаптера (функции ещё нет в базе) читается как null и ничего не прячет:
+ * права по серверу — надстройка над работающим форумом, а не условие его
+ * жизни. Перерисовку отсюда не делаем: роль нужна форме и кнопкам, а они
+ * перерисовываются своим чередом, и лишний paint() убрал бы каретку из
+ * набранного текста.
+ *
+ * Правила чтения этой карты живут не здесь, а в src/forum/server-rights.js:
+ * то же правило применяет разметка, пряча форму темы. Две копии одного правила
+ * разошлись бы в первый же месяц, и разошлись бы тихо.
+ */
+async function loadServerRoles() {
+  if (!state.me || typeof forum.myServerRoles !== 'function') {
+    state.serverRoles = null;
+    return;
+  }
+  state.serverRoles = await forum.myServerRoles().catch(() => null);
+}
+
 /*
   Заголовок вкладки говорит, чей форум человек читает, — он единственный, что
   видно при десяти открытых вкладках. Берётся заготовленный страницей и
@@ -1354,11 +1387,9 @@ async function handleAuth(form, mode, submitter) {
       : await forum.signIn(nick.value, password.value);
     await loadNotifications();
     await loadPushPrefs();
-    /*
-      Шаг новичка спрашивают заново при каждом входе: до этой строки в state
-      мог лежать список предыдущего человека, а он приватный и чужому не
-      показывается.
-    */
+    // И шаги новичка, и роли по серверам — про конкретного человека: в state
+    // мог лежать список предыдущего вошедшего, поэтому спрашиваем заново.
+    await loadServerRoles();
     await loadStarterSteps();
     await loadFeed();
   } catch (err) {
@@ -2223,6 +2254,8 @@ function wire() {
     if (t.closest('[data-forum-signout]')) {
       await forum.signOut();
       state.me = null;
+      // Чужие права лент следующему вошедшему не наследуются.
+      state.serverRoles = null;
       state.notifyOpen = false;
       state.notifyList = [];
       state.notifyUnread = 0;
@@ -3394,6 +3427,7 @@ export async function mountForum(container, view, postId = null, search = '') {
       loadStarterSteps(),
       loadPushPrefs(),
       loadSectionMutes(),
+      loadServerRoles(),
       typeof forum.listAllianceSubscriptions === 'function'
         ? forum.listAllianceSubscriptions()
           .then((ids) => { state.allianceSubscriptions = new Set(ids ?? []); })

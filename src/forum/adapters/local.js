@@ -79,6 +79,7 @@ function emptyState() {
     updateNotes: [],
     storeEvents: [],
     servers: [],
+    serverMembers: [],
   };
 }
 
@@ -118,6 +119,112 @@ function toServerId(value) {
   if (value == null || value === '') return null;
   const id = Number(value);
   return Number.isInteger(id) ? id : null;
+}
+
+/*
+  ПРАВА ПО СЕРВЕРУ В ЧЕРНОВОМ РЕЖИМЕ.
+
+  Черновик повторяет supabase/20261001-server-rights.sql и по правилам, и по
+  словам отказа: страница обязана сказать человеку то же самое до отправки, что
+  скажет база после, — иначе он узнает про чужую ленту только из окна ошибки.
+  Совпадение слов сторожит тест.
+
+  Участие здесь заводят ровно те же два механизма, что и в базе: авточленство
+  при регистрации в открытый сервер и дверь `setServerMember`. Одноразового
+  backfill'а, каким база разлила старых игроков по 33-му, тут нет намеренно:
+  сервер по умолчанию открытый, так что отказывать некому, а закрытую ленту в
+  черновом режиме заводит сам человек — и заполняет её той же дверью. Иначе
+  копия «уже всех развели» расходилась бы с настоящим списком на первом же
+  снятии участия.
+*/
+
+/** Ряд сервера вместе с признаком открытости — внутренний взгляд на список. */
+function serverRows(state) {
+  const rows = Array.isArray(state.servers) ? state.servers : [];
+  const list = rows
+    .filter((row) => toServerId(row?.id) != null)
+    .map((row) => ({
+      id: Number(row.id),
+      title: String(row.title || `Сервер ${row.id}`),
+      enabled: row.enabled !== false,
+      openWriting: row.openWriting === true,
+    }));
+  if (list.length) return list;
+  const id = defaultServerId();
+  return id == null ? [] : [{ id, title: `Сервер ${id}`, enabled: true, openWriting: true }];
+}
+
+function serverRowOf(state, serverId) {
+  const id = toServerId(serverId);
+  if (id == null) return null;
+  return serverRows(state).find((row) => row.id === id) || null;
+}
+
+/** Явная строка участия; её заводит авточленство или дверь, и больше никто. */
+function serverMemberRow(state, userId, serverId) {
+  const id = toServerId(serverId);
+  if (id == null) return null;
+  const rows = Array.isArray(state.serverMembers) ? state.serverMembers : [];
+  return rows.find((m) => m.userId === userId && toServerId(m.serverId) === id) || null;
+}
+
+/**
+ * Моя роль в сервере — та же лестница, что у `forum_my_server_roles()`:
+ * модератор ленты, участник (строка или открытость) или «none».
+ *
+ * Модерация сайта получает «moderator» в любом сервере: в базе это та же
+ * оговорка, `forum_is_staff()` обходит границы территории.
+ */
+function serverRoleOf(state, me, serverId) {
+  if (!me) return null;
+  if (isStaff(me)) return 'moderator';
+  const row = serverMemberRow(state, me.id, serverId);
+  if (row && row.role === 'moderator') return 'moderator';
+  if (row) return 'member';
+  return serverRowOf(state, serverId)?.openWriting ? 'member' : 'none';
+}
+
+function canWriteServer(state, me, serverId) {
+  const role = serverRoleOf(state, me, serverId);
+  return role === 'member' || role === 'moderator';
+}
+
+function canModerateServer(state, me, serverId) {
+  return serverRoleOf(state, me, serverId) === 'moderator';
+}
+
+/**
+ * Отказ тому, кому лента не своя. Порядок тот же, что в триггере: сначала про
+ * закрытый приём тем (ждать добавления бесполезно), потом про отсутствие
+ * участия.
+ */
+function requireServerWrite(state, me, serverId, isTopic) {
+  if (isStaff(me)) return;
+  const server = serverRowOf(state, serverId);
+  if (isTopic && server && !server.enabled) {
+    throw new Error('Приём новых тем в этот сервер закрыт модерацией');
+  }
+  if (!canWriteServer(state, me, serverId)) {
+    throw new Error('В этот сервер пишут только его участники: попросите модератора сервера добавить вас');
+  }
+}
+
+/**
+ * Кто распоряжается материалом ленты: модератор этого сервера или модерация
+ * сайта. Тема и ответ смотрят на сервер темы — ровно как политики
+ * `forum_posts_moderate` и `forum_comments_moderate`.
+ */
+function canModeratePost(state, me, post) {
+  return canModerateServer(state, me, post?.serverId ?? defaultServerId());
+}
+
+/** Число модераторов сервера без одного человека — ради правила «последний». */
+function countServerModerators(state, serverId, exceptUserId) {
+  const id = toServerId(serverId);
+  const rows = Array.isArray(state.serverMembers) ? state.serverMembers : [];
+  return rows.filter((m) => toServerId(m.serverId) === id
+    && m.role === 'moderator'
+    && m.userId !== exceptUserId).length;
 }
 
 const toDate = (v) => (v ? new Date(v) : null);
@@ -245,6 +352,26 @@ export async function signUp(nick) {
   };
   s.users.push(user);
   s.me = user.id;
+  /*
+    То же, что делает в базе триггер `forum_join_open_servers` после вставки в
+    `forum_users`: новичок становится участником каждого открытого сервера.
+    Иначе его список был бы фотографией момента, когда черновик впервые
+    открылся, а закрытый сервер новичка не получает ни как — там его заводят
+    руками.
+  */
+  const members = Array.isArray(s.serverMembers) ? s.serverMembers : [];
+  for (const server of serverRows(s)) {
+    if (!server.openWriting) continue;
+    if (members.some((m) => m.userId === user.id && toServerId(m.serverId) === server.id)) continue;
+    members.push({
+      userId: user.id,
+      serverId: server.id,
+      role: 'member',
+      addedBy: null,
+      addedAt: new Date().toISOString(),
+    });
+  }
+  s.serverMembers = members;
   write(s);
   return userOut(user);
 }
@@ -420,18 +547,115 @@ function pollOut(state, postId) {
 */
 export async function listServers() {
   const state = read();
-  const rows = Array.isArray(state.servers) ? state.servers : [];
-  if (rows.length) {
-    return rows
-      .filter((row) => toServerId(row?.id) != null)
-      .map((row) => ({
-        id: Number(row.id),
-        title: String(row.title || `Сервер ${row.id}`),
-        enabled: row.enabled !== false,
-      }));
+  return serverRows(state).map(({ id, title, enabled }) => ({ id, title, enabled }));
+}
+
+/**
+ * Те же три ответа, что отдаёт в базе `forum_my_server_roles()`: moderator,
+ * member, none по каждому серверу сразу. Гость получает null — там функция
+ * отказывает вошедшему, и экран читает это как «прав не проверяем».
+ */
+export async function myServerRoles() {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) return null;
+  const out = {};
+  for (const server of serverRows(s)) out[String(server.id)] = serverRoleOf(s, me, server.id);
+  return out;
+}
+
+/**
+ * Выдача членства — копия двери `forum_set_server_member`: те же проверки, в
+ * том же порядке и с теми же словами.
+ *
+ * Порядок важен не меньше чисел: отказ «не туда лезешь» человек обязан
+ * получать прежде отказа «не того удаляешь», иначе черновик выдавал бы
+ * устройство списка тому, кому он не предназначен.
+ */
+export async function setServerMember(userId, serverId, role) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const server = serverRowOf(s, serverId);
+  if (!server) throw new Error('Сервер не найден');
+
+  const user = s.users.find((u) => u.id === userId);
+  if (!user) throw new Error('Игрок не найден');
+
+  const vRole = role ?? null;
+  if (vRole !== null && vRole !== 'member' && vRole !== 'moderator') {
+    throw new Error('В сервере бывают роли „участник“ и „модератор“');
   }
-  const id = defaultServerId();
-  return id == null ? [] : [{ id, title: `Сервер ${id}`, enabled: true }];
+
+  if (!isStaff(me)) {
+    if (vRole === 'moderator') throw new Error('Модератора сервера назначает модерация сайта');
+    if (!canModerateServer(s, me, server.id)) {
+      throw new Error('В свой сервер добавляет его модератор, в чужой — модерация сайта');
+    }
+  }
+
+  const row = serverMemberRow(s, user.id, server.id);
+
+  /*
+    Последнего модератора закрытой ленты снять нельзя: без своего модератора
+    лента остаётся на попечении владельца сайта, который не знает ни имён, ни
+    обстоятельств этой команды. Открытому это не нужно — там список учёт, а не
+    граница.
+  */
+  if (row && row.role === 'moderator' && vRole !== 'moderator' && !server.openWriting) {
+    if (countServerModerators(s, server.id, user.id) === 0) {
+      throw new Error('Это последний модератор сервера — сначала назначьте другого');
+    }
+  }
+
+  const members = Array.isArray(s.serverMembers) ? s.serverMembers : [];
+  const now = new Date().toISOString();
+
+  if (vRole === null) {
+    s.serverMembers = members.filter((m) => !(m.userId === user.id && toServerId(m.serverId) === server.id));
+    // Снимали то, чего не было: журнал пустой, уведомления нет — как в двери.
+    if (!row) { write(s); return; }
+  } else if (row) {
+    row.role = vRole;
+    row.addedBy = me.id;
+  } else {
+    members.push({ userId: user.id, serverId: server.id, role: vRole, addedBy: me.id, addedAt: now });
+    s.serverMembers = members;
+  }
+
+  s.moderationActions.unshift({
+    id: newId('ma'),
+    actorNick: me.nick,
+    targetType: 'user',
+    targetId: user.id,
+    targetNick: user.nick,
+    action: vRole === null ? 'server_member_removed'
+      : vRole === 'moderator' ? 'server_moderator' : 'server_member',
+    details: { server_id: server.id, server_title: server.title, role: row?.role ?? null, was: row?.role ?? null },
+    createdAt: now,
+  });
+
+  /*
+    Снятие участия с открытого сервера слово не отнимает — право там даёт
+    открытость, а не строка. Молча это позволить значило бы дать модератору
+    иллюзию наказания, поэтому в уведомлении сказано, что за снятием ничего не
+    стоит.
+  */
+  pushNotification(s, {
+    userId: user.id,
+    actorId: me.id,
+    actorNick: me.nick,
+    kind: 'moderation',
+    preview: vRole === null
+      ? `Ваше участие в сервере «${server.title}» снято`
+        + (server.openWriting ? ' (писать там всё равно можно: сервер открытый)' : '')
+      : vRole === 'moderator'
+        ? `Вы модератор сервера «${server.title}»: лента, её закрепления и жалобы`
+        : `${me.nick} добавил вас в участники сервера «${server.title}»`,
+  });
+
+  write(s);
 }
 
 /**
@@ -725,6 +949,12 @@ export async function createPost(draft) {
   // базе триггеры перед insert идут по алфавиту, и forum_section_mute_insert
   // среди них последний.
   requireSectionOpen(s, me, draft.category);
+  /*
+    Сервер — уже после раздела: `forum_server_write_insert` по алфавиту имён
+    идёт следом, и человек, которому закрыты и раздел, и лента, должен сначала
+    прочитать причину помягче.
+  */
+  requireServerWrite(s, me, toServerId(draft.serverId) ?? defaultServerId(), true);
 
   const post = {
     id: newId('p'),
@@ -811,7 +1041,7 @@ export async function editPost(id, patch) {
   return postOut(s, post);
 }
 
-/** Автор удаляет свой пост, модератор — любой, но обязан назвать причину. */
+/** Автор удаляет свой пост, модература ленты — любой, но обязана назвать причину. */
 export async function deletePost(id, reason) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me);
@@ -819,39 +1049,42 @@ export async function deletePost(id, reason) {
   const post = s.posts.find((p) => p.id === id);
   if (!post) throw new Error('Пост не найден');
 
-  const isStaff = me.role === 'admin' || me.role === 'moderator';
-  if (!isStaff && post.authorId !== me.id) throw new Error('Это не ваш пост');
+  const moderator = canModeratePost(s, me, post);
+  if (!moderator && post.authorId !== me.id) throw new Error('Это не ваш пост');
 
   post.deleted = true;
-  post.deletedReason = isStaff && post.authorId !== me.id
+  post.deletedReason = moderator && post.authorId !== me.id
     ? String(reason || 'Нарушение правил форума')
     : 'Удалено автором';
   write(s);
 }
 
 /**
- * Закрепление — модерация: свои темы так нельзя двигать в топ.
+ * Закрепление — модература ленты: свои темы так нельзя двигать в топ.
  *
- * Лимит тот же, что и в базе (CONFIG.forum.limits.pinsMax): браузер
- * предупреждает заранее, а настоящая защита — в триггере supabase/applied/schema.sql.
- * Здесь проверка для понятного сообщения, а не для безопасности — в локальном
- * режиме запрос мимо сайта обойти некому.
+ * Лимит тот же, что и в базе (CONFIG.forum.limits.pinsMax), и считается ПО
+ * СЕРВЕРУ: три закреплённые темы одной ленты, положенные в общий топ, вытеснили
+ * бы из него все остальные ленты. Настоящая защита — в триггере
+ * supabase/20261001-server-rights.sql. Здесь проверка для понятного сообщения,
+ * а не для безопасности — в локальном режиме запрос мимо сайта обойти некому.
  */
 export async function setPinned(id, pinned) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me);
   if (!me) throw new Error('Сначала войдите');
-  if (me.role !== 'admin' && me.role !== 'moderator') throw new Error('Недостаточно прав');
 
   const post = s.posts.find((p) => p.id === id);
   if (!post) throw new Error('Пост не найден');
+  if (!canModeratePost(s, me, post)) throw new Error('Недостаточно прав');
   if (post.deleted) throw new Error('Удалённый пост закрепить нельзя');
 
   pinned = Boolean(pinned);
+  const serverId = post.serverId ?? defaultServerId();
   if (pinned && !post.pinned) {
-    const pinnedCount = s.posts.filter((p) => p.pinned && !p.deleted && p.id !== id).length;
+    const pinnedCount = s.posts.filter((p) => p.pinned && !p.deleted && p.id !== id
+      && (p.serverId ?? defaultServerId()) === serverId).length;
     if (pinnedCount >= CONFIG.forum.limits.pinsMax) {
-      throw new Error('Закреплено уже три темы — сначала открепите одну');
+      throw new Error('В этом сервере закреплено уже три темы — сначала открепите одну');
     }
   }
   post.pinned = pinned;
@@ -862,8 +1095,8 @@ export async function setPinned(id, pinned) {
 /**
  * Срок действия темы: продлить, назначить или снять.
  *
- * В базе это право отдаёт RLS — строку правит автор, а модерация любую. Здесь
- * то же разделение, иначе черновой режим показывал бы то, чего настоящий
+ * В базе это право отдаёт RLS — строку правит автор, а модература ленты любую.
+ * Здесь то же разделение, иначе черновой режим показывал бы то, чего настоящий
  * игроку откажет.
  */
 export async function setExpiry(id, expiresAt) {
@@ -873,8 +1106,7 @@ export async function setExpiry(id, expiresAt) {
 
   const post = s.posts.find((p) => p.id === id);
   if (!post) throw new Error('Пост не найден');
-  const isStaff = me.role === 'admin' || me.role === 'moderator';
-  if (!isStaff && post.authorId !== me.id) throw new Error('Это не ваш пост');
+  if (!canModeratePost(s, me, post) && post.authorId !== me.id) throw new Error('Это не ваш пост');
 
   const when = expiresAt ?? null;
   const error = expiryProblem(Array.isArray(post.tags) ? post.tags : [], when);
@@ -900,7 +1132,7 @@ export async function setEventAt(id, eventAt, eventCapacity = null) {
 
   const post = s.posts.find((p) => p.id === id);
   if (!post) throw new Error('Пост не найден');
-  if (!isStaff(me) && post.authorId !== me.id) throw new Error('Это не ваш пост');
+  if (!canModeratePost(s, me, post) && post.authorId !== me.id) throw new Error('Это не ваш пост');
 
   const error = eventWhenProblem(Array.isArray(post.tags) ? post.tags : [], eventAt ?? null)
     || eventSeatsProblem(eventCapacity ?? null);
@@ -929,7 +1161,7 @@ export async function closeBarter(id, closed) {
 
   const post = s.posts.find((p) => p.id === id);
   if (!post) throw new Error('Пост не найден');
-  if (!isStaff(me) && post.authorId !== me.id) throw new Error('Это не ваш пост');
+  if (!canModeratePost(s, me, post) && post.authorId !== me.id) throw new Error('Это не ваш пост');
   if (!needsBarterLines(Array.isArray(post.tags) ? post.tags : [])) {
     throw new Error('Снимать с доски можно только объявление с меткой «Обмен»');
   }
@@ -985,6 +1217,12 @@ export async function addComment(postId, body) {
   if (post.deleted) throw new Error('Пост удалён, обсуждать нечего');
   checkHold(s, 'comment', me, body);
   requireSectionOpen(s, me, post.category);
+  /*
+    Сервер ответ берёт у темы — ровно как `forum_comments_insert` в базе:
+    отдельной колонки у ответа нет, и право писать в чужую ленту проверяется по
+    её ленте, а не по выбору в переключателе.
+  */
+  requireServerWrite(s, me, post.serverId ?? defaultServerId(), false);
 
   const comment = {
     id: newId('c'),
@@ -1038,11 +1276,16 @@ export async function deleteComment(id, reason) {
   const comment = s.comments.find((c) => c.id === id);
   if (!comment) throw new Error('Комментарий не найден');
 
-  const isStaff = me.role === 'admin' || me.role === 'moderator';
-  if (!isStaff && comment.authorId !== me.id) throw new Error('Это не ваш комментарий');
+  /*
+    Сервер ответа — у темы, отдельной колонки у ответа нет (см. policy
+    forum_comments_moderate): модератор ленты снимает ответ в своей ленте.
+  */
+  const post = s.posts.find((p) => p.id === comment.postId);
+  const moderator = canModeratePost(s, me, post || {});
+  if (!moderator && comment.authorId !== me.id) throw new Error('Это не ваш комментарий');
 
   comment.deleted = true;
-  comment.deletedReason = isStaff && comment.authorId !== me.id
+  comment.deletedReason = moderator && comment.authorId !== me.id
     ? String(reason || 'Нарушение правил форума')
     : 'Удалено автором';
   write(s);
@@ -2507,10 +2750,17 @@ export async function closePoll(pollId) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me);
   if (!me) throw new Error('Сначала войдите');
-  if (me.role !== 'admin' && me.role !== 'moderator') throw new Error('Недостаточно прав');
 
   const poll = s.polls.find((pl) => pl.id === pollId);
   if (!poll) throw new Error('Опрос не найден');
+
+  /*
+    Опрос закрывает его автор или модература ленты, где он стоит, — ровно как
+    политика forum_polls_close. Право вставку опроса даёт тема, а тема уже
+    прошла проверку сервера, поэтому здесь смотрим только на закрытие.
+  */
+  const post = s.posts.find((p) => p.id === poll.postId) || {};
+  if (post.authorId !== me.id && !canModeratePost(s, me, post)) throw new Error('Недостаточно прав');
   poll.closed = true;
   write(s);
 }

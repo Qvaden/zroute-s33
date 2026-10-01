@@ -334,6 +334,8 @@
  * @property {(nick: string, password: string) => Promise<ForumUser>} signIn
  * @property {() => Promise<void>} signOut
  * @property {() => Promise<ForumServer[]>} [listServers]  Пустой список — это «миграции 20261001-server-scope.sql нет», а не «серверов нет»: по пустому ответу переключатель не показывается, и лента читается без фильтра по серверу.
+ * @property {() => Promise<Record<string, string>|null>} [myServerRoles]  Моя роль в каждом сервере одним запросом: ключ — номер строкой, значение — 'moderator' | 'member' | 'none'. `null` означает «миграции 20261001-server-rights.sql нет, прав не проверяем» — и ничего не прячет; пустая карта — это «тебя нет ни в одной ленте», и путать их нельзя.
+ * @property {(userId: string, serverId: number, role: string|null) => Promise<void>} [setServerMember]  Членство в сервере: 'member', 'moderator' или снятие при null. Право и все слова отказа — из базы (`forum_set_server_member`), черновой адаптер повторяет их дословно.
  * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}) => Promise<{posts: ForumPost[], total: number}>} listPosts  serverId — фильтр ленты; пусто значит «не фильтровать» (так читается база до миграции).
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.

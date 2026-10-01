@@ -26,6 +26,7 @@ import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } 
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
 import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
+import { canModerateServer, serverWriteNotice, writingServerId } from '../forum/server-rights.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
 import { formatQuietTime } from '../forum/quiet.js';
 import { slaPromiseLine } from '../forum/sla.js';
@@ -1533,7 +1534,7 @@ function barterBadge(p) {
 function barterControl(p, s) {
   const closed = Boolean(p.barterClosedAt);
   if (!s.me) return '';
-  if (s.me.id !== p.authorId && s.me.role !== 'admin' && s.me.role !== 'moderator') return '';
+  if (s.me.id !== p.authorId && !canModerateServer(s, p.serverId)) return '';
   return `
     <div class="forum-barter__foot">
       <button type="button" class="forum-act" data-forum-barter-close="${esc(p.id)}"
@@ -1567,11 +1568,14 @@ function expiryBadge(p) {
  * Отсчёт идёт от сегодняшнего дня, а не от прежней даты: продление темы,
  * проспавшей месяц, дало бы пару дней вместо месяца. То же правило записано
  * в триггере базы, и её отказ страница показывает как есть.
+ *
+ * Модерация здесь — та же территория, что у удаления: срок правит модератор
+ * ленты темы, а не только модерация сайта.
  */
 function expiryControl(p, s) {
   const days = expiryChoices();
   if (!s.me || !days.length) return '';
-  if (s.me.id !== p.authorId && s.me.role !== 'admin' && s.me.role !== 'moderator') return '';
+  if (s.me.id !== p.authorId && !canModerateServer(s, p.serverId)) return '';
 
   const dead = Boolean(p.expiresAt) && new Date(p.expiresAt).getTime() <= Date.now();
   const state = !p.expiresAt
@@ -1600,6 +1604,20 @@ function expiryControl(p, s) {
 function renderComposer(s) {
   if (!s.ready || !s.me) return '';
   if (s.me.banned) return '';
+
+  /*
+    Чужая лента. Форма темы заменяется одной строкой — теми же словами, какими
+    база ответит на отправку: узнавать про границу окном ошибки после нажатия
+    человеку незачем. Пустая строка значит либо «право есть», либо «прав мы не
+    спрашивали» — при отсутствии миграции форма остаётся на экране.
+  */
+  const closedServer = serverWriteNotice(s, writingServerId(s));
+  if (closedServer) {
+    return `
+      <div class="forum-blocked forum-blocked--server" data-forum-composer-blocked>
+        <p class="forum-blocked__line">${esc(closedServer)}</p>
+      </div>`;
+  }
 
   const L = CONFIG.forum.limits;
   /*
@@ -2058,10 +2076,19 @@ export function renderPostCard(p, s) {
   if (p.deleted) return '';
 
   const isOpen = s.openPostId === p.id;
-  const canModerate = s.me && (s.me.role === 'admin' || s.me.role === 'moderator');
+  /*
+    Модература смотрит на ленту темы, а не только на человека: модератор
+    сервера распоряжается всеми темами своей ленты и не может тронуть чужую.
+    Модерация сайта проходит этой же функцией — она модератор во всех лентах,
+    и пока роль не спрашивали (миграции нет), здесь остаётся ровно прежнее
+    правило.
+  */
+  const canModerate = canModerateServer(s, p.serverId);
   const isMine = s.me && s.me.id === p.authorId;
   const editing = s.editingPostId === p.id;
-  const canReply = Boolean(isOpen && s.me && !s.me.banned);
+  // Ответ уходит в ленту темы, поэтому право слова спрашиваем у неё.
+  const canReply = Boolean(isOpen && s.me && !s.me.banned
+    && !serverWriteNotice(s, p.serverId, false));
   // «Мой след» — темы, где участник оставил след: свой пост, реакция или голос
   // в опросе. Считается из данных, которые карточка уже несёт: сверяться
   // с ответами на каждый пост — N+1 запросов на ленту и лишняя нагрузка.
@@ -2390,15 +2417,23 @@ function renderPoll(poll, s) {
 /* ── Комментарии ──────────────────────────────────────────────────────────── */
 
 function renderComments(post, s) {
-  const canModerate = s.me && (s.me.role === 'admin' || s.me.role === 'moderator');
+  const canModerate = canModerateServer(s, post.serverId);
   const L = CONFIG.forum.limits;
+  /*
+    Поле ответа — тоже про ленту темы: ответ уходит туда, где живёт тема, и
+    отказ базы будет тем же текстом. Молчать об этом до отправки страница не
+    имеет права.
+  */
+  const writeBlocked = serverWriteNotice(s, post.serverId, false);
 
   const visible = s.comments.filter((c) => !c.deleted);
   const items = visible.length
     ? visible
         .map((c) => {
           const isMine = s.me && s.me.id === c.authorId;
-          const canQuote = Boolean(s.me && !s.me.banned);
+          // Цитировать нечего, если нечего и ответить: кнопка вставляет текст
+          // в поле ответа, а поля при закрытой ленте на экране нет.
+          const canQuote = Boolean(s.me && !s.me.banned) && !writeBlocked;
           return `<li class="forum-comment" data-forum-comment="${esc(c.id)}">
             ${avatarHtml(c.authorNick, c.authorAvatar, { size: 'sm' })}
             <div class="forum-comment__body">
@@ -2453,7 +2488,7 @@ function renderComments(post, s) {
       <ul class="forum-thread__list">${items}</ul>
 
       ${
-        s.me && !s.me.banned
+        s.me && !s.me.banned && !writeBlocked
           ? `<form class="forum-reply" data-forum-comment-form="${esc(post.id)}">
               <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
                    name="body" data-editor data-limit="${L.commentMax}"
@@ -2466,8 +2501,8 @@ function renderComments(post, s) {
               <p class="forum-error" data-forum-comment-error hidden></p>
             </form>`
           : `<p class="muted forum-reply__locked">${
-              s.me ? 'Вам запрещено писать.' : 'Войдите, чтобы ответить.'
-            }</p>`
+            writeBlocked || (s.me ? 'Вам запрещено писать.' : 'Войдите, чтобы ответить.')
+          }</p>`
       }
     </section>`;
 }
