@@ -10970,7 +10970,7 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('миграция стоит в реестре и описана там, где её ищут',
     readmeSrc.includes('20261001-server-scope.sql') && docsSrc.includes('20261001-server-scope.sql'));
   check('документы не обещают права по серверу в будущем времени: шаг назван файлом',
-    /Прав по серверу на этом шаге не было[\s\S]{0,240}supabase\/20261001-server-rights\.sql/.test(docsSrc));
+    /Прав по серверу на этом шаге не было[\s\S]{0,260}supabase\/applied\/20261001-server-rights\.sql/.test(docsSrc));
 }
 
 /* ── 13. Папка миграций: очередь наверху, история в applied/ ────────────────
@@ -11254,7 +11254,7 @@ console.log('\nAM. Фид магазина: обновление и событи
 ────────────────────────────────────────────────────────────────────────────── */
 {
   const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20261001-server-rights.sql', 'utf8');
+  const sql = await readFile('supabase/applied/20261001-server-rights.sql', 'utf8');
   const mountSrc = await readFile('src/forum/mount.js', 'utf8');
   const pageSrc = await readFile('src/pages/forum.js', 'utf8');
   const calSrc = await readFile('src/pages/calendar.js', 'utf8');
@@ -11599,8 +11599,10 @@ console.log('\nAM. Фид магазина: обновление и событи
       .every((re) => re.test(localSrc) && re.test(supaSrc)));
 
   /* ── Реестр и документы ── */
-  check('миграция стоит в очереди и названа в реестре по верхнему пути',
-    readmeSrc.includes('supabase/20261001-server-rights.sql') && readmeSrc.includes('ещё не выполнены'));
+  check('миграция прогнана: файл в истории, а реестр объявляет очередь пустой',
+    readmeSrc.includes('20261001-server-rights.sql')
+      && readmeSrc.includes('Очередь пуста')
+      && readmeSrc.includes('прогнан 01.10.2026'));
   check('реестр даёт владельцу готовые строки вызова двери — экрана выдачи пока нет',
     readmeSrc.includes('select public.forum_set_server_member(') && readmeSrc.includes("nick = 'НикИгрока'"));
   check('документы описывают шаг, его отказ и то, чего в нём нет',
@@ -11608,6 +11610,6 @@ console.log('\nAM. Фид магазина: обновление и событи
       && docsSrc.includes('forum_my_server_roles')
       && docsSrc.includes('экрана панели'));
   check('конфиг называет теперешнего хранителя предела закреплений, а не прежний триггер',
-    configSrc.includes('supabase/20261001-server-rights.sql')
+    configSrc.includes('supabase/applied/20261001-server-rights.sql')
       && CONFIG.forum.limits.pinsMax === 3);
 }
