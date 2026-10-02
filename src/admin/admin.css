@@ -633,31 +633,6 @@
   .adm-ev__acts { flex-direction: row; align-items: flex-start; }
 }
 
-/* ── Тексты ───────────────────────────────────────────────────────────────── */
-.adm-text { border-bottom: 1px solid var(--line-soft); }
-.adm-text:last-of-type { border-bottom: 0; }
-.adm-text summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 5px 11px;
-  padding: 12px 2px;
-  cursor: pointer;
-  list-style: none;
-}
-.adm-text summary::-webkit-details-marker { display: none; }
-.adm-text summary::before {
-  content: '▸';
-  color: var(--mute);
-  font-size: 11px;
-  transition: transform .16s var(--ease);
-}
-.adm-text[open] summary::before { transform: rotate(90deg); }
-.adm-text summary code { color: var(--accent); }
-.adm-text summary b { font-weight: 600; font-size: 14px; }
-.adm-text__body { padding: 2px 2px 18px 18px; }
-.adm-text__acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 18px 18px; }
-
 /* ── Вход ─────────────────────────────────────────────────────────────────── */
 .adm-login {
   position: relative;

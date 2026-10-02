@@ -13,16 +13,15 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
-import { marksFromRaw, eventsFromRaw, alliancesFromRaw, textsFromRaw } from '../src/admin/edit.js';
+import { marksFromRaw, eventsFromRaw, alliancesFromRaw } from '../src/admin/edit.js';
 import { byWeekStartDesc } from '../src/data/week-order.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
 import { renderWeek } from '../src/admin/screens/week.js';
 import { renderAlliances } from '../src/admin/screens/alliances.js';
 import { renderEvents } from '../src/admin/screens/events.js';
-import { renderTexts } from '../src/admin/screens/texts.js';
 
-const SCREEN_IDS = ['overview', 'week', 'alliances', 'events', 'texts'];
+const SCREEN_IDS = ['overview', 'week', 'alliances', 'events'];
 
 // Первый аргумент может быть и экраном, и именем файла — различаем по списку
 // экранов, иначе «week» без второго аргумента стал бы именем выходного файла.
@@ -81,11 +80,6 @@ const view = {
   alliances: alliancesFromRaw(raw),
   allianceDraft: alliancesFromRaw(raw)[0] ?? null,
   alliancesSaved: null,
-
-  /* И для текстов — та же причина. */
-  texts: textsFromRaw(raw),
-  textDraft: textsFromRaw(raw)[0] ? { ...textsFromRaw(raw)[0], originalKey: textsFromRaw(raw)[0].key } : null,
-  textsSaved: null,
 };
 
 const SCREENS = [
@@ -93,7 +87,6 @@ const SCREENS = [
   { id: 'week', label: 'Неделя', html: renderWeek(view, null) },
   { id: 'alliances', label: 'Альянсы', html: renderAlliances(view) },
   { id: 'events', label: 'Хронология', html: renderEvents(view) },
-  { id: 'texts', label: 'Тексты', html: renderTexts(view) },
 ];
 
 // Те же таблицы стилей и в том же порядке, что admin.html грузит на боевую

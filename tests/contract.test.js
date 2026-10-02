@@ -883,7 +883,6 @@ console.log('\nJ. Админ-панель');
     ['неделя', (await import('../src/admin/screens/week.js')).renderWeek],
     ['альянсы', (await import('../src/admin/screens/alliances.js')).renderAlliances],
     ['хронология', (await import('../src/admin/screens/events.js')).renderEvents],
-    ['тексты', (await import('../src/admin/screens/texts.js')).renderTexts],
   ];
 
   /*
@@ -1905,7 +1904,7 @@ console.log('\nP. Правка текстов');
 {
   const { mapDataset } = await import('../src/data/adapters/_map.js');
   const {
-    textsFromRaw, applyTexts, textsDiff, textProblems, textsCommitMessage, blankText, KNOWN_TEXT_KEYS,
+    textsFromRaw, applyTexts, textsDiff, textsCommitMessage, KNOWN_TEXT_KEYS,
   } = await import('../src/admin/edit.js');
 
   const raw = {
@@ -1924,27 +1923,12 @@ console.log('\nP. Правка текстов');
   equal('тексты читаются как есть, без пересортировки', list.map((t) => t.key).join(' '), 'guide-intro guide-week');
   check('известные ключи сайта названы явно', KNOWN_TEXT_KEYS.includes('guide-intro'));
 
-  /* ── Заготовка формы ── */
-  equal('у пустой заготовки originalKey пуст — значит форма для нового', blankText().originalKey, null);
-
   /* ── Валидатор ── */
   check('обычные тексты проходят валидатор', validateDataset(mapDataset(raw)).length === 0);
   check(
     'дубль ключа валидатор ловит',
     validateDataset(mapDataset({ ...raw, texts: [...raw.texts, { key: 'guide-intro', title: 'Дубль', body: '' }] }))
       .some((p) => /дубль key/.test(p))
-  );
-
-  /* ── Проверки формы ── */
-  check('без ключа не сохранить', textProblems({ key: '', title: 'Т', body: '' }, list).some((p) => /ключ/i.test(p)));
-  check(
-    'занятый ключ отвергается',
-    textProblems({ key: 'guide-intro', title: 'Т', body: '' }, list).some((p) => /уже занят/.test(p))
-  );
-  equal(
-    'новый ключ проходит форму',
-    textProblems({ key: 'guide-donts', title: 'Т', body: '' }, list).length,
-    0
   );
 
   /* ── Запись в данные ── */
@@ -1976,37 +1960,56 @@ console.log('\nP. Правка текстов');
 
   check('правка проходит валидатор сайта', validateDataset(mapDataset(next)).length === 0);
 
-  /* ── Экран рисуется на пустом списке и на полном ── */
-  const { renderTexts, describeTexts } = await import('../src/admin/screens/texts.js');
-  const viewFor = (over) => ({
-    raw, canPush: true, data: mapDataset(raw), texts: list, textsSaved: null, ...over,
-  });
+  /*
+    ЭКРАНА «ТЕКСТЫ» БОЛЬШЕ НЕТ — И ДОКУМЕНТЫ НЕ ИМЕЮТ ПРАВА ВОДИТЬ ЧЕЛОВЕКА
+    НА ЭКРАН, КОТОРОГО В ПАНЕЛИ НЕТ.
 
-  check('экран показывает кнопку добавления', renderTexts(viewFor({})).includes('data-text-new'));
-  check(
-    'у каждого текста есть правка и удаление',
-    (renderTexts(viewFor({})).match(/data-text-edit=/g) || []).length === 2
-  );
-  check('форма появляется только когда что-то правят', !renderTexts(viewFor({})).includes('data-text-form'));
-  check(
-    'открытая форма нового текста рисуется и даёт ввести ключ',
-    renderTexts(viewFor({ textDraft: blankText() })).includes('data-text-field="key"')
-  );
-  check(
-    'у формы правки существующего текста ключ только показан, не редактируется',
-    !renderTexts(viewFor({ textDraft: { ...list[0], originalKey: list[0].key } })).includes('data-text-field="key"')
-  );
-  check(
-    'без права записи кнопок правки нет',
-    !renderTexts(viewFor({ canPush: false })).includes('data-text-edit')
-  );
-  check('пустой список объясняет себя', renderTexts(viewFor({ texts: [] })).includes('Текстов нет'));
+    Беда lived ровно так: с того дня, когда на место списка ключей встал
+    редактор страницы целиком, код экрана жил отдельно от навигации, а в docs
+    осталась строчка «Экран Тексты → Правка». Человек открывал панель,
+    искал вкладку и не находил — а найти нечего.
 
-  check('удаление названо вслух до нажатия', /удалится/.test(describeTexts(d, null)));
-  check(
-    'без изменений публиковать нечего',
-    /нечего/.test(describeTexts(textsDiff(raw, textsFromRaw(raw)), null))
-  );
+    Проверка двусторонняя: каждый экран навигации назван в docs, и каждое
+    «Экран …» из docs живёт в навигации. Одна направляя ловила бы только
+    удалённые экраны, другая — только новые.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const panelSrc = await readFile('src/admin/main.js', 'utf8');
+  const screensBlock = panelSrc.match(/const SCREENS = \[([\s\S]*?)\n\];/)?.[1] ?? '';
+  const labels = [...screensBlock.matchAll(/\{ id: '\w+', label: '([^']+)'/g)].map((m) => m[1]);
+  const adminDoc = await readFile('docs/ADMIN.md', 'utf8');
+  const editorDoc = await readFile('docs/EDITOR-GUIDE.md', 'utf8');
+
+  check('навигация панели перечисляется — иначе проверка ниже ничего не сверяет',
+    labels.length >= 10, labels.join(', '));
+  equal('каждый экран панели описан в docs/ADMIN.md',
+    labels.filter((label) => !adminDoc.includes(label)).join(', '), '');
+
+  const mentioned = [...`${adminDoc}\n${editorDoc}`.matchAll(/Экран\s*(?:\*\*([^*]+)\*\*|«([^»]+)»)/g)]
+    .map((m) => m[1] ?? m[2]);
+  equal('документы не отправляют на экран, которого в панели нет',
+    mentioned.filter((label) => !labels.includes(label)).join(', '), '');
+
+  check('текстового экрана-списка в панели нет: его заменил редактор страницы целиком',
+    !labels.includes('Тексты') && !panelSrc.includes('data-text-new'));
+
+  /*
+    ПУБЛИКАЦИЯ ОДНА, А КНОПОК ДВЕ.
+
+    Дословно об этом и спотыкались: комментарий в main.js утверждал, что
+    кнопка data-texts-publish стоит на обоих экранах, — на «Президенте» у
+    неё свой адрес. Из-за этого публикация с доски не находила кнопку, не
+    показывала «Публикуем…» и позволяла нажать ещё раз поверх первого
+    коммита.
+  */
+  const guideSrc = await readFile('src/admin/screens/guide-roles.js', 'utf8');
+  const presidentSrc = await readFile('src/admin/screens/president.js', 'utf8');
+  check('оба живых текстовых экрана имеют свою кнопку публикации',
+    /data-texts-publish/.test(guideSrc) && /data-president-publish/.test(presidentSrc));
+  check('публикация текстов находит кнопку обоих экранов',
+    /\[data-texts-publish\], \[data-president-publish\]/.test(panelSrc));
+  check('кнопка «Президента» ведёт в тот же publishTexts',
+    /data-president-publish\]'\)\) \{ savePresidentToList\(\); publishTexts\(\)/.test(panelSrc));
 }
 
 // ── F. Достижения альянсов ────────────────────────────────────────────────
@@ -11016,13 +11019,19 @@ console.log('\nAM. Фид магазина: обновление и событи
     try { await stat(p); return true; } catch { return false; }
   };
 
-  const SKIP = new Set(['.git', 'node_modules', 'dist', 'data']);
+  const SKIP = new Set(['.git', 'node_modules', 'dist']);
   const TEXT = new Set(['.js', '.mjs', '.cjs', '.md', '.html', '.css', '.json', '.sql', '.ts', '.yml', '.yaml']);
   async function walk(dir, out = []) {
     for (const e of await readdir(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (!SKIP.has(e.name)) await walk(full, out);
+        /*
+          Не пропускать src/data: там код, тексты ошибок которого человек
+          читает дословно, — и именно в нём однажды стоял путь к миграции,
+          которого давно нет. Не обходить надо корневой data/ — это снимки
+          данных, а не код.
+        */
+        if (!SKIP.has(e.name) && full !== 'data') await walk(full, out);
       } else if (TEXT.has(path.extname(e.name))) {
         out.push(full);
       }

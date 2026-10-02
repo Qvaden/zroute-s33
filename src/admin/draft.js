@@ -142,8 +142,3 @@ export function saveTextsDraft(list) {
 export function dropTextsDraft() {
   safe(() => localStorage.removeItem(TEXTS_KEY));
 }
-
-export function textsDraftSavedAt() {
-  const at = safe(() => JSON.parse(localStorage.getItem(TEXTS_KEY) || 'null'), null)?.savedAt;
-  return at ? new Date(at) : null;
-}

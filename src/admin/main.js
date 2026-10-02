@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=42';
-import { esc, plural } from '../ui/helpers.js?v=42';
-import { mapDataset } from '../data/adapters/_map.js?v=42';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=42';
-import { validateDataset } from '../data/contract.js?v=42';
+import { CONFIG } from '../../config.js?v=43';
+import { esc, plural } from '../ui/helpers.js?v=43';
+import { mapDataset } from '../data/adapters/_map.js?v=43';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=43';
+import { validateDataset } from '../data/contract.js?v=43';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=42';
-import { renderHome } from '../pages/home.js?v=42';
+} from '../logic/standings.js?v=43';
+import { renderHome } from '../pages/home.js?v=43';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=42';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=42';
+} from '../db/account.js?v=43';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=42';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=42';
-import { roleLabel } from '../forum/roles.js?v=42';
-import { prepareImage, uploadPath } from './image.js?v=42';
+} from './store.js?v=43';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=43';
+import { roleLabel } from '../forum/roles.js?v=43';
+import { prepareImage, uploadPath } from './image.js?v=43';
 import {
   applyMarks,
   applyEvents,
@@ -84,10 +84,7 @@ import {
   nextAllianceId,
   textsFromRaw,
   applyTexts,
-  textsDiff,
-  textProblems,
-  blankText,
-} from './edit.js?v=42';
+} from './edit.js?v=43';
 import {
   getDraft,
   saveDraft,
@@ -104,24 +101,23 @@ import {
   getTextsDraft,
   saveTextsDraft,
   dropTextsDraft,
-  textsDraftSavedAt,
-} from './draft.js?v=42';
-import { renderShell } from './shell.js?v=42';
-import { renderLogin } from './login.js?v=42';
-import { renderOverview } from './screens/overview.js?v=42';
-import { renderWeek, describe } from './screens/week.js?v=42';
-import { renderAlliances } from './screens/alliances.js?v=42';
-import { renderEvents } from './screens/events.js?v=42';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=42';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=42';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=42';
-import { renderQuarter } from './screens/quarter.js?v=42';
-import { renderPresident } from './screens/president.js?v=42';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=42';
-import { renderModeration } from './screens/moderation.js?v=42';
-import { renderChatsAdmin } from './screens/chats.js?v=42';
-import { forum } from '../forum/index.js?v=42';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=42';
+} from './draft.js?v=43';
+import { renderShell } from './shell.js?v=43';
+import { renderLogin } from './login.js?v=43';
+import { renderOverview } from './screens/overview.js?v=43';
+import { renderWeek, describe } from './screens/week.js?v=43';
+import { renderAlliances } from './screens/alliances.js?v=43';
+import { renderEvents } from './screens/events.js?v=43';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=43';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=43';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=43';
+import { renderQuarter } from './screens/quarter.js?v=43';
+import { renderPresident } from './screens/president.js?v=43';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=43';
+import { renderModeration } from './screens/moderation.js?v=43';
+import { renderChatsAdmin } from './screens/chats.js?v=43';
+import { forum } from '../forum/index.js?v=43';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=43';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -223,7 +219,6 @@ function render() {
 
   if (screen.id === 'guidePage' || screen.id === 'president') {
     view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
-    view.textsSaved = textsDraftSavedAt();
     view.canPush = canEditSite(account);
   }
   if (screen.id === 'guidePage') {
@@ -990,78 +985,17 @@ async function publishAlliances() {
 
 /* ── Тексты ──────────────────────────────────────────────────────────────── */
 
-/**
- * Открыть форму: пустую для нового текста или заполненную для правки.
- *
- * `originalKey` — единственное, чего нет в самих данных: пока оно `null`,
- * форма считает текст новым и даёт набрать ключ руками; как только оно
- * заполнено, ключ показан, но недоступен для правки — см. edit.js.
- */
-function openTextForm(key) {
-  const found = key ? view.texts.find((t) => t.key === key) : null;
-  view.textDraft = found ? { ...found, originalKey: found.key } : blankText();
-  render();
-}
+/*
+  Экрана «Тексты» с формой по ключу в панели больше нет: его заменил редактор
+  страницы целиком («Малым алам») плюс доска «Президент». Оба правят один и тот
+  же рабочий список view.texts — через saveGuideToList и savePresidentToList, —
+  и публикуются одним и тем же вызовом, он ниже.
 
-function closeTextForm() {
-  view.textDraft = null;
-  render();
-}
-
-function showTextProblems(problems) {
-  const box = root.querySelector('[data-text-problems]');
-  if (!box) return;
-  box.innerHTML = `<b>Не сохранено.</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
-  box.hidden = false;
-}
-
-/** Сохранить текст в рабочий список — публикация отдельным действием, как и везде. */
-function saveTextToList() {
-  const form = view.textDraft;
-  if (!form || !view.canPush) return;
-
-  const entry = {
-    // Новый текст берёт ключ из поля, существующий — свой собственный:
-    // поле показано, но недоступно для правки, а прочитать оттуда чужой
-    // ввод означало бы позволить переименовать ключ через консоль браузера.
-    key: form.originalKey ?? String(form.key ?? '').trim(),
-    title: String(form.title ?? '').trim(),
-    body: String(form.body ?? ''),
-  };
-
-  const problems = textProblems(entry, view.texts.filter((t) => t.key !== entry.key));
-  if (problems.length) {
-    showTextProblems(problems);
-    return;
-  }
-
-  const i = view.texts.findIndex((t) => t.key === entry.key);
-  view.texts = i >= 0
-    ? view.texts.map((t) => (t.key === entry.key ? entry : t))
-    : [...view.texts, entry];
-
-  saveTextsDraft(view.texts);
-  view.textDraft = null;
-  render();
-}
-
-/** Удалить текст из списка. Безопасно всегда: пропавший блок сайт не сломает. */
-function deleteTextFromList(key) {
-  if (!view.canPush) return;
-
-  view.texts = view.texts.filter((t) => t.key !== key);
-  saveTextsDraft(view.texts);
-  if (view.textDraft?.originalKey === key) view.textDraft = null;
-  render();
-}
-
-function showTextsResult(html, kind) {
-  const box = root.querySelector('[data-texts-result]');
-  if (!box) return;
-  box.className = `adm-result adm-result--${kind}`;
-  box.innerHTML = html;
-  box.hidden = false;
-}
+  Кнопки при этом называются по-разному: на «Малым алам» — с прежним адресом
+  data-texts-*, на «Президенте» — data-president-*. Переименовывать их значит
+  трогать два живых экрана ради истории, которой никто, кроме этого
+  комментария, не знал.
+*/
 
 /** Публикация текстов — тот же путь, что у альянсов и хронологии. */
 async function publishTexts() {
@@ -1076,11 +1010,15 @@ async function publishTexts() {
   await publishDataset({
     candidate: applyTexts(view.raw, view.texts),
     resultBox: '[data-texts-result]',
-    button: root.querySelector('[data-texts-publish]'),
+    /*
+      Кнопка на экране своя у каждого из двух живых редакторов. Без второй
+      панель на «Президенте» не показала бы «Публикуем…» и позволила бы нажать
+      ещё раз, пока первый коммит не прошёл.
+    */
+    button: root.querySelector('[data-texts-publish], [data-president-publish]'),
     onDone: () => {
       dropTextsDraft();
       view.texts = null;
-      view.textDraft = null;
     },
   });
 }
@@ -2377,43 +2315,11 @@ document.addEventListener('click', async (e) => {
     dropTextsDraft(); view.texts = textsFromRaw(view.raw); view.guideDraft = guideFromTexts(view.texts); render(); return;
   }
 
-  /* ── Тексты ── */
-
-  if (e.target.closest('[data-text-new]')) {
-    openTextForm(null);
-    return;
-  }
-
-  const textEditBtn = e.target.closest('[data-text-edit]');
-  if (textEditBtn) {
-    openTextForm(textEditBtn.dataset.textEdit);
-    return;
-  }
-
-  const textDelBtn = e.target.closest('[data-text-delete]');
-  if (textDelBtn) {
-    deleteTextFromList(textDelBtn.dataset.textDelete);
-    return;
-  }
-
-  if (e.target.closest('[data-text-cancel]')) {
-    closeTextForm();
-    return;
-  }
-
-  if (e.target.closest('[data-text-save]')) {
-    saveTextToList();
-    return;
-  }
-
-  if (e.target.closest('[data-texts-reset]')) {
-    dropTextsDraft();
-    view.texts = textsFromRaw(view.raw);
-    view.textDraft = null;
-    render();
-    return;
-  }
-
+  /*
+    Публикация текстов со страницы «Малым алам». У «Президента» своя ветка
+    выше: она сначала переносит доску в рабочий список, а потом зовёт тот же
+    publishTexts.
+  */
   if (e.target.closest('[data-texts-publish]')) {
     publishTexts();
     return;
@@ -2527,12 +2433,6 @@ document.addEventListener('input', (e) => {
   // Черновик пишем на каждый ввод — и для ролей, и для доп.блоков: иначе
   // закрытая сразу после набора вкладка теряла последнее слово.
   if (guideField && view?.guideDraft) syncGuideDraft();
-
-  // Поля формы текста — ключ (только у нового), заголовок, тело.
-  const textField = e.target.closest?.('[data-text-field]');
-  if (textField && view?.textDraft) {
-    view.textDraft = { ...view.textDraft, [textField.dataset.textField]: e.target.value };
-  }
 });
 
 /*
