@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=41';
-import { esc, plural } from '../ui/helpers.js?v=41';
-import { mapDataset } from '../data/adapters/_map.js?v=41';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=41';
-import { validateDataset } from '../data/contract.js?v=41';
+import { CONFIG } from '../../config.js?v=42';
+import { esc, plural } from '../ui/helpers.js?v=42';
+import { mapDataset } from '../data/adapters/_map.js?v=42';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=42';
+import { validateDataset } from '../data/contract.js?v=42';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=41';
-import { renderHome } from '../pages/home.js?v=41';
+} from '../logic/standings.js?v=42';
+import { renderHome } from '../pages/home.js?v=42';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=41';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=41';
+} from '../db/account.js?v=42';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=41';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=41';
-import { roleLabel } from '../forum/roles.js?v=41';
-import { prepareImage, uploadPath } from './image.js?v=41';
+} from './store.js?v=42';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=42';
+import { roleLabel } from '../forum/roles.js?v=42';
+import { prepareImage, uploadPath } from './image.js?v=42';
 import {
   applyMarks,
   applyEvents,
@@ -87,7 +87,7 @@ import {
   textsDiff,
   textProblems,
   blankText,
-} from './edit.js?v=41';
+} from './edit.js?v=42';
 import {
   getDraft,
   saveDraft,
@@ -105,23 +105,23 @@ import {
   saveTextsDraft,
   dropTextsDraft,
   textsDraftSavedAt,
-} from './draft.js?v=41';
-import { renderShell } from './shell.js?v=41';
-import { renderLogin } from './login.js?v=41';
-import { renderOverview } from './screens/overview.js?v=41';
-import { renderWeek, describe } from './screens/week.js?v=41';
-import { renderAlliances } from './screens/alliances.js?v=41';
-import { renderEvents } from './screens/events.js?v=41';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=41';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=41';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=41';
-import { renderQuarter } from './screens/quarter.js?v=41';
-import { renderPresident } from './screens/president.js?v=41';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=41';
-import { renderModeration } from './screens/moderation.js?v=41';
-import { renderChatsAdmin } from './screens/chats.js?v=41';
-import { forum } from '../forum/index.js?v=41';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=41';
+} from './draft.js?v=42';
+import { renderShell } from './shell.js?v=42';
+import { renderLogin } from './login.js?v=42';
+import { renderOverview } from './screens/overview.js?v=42';
+import { renderWeek, describe } from './screens/week.js?v=42';
+import { renderAlliances } from './screens/alliances.js?v=42';
+import { renderEvents } from './screens/events.js?v=42';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=42';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=42';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=42';
+import { renderQuarter } from './screens/quarter.js?v=42';
+import { renderPresident } from './screens/president.js?v=42';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=42';
+import { renderModeration } from './screens/moderation.js?v=42';
+import { renderChatsAdmin } from './screens/chats.js?v=42';
+import { forum } from '../forum/index.js?v=42';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=42';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -266,6 +266,29 @@ function render() {
     из середины длинного списка игроков.
   */
   if (screenChanged) window.scrollTo(0, 0);
+}
+
+/**
+ * Открытую форму правки видно с того места списка, где её вызвали.
+ *
+ * На всех трёх экранах с черновиком-списком (альянсы, хронология, тексты)
+ * форма намеренно рисуется НАД списком. Список при этом длинный: 28 альянсов —
+ * около 5000 px. Значит нажатие «Правка» у середины списка вставляет 1250 px
+ * формы выше прокрутки, весь видимый кусок уезжает вниз, и человек видит
+ * другой конец списка вместо открытой формы. Выглядит это как сломанная
+ * кнопка, и так оно и работало — для тех, кто правит не первый альянс.
+ *
+ * Поэтому после открытия форму подставляют под верхний край. Прокрутку
+ * считаем от фактической высоты шапки, а не зашитым числом: шапка прилипшая,
+ * на телефоне она в два раза выше, чем на десктопе, и зашитое число каждый
+ * раз прячло бы заголовок формы под ней.
+ */
+function revealForm(selector) {
+  const form = root.querySelector(selector);
+  if (!form) return;
+  const header = root.querySelector('.adm-top');
+  const offset = (header?.getBoundingClientRect().height ?? 0) + 14;
+  window.scrollTo({ top: window.scrollY + form.getBoundingClientRect().top - offset });
 }
 
 function showLogin(error) {
@@ -708,6 +731,7 @@ function openEventForm(id) {
   const found = id ? view.events.find((e) => e.id === id) : null;
   view.eventDraft = found ? { ...found } : blankEvent();
   render();
+  revealForm('[data-event-form]');
 }
 
 function closeEventForm() {
@@ -861,6 +885,7 @@ function openAllianceForm(id) {
   const found = id ? view.alliances.find((a) => a.id === id) : null;
   view.allianceDraft = found ? { ...found } : blankAlliance();
   render();
+  revealForm('[data-alliance-form]');
 }
 
 function closeAllianceForm() {

@@ -1738,6 +1738,26 @@ console.log('\nN. Правка альянсов');
   );
   check('пустой список объясняет себя', renderAlliances(viewFor({ alliances: [] })).includes('Альянсов пока нет'));
 
+  /*
+    ФОРМА ПРАВКИ ДОЛЖНА ПОПАДАТЬСЯ ГЛАЗАМ.
+
+    Экран рисует форму НАД списком, а список на боевых данных — 28 строк, около
+    5000 px. До правки нажатие «Правка» у конца списка вставляло 1250 px формы
+    выше прокрутки: видимый кусок уезжал вниз, человек видел другой конец списка
+    и решал, что кнопка сломалась. Правится не разметкой — порядок формы и
+    списка осознанный, — а прокруткой к открытой форме.
+
+    Тест смотрит в текст main.js: проверка геометрии в браузере без входа в
+    панель недоступна, а отсутствие вызова видно именно здесь.
+  */
+  const { readFile: readAdminMain } = await import('node:fs/promises');
+  const adminMainSrc = await readAdminMain('src/admin/main.js', 'utf8');
+  check('открытая форма альянса и хронологии показывается человеку',
+    /function openAllianceForm[\s\S]{0,240}revealForm\('\[data-alliance-form\]'\)/.test(adminMainSrc)
+      && /function openEventForm[\s\S]{0,240}revealForm\('\[data-event-form\]'\)/.test(adminMainSrc));
+  check('отступ от прилипшей шапки измеряют, а не зашивают числом',
+    /function revealForm[\s\S]{0,500}\.adm-top[\s\S]{0,200}getBoundingClientRect\(\)\.height/.test(adminMainSrc));
+
   check('удаление названо вслух до нажатия', /удалится/.test(describeAlliances(d, null)));
   check(
     'без изменений публиковать нечего',
