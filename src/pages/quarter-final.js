@@ -1,4 +1,4 @@
-import { esc, formDots, plural } from '../ui/helpers.js?v=82';
+import { esc, formDots, plural } from '../ui/helpers.js?v=83';
 
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,

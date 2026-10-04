@@ -11,6 +11,12 @@
  * читает панель, и два места с одним числом однажды показали бы человеку
  * рейтинг одного сервера, а правку — другого.
  *
+ * КЭШ РАЗДЕЛЁН ПО СЕРВЕРАМ. Один промис на все выборы означал бы, что
+ * переключение назад на «свой» сервер мгновенно отдаёт чужой набор, а обратный
+ * переход — что 44-й показывает рейтинг 33-го, пока не перезагрузишь страницу.
+ * Это тот же редкий вид ошибки, где всё выглядит целым: цифры настоящие, просто
+ * не оттуда.
+ *
  * ПОЧЕМУ ОДИН ЗАПРОС, А НЕ ПЯТЬ. Объёмы крошечные: 32 альянса на 52 недели —
  * меньше двух тысяч строк в год. Пять запросов дали бы пять поводов для
  * частичной загрузки: альянсы приехали, результаты нет, и страница показывает
@@ -21,7 +27,7 @@
  * (select using(true)), а не отсутствие проверки здесь.
  */
 import { rest, isConfigured } from '../../db/client.js';
-import { datasetBody } from '../server.js';
+import { datasetBody, viewServer } from '../server.js';
 import { mapAlliances, mapWeeks, mapResults, mapEvents, mapTexts } from './_map.js';
 
 export const name = 'supabase';
@@ -38,18 +44,23 @@ export const capabilities = {
   canAuth: true,
 };
 
-/** @type {Promise<any> | null} */
-let cache = null;
+/**
+ * Один ответ на запрос, и ключ у него — сервер, а не «последний».
+ * @type {Map<any, Promise<any>>}
+ */
+const cache = new Map();
 
 /** Сбрасывает кэш, чтобы следующий запрос перечитал базу. */
 export function clearCache() {
-  cache = null;
+  cache.clear();
 }
 
 async function raw() {
-  if (cache) return cache;
+  const server = viewServer();
+  const running = cache.get(server);
+  if (running) return running;
 
-  cache = (async () => {
+  const pending = (async () => {
     if (!isConfigured()) {
       throw new Error(
         'База не настроена: в config.js пустые supabase.url и anonKey. ' +
@@ -57,7 +68,7 @@ async function raw() {
       );
     }
 
-    const data = await rest('/rpc/site_dataset', { method: 'POST', body: datasetBody() });
+    const data = await rest('/rpc/site_dataset', { method: 'POST', body: datasetBody(server) });
 
     /*
       Пустой ответ означает, что функции в базе нет: скорее всего
@@ -81,11 +92,19 @@ async function raw() {
     return data;
   })();
 
-  // Неудачную попытку не запоминаем: иначе один сбой сети закрыл бы сайт
-  // до перезагрузки страницы.
-  cache.catch(() => { cache = null; });
+  cache.set(server, pending);
 
-  return cache;
+  /*
+    Неудачную попытку не оставляем: иначе один сбой сети закрыл бы этот сервер
+    до перезагрузки страницы. Сброс проверяет, что в кэше всё ещё лежит именно
+    эта неудачная попытка, — за время её ожидания человек мог перещёлкнуть
+    сервер, и новая попытка того же ключа не должна быть стёрта старой.
+  */
+  pending.catch(() => {
+    if (cache.get(server) === pending) cache.delete(server);
+  });
+
+  return pending;
 }
 
 export async function getAlliances() {

@@ -26,6 +26,16 @@
  * это можно без браузера, поэтому здесь нет ни DOM, ни обращений к состоянию.
  */
 
+/**
+ * Сервер в адресе — его номер, а не название.
+ *
+ * Разбор, границы и правило «дефолт в адрес не пишем» живут в
+ * `src/logic/server-choice.js`: с шага мультиаренды данных сайта выбор сервера
+ * один на весь сайт, и две копии этих чисел разошлись бы в первый же день,
+ * когда список серверов вырастет.
+ */
+import { serverFromSearch, putServerParam } from '../logic/server-choice.js';
+
 /** Сколько символов поиска держим в адресе: длиннее — только ради длинной ссылки. */
 export const QUERY_MAX = 80;
 
@@ -39,29 +49,6 @@ export const DEFAULT_SORT = 'fresh';
  * у того, кто открыл адрес.
  */
 export const SAVED_FLAG = '1';
-
-/**
- * Сервер в адресе — его номер, а не название.
- *
- * `server=44` переживает переезд человека между браузерами и означает ровно
- * то же, что колонка `server_id` в базе: границы числа взяты из проверки
- * таблицы, и число вне них — не ошибка адреса, а обычный «фильтра нет».
- *
- * Дефолт в адрес не пишется по той же причине, что и «Все разделы»: ссылка на
- * общий сервер не должна выглядеть как ссылка на выбранный.
- */
-export const SERVER_KEY = 'server';
-export const SERVER_MIN = 1;
-export const SERVER_MAX = 999;
-
-/** Строка адреса → номер сервера или null, когда сервер в адресе не назван. */
-export function serverFromSearch(search) {
-  const raw = new URLSearchParams(String(search ?? '')).get(SERVER_KEY);
-  if (raw == null || raw === '') return null;
-  const id = Number(raw);
-  if (!Number.isInteger(id) || id < SERVER_MIN || id > SERVER_MAX) return null;
-  return id;
-}
 
 /**
  * Адрес → состояние ленты.
@@ -105,20 +92,7 @@ export function searchFromFilters(filters) {
   if (filters.sort && filters.sort !== DEFAULT_SORT) params.set('sort', filters.sort);
   if (filters.query) params.set('q', filters.query);
   if (filters.saved) params.set('saved', SAVED_FLAG);
-  /*
-    Сервер пишем только когда он выбран и когда он не тот, что «по умолчанию
-    для этого сайта». Иначе первый в мире адрес форума оброс бы хвостом, а
-    ссылка, данная человеку до мультиаренды, начала бы спорить сама с собой.
-
-    Выбор не проверяют одной конечностью числа: `Number(null)` — это ноль, и
-    без оговорки «значение названо» пустой выбор уехал бы в адрес как
-    `server=0`, а человек получил бы ссылку на сервер, которого в таблице нет.
-  */
-  const server = Number(filters.server);
-  const fallback = Number(filters.defaultServer);
-  if (filters.server != null && Number.isInteger(server) && server !== fallback) {
-    params.set(SERVER_KEY, String(server));
-  }
+  putServerParam(params, filters.server, filters.defaultServer);
   return params.toString().replace(/\+/g, '%20');
 }
 

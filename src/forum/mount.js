@@ -27,7 +27,10 @@ import {
   CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines, EVENT_TAG_ID,
   EVENT_RSVP_IDS,
 } from './rules.js';
-import { filtersFromSearch, searchFromFilters, composeIntentFromSearch, SERVER_MIN, SERVER_MAX } from './feed-url.js';
+import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
+import {
+  readServerChoice, writeServerChoice, resolveServer, serverTabTitle,
+} from '../logic/server-choice.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { normalizeQuietWindow, parseQuietTime, saveQuietWindow } from './quiet.js';
@@ -714,7 +717,7 @@ function readFilters(search) {
     открыть ему 44-й в разделе VS, а не сбросить на общий. Адрес описывает вид,
     а про данные знает ровно то, что в него вписано.
   */
-  const named = server ?? readServerChoice();
+  const named = resolveServer({ address: server, stored: readServerChoice() });
   state.serverId = Number.isInteger(named) ? named : null;
   /*
     «Создать встречу» из календаря ведёт сюда же, на форум: встреча у нас и
@@ -742,40 +745,15 @@ function writeFilters() {
 
 /* ── Выбор сервера ────────────────────────────────────────────────────────
  *
+ * Ключ памяти, границы номера и порядок «адрес > сохранённое > сервер сайта»
+ * живут в src/logic/server-choice.js: с шага мультиаренды данных сайта выбор
+ * один на весь сайт, и переключатель вкладок рейтинга читает ту же память, что
+ * эта лента. Здесь остаётся только склейка с состоянием форума.
+ *
  * Сервер помнится браузеру, а не человеку: это настройка просмотра, того же
  * ряда, что и тихие часы. Ключ отдельный от черновика и от памяти ленты —
- * выбор должен пережить закрытую вкладку и не обязан переезжать вместе с
- * ними.
- *
- * Порядок выбора: адрес > сохранённое > сервер сайта. Адрес важнее всего,
- * потому что его пишет человек, которому дали ссылку; сохранённое важнее
- * номера сайта, потому что человек однажды сказал «мне нужен 44-й» и не должен
- * говорить это на каждой странице.
+ * выбор должен пережить закрытую вкладку и не обязан переезжать вместе с ними.
  */
-
-const SERVER_CHOICE_KEY = 'zr33.forum.server';
-
-/** Сохранённый выбор сервера или null, когда человек его никогда не делал. */
-function readServerChoice() {
-  try {
-    const raw = localStorage.getItem(SERVER_CHOICE_KEY);
-    if (raw == null || raw === '') return null;
-    const id = Number(raw);
-    return Number.isInteger(id) && id >= SERVER_MIN && id <= SERVER_MAX ? id : null;
-  } catch {
-    // Хранилище недоступно — не беда: просто лента без сохранённого выбора.
-    return null;
-  }
-}
-
-function writeServerChoice(id) {
-  try {
-    if (id == null) localStorage.removeItem(SERVER_CHOICE_KEY);
-    else localStorage.setItem(SERVER_CHOICE_KEY, String(id));
-  } catch {
-    /* Приватный режим: выбор действует до перезагрузки и это честно. */
-  }
-}
 
 /**
  * Список серверов базы. Стартует рядом с лентой, а не перед ней: таблица из
@@ -852,7 +830,7 @@ const BASE_TITLE = document.title;
 
 function applyServerTitle() {
   const server = state.servers.find((row) => row.id === state.serverId);
-  document.title = server ? BASE_TITLE.replace(/^Сервер \d+/, server.title) : BASE_TITLE;
+  document.title = serverTabTitle(BASE_TITLE, server && server.title);
 }
 
 /* ── Память первого экрана ленты ──────────────────────────────────────────
