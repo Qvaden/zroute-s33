@@ -733,8 +733,55 @@ console.log('\nJ. Админ-панель');
     записи означает «результат ещё не внесли» — это состояние данных,
     а не игры (см. src/data/types.js).
   */
-  check('снятая отметка удаляет результат, а не пишет третий исход',
-    /method: 'DELETE'/.test(storeCode) && /site_results\?week_id=eq/.test(storeCode));
+  check('снятая отметка удаляет результат своего сервера, а не пишет третий исход',
+    /method: 'DELETE'/.test(storeCode) && /site_results\?server_id=eq\.\$\{server\}&week_id=eq/.test(storeCode));
+
+  /*
+    МУЛЬТАРЕНДА ДАННЫХ САЙТА.
+
+    С `supabase/20261004-site-server-scope.sql` id недели, события и текста
+    перестали быть глобальными: «W1» живёт на каждом сервере своя. Значит
+    запрос, в котором сервер не назван, опасен не косметически — DELETE по
+    одному id сносит неделю у всех, а вставка без `server_id` попадает в ключ,
+    которого панель не видит. Проверяем текстом панели, а не только поведением:
+    ровно одна пропущенная строка здесь означает порчу чужих данных.
+  */
+  const fnSource = (name) => {
+    const from = storeCode.indexOf(`export async function ${name}(`);
+    if (from < 0) return '';
+    const next = storeCode.indexOf('export async function', from + 10);
+    return storeCode.slice(from, next < 0 ? from + 1500 : next);
+  };
+  const noServer = ['saveWeekMarks', 'saveAlliance', 'saveWeek', 'saveEvent', 'saveText']
+    .filter((fn) => !/server_id: (?:writeServer\(\)|server[,}])/.test(fnSource(fn)));
+  equal('каждая вставка панели называет сервер', noServer.join(', '), '');
+
+  const deleteUrls = [...storeCode.matchAll(/rest\(\s*`(\/site_[^`]+)`,\s*\{\s*method: 'DELETE'\s*\}\s*\)/g)]
+    .map((m) => m[1]);
+  /*
+    Альянс — единственное исключение: его id глобален специально, потому что
+    на него смотрят таблицы форума и VS (объяснение — в шапке миграции).
+    Остальные удаления обязаны начинаться с фильтра по серверу.
+  */
+  const looseDelete = deleteUrls
+    .filter((u) => !/\?server_id=eq\./.test(u) && !/^\/site_alliances\?id=eq\./.test(u));
+  equal('удалений без ограничения сервером не осталось', looseDelete.join(' '), '');
+  equal('проверка видит все пять удалений панели', deleteUrls.length, 5);
+
+  /*
+    Номер сервера берётся из одного места. Если чтение и запись возьмут его
+    из разных — панель начнёт править один сервер, а показывать другой, и
+    глаза этого расхождения не увидят: и то и другое выглядит целым.
+  */
+  const serverSrc = await readFile('src/data/server.js', 'utf8');
+  check('номер сервера читается из config в одном месте',
+    serverSrc.includes('CONFIG.server') &&
+    (await readFile('src/admin/store.js', 'utf8')).includes("from '../data/server.js'") &&
+    (await readFile('src/data/adapters/supabase.js', 'utf8')).includes("from '../server.js'"));
+  check('запись требует номер сервера, а не додумывает его',
+    /writeServer\(\)/.test(serverSrc) && serverSrc.includes('не заполнен server'));
+  check('свободный номер альянса спрашивает базу, а не считает по своему списку',
+    /rpc\/site_next_alliance_id/.test(storeCode));
   /*
     Роль назначается функцией базы, а не правкой профиля напрямую. Правку
     профилей разрешено модерации, а роли — только владельцу; функция проверяет
@@ -1662,6 +1709,21 @@ console.log('\nN. Правка альянсов');
     'после удаления середины id не переиспользуется',
     nextAllianceId({ alliances: [{ id: 'a01' }, { id: 'a02' }, { id: 'a09' }] }, []),
     'a10'
+  );
+  /*
+    С мультиарендой своего списка мало: id альянса глобален, а панель видит
+    только свой сервер. `floor` — номер, который база назвала свободным по всем
+    серверам; без него «Добавить альянс» на 44-м выдал бы a02, занятый на 33-м,
+    и merge-duplicates перезаписал бы чужой альянс вместо вставки своего.
+  */
+  equal(
+    'номер не опускается ниже свободного по всем серверам',
+    [
+      nextAllianceId({ alliances: [{ id: 'a01' }] }, [], 33),
+      nextAllianceId({ alliances: [{ id: 'a33' }] }, [], 20),
+      nextAllianceId({ alliances: [{ id: 'a01' }] }, [], 0),
+    ].join(' '),
+    'a33 a34 a02'
   );
 
   /* ── Защита от удаления с историей ── */
@@ -11680,10 +11742,10 @@ console.log('\nAM. Фид магазина: обновление и событи
       .every((re) => re.test(localSrc) && re.test(supaSrc)));
 
   /* ── Реестр и документы ── */
-  check('миграция прогнана: файл в истории, а реестр объявляет очередь пустой',
+  check('миграция прогнана: реестр ставит файл в историю и называет дату прогона',
     readmeSrc.includes('20261001-server-rights.sql')
-      && readmeSrc.includes('Очередь пуста')
-      && readmeSrc.includes('прогнан 01.10.2026'));
+      && /[Пп]рогнан 01\.10\.2026/.test(readmeSrc)
+      && readmeSrc.includes('файл лежит в `applied/`'));
   check('реестр даёт владельцу готовые строки вызова двери — экрана выдачи пока нет',
     readmeSrc.includes('select public.forum_set_server_member(') && readmeSrc.includes("nick = 'НикИгрока'"));
   check('документы описывают шаг, его отказ и то, чего в нём нет',
@@ -11693,4 +11755,108 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('конфиг называет теперешнего хранителя предела закреплений, а не прежний триггер',
     configSrc.includes('supabase/applied/20261001-server-rights.sql')
       && CONFIG.forum.limits.pinsMax === 3);
+}
+
+/* ── 16. Мультиаренда данных сайта: у рейтинга появляется сервер ─────────────
+
+   Форум живёт несколькими серверами с 01.10, а таблицы данных сайта до этого
+   файла сервера не знали вовсе: один набор на всю базу, и чтение шло вызовом
+   `site_dataset()` без аргументов. Шаг делает сервер измерением данных, и
+   ошибки здесь не косметические:
+
+     1. удаление недели по одному id снесло бы «W1» на всех серверах, а вставка
+        без `server_id` попала бы в ключ, которого панель не видит;
+     2. id альянса обязан остаться ГЛОБАЛЬНЫМ: на него смотрят семь ограничений
+        вне данных сайта, и локальный id сделал бы двусмысленной каждую такую
+        строку — дайджест писал бы место чужого сервера поверх своего;
+     3. панель видит только свой список, поэтому свободный номер альянса считает
+        база, а не максимум локальных id: занятый номер при `merge-duplicates`
+        означает не отказ, а перезапись чужого альянса.
+
+   Поэтому проверяем и текст миграции, и текст панели: достаточно одного
+   пропущенного `server_id` в запросе, и эти проверки его не увидят бы.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const sql = await readFile('supabase/20261004-site-server-scope.sql', 'utf8');
+  const storeSrc = await readFile('src/admin/store.js', 'utf8');
+  const adapterSrc = await readFile('src/data/adapters/supabase.js', 'utf8');
+  const bootSrc = await readFile('src/admin/main.js', 'utf8');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const migDoc = await readFile('docs/MIGRATION.md', 'utf8');
+  const backupSrc = await readFile('scripts/backup-from-db.mjs', 'utf8');
+
+  const TABLES = ['site_alliances', 'site_weeks', 'site_results', 'site_events', 'site_texts'];
+
+  /* ── Схема ── */
+  check('колонка сервера есть у всех пяти таблиц и по умолчанию это сервер сайта',
+    TABLES.every((t) => new RegExp(
+      `alter table public\\.${t} +add column if not exists server_id integer not null default ${CONFIG.server}`
+    ).test(sql)));
+  check('список серверов один на форум и сайт: ссылка ведёт в forum_servers пять раз',
+    (sql.match(/references public\.forum_servers \(id\)/g) || []).length === 5);
+  check('недели, события, тексты и результаты ключуются парой «сервер и id»',
+    sql.includes('add constraint site_weeks_pkey primary key (server_id, id)')
+      && sql.includes('add constraint site_events_pkey primary key (server_id, id)')
+      && sql.includes('add constraint site_texts_pkey primary key (server_id, key)')
+      && sql.includes('primary key (server_id, week_id, alliance_id)'));
+  check('у альянсов первичный ключ не тронут — id остался глобальным намеренно',
+    !sql.includes('site_alliances_pkey')
+      && sql.includes('foreign key (alliance_id) references public.site_alliances (id)'));
+  check('результат не может относиться к неделе чужого сервера — ключ парный и с каскадом',
+    sql.includes('foreign key (server_id, week_id) references public.site_weeks (server_id, id) on delete cascade'));
+  check('сервер записи неподвижен на пяти таблицах, а не на двух из них',
+    /foreach t in array array\[/.test(sql)
+      && TABLES.every((t) => sql.includes(`'${t}'`))
+      && sql.includes('%1$s_server_immutable before update on public.%1$s'));
+
+  /* ── Отказы, названные причиной ── */
+  check('чужой альянс в результатах и слияние между серверами отвергаются словами',
+    sql.includes('принадлежит серверу') && sql.includes('Сливать альянс можно только с альянсом своего сервера'));
+  check('перенос истории назван переносом, а не правкой',
+    sql.includes('Это не правка, а перенос истории.'));
+
+  /* ── Чтение ── */
+  const fnDefault = /function public\.site_dataset\(p_server integer default (\d+)\)/.exec(sql);
+  check('набор одного сервера собирают пять фильтров, и все — по одному аргументу',
+    (sql.match(/where server_id = p_server/g) || []).length === 5);
+  check('значение по умолчанию в базе — то же число, что в config.js',
+    fnDefault && Number(fnDefault[1]) === Number(CONFIG.server));
+  check('прежняя безаргументная функция снята, а не оставлена рядом',
+    sql.includes('drop function if exists public.site_dataset();')
+      && sql.includes('grant execute on function public.site_dataset(integer) to anon, authenticated'));
+  check('смена состава аргументов требует сброса кэша схемы API',
+    sql.includes("notify pgrst, 'reload schema';"));
+  check('и сайт, и панель просят набор одного сервера одним вызовом',
+    adapterSrc.includes("'/rpc/site_dataset'") && storeSrc.includes("'/rpc/site_dataset'")
+      && /body: datasetBody\(\)/.test(adapterSrc) && /body: datasetBody\(\)/.test(storeSrc));
+
+  /* ── Свободный номер альянса ── */
+  check('номер альянса считает база по всем серверам, и гостю он не открыт',
+    sql.includes('function public.site_next_alliance_id()')
+      && sql.includes('grant execute on function public.site_next_alliance_id() to authenticated')
+      && sql.includes('revoke execute on function public.site_next_alliance_id() from anon'));
+  check('панель спрашивает этот номер до создания альянса и не падает без него',
+    bootSrc.includes('allianceFloor = await nextAllianceNumber();')
+      && /try \{\s*allianceFloor = await nextAllianceNumber\(\);\s*\} catch \{\s*allianceFloor = 0;\s*\}/.test(bootSrc)
+      && bootSrc.includes('nextAllianceId(view.raw, view.alliances, view.allianceFloor)'));
+
+  /* ── Резервный снимок ── */
+  check(
+    'снимок-резерв остался без аргументов и получает сервер по умолчанию',
+    backupSrc.includes("body: '{}'")
+      && sql.includes('планировщик снимка (`scripts/backup-from-db.mjs`)')
+      && sql.includes('шлют `{}`')
+  );
+
+  /* ── Реестр и документы ── */
+  check('реестр держит файл в очереди и говорит, что он ещё не прогнан',
+    readmeSrc.includes('20261004-site-server-scope.sql')
+      && readmeSrc.includes('ещё не прогнан')
+      && readmeSrc.includes('обязан быть прогнан до пуша'));
+  check('реестр объясняет, чего в шаге нет, чтобы не ждали переключателя и прав',
+    readmeSrc.includes('переключатель сервера в шапке сайта')
+      && readmeSrc.includes('права на внесение по серверу'));
+  check('документ переезда называет шаг и его проверку одной строкой',
+    migDoc.includes('20261004-site-server-scope.sql') && migDoc.includes('site_dataset(p_server)'));
 }

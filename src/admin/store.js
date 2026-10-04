@@ -23,13 +23,29 @@
  * запрос можно отправить мимо панели, и тогда откажут правила доступа
  * (см. site_can_edit в supabase/applied/site-data.sql). Проверки нужны для понятных
  * сообщений, а не вместо базы.
+ *
+ * ПОЧЕМУ КАЖДЫЙ ЗАПРОС НАЗЫВАЕТ СЕРВЕР. С мультиарендой идентификаторы недель,
+ * событий и текстов перестали быть глобальными: «W1» — это неделя первого
+ * сервера, а на четвёртом своя «W1» (см. supabase/20261004-site-server-scope.sql).
+ * Значит DELETE по одному `id` снёс бы строки всех серверов разом, а вставка
+ * без `server_id` не попала бы в составной ключ. У альянсов идентификатор
+ * глобален — поэтому `deleteAlliance` и не называет сервер, и это единственное
+ * такое место в файле.
  */
 import { rest, uploadFile } from '../db/client.js';
+import { datasetBody, writeServer } from '../data/server.js';
+
+/*
+  Все изменяющие запросы начинают путь с фильтра по серверу, а не добавляют
+  его в конец: адрес тогда читается как «сначала область, потом строка», и
+  пропущенный сервер заметен глазами, а не после удаления чужих данных.
+*/
 
 /* ── Чтение ───────────────────────────────────────────────────────────────── */
 
 /**
- * Всё разом, ровно в том виде, в каком раньше лежал data/live.json.
+ * Всё разом, ровно в том виде, в каком раньше лежал data/live.json, — и только
+ * своего сервера.
  *
  * Так панель продолжает работать с привычным «сырым» объектом: экраны,
  * валидатор и логика правки (edit.js) написаны под него и проверены тестами.
@@ -37,11 +53,12 @@ import { rest, uploadFile } from '../db/client.js';
  * в один шаг и не понять потом, какое из них что сломало.
  */
 export async function readDataset() {
-  const raw = await rest('/rpc/site_dataset', { method: 'POST', body: {} });
+  const raw = await rest('/rpc/site_dataset', { method: 'POST', body: datasetBody() });
 
   if (!raw || typeof raw !== 'object') {
     throw new Error(
-      'База не отдала данные сайта. Похоже, не выполнен supabase/applied/site-data.sql.'
+      'База не отдала данные сайта. Похоже, не выполнен ' +
+        'supabase/applied/site-data.sql или supabase/20261004-site-server-scope.sql.'
     );
   }
   return raw;
@@ -50,8 +67,12 @@ export async function readDataset() {
 /**
  * Журнал правок: кто и что менял.
  *
- * То, что в git получалось само собой из истории коммитов. Пишется триггерами
+ * То, что в git получалось само собой из истории коммитов. Пишется триггером
  * в базе, а не панелью, — правка из любого места всё равно попадёт в журнал.
+ *
+ * Сервера у журнала нет намеренно: журнал один на все серверы, а номер видно
+ * в деталях самой строки. Экран «Обзор» потому и показывает правки соседних
+ * серверов — владельцу их скрывать не от кого.
  */
 export async function recentChanges(limit = 20) {
   const rows = await rest(`/site_audit?select=*&order=at.desc&limit=${Number(limit)}`);
@@ -74,12 +95,13 @@ export async function recentChanges(limit = 20) {
  * @param {Record<string, 'win'|'loss'|null>} marks Пусто/null — удалить запись.
  */
 export async function saveWeekMarks(weekId, marks) {
+  const server = writeServer();
   const rows = [];
   const remove = [];
 
   for (const [allianceId, outcome] of Object.entries(marks ?? {})) {
     if (outcome === 'win' || outcome === 'loss') {
-      rows.push({ week_id: weekId, alliance_id: allianceId, outcome });
+      rows.push({ server_id: server, week_id: weekId, alliance_id: allianceId, outcome });
     } else {
       /*
         Пустая отметка УДАЛЯЕТ запись, а не пишет третий исход. Отсутствие
@@ -102,7 +124,7 @@ export async function saveWeekMarks(weekId, marks) {
   if (remove.length) {
     const list = remove.map((id) => `"${id}"`).join(',');
     await rest(
-      `/site_results?week_id=eq.${encodeURIComponent(weekId)}&alliance_id=in.(${encodeURIComponent(list)})`,
+      `/site_results?server_id=eq.${server}&week_id=eq.${encodeURIComponent(weekId)}&alliance_id=in.(${encodeURIComponent(list)})`,
       { method: 'DELETE' }
     );
   }
@@ -116,6 +138,7 @@ export async function saveWeekMarks(weekId, marks) {
 export async function saveAlliance(a, sortOrder) {
   const body = {
     id: a.id,
+    server_id: writeServer(),
     tag: a.tag,
     name: a.name,
     color: a.color || null,
@@ -130,6 +153,28 @@ export async function saveAlliance(a, sortOrder) {
     prefer: 'resolution=merge-duplicates',
     body,
   });
+}
+
+/**
+ * Свободный номер альянса считает база, а не панель.
+ *
+ * Идентификатор альянса глобален (объяснение — в supabase/20261004-site-server-scope.sql:
+ * на него смотрят таблицы форума и VS), а данные панель видит только своего
+ * сервера. Считать «следующий после максимального» по своему списку — значит
+ * выдать номер, который занят у соседа, и тогда `merge-duplicates` не откажет,
+ * а перезапишет чужой альянс. Отказ получился бы через триггер неподвижности
+ * сервера — то есть человек увидел бы странную ошибку вместо новой строки.
+ *
+ * Возвращаемое число уже свободно: функция отдаёт максимум по всем серверам
+ * плюс единица.
+ */
+export async function nextAllianceNumber() {
+  const value = await rest('/rpc/site_next_alliance_id', { method: 'POST', body: {} });
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1) {
+    throw new Error('База не дала свободный номер альянса');
+  }
+  return n;
 }
 
 /**
@@ -151,6 +196,7 @@ export async function saveWeek(w) {
     method: 'POST',
     prefer: 'resolution=merge-duplicates',
     body: {
+      server_id: writeServer(),
       id: w.id,
       number: Number(w.number),
       start_date: asDate(w.startDate),
@@ -161,7 +207,10 @@ export async function saveWeek(w) {
 }
 
 export async function deleteWeek(id) {
-  await rest(`/site_weeks?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  await rest(
+    `/site_weeks?server_id=eq.${writeServer()}&id=eq.${encodeURIComponent(id)}`,
+    { method: 'DELETE' }
+  );
 }
 
 /* ── Хронология ───────────────────────────────────────────────────────────── */
@@ -173,6 +222,12 @@ export async function saveEvent(e) {
     method: 'POST',
     prefer: 'resolution=merge-duplicates',
     body: {
+      /*
+        Здесь рядом лежат два похожих поля, и путаница в них стоит чужих
+        данных: server_id — чей это сайт, server_number — номер сервера,
+        захваченного в игре.
+      */
+      server_id: writeServer(),
       id: e.id,
       event_date: asDate(e.date),
       type: e.type || 'other',
@@ -187,7 +242,10 @@ export async function saveEvent(e) {
 }
 
 export async function deleteEvent(id) {
-  await rest(`/site_events?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  await rest(
+    `/site_events?server_id=eq.${writeServer()}&id=eq.${encodeURIComponent(id)}`,
+    { method: 'DELETE' }
+  );
 }
 
 /* ── Тексты ───────────────────────────────────────────────────────────────── */
@@ -196,12 +254,20 @@ export async function saveText(t) {
   await rest('/site_texts', {
     method: 'POST',
     prefer: 'resolution=merge-duplicates',
-    body: { key: t.key, title: t.title ?? '', body: t.body ?? '' },
+    body: {
+      server_id: writeServer(),
+      key: t.key,
+      title: t.title ?? '',
+      body: t.body ?? '',
+    },
   });
 }
 
 export async function deleteText(key) {
-  await rest(`/site_texts?key=eq.${encodeURIComponent(key)}`, { method: 'DELETE' });
+  await rest(
+    `/site_texts?server_id=eq.${writeServer()}&key=eq.${encodeURIComponent(key)}`,
+    { method: 'DELETE' }
+  );
 }
 
 /* ── Фотографии ───────────────────────────────────────────────────────────── */

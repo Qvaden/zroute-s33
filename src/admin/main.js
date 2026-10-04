@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=44';
-import { esc, plural } from '../ui/helpers.js?v=44';
-import { mapDataset } from '../data/adapters/_map.js?v=44';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=44';
-import { validateDataset } from '../data/contract.js?v=44';
+import { CONFIG } from '../../config.js?v=45';
+import { esc, plural } from '../ui/helpers.js?v=45';
+import { mapDataset } from '../data/adapters/_map.js?v=45';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=45';
+import { validateDataset } from '../data/contract.js?v=45';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=44';
-import { renderHome } from '../pages/home.js?v=44';
+} from '../logic/standings.js?v=45';
+import { renderHome } from '../pages/home.js?v=45';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=44';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=44';
+} from '../db/account.js?v=45';
 import {
-  readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=44';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=44';
-import { roleLabel } from '../forum/roles.js?v=44';
-import { prepareImage, uploadPath } from './image.js?v=44';
+  readDataset, recentChanges, uploadPhoto, setModerator, nextAllianceNumber,
+} from './store.js?v=45';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=45';
+import { roleLabel } from '../forum/roles.js?v=45';
+import { prepareImage, uploadPath } from './image.js?v=45';
 import {
   applyMarks,
   applyEvents,
@@ -84,7 +84,7 @@ import {
   nextAllianceId,
   textsFromRaw,
   applyTexts,
-} from './edit.js?v=44';
+} from './edit.js?v=45';
 import {
   getDraft,
   saveDraft,
@@ -101,23 +101,23 @@ import {
   getTextsDraft,
   saveTextsDraft,
   dropTextsDraft,
-} from './draft.js?v=44';
-import { renderShell } from './shell.js?v=44';
-import { renderLogin } from './login.js?v=44';
-import { renderOverview } from './screens/overview.js?v=44';
-import { renderWeek, describe } from './screens/week.js?v=44';
-import { renderAlliances } from './screens/alliances.js?v=44';
-import { renderEvents } from './screens/events.js?v=44';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=44';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=44';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=44';
-import { renderQuarter } from './screens/quarter.js?v=44';
-import { renderPresident } from './screens/president.js?v=44';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=44';
-import { renderModeration } from './screens/moderation.js?v=44';
-import { renderChatsAdmin } from './screens/chats.js?v=44';
-import { forum } from '../forum/index.js?v=44';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=44';
+} from './draft.js?v=45';
+import { renderShell } from './shell.js?v=45';
+import { renderLogin } from './login.js?v=45';
+import { renderOverview } from './screens/overview.js?v=45';
+import { renderWeek, describe } from './screens/week.js?v=45';
+import { renderAlliances } from './screens/alliances.js?v=45';
+import { renderEvents } from './screens/events.js?v=45';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=45';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=45';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=45';
+import { renderQuarter } from './screens/quarter.js?v=45';
+import { renderPresident } from './screens/president.js?v=45';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=45';
+import { renderModeration } from './screens/moderation.js?v=45';
+import { renderChatsAdmin } from './screens/chats.js?v=45';
+import { forum } from '../forum/index.js?v=45';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=45';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -359,6 +359,27 @@ async function load() {
 
   const data = mapDataset(raw);
 
+  /*
+    Свободный номер альянса спрашиваем у базы, а не выводим из своего списка:
+    идентификатор альянса глобален, а панель видит только данные своего сервера.
+    Без этого вопроса «Добавить альянс» на втором сервере выдал бы номер, занятый
+    на первом, и база приняла бы его не как отказ, а как правку чужого альянса.
+    (см. nextAllianceNumber в src/admin/store.js)
+
+    Неудача вопроса не ломает панель: floor остаётся нулём, и id считается по
+    своему списку — ровно как до мультиаренды. Живёт этот номер только до
+    перезагрузки страницы, и это осознанно: альянсов добавляют единицами в
+    неделю, а спор за номер при редкой правке перекрыт триггером в базе.
+  */
+  let allianceFloor = 0;
+  if (canEditSite(account)) {
+    try {
+      allianceFloor = await nextAllianceNumber();
+    } catch {
+      allianceFloor = 0;
+    }
+  }
+
   view = {
     account,
     user: { login: account?.nick ?? '' },
@@ -379,6 +400,7 @@ async function load() {
     data,
     weeks: data.weeks,
     canPush: canEditSite(account),
+    allianceFloor,
     // Тот же валидатор, которым проверяется сайт: панель не должна судить
     // о данных по своим правилам, иначе «в панели всё хорошо, а сайт пустой».
     problems: validateDataset(data),
@@ -1028,7 +1050,8 @@ function saveAllianceToList() {
 
   const mergedInto = String(form.mergedInto ?? '').trim();
   const entry = {
-    id: form.id ?? nextAllianceId(view.raw, view.alliances),
+    // floor — номер, свободный по всем серверам: см. load() и nextAllianceNumber.
+    id: form.id ?? nextAllianceId(view.raw, view.alliances, view.allianceFloor),
     tag: String(form.tag ?? '').trim(),
     name: String(form.name ?? '').trim(),
     color: String(form.color ?? '').trim(),

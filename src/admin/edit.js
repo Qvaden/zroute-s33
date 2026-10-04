@@ -481,14 +481,21 @@ export function blankAlliance() {
  * с ведущим нулём (a01…a32) — это уже сложившийся формат в data/live.json,
  * и новый id обязан ему следовать, иначе список вперемешку читался бы хуже.
  * padStart ничего не обрежет и после a99: там ведущий ноль просто не нужен.
+ *
+ * `floor` — минимальный номер, который панель считает свободным. Нужен с
+ * мультиарендой: id альянса глобален, а список в `raw` содержит только свой
+ * сервер, поэтому максимум по нему может быть номером чужого альянса. Число
+ * приходит из базы (site_next_alliance_id) и равно нулю, пока его не спросили,
+ * — тогда поведение точно прежнее.
  */
-export function nextAllianceId(raw, list) {
+export function nextAllianceId(raw, list, floor = 0) {
   const used = new Set([
     ...(raw?.alliances ?? []).map((a) => String(a.id)),
     ...(list ?? []).map((a) => String(a.id)),
   ]);
 
-  let max = 0;
+  const base = Number(floor);
+  let max = Number.isFinite(base) && base > 0 ? base - 1 : 0;
   for (const id of used) {
     const m = /^a(\d+)$/.exec(id);
     if (m) max = Math.max(max, Number(m[1]));
