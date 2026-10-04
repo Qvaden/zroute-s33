@@ -8,7 +8,33 @@
  *
  * Поэтому каждая отметка сразу пишется в localStorage. Черновики хранятся
  * по неделям: переключение на другую неделю не должно ничего стирать.
+ *
+ * ПОЧЕМУ У ЧЕРНОВИКА ЕСТЬ СЕРВЕР.
+ *   С мультиарендой «W1» перестал быть уникальным: на 33-м и на 44-м свои
+ *   недели с одинаковыми именами, и одна и та же клетка значит разное. Без
+ *   разделения панель, открытая на чужом сервере, показала бы незаконченную
+ *   отметку соседней недели, а «Сбросить» стёр бы чужой ввод. Поэтому все
+ *   четыре черновика лежат в папке по номеру сервера.
+ *
+ *   Рядом с этим — цена молчаливой ошибки. Черновик, который прочитался не из
+ *   своей папки, выглядит ровно как свой: те же имена недель, те же теги.
+ *   Отсюда и правило удаления: снял черновик на своём сервере — чужие папки
+ *   остались нетронутыми.
+ *
+ * СТАРЫЕ ЧЕРНОВИКИ — СЕРВЕР САЙТА.
+ *   До этого шага папок не было, и всё написанное относилось к одному набору —
+ *   тому, что в `config.js`. Поэтому плоский черновик при первом чтении
+ *   перекладывается под номер сервера сайта и больше не трогается: переезд
+ *   происходит один раз, в момент чтения, и не требует, чтобы человек что-то
+ *   публиковал или терял ввод.
+ *
+ * Две цели у одной папки: сервер берётся из `draftServer()` (src/admin/target.js)
+ * — тот же источник, что у чтений и записей. Пока права не прочитаны, это сервер
+ * сайта, то есть ровно то, чем черновик был до мультиаренды.
  */
+import { draftServer } from './target.js';
+import { siteServer } from '../data/server.js';
+
 const KEY = 'zr33.admin.drafts';
 
 /** @param {() => any} fn */
@@ -20,24 +46,67 @@ function safe(fn, fallback = null) {
   }
 }
 
-/** @returns {Record<string, {marks: Record<string, 'win'|'loss'>, savedAt: string}>} */
-export function loadDrafts() {
-  const parsed = safe(() => JSON.parse(localStorage.getItem(KEY) || '{}'), {});
-  return parsed && typeof parsed === 'object' ? parsed : {};
+function readRaw(key) {
+  return safe(() => JSON.parse(localStorage.getItem(key) || 'null'), null);
 }
 
-function writeDrafts(drafts) {
-  safe(() => localStorage.setItem(KEY, JSON.stringify(drafts)));
+function writeRaw(key, value) {
+  safe(() => localStorage.setItem(key, JSON.stringify(value)));
+}
+
+/*
+  Ключ папки — число сервера текстом. Пустое число (в config.js не заполнен)
+  получает имя «site»: черновик обязан остаться читаемым, а не исчезнуть из-за
+  того, что папку не как назвать.
+*/
+function folder(server) {
+  return server === null || server === undefined ? 'site' : String(server);
+}
+
+/** Папка текущего сервера панели. */
+function current() {
+  return folder(draftServer());
+}
+
+/** Папка, куда переезжают черновики без папки: сервер сайта. */
+function home() {
+  return folder(siteServer());
 }
 
 /**
- * Незаконченные отметки недели.
+ * Черновики недель, разложенные по серверам, — с переездом старого плоского
+ * вида в папку сервера сайта.
+ *
+ * @returns {Record<string, Record<string, {marks: object, savedAt: string}>>}
+ */
+function loadBuckets() {
+  const parsed = readRaw(KEY);
+  if (!parsed || typeof parsed !== 'object') return {};
+
+  // Строка недели всегда имеет `marks`; строка папки — нет. По этому признаку
+  // и различаем старый и новый вид, а не по имени ключа: «W31» и «33» выглядят
+  // в JSON одинаково.
+  const weekEntries = Object.entries(parsed).filter(([, v]) => v && typeof v === 'object' && 'marks' in v);
+  if (!weekEntries.length) return parsed;
+
+  const moved = { ...parsed, [home()]: { ...parsed[home()], ...Object.fromEntries(weekEntries) } };
+  for (const [id] of weekEntries) delete moved[id];
+  writeRaw(KEY, moved);
+  return moved;
+}
+
+function writeBuckets(buckets) {
+  writeRaw(KEY, buckets);
+}
+
+/**
+ * Незаконченные отметки недели этого сервера.
  *
  * @param {string} weekId
  * @returns {Record<string, 'win'|'loss'> | null}
  */
 export function getDraft(weekId) {
-  const entry = loadDrafts()[String(weekId)];
+  const entry = loadBuckets()[current()]?.[String(weekId)];
   return entry ? entry.marks ?? {} : null;
 }
 
@@ -46,99 +115,129 @@ export function getDraft(weekId) {
  * @param {Record<string, 'win'|'loss'>} marks
  */
 export function saveDraft(weekId, marks) {
-  const drafts = loadDrafts();
-  drafts[String(weekId)] = { marks: marks ?? {}, savedAt: new Date().toISOString() };
-  writeDrafts(drafts);
+  const buckets = loadBuckets();
+  const scope = current();
+  buckets[scope] = { ...buckets[scope], [String(weekId)]: { marks: marks ?? {}, savedAt: new Date().toISOString() } };
+  writeBuckets(buckets);
 }
 
 /** @param {string} weekId */
 export function dropDraft(weekId) {
-  const drafts = loadDrafts();
-  delete drafts[String(weekId)];
-  writeDrafts(drafts);
+  const buckets = loadBuckets();
+  const scope = current();
+  const weeks = buckets[scope];
+  if (!weeks || !(String(weekId) in weeks)) return;
+  delete weeks[String(weekId)];
+  writeBuckets(buckets);
 }
 
 /** Когда черновик этой недели трогали последний раз. */
 export function draftSavedAt(weekId) {
-  const at = loadDrafts()[String(weekId)]?.savedAt;
+  const at = loadBuckets()[current()]?.[String(weekId)]?.savedAt;
   return at ? new Date(at) : null;
 }
 
-/** Список недель с незаконченным вводом — для значка в шапке. */
+/**
+ * Список недель с незаконченным вводом — для значка в шапке.
+ *
+ * Только своего сервера: значок ведёт по адресу `#/week/<id>`, и неделя из
+ * чужой папки открыла бы экран с пустой сеткой вместо обещанного черновика.
+ */
 export function draftWeekIds() {
-  return Object.keys(loadDrafts());
+  return Object.keys(loadBuckets()[current()] ?? {});
 }
 
-/* ── Черновик хронологии ──────────────────────────────────────────────────── */
+/* ── Черновики списков (хронология, альянсы, тексты) ───────────────────────── */
 
 /**
  * События хранятся отдельным черновиком и целым списком, а не по одному.
  *
  * Причина в природе правки: неделю заполняют по клеткам, а летопись правят
  * пачкой — добавил запись, поправил соседнюю, удалил лишнюю — и публикуют
- * это одним коммитом. Список целиком совпадает с тем, что уедет в файл.
+ * это одним действием. Список целиком совпадает с тем, что уедет в базу.
+ *
+ * Тот же приём у альянсов и текстов.
+ *
+ * @param {string} key
+ * @param {any[]} [list]  Передан — список этого сервера заменяется на него.
  */
+function listBucket(key, list) {
+  const parsed = readRaw(key);
+  // Старый вид: `{ list: [...], savedAt }` без папок. Это сервер сайта.
+  const buckets = parsed && Array.isArray(parsed.list) ? { [home()]: parsed } : parsed && typeof parsed === 'object' ? parsed : {};
+
+  if (list !== undefined) {
+    buckets[current()] = { list, savedAt: new Date().toISOString() };
+    writeRaw(key, buckets);
+  }
+  return buckets;
+}
+
+function readList(key) {
+  const entry = listBucket(key)[current()];
+  return entry && Array.isArray(entry.list) ? entry.list : null;
+}
+
+/**
+ * Сброс — только своей папки: `removeItem` стёр бы и чужой несохранённый
+ * список, а человек на другом сервере потерял бы работу без единого нажатия.
+ */
+function dropList(key) {
+  const buckets = listBucket(key);
+  if (!(current() in buckets)) return;
+  delete buckets[current()];
+  writeRaw(key, buckets);
+}
+
+function listSavedAt(key) {
+  const at = listBucket(key)[current()]?.savedAt;
+  return at ? new Date(at) : null;
+}
+
 const EVENTS_KEY = 'zr33.admin.events';
+const ALLIANCES_KEY = 'zr33.admin.alliances';
+const TEXTS_KEY = 'zr33.admin.texts';
 
 export function getEventsDraft() {
-  const parsed = safe(() => JSON.parse(localStorage.getItem(EVENTS_KEY) || 'null'), null);
-  return parsed && Array.isArray(parsed.list) ? parsed.list : null;
+  return readList(EVENTS_KEY);
 }
 
 export function saveEventsDraft(list) {
-  safe(() => localStorage.setItem(EVENTS_KEY, JSON.stringify({ list, savedAt: new Date().toISOString() })));
+  listBucket(EVENTS_KEY, list);
 }
 
 export function dropEventsDraft() {
-  safe(() => localStorage.removeItem(EVENTS_KEY));
+  dropList(EVENTS_KEY);
 }
 
 export function eventsDraftSavedAt() {
-  const at = safe(() => JSON.parse(localStorage.getItem(EVENTS_KEY) || 'null'), null)?.savedAt;
-  return at ? new Date(at) : null;
+  return listSavedAt(EVENTS_KEY);
 }
 
-/* ── Черновик альянсов ──────────────────────────────────────────────────────── */
-
-/**
- * Тот же приём, что и у черновика хронологии: список альянсов целиком,
- * а не по одному. Правят их так же пачкой — добавил, переименовал,
- * деактивировал распавшийся, удалил лишний, — и публикуют разом.
- */
-const ALLIANCES_KEY = 'zr33.admin.alliances';
-
 export function getAlliancesDraft() {
-  const parsed = safe(() => JSON.parse(localStorage.getItem(ALLIANCES_KEY) || 'null'), null);
-  return parsed && Array.isArray(parsed.list) ? parsed.list : null;
+  return readList(ALLIANCES_KEY);
 }
 
 export function saveAlliancesDraft(list) {
-  safe(() => localStorage.setItem(ALLIANCES_KEY, JSON.stringify({ list, savedAt: new Date().toISOString() })));
+  listBucket(ALLIANCES_KEY, list);
 }
 
 export function dropAlliancesDraft() {
-  safe(() => localStorage.removeItem(ALLIANCES_KEY));
+  dropList(ALLIANCES_KEY);
 }
 
 export function alliancesDraftSavedAt() {
-  const at = safe(() => JSON.parse(localStorage.getItem(ALLIANCES_KEY) || 'null'), null)?.savedAt;
-  return at ? new Date(at) : null;
+  return listSavedAt(ALLIANCES_KEY);
 }
 
-/* ── Черновик текстов ────────────────────────────────────────────────────── */
-
-/** Тот же приём: список блоков целиком, правят его пачкой и публикуют разом. */
-const TEXTS_KEY = 'zr33.admin.texts';
-
 export function getTextsDraft() {
-  const parsed = safe(() => JSON.parse(localStorage.getItem(TEXTS_KEY) || 'null'), null);
-  return parsed && Array.isArray(parsed.list) ? parsed.list : null;
+  return readList(TEXTS_KEY);
 }
 
 export function saveTextsDraft(list) {
-  safe(() => localStorage.setItem(TEXTS_KEY, JSON.stringify({ list, savedAt: new Date().toISOString() })));
+  listBucket(TEXTS_KEY, list);
 }
 
 export function dropTextsDraft() {
-  safe(() => localStorage.removeItem(TEXTS_KEY));
+  dropList(TEXTS_KEY);
 }

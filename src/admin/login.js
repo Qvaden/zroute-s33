@@ -22,7 +22,7 @@ export function renderLogin({ error, configured = true } = {}) {
     return `
       <div class="adm-login">
         <section class="adm-login__card">
-          <span class="eyebrow">Панель · Сервер 33</span>
+          <span class="eyebrow">Панель управления</span>
           <h1 class="adm-h1">База не подключена</h1>
           <p class="adm-lead">
             В <code class="adm-mono">config.js</code> не заполнен раздел
@@ -43,7 +43,7 @@ export function renderLogin({ error, configured = true } = {}) {
   return `
     <div class="adm-login">
       <section class="adm-login__card">
-        <span class="eyebrow">Панель · Сервер 33</span>
+        <span class="eyebrow">Панель управления</span>
         <h1 class="adm-h1">Вход</h1>
         <p class="adm-lead">
           Тот же ник и пароль, что на форуме. Отдельной учётной записи
@@ -70,8 +70,11 @@ export function renderLogin({ error, configured = true } = {}) {
         <details class="adm-help">
           <summary>Нет доступа?</summary>
           <p>
-            Панель открыта владельцу и модераторам. Роль выдаёт владелец
-            на вкладке <b>Игроки</b> — одним нажатием, без GitHub и без токенов.
+            Панель открыта владельцу, модераторам сайта и модераторам отдельного
+            сервера — последние правят только данные своего сервера. Роль
+            модератора сайта выдаёт владелец на вкладке <b>Игроки</b> — одним
+            нажатием, без GitHub и без токенов. Модератором сервера он пока
+            заводит только в базе.
           </p>
           <ol>
             <li>Зарегистрируйтесь на сайте, на вкладке <b>Форум</b></li>

@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=45';
-import { esc, plural } from '../ui/helpers.js?v=45';
-import { mapDataset } from '../data/adapters/_map.js?v=45';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=45';
-import { validateDataset } from '../data/contract.js?v=45';
+import { CONFIG } from '../../config.js?v=46';
+import { esc, plural } from '../ui/helpers.js?v=46';
+import { mapDataset } from '../data/adapters/_map.js?v=46';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=46';
+import { validateDataset } from '../data/contract.js?v=46';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=45';
-import { renderHome } from '../pages/home.js?v=45';
+} from '../logic/standings.js?v=46';
+import { renderHome } from '../pages/home.js?v=46';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -56,14 +56,26 @@ import { renderHome } from '../pages/home.js?v=45';
   GitHub — единственный путь назад. Панель его не использует.
 */
 import {
-  currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=45';
+  currentAccount, signIn, signOut, canModerate, canManagePeople, isConfigured,
+} from '../db/account.js?v=46';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator, nextAllianceNumber,
-} from './store.js?v=45';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=45';
-import { roleLabel } from '../forum/roles.js?v=45';
-import { prepareImage, uploadPath } from './image.js?v=45';
+} from './store.js?v=46';
+/*
+  ЦЕЛЬ ПАНЕЛИ — КАКОЙ СЕРВЕР ОНА ПРАВИТ.
+
+  Число спрашивают у одного места все, кому оно нужно: чтение набора, каждая
+  запись, пути фотографий и папки черновиков. Право при этом держит база
+  (`site_can_edit_server`), а панель читает карту ролей только затем, чтобы не
+  давать человеку заполнять неделю сервера, куда его не пустят.
+*/
+import {
+  adoptRights, canEditServer, choosePanelServer, forgetRights, hasTarget,
+  panelServer, panelServerTitle, writableServers,
+} from './target.js?v=46';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=46';
+import { roleLabel } from '../forum/roles.js?v=46';
+import { prepareImage, uploadPath } from './image.js?v=46';
 import {
   applyMarks,
   applyEvents,
@@ -84,7 +96,7 @@ import {
   nextAllianceId,
   textsFromRaw,
   applyTexts,
-} from './edit.js?v=45';
+} from './edit.js?v=46';
 import {
   getDraft,
   saveDraft,
@@ -101,23 +113,23 @@ import {
   getTextsDraft,
   saveTextsDraft,
   dropTextsDraft,
-} from './draft.js?v=45';
-import { renderShell } from './shell.js?v=45';
-import { renderLogin } from './login.js?v=45';
-import { renderOverview } from './screens/overview.js?v=45';
-import { renderWeek, describe } from './screens/week.js?v=45';
-import { renderAlliances } from './screens/alliances.js?v=45';
-import { renderEvents } from './screens/events.js?v=45';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=45';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=45';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=45';
-import { renderQuarter } from './screens/quarter.js?v=45';
-import { renderPresident } from './screens/president.js?v=45';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=45';
-import { renderModeration } from './screens/moderation.js?v=45';
-import { renderChatsAdmin } from './screens/chats.js?v=45';
-import { forum } from '../forum/index.js?v=45';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=45';
+} from './draft.js?v=46';
+import { renderShell } from './shell.js?v=46';
+import { renderLogin } from './login.js?v=46';
+import { renderOverview } from './screens/overview.js?v=46';
+import { renderWeek, describe } from './screens/week.js?v=46';
+import { renderAlliances } from './screens/alliances.js?v=46';
+import { renderEvents } from './screens/events.js?v=46';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=46';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=46';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=46';
+import { renderQuarter } from './screens/quarter.js?v=46';
+import { renderPresident } from './screens/president.js?v=46';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=46';
+import { renderModeration } from './screens/moderation.js?v=46';
+import { renderChatsAdmin } from './screens/chats.js?v=46';
+import { forum } from '../forum/index.js?v=46';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=46';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -185,6 +197,18 @@ function pickWeek(param) {
 /** Какой экран отрисован сейчас — чтобы скроллить наверх только при смене. */
 let lastScreenId = null;
 
+/**
+ * Есть ли право писать в тот сервер, который панель правит сейчас.
+ *
+ * Два признака, а не один: цель без права означает, что права сняли, пока
+ * вкладка была открыта, а право без цели — что права ещё не прочитаны.
+ * `panelServer()` без цели бросает ошибку, поэтому порядок проверок важен:
+ * `hasTarget()` стоит первым и коротко замыкает цепочку.
+ */
+function mayEdit() {
+  return hasTarget() && canEditServer(panelServer(), account);
+}
+
 function render() {
   if (!view) return;
   const { id, param } = parseHash();
@@ -200,26 +224,26 @@ function render() {
     view.weekId = week?.id ?? null;
     view.marks = week ? getDraft(week.id) ?? marksFromRaw(view.raw, week.id) : {};
     view.draftSaved = week ? draftSavedAt(week.id) : null;
-    view.canPush = canEditSite(account);
+    view.canPush = mayEdit();
   }
 
   if (screen.id === 'events') {
     // Черновик летописи живёт списком целиком — правят её пачкой, а не по полю.
     view.events = view.events ?? getEventsDraft() ?? eventsFromRaw(view.raw);
     view.eventsSaved = eventsDraftSavedAt();
-    view.canPush = canEditSite(account);
+    view.canPush = mayEdit();
   }
 
   if (screen.id === 'alliances') {
     // Тот же приём, что и у летописи: черновик — весь список альянсов целиком.
     view.alliances = view.alliances ?? getAlliancesDraft() ?? alliancesFromRaw(view.raw);
     view.alliancesSaved = alliancesDraftSavedAt();
-    view.canPush = canEditSite(account);
+    view.canPush = mayEdit();
   }
 
   if (screen.id === 'guidePage' || screen.id === 'president') {
     view.texts = view.texts ?? getTextsDraft() ?? textsFromRaw(view.raw);
-    view.canPush = canEditSite(account);
+    view.canPush = mayEdit();
   }
   if (screen.id === 'guidePage') {
     view.guideDraft = view.guideDraft ?? guideFromTexts(view.texts);
@@ -250,7 +274,15 @@ function render() {
       на него прямо, и словарь для неё один на сайт и панель (forum/roles.js).
     */
     role: roleLabel(account),
-    canPush: canEditSite(account),
+    canPush: mayEdit(),
+    /*
+      Номер сервера в бренде и ряд выбора. Ряд показывает только те серверы,
+      где право есть, поэтому исчезнувшая кнопка означает снятое право, а не
+      забывчивость панели: человеку важно видеть разницу, пока он не нажал
+      «Опубликовать».
+    */
+    server: view.server,
+    servers: view.servers,
     weekIds: view.data.weeks.map((w) => w.id),
     theme: adminTheme,
   });
@@ -318,17 +350,26 @@ function showError(message) {
  * Отдельно от ошибки: человек вошёл правильно, просто ему не выдали роль.
  * Показывать здесь «не получилось» значило бы обвинить его в чужом решении —
  * и он полез бы проверять пароль, которого дело не касается.
+ *
+ * Надпись «Сервер 33» здесь стоять не может: этот экран показывают как раз
+ * тогда, когда ни одного сервера панель править не может. Номер в шапке
+ * обещал бы набор, которого у вошедшего нет.
  */
 function showNoAccess(account) {
   root.innerHTML = `
     <div class="adm-login">
       <section class="adm-login__card">
-        <span class="eyebrow">Панель · Сервер 33</span>
+        <span class="eyebrow">Панель управления</span>
         <h1 class="adm-h1">Панель закрыта</h1>
         <p class="adm-lead">
           Вы вошли как <b>${esc(account.nick)}</b>, но править данные сайта пока
-          не можете. Панель открыта владельцу и модераторам — роль выдаёт
-          владелец на вкладке «Игроки», одним нажатием.
+          не можете. Панель открыта владельцу, модераторам сайта и модераторам
+          отдельного сервера — последним только данные их сервера.
+        </p>
+        <p class="muted">
+          Роль модератора сайта выдаёт владелец на вкладке «Игроки», одним
+          нажатием. Модератором сервера его пока заводит только в базе: скажите
+          ему свой ник и номер сервера.
         </p>
         <p class="muted">Скажите ему свой ник: <code class="adm-mono">${esc(account.nick)}</code></p>
         <div class="adm-login__form">
@@ -372,7 +413,7 @@ async function load() {
     неделю, а спор за номер при редкой правке перекрыт триггером в базе.
   */
   let allianceFloor = 0;
-  if (canEditSite(account)) {
+  if (mayEdit()) {
     try {
       allianceFloor = await nextAllianceNumber();
     } catch {
@@ -383,6 +424,15 @@ async function load() {
   view = {
     account,
     user: { login: account?.nick ?? '' },
+    /*
+      Цель панели держит target.js, а view только переносит её на экран: шапка
+      обязана называть тот сервер, чьи строки человек видит, а не тот, что
+      записан в config.js. Модератор 44-го, увидев рядом со словом «панель»
+      тройку, решил бы, что правит чужую историю.
+    */
+    server: panelServer(),
+    serverTitle: panelServerTitle(),
+    servers: writableServers(account),
     /*
       Панель показывает, откуда данные и сколько их. Раньше это был путь
       к файлу и его размер; теперь размера файла нет, поэтому считаем объём
@@ -399,7 +449,7 @@ async function load() {
     baseRaw: structuredClone(raw),
     data,
     weeks: data.weeks,
-    canPush: canEditSite(account),
+    canPush: mayEdit(),
     allianceFloor,
     // Тот же валидатор, которым проверяется сайт: панель не должна судить
     // о данных по своим правилам, иначе «в панели всё хорошо, а сайт пустой».
@@ -411,6 +461,33 @@ async function load() {
 
 /** Кто вошёл. Держится отдельно от view: нужен и до загрузки данных. */
 let account = null;
+
+/**
+ * Чем вошедший может править: карта ролей по серверам и подписи серверов.
+ *
+ * Один пакет запросов на вход, а не по одному на экран: цель нужна до чтения
+ * данных, потому что набор лежит в таблице, размеченной по серверам, и без
+ * номера панели неоткуда взять строки.
+ *
+ * Отказ здесь — не поломка, а «миграции нет». Карта прав появляется вместе с
+ * `20261005-site-server-rights.sql`, список серверов — с предыдущей; панель
+ * проглатывает оба в значения «не проверяем» и «показать нечего», потому что
+ * иначе человек без прогнанного SQL не увидел бы ни одного экрана, хотя база
+ * пуста по обе стороны от миграции. Различать «прав не спрашивали» и «прав
+ * нигде» обязан target.js, а не этот код: от ответа зависит, закрыта панель
+ * или открыта на сервер сайта.
+ */
+async function readRights() {
+  const [roles, servers] = await Promise.all([
+    typeof forum.myServerRoles === 'function'
+      ? forum.myServerRoles().catch(() => null)
+      : Promise.resolve(null),
+    typeof forum.listServers === 'function'
+      ? forum.listServers().catch(() => [])
+      : Promise.resolve([]),
+  ]);
+  return adoptRights({ account, roles, servers });
+}
 
 async function boot() {
   if (!isConfigured()) {
@@ -436,8 +513,14 @@ async function boot() {
     в записи, но человек узнал бы об этом лишь нажав «Опубликовать» —
     после того, как заполнил всю неделю. Отказ должен приходить до работы,
     а не после.
+
+    Проверяется именно цель, а не роль: с правами по серверу их два разных
+    вопроса. Модератор 44-го — не модератор сайта, и прежняя проверка
+    `canEditSite` закрыла бы его в панель, хотя править ему нечем ровно свой
+    набор.
   */
-  if (!canEditSite(account)) {
+  await readRights();
+  if (!hasTarget()) {
     showNoAccess(account);
     return;
   }
@@ -790,7 +873,8 @@ async function publishDataset({ candidate, resultBox, onDone, button }) {
 
     show(
       `<b>Опубликовано.</b> ${esc(describeChanges(changes))}
-       <p class="muted">Сайт покажет изменения сразу — данные читаются из базы.</p>`,
+       <p class="muted">Данные ушли в «${esc(panelServerTitle())}». Сайт покажет
+       изменения сразу — они читаются из базы.</p>`,
       'ok'
     );
   } catch (err) {
@@ -1869,9 +1953,13 @@ document.addEventListener('click', async (e) => {
       Выход из панели выкидывает и с форума: учётная запись одна. Раньше это
       были разные вещи — здесь отзывался токен GitHub, а сессия форума жила
       своей жизнью.
+
+      Карта прав и цель стираются вместе с входом: следующему вошедшему не
+      должны достаться чужие серверы, даже если он прочитает тот же браузер.
     */
     await signOut();
     account = null;
+    forgetRights();
     showLogin();
     return;
   }
@@ -1883,6 +1971,36 @@ document.addEventListener('click', async (e) => {
   }
   if (e.target.closest('[data-refresh]') || e.target.closest('[data-retry]')) {
     boot();
+    return;
+  }
+
+  /*
+    Смена сервера, который панель правит.
+
+    Перечитываем набор целиком, а не перекрашиваем кнопки: цель меняет всё —
+    недели, альянсы, хронологию, тексты и даже журнал правок. Черновики при
+    этом не теряются: они лежат в папке каждого сервера, поэтому начатая
+    неделя 44-го дождётся редактора, пока он правит 33-й.
+
+    Отказ `choosePanelServer` означает, что кнопки в ряду устарели, — право
+    сняли, пока вкладка была открыта. Тогда перечитываем права целиком: человек
+    увидит либо новый набор, либо закрытую панель, но не старую цель, в которую
+    база уже не пустит.
+  */
+  const serverButton = e.target.closest('[data-panel-server]');
+  if (serverButton) {
+    const next = Number(serverButton.dataset.panelServer);
+    if (hasTarget() && next === panelServer()) return;
+    if (choosePanelServer(next, account)) {
+      view = null;
+      try {
+        await load();
+      } catch (err) {
+        showError(String(err?.message ?? err));
+      }
+      return;
+    }
+    await boot();
     return;
   }
 

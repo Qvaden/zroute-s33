@@ -753,7 +753,7 @@ console.log('\nJ. Админ-панель');
     return storeCode.slice(from, next < 0 ? from + 1500 : next);
   };
   const noServer = ['saveWeekMarks', 'saveAlliance', 'saveWeek', 'saveEvent', 'saveText']
-    .filter((fn) => !/server_id: (?:writeServer\(\)|server[,}])/.test(fnSource(fn)));
+    .filter((fn) => !/server_id: (?:panelServer\(\)|server[,}])/.test(fnSource(fn)));
   equal('каждая вставка панели называет сервер', noServer.join(', '), '');
 
   const deleteUrls = [...storeCode.matchAll(/rest\(\s*`(\/site_[^`]+)`,\s*\{\s*method: 'DELETE'\s*\}\s*\)/g)]
@@ -772,14 +772,23 @@ console.log('\nJ. Админ-панель');
     Номер сервера берётся из одного места. Если чтение и запись возьмут его
     из разных — панель начнёт править один сервер, а показывать другой, и
     глаза этого расхождения не увидят: и то и другое выглядит целым.
+
+    С правами по серверу это одно место — `src/admin/target.js`: у панели
+    появилась цель, и она у неё одна на чтение, запись, пути фотографий и
+    папки черновиков. `src/data/server.js` остаётся читающей стороной: там
+    живёт сервер сайта и выбор зрителя.
   */
+  const targetSrc = await readFile('src/admin/target.js', 'utf8');
   const serverSrc = await readFile('src/data/server.js', 'utf8');
   check('номер сервера читается из config в одном месте',
     serverSrc.includes('CONFIG.server') &&
     (await readFile('src/admin/store.js', 'utf8')).includes("from '../data/server.js'") &&
     (await readFile('src/data/adapters/supabase.js', 'utf8')).includes("from '../server.js'"));
   check('запись требует номер сервера, а не додумывает его',
-    /writeServer\(\)/.test(serverSrc) && serverSrc.includes('не заполнен server'));
+    /export function panelServer\(\)/.test(targetSrc) && targetSrc.includes('не заполнен server'));
+  check('пишущая сторона спрашивает число у цели панели, а не у config',
+    !/writeServer\(\)/.test(storeCode) && storeCode.includes("from './target.js'") &&
+    /site_dataset'[\s\S]{0,120}panelServer\(\)/.test(storeCode));
   check('свободный номер альянса спрашивает базу, а не считает по своему списку',
     /rpc\/site_next_alliance_id/.test(storeCode));
   /*
@@ -1689,8 +1698,26 @@ console.log('\nM. Правка хронологии');
     в репозиторий. После переезда фотографии живут в хранилище базы, и папка
     внутри него другая: «public/» в имени объекта означало бы папку с таким
     названием, а не публичный доступ — он задаётся правами на хранилище.
+
+    Цель панели в тесте называется до проверки: без неё `panelServer()` обязан
+    отказать, а не придумать номер, и этот отказ — часть контракта.
   */
-  check('путь загрузки лежит в папке событий', uploadPath('jpg').startsWith('events/'));
+  const target = await import('../src/admin/target.js');
+  target.adoptRights({ account: { role: 'admin' }, roles: null, servers: [] });
+  check('без выбранной цели путь фотографии не выдумывается',
+    (() => {
+      target.forgetRights();
+      try {
+        uploadPath('jpg');
+        return false;
+      } catch {
+        return true;
+      } finally {
+        target.adoptRights({ account: { role: 'admin' }, roles: null, servers: [] });
+      }
+    })());
+  check('путь загрузки лежит в папке событий своего сервера',
+    uploadPath('jpg').startsWith(`${target.panelServer()}/events/`), uploadPath('jpg'));
   check('путь загрузки оканчивается на расширение', uploadPath('jpg').endsWith('.jpg'));
   check('два вызова дают разные имена', uploadPath('jpg') !== uploadPath('jpg'));
 
@@ -11949,9 +11976,9 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('и сайт, и панель просят набор одного сервера одним вызовом',
     adapterSrc.includes("'/rpc/site_dataset'") && storeSrc.includes("'/rpc/site_dataset'")
       && /body: datasetBody\(server\)/.test(adapterSrc)
-      && /body: datasetBody\(\)/.test(storeSrc));
+      && /body: datasetBody\(panelServer\(\)\)/.test(storeSrc));
   check('панель не следует за переключателем зрителя: у неё свой сервер',
-    !storeSrc.includes('viewServer')
+    !storeSrc.includes('viewServer') && !storeSrc.includes('siteServer')
       && serverSrc.includes('export function datasetBody(server = siteServer())'));
 
   /* ── Свободный номер альянса ── */
@@ -12009,14 +12036,14 @@ console.log('\nAM. Фид магазина: обновление и событи
   );
 
   /* ── Реестр и документы ── */
-  check('реестр говорит, что шаг и его исправление прогнаны, а очередь закрыта',
+  check('реестр говорит, что шаг и его исправление прогнаны, а очередь называет следующий файл',
     readmeSrc.includes('Прогнан 04.10.2026')
       && readmeSrc.includes('20261004-site-next-id-anon.sql')
       && readmeSrc.includes('обязан быть прогнан до пуша')
-      && readmeSrc.includes('Очередь пуста'));
-  check('реестр объясняет, чего в шаге нет: прав на внесение и снимка на каждый сервер',
-    readmeSrc.includes('права на внесение по серверу')
-      && readmeSrc.includes('и отдельный снимок `data/live.json` на каждый сервер')
+      && readmeSrc.includes('Сейчас в очереди один файл'));
+  check('реестр объясняет, чего в шаге нет: отдельного снимка на сервер, а права уже сделаны',
+    readmeSrc.includes('отдельный снимок `data/live.json` на каждый сервер')
+      && readmeSrc.includes('Право вносить данные по серверу даёт не этот файл')
       && !readmeSrc.includes('), переключатель сервера в шапке сайта'));
   check('документ переезда называет шаг и его проверку одной строкой',
     migDoc.includes('20261004-site-server-scope.sql') && migDoc.includes('site_dataset(p_server)'));
@@ -12025,7 +12052,7 @@ console.log('\nAM. Фид магазина: обновление и событи
       && migDoc.includes('permission denied for function site_next_alliance_id'));
 }
 
-/* ── 15. Мультиаренда сайта, шаг 2: один выбор сервера на весь сайт ─────────
+/* ── 17. Мультиаренда сайта, шаг 2: один выбор сервера на весь сайт ─────────
 
    Шаг 1 дал данным сайта измерение «сервер», но прочитать его мог только
    config.js: рейтинг показывал 33-й под лентой 44-го. С этого шага выбор один
@@ -12255,4 +12282,332 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('реестр миграций не обещает переключатель в списке незакрытого',
     queueSrc.includes('Переключатель сервера в шапке сайта (шаг 2 после этого файла)')
       && !queueSrc.includes('переключатель сервера в шапке сайта и отдельный снимок'));
+}
+
+/* ── 18. Мультиаренда сайта, шаг 3: право вносить данные по серверу ────────
+
+   Шаг 1 дал данным сайта сервер, шаг 2 позволил зрителю выбрать его глазами.
+   Право писать при этом осталось одноклассным: политики смотрели на человека
+   (`site_can_edit()`), и модератор 44-го равнял чужую неделю на 33-м. С этого
+   шага граница — строка `server_id`, а у панели есть осознанная цель.
+
+   Что здесь ломается молча, если разъехалось:
+
+     1. Право по человеку вместо права по строке. Панель покажет ряд серверов,
+        база откажет в записи — человек узнает об этом после работы, а не до.
+     2. Две цели в одном файле. Если запись спрашивает номер не там, где чтение,
+        панель показывает один набор и сохраняет в другой, а глазами это
+        неразличимо: интерфейс тот же, цифры те же.
+     3. Пустая карта прав вместо «прав не спрашивали». На пустой карте панель
+        обязана закрыться, на null — открыться серверу сайта; перепутать их
+        значит либо оставить владельца без панели, либо выпустить чужого
+        редактора в ряд записи.
+     4. Черновик без папки сервера. «W1» на 33-м и на 44-м — разные недели, и
+        прочитанный не из своей папки черновик выглядит ровно как свой.
+     5. Путь фотографии без номера. База читает сервер из первой части пути, и
+        панель, положившая файл в общую папку, лишила бы своего модератора
+        половины экрана молча.
+     6. Журнал без сервера. Модератор сайта видит правки всех наборов, и запись
+        «изменена W1» без номера выглядит как его собственная.
+     7. Ряд в шапке сайта как цель панели. Ссылка «смотри, что у нас на 44-м»,
+        открытая редактором, перенаправила бы его правку в чужой набор.
+
+   Миграция, цель панели, черновики, путь фото и ряд выбора проверяются делом и
+   по строкам; живого обращения к базе у теста нет.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  /*
+    Нормализование переводов строк нужно этому блоку: проверки разбирают
+    исходники регулярными выражениями с `\n`, а файлы в проекте лежат и с CRLF,
+    и с LF — одна правка формата не должна превращать живую проверку в мёртвую.
+  */
+  const text = async (p) => (await readFile(p, 'utf8')).replace(/\r\n/g, '\n');
+  const mig = await text('supabase/20261005-site-server-rights.sql');
+  const targetSrc = await text('src/admin/target.js');
+  const mainSrc = await text('src/admin/main.js');
+  const shellSrc = await text('src/admin/shell.js');
+  const draftSrc = await text('src/admin/draft.js');
+  const imageSrc = await text('src/admin/image.js');
+  const storeSrc = await text('src/admin/store.js');
+  const cssSrc = await text('src/admin/admin.css');
+  const loginSrc = await text('src/admin/login.js');
+  const overviewSrc = await text('src/admin/screens/overview.js');
+
+  /*
+    Комментарии из main.js сняты намеренно: проверка ниже запрещает прежнему
+    признаку `canEditSite` жить в КОДЕ. В комментариях он обязан остаться —
+    именно там объясняется, почему проверка сменилась, и без этого пояснения
+    следующая правка вернула бы прежнее имя, решив, что оно свободное.
+  */
+  const mainCode = mainSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+
+  /* ── Право: одна функция, а не пять копий правила ── */
+  equal('право на сервер определено ровно один раз',
+    (mig.match(/create or replace function public\.site_can_edit_server/g) || []).length, 1);
+  check('его зовут охранник, политики, журнал, ведро и срез рейтинга — все из одного места',
+    (mig.match(/public\.site_can_edit_server\(/g) || []).length >= 9,
+    `зовётся: ${(mig.match(/public\.site_can_edit_server\(/g) || []).length}`);
+  check('право дают модерация сайта или модератор сервера, и бан перекрывает обе ветки',
+    /select public\.site_can_edit\(\)[\s\S]{0,400}public\.forum_is_server_moderator\(p_server\)[\s\S]{0,300}not coalesce\(\(select u\.banned/.test(mig));
+  check('правом смотрит definer-функция: список участия самим политикам не открыт',
+    /function public\.site_can_edit_server\(p_server integer\)\s*\nreturns boolean\s*\nlanguage sql stable security definer set search_path = public/.test(mig));
+  check('выполнять функцию гостю оставлено: иначе вместо отказа политики он слышит «permission denied for function»',
+    /revoke all on function public\.site_can_edit_server\(integer\) from public;\s*\ngrant execute on function public\.site_can_edit_server\(integer\) to anon, authenticated;/.test(mig));
+  check('второго признака «редактор данных сайта по серверу» нет: тот же список участия и ни одной новой таблицы',
+    mig.includes('public.forum_is_server_moderator(p_server)') && !/create table/.test(mig)
+      && /forum\.myServerRoles/.test(mainSrc));
+  check('открытость сервера на данные сайта не распространяется — упомянутая один раз и только чтобы это отрицать',
+    (mig.match(/open_writing/g) || []).length === 1 && /--\s+.*open_writing/.test(mig));
+
+  /* ── Политики смотрят на строку, а не на человека ── */
+  check('вставка, правка и удаление проверяют server_id строки',
+    mig.includes('for insert with check (public.site_can_edit_server(server_id))')
+      && mig.includes('for update using (public.site_can_edit_server(server_id)) with check (public.site_can_edit_server(server_id))')
+      && mig.includes('for delete using (public.site_can_edit_server(server_id))'));
+  equal('ряд таблиц один и тот же: охранник и политики перечисляют их одинаково',
+    (mig.match(/array\['site_alliances', 'site_weeks', 'site_results', 'site_events', 'site_texts'\]/g) || []).length, 2);
+  check('охранник берёт сервер у старой строки при удалении и у новой при вставке',
+    /if TG_OP = 'DELETE' then\s+v_server := old\.server_id;\s+else\s+v_server := new\.server_id;/.test(mig));
+  check('пустой auth.uid() проходит: прогон миграции и SQL Editor не получают отказа в своей базе',
+    /if auth\.uid\(\) is null or public\.site_can_edit_server\(v_server\) then/.test(mig));
+  check('отказ назван причиной и содержит номер сервера, а не «violates row-level security policy»',
+    mig.includes("'Править данные сервера % может только его модератор: попросите добавить вас в модераторы этого сервера.'"));
+  check('забаненному отказ отдельный: совет просить в модераторы был бы неверным',
+    mig.includes("'Ваш аккаунт под запретом — данные сайта править нельзя'")
+      && /if exists \(select 1 from public\.forum_users where id = auth\.uid\(\) and banned\)/.test(mig));
+  check('охранник снимается перед навешиванием и висит до записи',
+    mig.includes("drop trigger if exists %1$s_server_rights")
+      && mig.includes('create trigger %1$s_server_rights before insert or update or delete'));
+  check('политики пересоздаются, а не копятся рядом',
+    mig.includes("drop policy if exists %1$s_write") && mig.includes("drop policy if exists %1$s_update")
+      && mig.includes("drop policy if exists %1$s_delete"));
+
+  /* ── Журнал правок: у каждой записи свой сервер ── */
+  check('у журнала появляется колонка сервера, повторный прогон её не дублирует',
+    mig.includes('alter table public.site_audit add column if not exists server_id integer;'));
+  check('старые записи доживаются по деталям правки, а не остаются пустыми молча',
+    /update public\.site_audit\s+set server_id = \(details ->> 'server_id'\)::integer/.test(mig));
+  check('приведение guarded: журнал не должен падать из-за стола, где server_id не число',
+    (mig.match(/~ '\^\[0-9\]\+\$'/g) || []).length >= 2);
+  check('чтение журнала: модерация сайта видит всё, серверный модератор — своё',
+    /create policy site_audit_read on public\.site_audit\s+for select using \(\s+public\.site_can_edit\(\)\s+or \(server_id is not null and public\.site_can_edit_server\(server_id\)\)/.test(mig));
+  check('триггер журнала пишет сервер, а не оставляет его на панель',
+    /insert into public\.site_audit\s+\(actor_id, actor_nick, entity, entity_id, action, details, server_id\)/.test(mig));
+  check('индекс под тот порядок, которым журнал читают: сервер и свежие записи',
+    mig.includes('create index if not exists site_audit_server_idx on public.site_audit (server_id, at desc);'));
+  check('панель отдаёт экрану номер строки и не спорит с правами фильтрам',
+    /server: Number\.isInteger\(r\.server_id\) \? r\.server_id : null/.test(storeSrc)
+      && !/site_audit\?[^`]*server_id=eq/.test(storeSrc));
+  check('обзор рисует сервер у правки: без него соседняя запись чужого набора выглядит своей',
+    /c\.server \? `<span class="muted">сервер \$\{esc\(c\.server\)\}<\/span>`/.test(overviewSrc));
+
+  /* ── Фотографии: номер сервера в пути ── */
+  check('сервер фотографии база читает из первой части пути и только если это число',
+    mig.includes("select case when split_part(coalesce(p_name, ''), '/', 1) ~ '^[0-9]+$'"));
+  check('панель кладёт файл в папку своего сервера — то же число, что читает база',
+    imageSrc.includes('makePath(`${panelServer()}/events`, ext)'));
+  check('право на файл даёт либо модерация сайта, либо модератор сервера из пути',
+    (mig.match(/bucket_id = 'site-photos'/g) || []).length === 2
+      && mig.includes('or (public.site_photo_server(name) is not null'));
+  check('старые файлы без папки остаются за модерацией сайта, а не становятся ничейными',
+    mig.includes('у старых файлов папки сервера нет'));
+
+  /* ── Срез позиций рейтинга: право по альянсу, а не модерация сайта ── */
+  check('модерация сайта проходит прежней веткой, а серверный редактор проверяется по альянсу',
+    /if not public\.site_can_edit\(\) then\s+select server_id into a_server from public\.site_alliances/.test(mig));
+  check('проверка идёт по каждому альянсу: иначе снимок чужого сервера ушёл бы вместе с чужими уведомлениями',
+    mig.includes('if not public.site_can_edit_server(a_server) then')
+      && mig.includes("'Альянс «%» относится к серверу %, который вы не правите.'"));
+
+  /* ── Повторный прогон и кэш схемы ── */
+  equal('функции переопределяются, а не создаются заново: файл идемпотентен',
+    (mig.match(/create or replace function/g) || []).length, 5);
+  check('ни голого create function, ни create table, ни повтора add constraint без drop',
+    !/^\s*create function/m.test(mig) && !/^\s*create table/m.test(mig)
+      && mig.includes('alter table public.site_audit drop constraint if exists site_audit_server_id_fkey;'));
+  check('кэш схемы API извещён: новые функции и колонка иначе отвечают «does not exist»',
+    mig.trimEnd().endsWith("notify pgrst, 'reload schema';"));
+  check('дверь выдачи права названа готовым вызовом: экрана выдачи ещё нет',
+    mig.includes('select public.forum_set_server_member(') && mig.includes("'moderator')"));
+
+  /* ── Панель: цель читает право, а не роль вообще ── */
+  check('право спрашивается у цели, а не у человека: прежняя проверка закрыла бы модератора сервера',
+    !/canEditSite/.test(mainCode)
+      && /function mayEdit\(\) \{\s*\n\s*return hasTarget\(\) && canEditServer\(panelServer\(\), account\);/.test(mainSrc));
+  equal('все места, где решает кнопка записи, зовут mayEdit',
+    (mainSrc.match(/(?:view\.canPush = |canPush: )mayEdit\(\)/g) || []).length, 6);
+  check('цель без права и право без цели — оба отказа: права могли снять, пока вкладка открыта',
+    /hasTarget\(\) && canEditServer\(panelServer\(\), account\)/.test(mainSrc));
+  check('право читается до данных: набор лежит в таблице, размеченной по серверам',
+    /await readRights\(\);\s*\n\s*if \(!hasTarget\(\)\) \{/.test(mainSrc));
+  check('без цели панель не открывается пустым экраном, а объясняет, кто даёт право',
+    /if \(!hasTarget\(\)\) \{\s*\n\s*showNoAccess\(account\);/.test(mainSrc));
+  check('отказ обоих запросов о правах означает «миграции нет», а не «прав нет»',
+    /forum\.myServerRoles\(\)\.catch\(\(\) => null\)[\s\S]{0,220}forum\.listServers\(\)\.catch\(\(\) => \[\]\)/.test(mainSrc));
+  check('выход стирает карту прав и цель: следующему вошедшему не достанется чужой набор',
+    /await signOut\(\);\s*\n\s*account = null;\s*\n\s*forgetRights\(\);/.test(mainSrc));
+  check('щелчок по ряду перечитывает набор целиком, а не перекрашивает кнопки',
+    /const serverButton = e\.target\.closest\('\[data-panel-server\]'\);[\s\S]{0,300}view = null;\s*\n\s*try \{/.test(mainSrc));
+  check('устаревший ряд (право сняли) ведёт в перечитывание прав, а не в запись',
+    /if \(choosePanelServer\(next, account\)\) \{[\s\S]{0,260}\n    \}\n    await boot\(\);/.test(mainSrc));
+  check('свободный номер альянса спрашивается только при праве на запись',
+    /let allianceFloor = 0;\s*\n\s*if \(mayEdit\(\)\) \{/.test(mainSrc));
+  check('публикация называет набор, куда ушли данные',
+    /Данные ушли в «\$\{esc\(panelServerTitle\(\)\)\}»/.test(mainSrc));
+  check('шапка получает цель и ряд из того же места, что и запись',
+    /server: panelServer\(\),\s*\n\s*serverTitle: panelServerTitle\(\),\s*\n\s*servers: writableServers\(account\),/.test(mainSrc)
+      && /server: view\.server,\s*\n\s*servers: view\.servers,/.test(mainSrc));
+  check('у панели своя память и она не читает выбор зрителя',
+    targetSrc.includes("const KEY = 'zr33.admin.server'") && !/server-choice/.test(targetSrc));
+  check('вход и отказ называют три круга прав и не обещают кнопку, которой ещё нет',
+    loginSrc.includes('модераторам отдельного') && /пока\s+заводит\s+только\s+в\s+базе/.test(loginSrc)
+      && /пока\s+заводит\s+только\s+в\s+базе/.test(mainSrc));
+  check('обзор подписан названием набора, а не вечным «Данные сайта»',
+    overviewSrc.includes('const serverTitle = view.serverTitle')
+      && overviewSrc.includes('правка — «${esc(serverTitle)}»'));
+
+  /* ── Семантика прав: target.js исполняется делом ── */
+  const mem = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, String(v)),
+    removeItem: (k) => mem.delete(k),
+  };
+  const target = await import('../src/admin/target.js');
+  const OWNER = { role: 'admin', nick: 'Владелец' };
+  const SITE_MOD = { role: 'moderator', nick: 'Модератор сайта' };
+  const SERVER_MOD = { role: 'player', nick: 'Модератор 44-го' };
+  const BOTH = { 33: 'moderator', 44: 'moderator' };
+  const ONLY44 = { 44: 'moderator', 33: 'member' };
+  const LIST = [{ id: 33, title: 'Сервер 33' }, { id: 44, title: 'Сервер 44' }];
+
+  target.forgetRights();
+  mem.clear();
+  equal('пока прав не спрашивали, панель открыта модерации сайта и только на её сервер',
+    [target.adoptRights({ account: OWNER, roles: null, servers: [] }),
+      target.canEditServer(33, OWNER), target.canEditServer(44, OWNER)], [33, true, false]);
+  check('гостю и забаненному не помогает ни роль сайта, ни карта прав',
+    [target.canEditServer(33, null), target.canEditServer(44, { role: 'player', banned: true }),
+      target.writableServers({ role: 'admin', banned: true }).length]
+      .join() === 'false,false,0');
+
+  mem.clear();
+  equal('правая карта прочитана и пустая: это «нигде», и панель закрывается',
+    [target.adoptRights({ account: SITE_MOD, roles: {}, servers: LIST }), target.hasTarget()], [null, false]);
+  check('на закрытой панели цель не выдумывается: запись отказывает до запроса',
+    (() => {
+      try {
+        target.panelServer();
+        return false;
+      } catch (err) {
+        return /Править данные сайта нечем/.test(String(err.message));
+      }
+    })());
+
+  mem.clear();
+  equal('без памяти панель открывается серверу сайта, а не первому попавшемуся набору',
+    target.adoptRights({ account: OWNER, roles: BOTH, servers: LIST }), 33);
+  mem.set('zr33.admin.server', '44');
+  equal('память бьёт сервер сайта: редактор возвращается туда, где работал',
+    target.adoptRights({ account: OWNER, roles: BOTH, servers: LIST }), 44);
+  mem.set('zr33.admin.server', '77');
+  equal('память про сервер, куда права нет, не принимается: цель берётся из прав',
+    [target.adoptRights({ account: SERVER_MOD, roles: ONLY44, servers: LIST }), target.hasTarget()], [44, true]);
+  equal('ряд выбора показывает только то, где право есть, и называет это подписью сервера',
+    target.writableServers(SERVER_MOD), [{ id: 44, title: 'Сервер 44' }]);
+  check('подпись цели берётся из того же места, что и номер',
+    target.panelServerTitle() === 'Сервер 44');
+  check('переключение на чужой сервер отвергается, и цель остаётся своей',
+    target.choosePanelServer(33, SERVER_MOD) === false && target.panelServer() === 44);
+  check('тот же сервер повторно не перемонтируется, а память не пишется впустую',
+    target.choosePanelServer(44, SERVER_MOD) === false && mem.get('zr33.admin.server') === '44');
+  mem.clear();
+  check('участник без модераторства не получает ни одного сервера',
+    target.adoptRights({ account: SERVER_MOD, roles: { 33: 'member', 44: 'none' }, servers: LIST }) === null);
+
+  /* ── Черновики: папка сервера вместо общего ключа ── */
+  const draft = await import('../src/admin/draft.js');
+  mem.clear();
+  target.adoptRights({ account: OWNER, roles: BOTH, servers: LIST });   // цель 33
+  mem.set('zr33.admin.drafts', JSON.stringify({ W9: { marks: { a05: 'win' }, savedAt: '2026-10-01T00:00:00.000Z' } }));
+  equal('плоский черновик до мультиаренды читается как черновик сервера сайта',
+    draft.getDraft('W9'), { a05: 'win' });
+  check('и переезжает в папку своего сервера, а не остаётся общим на все наборы',
+    (() => {
+      const raw = JSON.parse(mem.get('zr33.admin.drafts'));
+      return '33' in raw && !('W9' in raw);
+    })());
+  target.choosePanelServer(44, OWNER);
+  equal('на другом сервере тот же id недели — пустая клетка, а не чужой ввод',
+    draft.getDraft('W9'), null);
+  draft.saveDraft('W9', { a07: 'loss' });
+  target.choosePanelServer(33, OWNER);
+  equal('черновик своего сервера пережил поездку к соседу', draft.getDraft('W9'), { a05: 'win' });
+  draft.dropDraft('W9');
+  target.choosePanelServer(44, OWNER);
+  equal('снятие черновика не трогает чужую папку', draft.getDraft('W9'), { a07: 'loss' });
+  check('списки летописи, альянсов и текстов лежат в тех же папках',
+    draftSrc.includes('function listBucket(key, list)') && draftSrc.includes('buckets[current()] = { list, savedAt'))
+      && !/localStorage\.removeItem/.test(draftSrc);
+  mem.set('zr33.admin.events', JSON.stringify({ list: [{ id: 'e1' }], savedAt: '2026-10-01T00:00:00.000Z' }));
+  target.choosePanelServer(33, OWNER);
+  equal('старый список летописи так же относится к серверу сайта', draft.getEventsDraft(), [{ id: 'e1' }]);
+  target.choosePanelServer(44, OWNER);
+  check('а на другом сервере летописи ещё нет', draft.getEventsDraft() === null);
+  draft.saveEventsDraft([{ id: 'e2' }]);
+  draft.dropEventsDraft();
+  target.choosePanelServer(33, OWNER);
+  equal('сброс списка стирает только свою папку', draft.getEventsDraft(), [{ id: 'e1' }]);
+  target.forgetRights();
+  check('черновик зовёт draftServer, а не panelServer: без цели он не бросает, а читает дом',
+    draftSrc.includes("import { draftServer } from './target.js'") && !/panelServer\(\)/.test(draftSrc)
+      && JSON.stringify(draft.getEventsDraft()) === JSON.stringify([{ id: 'e1' }]));
+
+  /* ── Вид: ряд в каркасе панели ── */
+  const { renderShell } = await import('../src/admin/shell.js');
+  const base = { screens: [{ id: 'overview', label: 'Обзор' }], activeId: 'overview', inner: '<p>тело</p>' };
+  const one = renderShell({ ...base, server: 33, servers: [{ id: 33, title: 'Сервер 33' }] });
+  const two = renderShell({ ...base, server: 44, servers: LIST });
+  check('под одним сервером ряда нет: переключатель-шум', !one.includes('adm-servers'));
+  check('ряд называет каждый сервер кнопкой с его номером',
+    two.includes('data-panel-server="33"') && two.includes('data-panel-server="44"'));
+  check('активная кнопка помечена и для экрана, и для читалки экрана',
+    /data-panel-server="44" aria-pressed="true"/.test(two) && two.includes('adm-servers__btn is-on'));
+  check('в бренде цель панели, а не сервер из config.js', two.includes('<b>44</b>') && !two.includes('<b>33</b>'));
+  check('подвал называет сервер словами, а цель без выбора — прочерком, а не нулём',
+    two.includes('панель правит сервер 44')
+      && renderShell({ ...base, server: null, servers: [] }).includes('<b>—</b>'));
+  check('ряд описан стилем, которым нарисовано остальное',
+    cssSrc.includes('.adm-servers') && cssSrc.includes('.adm-servers__btn.is-on'));
+
+  /* ── Документы ── */
+  const queueSrc = await readFile('supabase/README.md', 'utf8');
+  const migDocSrc = await readFile('docs/MIGRATION.md', 'utf8');
+  const archSrc = await readFile('docs/ARCHITECTURE.md', 'utf8');
+  const adminDocSrc = await readFile('docs/ADMIN.md', 'utf8');
+  const editorDocSrc = await readFile('docs/EDITOR-GUIDE.md', 'utf8');
+
+  check('реестр стоит в очереди и описан: по нему идут в SQL Editor',
+    queueSrc.includes('20261005-site-server-rights.sql')
+      && queueSrc.includes('ещё не выполнены')
+      && /`20261005-site-server-rights\.sql` — шаг 3/.test(queueSrc));
+  check('реестр говорит, что файл обязан быть прогнан до пуша, и почему',
+    queueSrc.includes('обязан быть прогнан до пуша'));
+  check('реестр не оставляет шаг 1 в списке незакрытого: права сделаны',
+    !queueSrc.includes('Не здесь: права на внесение по серверу (модератор одного сервера сегодня правит чужую неделю'));
+  check('документ переезда описывает шаг 3 и не врёт про прежние два признака прав',
+    migDocSrc.includes('20261005-site-server-rights.sql') && !migDocSrc.includes('can_edit_site'));
+  check('архитектура называет цель панели и почему она не следует за зрителем',
+    archSrc.includes('## Право вносить данные по серверу')
+      && archSrc.includes('src/admin/target.js')
+      && archSrc.includes('panelServer()'));
+  check('документ панели описывает ряд выбора и отказ без права',
+    adminDocSrc.includes('zr33.admin.server') && adminDocSrc.includes('данные только этого сервера'));
+  check('документ панели называет цель модулем и порядок выбора, а не догадку',
+    adminDocSrc.includes('src/admin/target.js') && /[Пп]амять браузера/.test(adminDocSrc)
+      && adminDocSrc.includes('сервер сайта'));
+  check('документы панели не обещают вход эпохи токена и не зовут на несуществующий экран',
+    !/токен GitHub|Токен не принят|api\.github\.com|Как получить токен/.test(adminDocSrc)
+      && !/файл успели изменить|одним коммитом/.test(adminDocSrc + editorDocSrc));
 }

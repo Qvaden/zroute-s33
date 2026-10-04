@@ -58,6 +58,13 @@ const ACTION_LABEL = {
 export function renderOverview(view) {
   const { data, problems, changes, file, weeks, account } = view;
 
+  /*
+    Заголовок называет тот сервер, чьи строки экран показывает. Надпись
+    «Сервер 33» была верна, пока набор был один; с правами по серверу она
+    стала врать: у модератора 44-го цифры на экране его, а заголовок чужой.
+  */
+  const serverTitle = view.serverTitle || 'Данные сайта';
+
   const active = data.alliances.filter((a) => a.active).length;
 
   // Ближайшая неделя, которая ещё не закончилась — та, что «сейчас в игре».
@@ -88,7 +95,7 @@ export function renderOverview(view) {
   return `
     <section class="adm-hero">
       <span class="eyebrow">Панель управления</span>
-      <h1 class="adm-h1">Сервер 33</h1>
+      <h1 class="adm-h1">${esc(serverTitle)}</h1>
       <p class="adm-lead">
         Данные лежат в базе, панель читает и пишет их напрямую. Вход тот же,
         что на форуме — ни токенов, ни доступа к репозиторию. Правки видны
@@ -125,7 +132,7 @@ export function renderOverview(view) {
           <div><span>Источник</span><b>${esc(file.path)}</b></div>
           <div><span>Объём</span><b>${esc(fmtSize(file.size))}</b></div>
           <div><span>Вы вошли как</span><b>${esc(account?.nick ?? '—')}</b></div>
-          <div><span>Ваши права</span><b>${view.canPush ? 'правка данных сайта' : 'только чтение'}</b></div>
+          <div><span>Ваши права</span><b>${view.canPush ? `правка — «${esc(serverTitle)}»` : 'только чтение'}</b></div>
         </div>
         ${
           view.canPush
@@ -135,12 +142,13 @@ export function renderOverview(view) {
                  не затирают работу друг друга.
                </p>
                <p class="muted">
-                 Резервная копия попадает в репозиторий раз в сутки: историю
+                 Резервная копия попадает в репозиторий каждые два часа: историю
                  сервера нельзя терять, а база живёт на одном аккаунте.
                </p>`
             : `<p class="adm-warn">
-                 Права на правку нет — только смотреть. Роль выдаёт владелец
-                 на вкладке «Игроки».
+                 Прав на правку нет — только смотреть. Модератора сайта выдаёт
+                 владелец на вкладке «Игроки»; право на один сервер пока
+                 заводится в базе, и даёт оно данные только этого сервера.
                </p>`
         }
       </section>
@@ -176,6 +184,12 @@ export function renderOverview(view) {
  * «кто трогал файл», а тут правки идут по одной, и последняя из них — это
  * часто одна клетка. Список отвечает на настоящий вопрос: «что здесь
  * происходило».
+ *
+ * Рядом с id стоит номер сервера. Модератор сайта и владелец видят журнал
+ * целиком, а «W1» без него — это запись сразу нескольких наборов, и соседняя
+ * правка чужого сервера выглядела бы своей. У серверного модератора база
+ * отдаёт только его строки, поэтому для него этот номер — подтверждение, что
+ * панель правит именно его набор.
  */
 function renderChanges(changes) {
   if (!changes?.length) {
@@ -193,6 +207,7 @@ function renderChanges(changes) {
           (c) => `<li>
             <b>${esc(ENTITY_LABEL[c.entity] ?? c.entity)}</b>
             <span class="adm-changes__what">${esc(ACTION_LABEL[c.action] ?? c.action)}</span>
+            ${c.server ? `<span class="muted">сервер ${esc(c.server)}</span>` : ''}
             ${c.entityId ? `<i class="adm-mono muted">${esc(c.entityId)}</i>` : ''}
             <span class="adm-changes__who muted">${esc(c.actorNick || 'неизвестно кто')} · ${esc(fmtWhen(c.at))}</span>
           </li>`

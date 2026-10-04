@@ -21,8 +21,8 @@
  *
  * ГДЕ ЖИВУТ ПРАВА. В базе. Ни одна проверка в этом файле не является защитой:
  * запрос можно отправить мимо панели, и тогда откажут правила доступа
- * (см. site_can_edit в supabase/applied/site-data.sql). Проверки нужны для понятных
- * сообщений, а не вместо базы.
+ * (см. site_can_edit_server в supabase/20261005-site-server-rights.sql).
+ * Проверки нужны для понятных сообщений, а не вместо базы.
  *
  * ПОЧЕМУ КАЖДЫЙ ЗАПРОС НАЗЫВАЕТ СЕРВЕР. С мультиарендой идентификаторы недель,
  * событий и текстов перестали быть глобальными: «W1» — это неделя первого
@@ -31,9 +31,14 @@
  * без `server_id` не попала бы в составной ключ. У альянсов идентификатор
  * глобален — поэтому `deleteAlliance` и не называет сервер, и это единственное
  * такое место в файле.
+ *
+ * Число берётся из `panelServer()` (src/admin/target.js) — у панели одна цель
+ * на чтение, запись и черновики, и спрашивать её у каждого места по отдельности
+ * значило бы позволить им разойтись.
  */
 import { rest, uploadFile } from '../db/client.js';
-import { datasetBody, writeServer } from '../data/server.js';
+import { datasetBody } from '../data/server.js';
+import { panelServer } from './target.js';
 
 /*
   Все изменяющие запросы начинают путь с фильтра по серверу, а не добавляют
@@ -45,20 +50,28 @@ import { datasetBody, writeServer } from '../data/server.js';
 
 /**
  * Всё разом, ровно в том виде, в каком раньше лежал data/live.json, — и только
- * своего сервера.
+ * того сервера, который панель правит.
  *
  * Так панель продолжает работать с привычным «сырым» объектом: экраны,
  * валидатор и логика правки (edit.js) написаны под него и проверены тестами.
  * Менять их заодно с хранилищем значило бы делать два больших изменения
  * в один шаг и не понять потом, какое из них что сломало.
+ *
+ * Номер передаётся явно, хотя база подставила бы и свой: чтение обязано назвать
+ * тот же сервер, что и запись. Совпадение двух чисел — не аккуратность, а
+ * защита от показывать один набор и сохранять в другой.
  */
 export async function readDataset() {
-  const raw = await rest('/rpc/site_dataset', { method: 'POST', body: datasetBody() });
+  const raw = await rest('/rpc/site_dataset', {
+    method: 'POST',
+    body: datasetBody(panelServer()),
+  });
 
   if (!raw || typeof raw !== 'object') {
     throw new Error(
       'База не отдала данные сайта. Похоже, не выполнен ' +
-        'supabase/applied/site-data.sql или supabase/applied/20261004-site-server-scope.sql.'
+        'supabase/applied/site-data.sql, supabase/applied/20261004-site-server-scope.sql ' +
+        'или supabase/20261005-site-server-rights.sql.'
     );
   }
   return raw;
@@ -70,9 +83,10 @@ export async function readDataset() {
  * То, что в git получалось само собой из истории коммитов. Пишется триггером
  * в базе, а не панелью, — правка из любого места всё равно попадёт в журнал.
  *
- * Сервера у журнала нет намеренно: журнал один на все серверы, а номер видно
- * в деталях самой строки. Экран «Обзор» потому и показывает правки соседних
- * серверов — владельцу их скрывать не от кого.
+ * Сервер у журнала есть, но список не фильтруется по цели панели: база по
+ * правилу доступа отдаёт владельцу все серверы, а модератору — только его, так
+ * что фильтровать здесь значило бы спорить с правами, а не читать их. Номер
+ * строки отдаётся экрану, чтобы соседняя правка не выглядела своей.
  */
 export async function recentChanges(limit = 20) {
   const rows = await rest(`/site_audit?select=*&order=at.desc&limit=${Number(limit)}`);
@@ -83,6 +97,7 @@ export async function recentChanges(limit = 20) {
     entity: r.entity,
     entityId: r.entity_id || '',
     action: r.action,
+    server: Number.isInteger(r.server_id) ? r.server_id : null,
   }));
 }
 
@@ -95,7 +110,7 @@ export async function recentChanges(limit = 20) {
  * @param {Record<string, 'win'|'loss'|null>} marks Пусто/null — удалить запись.
  */
 export async function saveWeekMarks(weekId, marks) {
-  const server = writeServer();
+  const server = panelServer();
   const rows = [];
   const remove = [];
 
@@ -138,7 +153,7 @@ export async function saveWeekMarks(weekId, marks) {
 export async function saveAlliance(a, sortOrder) {
   const body = {
     id: a.id,
-    server_id: writeServer(),
+    server_id: panelServer(),
     tag: a.tag,
     name: a.name,
     color: a.color || null,
@@ -196,7 +211,7 @@ export async function saveWeek(w) {
     method: 'POST',
     prefer: 'resolution=merge-duplicates',
     body: {
-      server_id: writeServer(),
+      server_id: panelServer(),
       id: w.id,
       number: Number(w.number),
       start_date: asDate(w.startDate),
@@ -208,7 +223,7 @@ export async function saveWeek(w) {
 
 export async function deleteWeek(id) {
   await rest(
-    `/site_weeks?server_id=eq.${writeServer()}&id=eq.${encodeURIComponent(id)}`,
+    `/site_weeks?server_id=eq.${panelServer()}&id=eq.${encodeURIComponent(id)}`,
     { method: 'DELETE' }
   );
 }
@@ -227,7 +242,7 @@ export async function saveEvent(e) {
         данных: server_id — чей это сайт, server_number — номер сервера,
         захваченного в игре.
       */
-      server_id: writeServer(),
+      server_id: panelServer(),
       id: e.id,
       event_date: asDate(e.date),
       type: e.type || 'other',
@@ -243,7 +258,7 @@ export async function saveEvent(e) {
 
 export async function deleteEvent(id) {
   await rest(
-    `/site_events?server_id=eq.${writeServer()}&id=eq.${encodeURIComponent(id)}`,
+    `/site_events?server_id=eq.${panelServer()}&id=eq.${encodeURIComponent(id)}`,
     { method: 'DELETE' }
   );
 }
@@ -255,7 +270,7 @@ export async function saveText(t) {
     method: 'POST',
     prefer: 'resolution=merge-duplicates',
     body: {
-      server_id: writeServer(),
+      server_id: panelServer(),
       key: t.key,
       title: t.title ?? '',
       body: t.body ?? '',
@@ -265,7 +280,7 @@ export async function saveText(t) {
 
 export async function deleteText(key) {
   await rest(
-    `/site_texts?server_id=eq.${writeServer()}&key=eq.${encodeURIComponent(key)}`,
+    `/site_texts?server_id=eq.${panelServer()}&key=eq.${encodeURIComponent(key)}`,
     { method: 'DELETE' }
   );
 }

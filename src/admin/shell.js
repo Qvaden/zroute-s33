@@ -10,6 +10,20 @@ import { draftWeekIds } from './draft.js';
  * панель был бы «зайти с рабочим токеном», а значит её нельзя ни проверить,
  * ни показать, не выдав доступ.
  *
+ * РЯД СЕРВЕРОВ В ШАПКЕ.
+ *   Панель правит один набор, и число в бренде обязано называть именно его, а
+ *   не сервер из config.js: модератор 44-го, увидев рядом с «панель» тройку,
+ *   решит, что правит чужую историю, — или, что хуже, правит её и не заметит.
+ *
+ *   Ряд показывается, только когда править чем больше: под одним сервером
+ *   переключатель — шум. В нём лежат только серверы, где право есть (их даёт
+ *   `writableServers`), поэтому исчезнувшая кнопка означает снятое право, а не
+ *   забывчивость панели.
+ *
+ *   Это НЕ тот ряд, что в шапке сайта: там выбор зрителя, который меняется
+ *   щелчком и ничего не пишет. Объяснение цены расхождения — в шапке
+ *   src/admin/target.js.
+ *
  * @param {{
  *   screens: {id: string, label: string}[],
  *   activeId: string,
@@ -18,9 +32,14 @@ import { draftWeekIds } from './draft.js';
  *   role?: string,
  *   canPush?: boolean,
  *   weekIds?: string[],
+ *   server?: number|null,
+ *   servers?: {id: number, title: string}[],
  * }} opts
  */
-export function renderShell({ screens, activeId, inner, login = '', role = '', canPush = true, weekIds, theme = 'dark' }) {
+export function renderShell({
+  screens, activeId, inner, login = '', role = '', canPush = true, weekIds,
+  server = null, servers = [], theme = 'dark',
+}) {
   /*
     Значок незаконченного ввода виден с любого экрана. Черновик живёт
     в браузере и молча ждёт публикации — без напоминания неделя может
@@ -34,11 +53,25 @@ export function renderShell({ screens, activeId, inner, login = '', role = '', c
   const known = weekIds ? new Set(weekIds) : null;
   const drafts = draftWeekIds().filter((id) => !known || known.has(id));
 
+  const serverRow = servers.length > 1
+    ? `<div class="adm-servers" role="group" aria-label="Какой сервер править">
+        ${servers
+          .map((s) => {
+            const on = Number(s.id) === Number(server);
+            return `<button type="button" class="adm-servers__btn${on ? ' is-on' : ''}"
+                    data-panel-server="${esc(s.id)}" aria-pressed="${on ? 'true' : 'false'}"
+                    title="Править данные «${esc(s.title)}»">${esc(s.id)}</button>`;
+          })
+          .join('')}
+      </div>`
+    : '';
+
   return `
     <header class="adm-top">
       <a class="adm-top__brand" href="#/overview">
-        <b>33</b><span>панель</span>
+        <b>${server === null ? '—' : esc(server)}</b><span>панель</span>
       </a>
+      ${serverRow}
       <nav class="adm-nav">
         ${screens
           .map(
@@ -76,7 +109,7 @@ export function renderShell({ screens, activeId, inner, login = '', role = '', c
     <main class="adm-main">${inner}</main>
 
     <footer class="adm-foot">
-      <span>Данные живут в базе · отдельного сервера у панели нет</span>
+      <span>Данные живут в базе · панель правит ${server === null ? 'не выбранный пока сервер' : `сервер ${esc(server)}`}</span>
       <a href="./index.html">Открыть сайт</a>
     </footer>`;
 }
