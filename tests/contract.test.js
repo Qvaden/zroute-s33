@@ -12036,11 +12036,11 @@ console.log('\nAM. Фид магазина: обновление и событи
   );
 
   /* ── Реестр и документы ── */
-  check('реестр говорит, что шаг и его исправление прогнаны, а очередь называет следующий файл',
+  check('реестр говорит, что шаг и его исправление прогнаны, а очередь называет пустой',
     readmeSrc.includes('Прогнан 04.10.2026')
       && readmeSrc.includes('20261004-site-next-id-anon.sql')
       && readmeSrc.includes('обязан быть прогнан до пуша')
-      && readmeSrc.includes('Сейчас в очереди один файл'));
+      && readmeSrc.includes('Очередь пуста'));
   check('реестр объясняет, чего в шаге нет: отдельного снимка на сервер, а права уже сделаны',
     readmeSrc.includes('отдельный снимок `data/live.json` на каждый сервер')
       && readmeSrc.includes('Право вносить данные по серверу даёт не этот файл')
@@ -12323,7 +12323,7 @@ console.log('\nAM. Фид магазина: обновление и событи
     и с LF — одна правка формата не должна превращать живую проверку в мёртвую.
   */
   const text = async (p) => (await readFile(p, 'utf8')).replace(/\r\n/g, '\n');
-  const mig = await text('supabase/20261005-site-server-rights.sql');
+  const mig = await text('supabase/applied/20261005-site-server-rights.sql');
   const targetSrc = await text('src/admin/target.js');
   const mainSrc = await text('src/admin/main.js');
   const shellSrc = await text('src/admin/shell.js');
@@ -12595,12 +12595,14 @@ console.log('\nAM. Фид магазина: обновление и событи
   const adminDocSrc = await readFile('docs/ADMIN.md', 'utf8');
   const editorDocSrc = await readFile('docs/EDITOR-GUIDE.md', 'utf8');
 
-  check('реестр стоит в очереди и описан: по нему идут в SQL Editor',
+  check('реестр ставит шаг 3 в историю и называет дату прогона',
     queueSrc.includes('20261005-site-server-rights.sql')
       && queueSrc.includes('ещё не выполнены')
-      && /`20261005-site-server-rights\.sql` — шаг 3/.test(queueSrc));
-  check('реестр говорит, что файл обязан быть прогнан до пуша, и почему',
-    queueSrc.includes('обязан быть прогнан до пуша'));
+      && /`20261005-site-server-rights\.sql` — шаг 3/.test(queueSrc)
+      && queueSrc.includes('Прогнан 05.10.2026, файл лежит в `applied/`'));
+  check('реестр говорит, зачем шаг был нужен до пуша кода',
+    /Порядок здесь был такой: сперва прогон файла, потом пуш кода/.test(queueSrc)
+      && queueSrc.includes('кончилось бы отказом политики'));
   check('реестр не оставляет шаг 1 в списке незакрытого: права сделаны',
     !queueSrc.includes('Не здесь: права на внесение по серверу (модератор одного сервера сегодня правит чужую неделю'));
   check('документ переезда описывает шаг 3 и не врёт про прежние два признака прав',

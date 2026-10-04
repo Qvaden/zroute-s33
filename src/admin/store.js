@@ -21,7 +21,7 @@
  *
  * ГДЕ ЖИВУТ ПРАВА. В базе. Ни одна проверка в этом файле не является защитой:
  * запрос можно отправить мимо панели, и тогда откажут правила доступа
- * (см. site_can_edit_server в supabase/20261005-site-server-rights.sql).
+ * (см. site_can_edit_server в supabase/applied/20261005-site-server-rights.sql).
  * Проверки нужны для понятных сообщений, а не вместо базы.
  *
  * ПОЧЕМУ КАЖДЫЙ ЗАПРОС НАЗЫВАЕТ СЕРВЕР. С мультиарендой идентификаторы недель,
@@ -71,7 +71,7 @@ export async function readDataset() {
     throw new Error(
       'База не отдала данные сайта. Похоже, не выполнен ' +
         'supabase/applied/site-data.sql, supabase/applied/20261004-site-server-scope.sql ' +
-        'или supabase/20261005-site-server-rights.sql.'
+        'или supabase/applied/20261005-site-server-rights.sql.'
     );
   }
   return raw;

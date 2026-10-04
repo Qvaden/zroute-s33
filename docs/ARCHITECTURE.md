@@ -184,7 +184,7 @@ sheets-адаптеру поддельный CSV и проверяет, что �
 ## Право вносить данные по серверу
 
 Шаг 3 мультиаренды данных сайта
-([`supabase/20261005-site-server-rights.sql`](../supabase/20261005-site-server-rights.sql)).
+([`supabase/applied/20261005-site-server-rights.sql`](../supabase/applied/20261005-site-server-rights.sql)).
 Пока право было одноклассным (`site_can_edit()` смотрит на роль в `forum_users`),
 второй сервер оставался витриной: модератор 44-го правил чужую неделю на 33-м.
 
