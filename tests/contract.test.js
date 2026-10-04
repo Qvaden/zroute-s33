@@ -1402,6 +1402,58 @@ console.log('\nL. Летопись сервера: захватили, защи�
   );
   check('на экране недели нет блока итога', !weekHtml.includes('data-server-block'));
   check('на экране недели остались клетки альянсов', weekHtml.includes('data-cell='));
+
+  /* ── Фильтр клеток и одна массовая отметка вместо десятка «Х» ── */
+  const { readFile: readAdmCss } = await import('node:fs/promises');
+  const weekTwo = {
+    data: {
+      weeks: mapWeeks([{ id: 'W1', number: 1, startDate: '2026-07-27', endDate: '2026-08-02' }]),
+      alliances: [
+        { id: 'a01', tag: 'ZOR', name: 'Зорч', active: true },
+        { id: 'a02', tag: 'QNT', name: 'Квант', active: true },
+      ],
+    },
+    raw: { results: [{ weekId: 'W1', allianceId: 'a01', outcome: 'win' }], weeks: [], alliances: [] },
+    canPush: true,
+    weekId: 'W1',
+    marks: { a01: 'win' },
+  };
+
+  const filtered = weekScreen(weekTwo, null);
+  check('над клетками есть поле поиска', filtered.includes('data-cell-query'));
+  check('есть переключатель «только неотмеченные»', filtered.includes('data-cell-only-empty'));
+  check('есть счётчик показанных клеток', filtered.includes('data-cell-shown'));
+  check(
+    'клетка несёт строку поиска уже в нижнем регистре',
+    filtered.includes('data-cell-find="qnt квант"'),
+    'иначе «Квант» не найдётся по слову «квант»'
+  );
+  check(
+    'массовая кнопка считает только неотмеченных',
+    /data-mass-loss[\s\S]*?<b data-mass-count>1<\/b>/.test(filtered),
+    'отмеченный альянс не должен попадать в число'
+  );
+
+  const prefilled = weekScreen({ ...weekTwo, weekFilter: { q: 'кван' } }, null);
+  check(
+    'введённое слово остаётся в поле после перерисовки',
+    prefilled.includes('value="кван"'),
+    'экран пересобирают после публикации и после сброса черновика'
+  );
+
+  const allMarked = weekScreen({ ...weekTwo, marks: { a01: 'win', a02: 'loss' } }, null);
+  check('когда неотмеченных не осталось, массовой кнопки нет', !allMarked.includes('data-mass-loss'));
+
+  const readOnly = weekScreen({ ...weekTwo, canPush: false }, null);
+  check('без права на запись массовой кнопки нет', !readOnly.includes('data-mass-loss'));
+  check('без права на записи фильтр остаётся', readOnly.includes('data-cell-query'));
+
+  const admCss = await readAdmCss('src/admin/admin.css', 'utf8');
+  check(
+    'скрытая клетка убирается из сетки, а не только визуально',
+    /\.adm-cell\[hidden\]\s*\{\s*display:\s*none/.test(admCss),
+    '.adm-cell задаёт display:grid и перебивает заводское [hidden]'
+  );
 }
 
 // ── M. Правка хронологии ────────────────────────────────────────────────────

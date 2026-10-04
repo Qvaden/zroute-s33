@@ -15,6 +15,15 @@ import { byWeekStartDesc, findCurrentWeek } from '../../data/week-order.js';
  * — Каждое нажатие сразу уходит в черновик. Ничего не «сохраняется» отдельно,
  *   потому что забыть нажать «сохранить» — самый частый способ потерять работу.
  * — Публикация одна на всю неделю: один коммит вместо тридцати двух.
+ * — Над клетками стоит фильтр: по тегу или названию и «только неотмеченные».
+ *   Дело не в красоте: человек идёт по списку в том порядке, в котором ему
+ *   ответили альянсы, а клетки стоят по тегу. Значит каждую следующую надо
+ *   искать глазами, и на двадцати шести альянсах поиск стоит дороже самого
+ *   нажатия. Отмеченное при фильтре прячется — список тает сам, и его конец
+ *   означает «недели больше проверять не нужно».
+ * — Кнопка «Неотмеченным — поражение» закрывает самый частый хвост недели:
+ *   альянсы, которые молчат. Раньше каждому вручную тыкали Х по одной клетке.
+ *   Кнопка сперва называет число и теги, и только потом пишет.
  *
  * Чего здесь НЕТ: захватов и защит. У недели одна обязанность — счёт альянсов.
  * Что делал сервер целиком, живёт в хронологии отдельными событиями, иначе один
@@ -61,6 +70,16 @@ export function renderWeek(view, param) {
   const pct = total ? Math.round((filled / total) * 100) : 0;
   const diff = diffMarks(raw, selected.id, current);
 
+  /*
+    Состояние фильтра принадлежит view, а не разметке: экран перерисовывают
+    после публикации и после сброса черновика, и найденное слово не должно
+    исчезать вместе с набранным полем. Тем, что именно показывать, заведует
+    main.js — здесь только начальное значение поля и кнопки.
+  */
+  const filter = view.weekFilter ?? {};
+  const onlyEmpty = Boolean(filter.onlyEmpty);
+  const emptyCount = alliances.filter((a) => !current[a.id]).length;
+
   const picker = renderPicker(weeks, selected);
 
   const cells = alliances
@@ -68,6 +87,7 @@ export function renderWeek(view, param) {
       const outcome = current[a.id] ?? null;
       const state = outcome ?? 'empty';
       return `<div class="adm-cell adm-cell--${state}" data-cell="${esc(a.id)}"
+                   data-cell-find="${esc(`${a.tag} ${a.name}`.toLowerCase())}"
                    style="--tag-color:${esc(a.color || '#7a8494')}">
           <span class="adm-cell__tag">${esc(a.tag)}</span>
           <span class="adm-cell__name">${esc(a.name)}</span>
@@ -113,6 +133,28 @@ export function renderWeek(view, param) {
           ? ''
           : `<p class="adm-warn">У вас нет права на запись, поэтому клетки не нажимаются.
                Исправления вносят редакторы сайта — право выдаёт владелец на вкладке «Игроки».</p>`
+      }
+
+      <div class="adm-filter">
+        <input class="adm-filter__input" type="search" data-cell-query autocomplete="off"
+               aria-label="Найти альянс по тегу или названию"
+               placeholder="Найти альянс: тег или название" value="${esc(filter.q ?? '')}">
+        <button type="button" class="adm-chip adm-filter__chip ${onlyEmpty ? 'is-on' : ''}"
+                data-cell-only-empty aria-pressed="${onlyEmpty ? 'true' : 'false'}"
+                title="Показывать только те, кого ещё не отмечали">Только неотмеченные</button>
+        <span class="muted adm-filter__count" data-cell-shown hidden></span>
+      </div>
+
+      ${
+        canPush && emptyCount
+          ? `<p class="adm-mass">
+               <button type="button" class="adm-btn" data-mass-loss
+                       title="Тем, кого ещё не отмечали на этой неделе">
+                 Неотмеченным — поражение <b data-mass-count>${emptyCount}</b>
+               </button>
+             </p>
+             <div class="adm-result" data-mass-box hidden></div>`
+          : ''
       }
 
       <div class="adm-cells">${cells}</div>

@@ -329,6 +329,43 @@
 }
 .adm-progress i { display: block; height: 100%; background: var(--win); border-radius: 999px; transition: width .3s var(--ease); }
 
+/*
+  Поиск и фильтр неотмеченных стоят НАД клетками, а не внутри панели:
+  тридцать два альянса на телефоне — это четыре экрана прокрутки, и поле,
+  которое уехало вместе со списком, пришлось бы доскроллить назад.
+  Поле не перерисовывается при наборе, поэтому высота фиксирована и
+  равна высоте кнопки отметки — строка не прыгает.
+*/
+.adm-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.adm-filter__input {
+  flex: 1 1 190px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 14px;
+}
+.adm-filter__input:focus { outline: none; border-color: var(--accent); }
+.adm-filter__input::placeholder { color: var(--mute); }
+/* Крестик браузера прячем: у поля есть сосед-переключатель, и две кнопки
+   очистки в ряд читаются как одна. */
+.adm-filter__input::-webkit-search-cancel-button { display: none; }
+.adm-filter__chip { flex: 0 0 auto; min-height: 40px; font-family: inherit; cursor: pointer; }
+.adm-filter__count { font-size: 12.5px; }
+
+.adm-mass { margin: 12px 0 0; }
+.adm-mass b { font-variant-numeric: tabular-nums; }
+
 .adm-cells {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -347,6 +384,10 @@
   border-left: 3px solid var(--tag-color);
   border-radius: var(--r-sm);
 }
+/* Прямое правило нужно именно здесь: .adm-cell задаёт display:grid, и оно
+   перебивает заводское [hidden] { display:none }. Без него фильтр прятал бы
+   клетку, но grid-ячейка оставалась бы в раскладке. */
+.adm-cell[hidden] { display: none; }
 .adm-cell__tag {
   grid-area: tag;
   font-family: Unbounded, sans-serif;

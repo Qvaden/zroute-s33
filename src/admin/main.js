@@ -29,18 +29,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=43';
-import { esc, plural } from '../ui/helpers.js?v=43';
-import { mapDataset } from '../data/adapters/_map.js?v=43';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=43';
-import { validateDataset } from '../data/contract.js?v=43';
+import { CONFIG } from '../../config.js?v=44';
+import { esc, plural } from '../ui/helpers.js?v=44';
+import { mapDataset } from '../data/adapters/_map.js?v=44';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=44';
+import { validateDataset } from '../data/contract.js?v=44';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=43';
-import { renderHome } from '../pages/home.js?v=43';
+} from '../logic/standings.js?v=44';
+import { renderHome } from '../pages/home.js?v=44';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,13 +57,13 @@ import { renderHome } from '../pages/home.js?v=43';
 */
 import {
   currentAccount, signIn, signOut, canEditSite, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=43';
+} from '../db/account.js?v=44';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator,
-} from './store.js?v=43';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=43';
-import { roleLabel } from '../forum/roles.js?v=43';
-import { prepareImage, uploadPath } from './image.js?v=43';
+} from './store.js?v=44';
+import { diffDataset, applyChanges, describeChanges } from './publish.js?v=44';
+import { roleLabel } from '../forum/roles.js?v=44';
+import { prepareImage, uploadPath } from './image.js?v=44';
 import {
   applyMarks,
   applyEvents,
@@ -84,7 +84,7 @@ import {
   nextAllianceId,
   textsFromRaw,
   applyTexts,
-} from './edit.js?v=43';
+} from './edit.js?v=44';
 import {
   getDraft,
   saveDraft,
@@ -101,23 +101,23 @@ import {
   getTextsDraft,
   saveTextsDraft,
   dropTextsDraft,
-} from './draft.js?v=43';
-import { renderShell } from './shell.js?v=43';
-import { renderLogin } from './login.js?v=43';
-import { renderOverview } from './screens/overview.js?v=43';
-import { renderWeek, describe } from './screens/week.js?v=43';
-import { renderAlliances } from './screens/alliances.js?v=43';
-import { renderEvents } from './screens/events.js?v=43';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=43';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=43';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=43';
-import { renderQuarter } from './screens/quarter.js?v=43';
-import { renderPresident } from './screens/president.js?v=43';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=43';
-import { renderModeration } from './screens/moderation.js?v=43';
-import { renderChatsAdmin } from './screens/chats.js?v=43';
-import { forum } from '../forum/index.js?v=43';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=43';
+} from './draft.js?v=44';
+import { renderShell } from './shell.js?v=44';
+import { renderLogin } from './login.js?v=44';
+import { renderOverview } from './screens/overview.js?v=44';
+import { renderWeek, describe } from './screens/week.js?v=44';
+import { renderAlliances } from './screens/alliances.js?v=44';
+import { renderEvents } from './screens/events.js?v=44';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=44';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=44';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=44';
+import { renderQuarter } from './screens/quarter.js?v=44';
+import { renderPresident } from './screens/president.js?v=44';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=44';
+import { renderModeration } from './screens/moderation.js?v=44';
+import { renderChatsAdmin } from './screens/chats.js?v=44';
+import { forum } from '../forum/index.js?v=44';
+import { deletionReason, categoryLabel } from '../forum/rules.js?v=44';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -261,6 +261,13 @@ function render() {
     из середины длинного списка игроков.
   */
   if (screenChanged) window.scrollTo(0, 0);
+  /*
+    Фильтр клеток навешиваем сразу после сборки экрана: разметка знает про
+    состояние поля и кнопки, но не про то, какие клетки прятать. Между
+    innerHTML и этим вызовом экран не успевает отрисоваться, поэтому мигания
+    со «сначала видно всё, потом прячется» нет.
+  */
+  if (screen.id === 'week') refreshWeekFilters();
 }
 
 /**
@@ -492,6 +499,120 @@ function toggleMark(cell, mark) {
   saveDraft(view.weekId, view.marks);
   paintCell(allianceId);
   paintProgress();
+  /*
+    Фильтр обновляем после каждой отметки, а не только по нажатию на него:
+    иначе включённые «неотмеченные» остались бы списком, который не уменьшается,
+    и человек не видел бы разницы между «внёс» и «ещё нет».
+  */
+  refreshWeekFilters();
+}
+
+/**
+ * Какие клетки недели показывать и сколько их осталось без отметки.
+ *
+ * Клетки не перерисовываются: меняем только hidden. Перерисовка на каждую
+ * букву поиска выбросила бы и прокрутку, и курсор из поля — а этим полем
+ * пользуются тридцать раз подряд.
+ */
+function refreshWeekFilters() {
+  const form = root.querySelector('[data-week-form]');
+  if (!form) return;
+
+  const filter = view?.weekFilter ?? {};
+  const query = String(filter.q ?? '').trim().toLowerCase();
+  const onlyEmpty = Boolean(filter.onlyEmpty);
+
+  const cells = [...form.querySelectorAll('[data-cell]')];
+  let shown = 0;
+  let unmarked = 0;
+
+  for (const cell of cells) {
+    const marked = !cell.classList.contains('adm-cell--empty');
+    if (!marked) unmarked++;
+    const hit =
+      (!query || (cell.dataset.cellFind ?? '').includes(query)) && (!onlyEmpty || !marked);
+    cell.hidden = !hit;
+    if (hit) shown++;
+  }
+
+  const count = form.querySelector('[data-cell-shown]');
+  if (count) {
+    count.hidden = !query && !onlyEmpty;
+    count.textContent = `показано ${shown} из ${cells.length}`;
+  }
+
+  /*
+    Кнопка массовой отметки исчезает, когда неотмеченных не осталось: после
+    нажатия на неё весь хвост недели закрыт, и висящая рядом кнопка с нулём —
+    просто мусор на экране.
+  */
+  const mass = form.querySelector('[data-mass-loss]');
+  if (mass) {
+    mass.hidden = unmarked === 0;
+    const label = mass.querySelector('[data-mass-count]');
+    if (label) label.textContent = String(unmarked);
+  }
+}
+
+/** Альянсы без отметки на показанной неделе, в порядке списка. */
+function unmarkedCells() {
+  const form = root.querySelector('[data-week-form]');
+  if (!form) return [];
+  return [...form.querySelectorAll('[data-cell]')].filter((c) => c.classList.contains('adm-cell--empty'));
+}
+
+/**
+ * Просьба подтвердить массовое поражение.
+ *
+ * Подтверждение обязательное, а не сразу: это единственное действие экрана,
+ * которое касается разом двадцати с лишним записей. Список тегов показывает
+ * именно потому, что промах по числу («13») ничего не докажет, а поимённый
+ * перечень молчащего альянса человек узнаёт.
+ */
+function askMassLoss() {
+  const box = root.querySelector('[data-mass-box]');
+  const cells = unmarkedCells();
+  if (!box || !cells.length) return;
+
+  const tags = cells.map((c) => {
+    const a = view.data.alliances.find((x) => x.id === c.dataset.cell);
+    return a ? a.tag : c.dataset.cell;
+  });
+  const number = view.data.weeks.find((w) => w.id === view.weekId)?.number;
+
+  box.className = 'adm-result';
+  box.hidden = false;
+  box.innerHTML = `
+    <b>${esc(plural(cells.length, 'альянс получит', 'альянса получат', 'альянсов получают'))}
+       поражение${number == null ? ` на неделе ${esc(view.weekId)}` : ` на неделе ${esc(String(number))}`}.</b>
+    <p class="muted">${esc(tags.join(', '))}</p>
+    <p class="muted">Отмеченные ранее не тронем. Опубликуется только после кнопки
+       «Опубликовать» ниже; отменить — «Сбросить».</p>
+    <p>
+      <button type="button" class="adm-btn adm-btn--primary" data-mass-confirm>Да, проставить</button>
+      <button type="button" class="adm-btn" data-mass-cancel>Отмена</button>
+    </p>`;
+}
+
+/** Проставить Х всем ещё не отмеченным. Черновик, но не публикация. */
+function applyMassLoss() {
+  const cells = unmarkedCells();
+  if (!cells.length) return;
+
+  const additions = {};
+  for (const cell of cells) additions[cell.dataset.cell] = 'loss';
+  view.marks = { ...view.marks, ...additions };
+
+  saveDraft(view.weekId, view.marks);
+  for (const cell of cells) paintCell(cell.dataset.cell);
+  paintProgress();
+  refreshWeekFilters();
+
+  const box = root.querySelector('[data-mass-box]');
+  if (box) {
+    box.hidden = true;
+    box.innerHTML = '';
+  }
 }
 
 /**
@@ -2134,6 +2255,41 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  /*
+    «Только неотмеченные» переключается на месте, без render(): перерисовка
+    экрана выбросила бы курсор из поля поиска, а эти два действия выполняют
+    вместе — ищут и фильтруют.
+  */
+  const onlyEmptyBtn = e.target.closest('[data-cell-only-empty]');
+  if (onlyEmptyBtn) {
+    if (!view) return;
+    view.weekFilter = { ...(view.weekFilter ?? {}), onlyEmpty: !view.weekFilter?.onlyEmpty };
+    onlyEmptyBtn.classList.toggle('is-on', view.weekFilter.onlyEmpty);
+    onlyEmptyBtn.setAttribute('aria-pressed', view.weekFilter.onlyEmpty ? 'true' : 'false');
+    refreshWeekFilters();
+    return;
+  }
+
+  if (e.target.closest('[data-mass-loss]')) {
+    askMassLoss();
+    return;
+  }
+
+  if (e.target.closest('[data-mass-confirm]')) {
+    applyMassLoss();
+    return;
+  }
+
+  const massCancel = e.target.closest('[data-mass-cancel]');
+  if (massCancel) {
+    const box = massCancel.closest('[data-mass-box]');
+    if (box) {
+      box.hidden = true;
+      box.innerHTML = '';
+    }
+    return;
+  }
+
   if (e.target.closest('[data-preview-toggle]')) {
     togglePreview();
     return;
@@ -2349,6 +2505,18 @@ document.addEventListener('input', (e) => {
     document.querySelectorAll('[data-player-search-text]').forEach((row) => {
       row.hidden = Boolean(query) && !row.dataset.playerSearchText.includes(query);
     });
+    return;
+  }
+
+  /*
+    Поиск по клеткам недели. Слушаем input, а не change: человек вводит «kop»,
+    видит одну клетку и тут же тыкает по ней — поле при этом фокус не теряет,
+    и на change он бы не попал до самого конца работы.
+  */
+  const cellQuery = e.target.closest?.('[data-cell-query]');
+  if (cellQuery && view) {
+    view.weekFilter = { ...(view.weekFilter ?? {}), q: cellQuery.value };
+    refreshWeekFilters();
     return;
   }
 
