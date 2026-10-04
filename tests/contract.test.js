@@ -12580,6 +12580,13 @@ console.log('\nAM. Фид магазина: обновление и событи
       && renderShell({ ...base, server: null, servers: [] }).includes('<b>—</b>'));
   check('ряд описан стилем, которым нарисовано остальное',
     cssSrc.includes('.adm-servers') && cssSrc.includes('.adm-servers__btn.is-on'));
+  /*
+    Шапка на десктопе не переносится, а навигация — десять ссылок, которые не
+    сжимаются. Ряд серверов добавился в этот же ряд, и без этих двух правил он
+    вытеснил бы ссылки за правый край шапки на узком окне.
+  */
+  check('ряд не вытесняет навигацию: кнопки целые, ссылки листаются',
+    /@media \(min-width: 900px\)[\s\S]{0,300}\.adm-servers \{ flex: none; \}[\s\S]{0,160}\.adm-nav \{[^}]*min-width: 0[^}]*overflow-x: auto/.test(cssSrc));
 
   /* ── Документы ── */
   const queueSrc = await readFile('supabase/README.md', 'utf8');

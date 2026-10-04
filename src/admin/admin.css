@@ -794,7 +794,10 @@
 
 @media (min-width: 900px) {
   .adm-top { padding: 12px 26px; flex-wrap: nowrap; }
-  .adm-nav { order: 0; width: auto; overflow: visible; margin-left: 12px; }
+  /* Ряд серверов добавился в шапку, где места и без него в обрез: кнопки
+     выбора не сжимаются, а листается навигация — ссылки важнее друг друга. */
+  .adm-servers { flex: none; }
+  .adm-nav { order: 0; width: auto; min-width: 0; overflow-x: auto; margin-left: 12px; }
   .adm-who { display: flex; }
   .adm-main { padding: 30px 26px 70px; }
   .adm-foot { padding: 18px 26px; }
