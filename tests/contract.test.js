@@ -11839,8 +11839,9 @@ console.log('\nAM. Фид магазина: обновление и событи
     anon`, и живой вызов публичным ключом ответил числом — Postgres выдаёт
     EXECUTE роли PUBLIC при создании функции, а anon входит в PUBLIC. Поэтому
     проверка смотрит не на намерение, а на форму, которая реально снимает право.
+    Исправляющий файл уже прогнан, поэтому читается из истории, как и шаг.
   */
-  const nextIdSql = await readFile('supabase/20261004-site-next-id-anon.sql', 'utf8');
+  const nextIdSql = await readFile('supabase/applied/20261004-site-next-id-anon.sql', 'utf8');
   check('гостю этот номер закрыт снятием и с PUBLIC, а панели вернён grant',
     nextIdSql.includes('revoke all on function public.site_next_alliance_id() from public, anon')
       && nextIdSql.includes('grant execute on function public.site_next_alliance_id() to authenticated'));
@@ -11885,16 +11886,17 @@ console.log('\nAM. Фид магазина: обновление и событи
   );
 
   /* ── Реестр и документы ── */
-  check('реестр говорит, что шаг прогнан, и держит в очереди его исправление',
+  check('реестр говорит, что шаг и его исправление прогнаны, а очередь закрыта',
     readmeSrc.includes('Прогнан 04.10.2026')
       && readmeSrc.includes('20261004-site-next-id-anon.sql')
-      && readmeSrc.includes('обязан быть прогнан до пуша'));
+      && readmeSrc.includes('обязан быть прогнан до пуша')
+      && readmeSrc.includes('Очередь пуста'));
   check('реестр объясняет, чего в шаге нет, чтобы не ждали переключателя и прав',
     readmeSrc.includes('переключатель сервера в шапке сайта')
       && readmeSrc.includes('права на внесение по серверу'));
   check('документ переезда называет шаг и его проверку одной строкой',
     migDoc.includes('20261004-site-server-scope.sql') && migDoc.includes('site_dataset(p_server)'));
-  check('и называет исправление прав тем же способом — файлом из папки',
-    migDoc.includes('supabase/20261004-site-next-id-anon.sql')
+  check('и называет исправление прав тем же способом — файлом из истории',
+    migDoc.includes('supabase/applied/20261004-site-next-id-anon.sql')
       && migDoc.includes('permission denied for function site_next_alliance_id'));
 }
