@@ -75,7 +75,7 @@ async function raw() {
     if (!data || typeof data !== 'object') {
       throw new Error(
         'База не отдала данные сайта. Похоже, не выполнен ' +
-          'supabase/applied/site-data.sql или supabase/20261004-site-server-scope.sql.'
+          'supabase/applied/site-data.sql или supabase/applied/20261004-site-server-scope.sql.'
       );
     }
     return data;

@@ -739,7 +739,7 @@ console.log('\nJ. Админ-панель');
   /*
     МУЛЬТАРЕНДА ДАННЫХ САЙТА.
 
-    С `supabase/20261004-site-server-scope.sql` id недели, события и текста
+    С `supabase/applied/20261004-site-server-scope.sql` id недели, события и текста
     перестали быть глобальными: «W1» живёт на каждом сервере своя. Значит
     запрос, в котором сервер не назван, опасен не косметически — DELETE по
     одному id сносит неделю у всех, а вставка без `server_id` попадает в ключ,
@@ -11777,8 +11777,8 @@ console.log('\nAM. Фид магазина: обновление и событи
    пропущенного `server_id` в запросе, и эти проверки его не увидят бы.
 ────────────────────────────────────────────────────────────────────────────── */
 {
-  const { readFile } = await import('node:fs/promises');
-  const sql = await readFile('supabase/20261004-site-server-scope.sql', 'utf8');
+  const { readFile, readdir } = await import('node:fs/promises');
+  const sql = await readFile('supabase/applied/20261004-site-server-scope.sql', 'utf8');
   const storeSrc = await readFile('src/admin/store.js', 'utf8');
   const adapterSrc = await readFile('src/data/adapters/supabase.js', 'utf8');
   const bootSrc = await readFile('src/admin/main.js', 'utf8');
@@ -11832,10 +11832,45 @@ console.log('\nAM. Фид магазина: обновление и событи
       && /body: datasetBody\(\)/.test(adapterSrc) && /body: datasetBody\(\)/.test(storeSrc));
 
   /* ── Свободный номер альянса ── */
-  check('номер альянса считает база по всем серверам, и гостю он не открыт',
-    sql.includes('function public.site_next_alliance_id()')
-      && sql.includes('grant execute on function public.site_next_alliance_id() to authenticated')
-      && sql.includes('revoke execute on function public.site_next_alliance_id() from anon'));
+  check('номер альянса считает база по всем серверам',
+    sql.includes('function public.site_next_alliance_id()'));
+  /*
+    Отдельный прогон после шага: в самом файле стояло `revoke execute ... from
+    anon`, и живой вызов публичным ключом ответил числом — Postgres выдаёт
+    EXECUTE роли PUBLIC при создании функции, а anon входит в PUBLIC. Поэтому
+    проверка смотрит не на намерение, а на форму, которая реально снимает право.
+  */
+  const nextIdSql = await readFile('supabase/20261004-site-next-id-anon.sql', 'utf8');
+  check('гостю этот номер закрыт снятием и с PUBLIC, а панели вернён grant',
+    nextIdSql.includes('revoke all on function public.site_next_alliance_id() from public, anon')
+      && nextIdSql.includes('grant execute on function public.site_next_alliance_id() to authenticated'));
+
+  /*
+    Та же ошибка в масштабе: `revoke ... on function ... from anon` без `public`
+    право не снимает (EXECUTE по умолчанию выдан PUBLIC, а anon в него входит).
+    Просмотреть такое глазами в одном файле легко, поэтому проверка проходит по
+    всей истории и требует, чтобы для каждого имени функции снятие с PUBLIC
+    где-то стояло — в том же файле или в следующем исправляющем.
+  */
+  const allSql = [];
+  for (const name of await readdir('supabase')) {
+    if (name.endsWith('.sql')) allSql.push(await readFile(`supabase/${name}`, 'utf8'));
+  }
+  for (const name of await readdir('supabase/applied')) {
+    if (name.endsWith('.sql')) allSql.push(await readFile(`supabase/applied/${name}`, 'utf8'));
+  }
+  const revoked = [];
+  const withPublic = new Set();
+  for (const text of allSql) {
+    for (const m of text.matchAll(
+      /revoke\s+[^;]*on\s+function\s+public\.([a-z_]+)\s*\([^)]*\)\s*from\s+([^;]+);/g
+    )) {
+      revoked.push(m[1]);
+      if (/\bpublic\b/.test(m[2])) withPublic.add(m[1]);
+    }
+  }
+  equal('у каждой закрытой функции снятие права дошло до PUBLIC',
+    [...new Set(revoked)].filter((n) => !withPublic.has(n)).join(', '), '');
   check('панель спрашивает этот номер до создания альянса и не падает без него',
     bootSrc.includes('allianceFloor = await nextAllianceNumber();')
       && /try \{\s*allianceFloor = await nextAllianceNumber\(\);\s*\} catch \{\s*allianceFloor = 0;\s*\}/.test(bootSrc)
@@ -11850,13 +11885,16 @@ console.log('\nAM. Фид магазина: обновление и событи
   );
 
   /* ── Реестр и документы ── */
-  check('реестр держит файл в очереди и говорит, что он ещё не прогнан',
-    readmeSrc.includes('20261004-site-server-scope.sql')
-      && readmeSrc.includes('ещё не прогнан')
+  check('реестр говорит, что шаг прогнан, и держит в очереди его исправление',
+    readmeSrc.includes('Прогнан 04.10.2026')
+      && readmeSrc.includes('20261004-site-next-id-anon.sql')
       && readmeSrc.includes('обязан быть прогнан до пуша'));
   check('реестр объясняет, чего в шаге нет, чтобы не ждали переключателя и прав',
     readmeSrc.includes('переключатель сервера в шапке сайта')
       && readmeSrc.includes('права на внесение по серверу'));
   check('документ переезда называет шаг и его проверку одной строкой',
     migDoc.includes('20261004-site-server-scope.sql') && migDoc.includes('site_dataset(p_server)'));
+  check('и называет исправление прав тем же способом — файлом из папки',
+    migDoc.includes('supabase/20261004-site-next-id-anon.sql')
+      && migDoc.includes('permission denied for function site_next_alliance_id'));
 }

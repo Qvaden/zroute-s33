@@ -26,7 +26,7 @@
  *
  * ПОЧЕМУ КАЖДЫЙ ЗАПРОС НАЗЫВАЕТ СЕРВЕР. С мультиарендой идентификаторы недель,
  * событий и текстов перестали быть глобальными: «W1» — это неделя первого
- * сервера, а на четвёртом своя «W1» (см. supabase/20261004-site-server-scope.sql).
+ * сервера, а на четвёртом своя «W1» (см. supabase/applied/20261004-site-server-scope.sql).
  * Значит DELETE по одному `id` снёс бы строки всех серверов разом, а вставка
  * без `server_id` не попала бы в составной ключ. У альянсов идентификатор
  * глобален — поэтому `deleteAlliance` и не называет сервер, и это единственное
@@ -58,7 +58,7 @@ export async function readDataset() {
   if (!raw || typeof raw !== 'object') {
     throw new Error(
       'База не отдала данные сайта. Похоже, не выполнен ' +
-        'supabase/applied/site-data.sql или supabase/20261004-site-server-scope.sql.'
+        'supabase/applied/site-data.sql или supabase/applied/20261004-site-server-scope.sql.'
     );
   }
   return raw;
@@ -158,7 +158,7 @@ export async function saveAlliance(a, sortOrder) {
 /**
  * Свободный номер альянса считает база, а не панель.
  *
- * Идентификатор альянса глобален (объяснение — в supabase/20261004-site-server-scope.sql:
+ * Идентификатор альянса глобален (объяснение — в supabase/applied/20261004-site-server-scope.sql:
  * на него смотрят таблицы форума и VS), а данные панель видит только своего
  * сервера. Считать «следующий после максимального» по своему списку — значит
  * выдать номер, который занят у соседа, и тогда `merge-duplicates` не откажет,
