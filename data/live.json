@@ -263,6 +263,7 @@
       "serverNumber": 33
     }
   ],
+  "server": 33,
   "source": "supabase",
   "results": [
     {
@@ -1461,7 +1462,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-10-04T08:19:50+00",
+  "pulledAt": "2026-10-04T15:17:59+00",
   "alliances": [
     {
       "id": "a01",
