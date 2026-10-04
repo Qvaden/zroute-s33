@@ -323,34 +323,6 @@
   .president-board { flex: 1 0 100%; max-width: none; }
 }
 
-/*
-  Ряд переключения сервера в шапке (src/ui/server-switch.js).
-
-  Кнопки берут вид форума: `.seg .seg--server` уже нарисованы рядом над лентой,
-  и второй внешний вид того же выбора читался бы как два разных переключателя.
-  Слово «Сервер» слева стоит затем, чтобы полоса из двух названий не выглядела
-  списком разделов: человек понимает, что выбирает, а не куда идёт.
-*/
-.server-switch { flex: 0 1 auto; min-width: 0; }
-.server-switch__inner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.server-switch__label {
-  font: 700 9.5px/1 Inter, sans-serif;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--mute);
-  white-space: nowrap;
-}
-.server-switch .seg--server { flex-wrap: wrap; }
-@media (max-width: 700px) {
-  /* В строку шапки ряд не влезает и уезжает под неё, как доска статуса. */
-  .server-switch { flex: 1 0 100%; }
-}
-
 /* ── Сводка сервера на форуме ─────────────────────────────────────────────── */
 
 .forum-chron { padding-bottom: 18px; }
@@ -1337,12 +1309,6 @@
   margin-bottom: 16px;
 }
 .ctl--forum .seg { flex-wrap: wrap; }
-/*
-  Ряд серверов — первый в управлении лентой и отвечает не на «как сортировать»,
-  а на «чью ленту я смотрю». Поэтому он не прижимается вправо, как порядок, и
-  названия серверов читаются с краю.
-*/
-.seg--server { font-weight: 600; }
 .seg--sort { margin-left: auto; }
 @media (max-width: 620px) {
   .seg--sort { margin-left: 0; }

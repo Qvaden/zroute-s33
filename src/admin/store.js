@@ -83,13 +83,14 @@ export async function readDataset() {
  * То, что в git получалось само собой из истории коммитов. Пишется триггером
  * в базе, а не панелью, — правка из любого места всё равно попадёт в журнал.
  *
- * Сервер у журнала есть, но список не фильтруется по цели панели: база по
- * правилу доступа отдаёт владельцу все серверы, а модератору — только его, так
- * что фильтровать здесь значило бы спорить с правами, а не читать их. Номер
- * строки отдаётся экрану, чтобы соседняя правка не выглядела своей.
+ * Список берётся по серверу сайта: база по правилу доступа отдала бы владельцу
+ * строки и других серверов, а панель с этих пор показывает ровно один набор, и
+ * чужие правки в его журнале были бы намёком на ленты, которых на сайте нет.
  */
 export async function recentChanges(limit = 20) {
-  const rows = await rest(`/site_audit?select=*&order=at.desc&limit=${Number(limit)}`);
+  const rows = await rest(
+    `/site_audit?server_id=eq.${panelServer()}&select=*&order=at.desc&limit=${Number(limit)}`
+  );
   return (Array.isArray(rows) ? rows : []).map((r) => ({
     id: r.id,
     at: r.at ? new Date(r.at) : null,
@@ -97,7 +98,6 @@ export async function recentChanges(limit = 20) {
     entity: r.entity,
     entityId: r.entity_id || '',
     action: r.action,
-    server: Number.isInteger(r.server_id) ? r.server_id : null,
   }));
 }
 

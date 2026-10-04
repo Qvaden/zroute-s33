@@ -63,7 +63,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=83">
+  <link rel="modulepreload" href="./src/main.js?v=84">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -76,7 +76,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=32">
+  <link rel="stylesheet" href="./src/forum.css?v=33">
   <!--
     Телефон — последним слоем.
 
@@ -161,15 +161,6 @@
         </span>
       </a>
 
-      <!--
-        Ряд переключения сервера. Пустой контейнер и скрыт: он наполняется на
-        страницах рейтинга и только когда серверов в базе больше одного.
-        На форуме рядом стоит свой ряд — над лентой, — и показывать два
-        переключателя одного выбора на одном экране значит давать человеку
-        два ответа на один вопрос. Разбирает ряд src/ui/server-switch.js.
-      -->
-      <div id="server-switch" class="server-switch" hidden></div>
-
       <div id="president-board" class="president-board" hidden></div>
       <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Переключить тему" title="Тёмная/светлая тема">
         <span class="icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span>
@@ -227,7 +218,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=83"></script>
+  <script type="module" src="./src/main.js?v=84"></script>
 
   <script>
     /*

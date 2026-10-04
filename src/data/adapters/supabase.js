@@ -11,12 +11,6 @@
  * читает панель, и два места с одним числом однажды показали бы человеку
  * рейтинг одного сервера, а правку — другого.
  *
- * КЭШ РАЗДЕЛЁН ПО СЕРВЕРАМ. Один промис на все выборы означал бы, что
- * переключение назад на «свой» сервер мгновенно отдаёт чужой набор, а обратный
- * переход — что 44-й показывает рейтинг 33-го, пока не перезагрузишь страницу.
- * Это тот же редкий вид ошибки, где всё выглядит целым: цифры настоящие, просто
- * не оттуда.
- *
  * ПОЧЕМУ ОДИН ЗАПРОС, А НЕ ПЯТЬ. Объёмы крошечные: 32 альянса на 52 недели —
  * меньше двух тысяч строк в год. Пять запросов дали бы пять поводов для
  * частичной загрузки: альянсы приехали, результаты нет, и страница показывает
@@ -27,7 +21,7 @@
  * (select using(true)), а не отсутствие проверки здесь.
  */
 import { rest, isConfigured } from '../../db/client.js';
-import { datasetBody, viewServer } from '../server.js';
+import { datasetBody, siteServer } from '../server.js';
 import { mapAlliances, mapWeeks, mapResults, mapEvents, mapTexts } from './_map.js';
 
 export const name = 'supabase';
@@ -45,19 +39,18 @@ export const capabilities = {
 };
 
 /**
- * Один ответ на запрос, и ключ у него — сервер, а не «последний».
- * @type {Map<any, Promise<any>>}
+ * Один ответ на страницу: пять геттеров делят один запрос.
+ * @type {Promise<any>|null}
  */
-const cache = new Map();
+let running = null;
 
 /** Сбрасывает кэш, чтобы следующий запрос перечитал базу. */
 export function clearCache() {
-  cache.clear();
+  running = null;
 }
 
 async function raw() {
-  const server = viewServer();
-  const running = cache.get(server);
+  const server = siteServer();
   if (running) return running;
 
   const pending = (async () => {
@@ -92,16 +85,16 @@ async function raw() {
     return data;
   })();
 
-  cache.set(server, pending);
+  running = pending;
 
   /*
-    Неудачную попытку не оставляем: иначе один сбой сети закрыл бы этот сервер
-    до перезагрузки страницы. Сброс проверяет, что в кэше всё ещё лежит именно
-    эта неудачная попытка, — за время её ожидания человек мог перещёлкнуть
-    сервер, и новая попытка того же ключа не должна быть стёрта старой.
+    Неудачную попытку не оставляем: иначе один сбой сети закрыл бы данные до
+    перезагрузки страницы. Сброс проверяет, что в кэше всё ещё лежит именно эта
+    неудачная попытка, — за время её ожидания мог уйти новый запрос, и стирать
+    его старой не нужно.
   */
   pending.catch(() => {
-    if (cache.get(server) === pending) cache.delete(server);
+    if (running === pending) running = null;
   });
 
   return pending;

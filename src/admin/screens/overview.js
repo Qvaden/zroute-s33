@@ -59,11 +59,11 @@ export function renderOverview(view) {
   const { data, problems, changes, file, weeks, account } = view;
 
   /*
-    Заголовок называет тот сервер, чьи строки экран показывает. Надпись
-    «Сервер 33» была верна, пока набор был один; с правами по серверу она
-    стала врать: у модератора 44-го цифры на экране его, а заголовок чужой.
+    Заголовок называет набор, чьи строки экран показывает. Сервер у сайта один
+    и взят он из config.js, поэтому номер здесь — не выбор человека, а подпись
+    данных: «правки» касаются ровно этого набора.
   */
-  const serverTitle = view.serverTitle || 'Данные сайта';
+  const serverTitle = view.server == null ? 'Данные сайта' : `Сервер ${view.server}`;
 
   const active = data.alliances.filter((a) => a.active).length;
 
@@ -185,11 +185,10 @@ export function renderOverview(view) {
  * часто одна клетка. Список отвечает на настоящий вопрос: «что здесь
  * происходило».
  *
- * Рядом с id стоит номер сервера. Модератор сайта и владелец видят журнал
- * целиком, а «W1» без него — это запись сразу нескольких наборов, и соседняя
- * правка чужого сервера выглядела бы своей. У серверного модератора база
- * отдаёт только его строки, поэтому для него этот номер — подтверждение, что
- * панель правит именно его набор.
+ * Список читается по серверу сайта (recentChanges в src/admin/store.js), и
+ * номера серверов рядом с id больше нет: на одном наборе он был бы одинаковый
+ * на всех строках. До этого списка журнал показывал правки всех наборов, и
+ * «W1» без номера означала запись сразу нескольких серверов.
  */
 function renderChanges(changes) {
   if (!changes?.length) {
@@ -207,7 +206,6 @@ function renderChanges(changes) {
           (c) => `<li>
             <b>${esc(ENTITY_LABEL[c.entity] ?? c.entity)}</b>
             <span class="adm-changes__what">${esc(ACTION_LABEL[c.action] ?? c.action)}</span>
-            ${c.server ? `<span class="muted">сервер ${esc(c.server)}</span>` : ''}
             ${c.entityId ? `<i class="adm-mono muted">${esc(c.entityId)}</i>` : ''}
             <span class="adm-changes__who muted">${esc(c.actorNick || 'неизвестно кто')} · ${esc(fmtWhen(c.at))}</span>
           </li>`

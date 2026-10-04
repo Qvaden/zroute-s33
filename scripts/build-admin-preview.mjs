@@ -15,6 +15,7 @@ import { mapDataset } from '../src/data/adapters/_map.js';
 import { validateDataset } from '../src/data/contract.js';
 import { marksFromRaw, eventsFromRaw, alliancesFromRaw } from '../src/admin/edit.js';
 import { byWeekStartDesc } from '../src/data/week-order.js';
+import { siteServer } from '../src/data/server.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
 import { renderWeek } from '../src/admin/screens/week.js';
@@ -41,6 +42,8 @@ const latestWeek = [...data.weeks].sort(byWeekStartDesc)[0];
   выдумано, но выдумано так, как выглядит в жизни.
 */
 const view = {
+  // Номер набора превью берёт оттуда же, откуда живая панель: из config.js.
+  server: siteServer(),
   user: { login: 'редактор', name: '', avatar: '' },
   repo: { fullName: 'Qvaden/zroute-s33', isPrivate: false, defaultBranch: 'main', canPush: true },
   file: { path: 'data/live.json', size: 96_400, sha: 'd41d8cd98f00b204e9800998ecf8427e' },
@@ -125,7 +128,7 @@ ${controlsCss}
 </head>
 <body class="adm">
 <div id="admin">
-${renderShell({ screens: SCREENS, activeId: startId, inner, login: view.user.login, canPush: true })}
+${renderShell({ screens: SCREENS, activeId: startId, inner, login: view.user.login, canPush: true, server: view.server })}
 </div>
 
 <script>

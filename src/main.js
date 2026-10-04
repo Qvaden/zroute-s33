@@ -1,7 +1,6 @@
-import { CONFIG } from '../config.js?v=83';
-import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=83';
-import { siteServer, viewServer } from './data/server.js?v=83';
-import { validateDataset } from './data/contract.js?v=83';
+import { CONFIG } from '../config.js?v=84';
+import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=84';
+import { validateDataset } from './data/contract.js?v=84';
 import {
   computeStandings,
   computeWeekSummary,
@@ -10,36 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=83';
-import { renderHome } from './pages/home.js?v=83';
-import { renderLadder } from './pages/ladder.js?v=83';
-import { renderQuarter } from './pages/quarter-final.js?v=83';
-import { renderTimeline } from './pages/timeline.js?v=83';
-import { renderGuide } from './pages/guide.js?v=83';
-import { renderBot } from './pages/bot.js?v=83';
-import { renderHandbook } from './pages/handbook.js?v=83';
-import { renderAbout } from './pages/about.js?v=83';
-import { renderAlliance } from './pages/alliance.js?v=83';
-import { computeAchievements } from './logic/achievements.js?v=83';
-import { esc } from './ui/helpers.js?v=83';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=83';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=83';
+} from './logic/standings.js?v=84';
+import { renderHome } from './pages/home.js?v=84';
+import { renderLadder } from './pages/ladder.js?v=84';
+import { renderQuarter } from './pages/quarter-final.js?v=84';
+import { renderTimeline } from './pages/timeline.js?v=84';
+import { renderGuide } from './pages/guide.js?v=84';
+import { renderBot } from './pages/bot.js?v=84';
+import { renderHandbook } from './pages/handbook.js?v=84';
+import { renderAbout } from './pages/about.js?v=84';
+import { renderAlliance } from './pages/alliance.js?v=84';
+import { computeAchievements } from './logic/achievements.js?v=84';
+import { esc } from './ui/helpers.js?v=84';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=84';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=84';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=83';
-import './ui/timeline-controls.js?v=83';
+import './ui/ladder-controls.js?v=84';
+import './ui/timeline-controls.js?v=84';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=83';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=83';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=83';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=83';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=83';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=83';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=83';
-/*
-  Ряд серверов в шапке сам вешает обработчик клика, но после каждой перерисовки
-  страницы его надо перекрасить: какая вкладка открыта, знает только main.js.
-*/
-import { loadServerSwitch, syncServerSwitch } from './ui/server-switch.js?v=83';
+import './ui/handbook-controls.js?v=84';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=84';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=84';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=84';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=84';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=84';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=84';
 
 /*
   РАЗДЕЛЫ.
@@ -199,13 +193,6 @@ document.addEventListener('click', (e) => {
 
 /** @type {any} */
 let view = null;
-
-/*
-  Сервер, ЧЬИ ДАННЫЕ ЛЕЖАТ В `view`. Отдельное число, а не поле внутри view:
-  страницы читают набор целиком, и одно число отвечает на вопрос «свежее ли то,
-  что мы собираемся нарисовать». См. проверку в render().
-*/
-let viewServerLoaded = null;
 
 /**
  * Адрес вида #/ladder или #/alliance/a05.
@@ -476,22 +463,6 @@ function render() {
     return;
   }
 
-  /*
-    ОДИН ВЫБОР СЕРВЕРА ПРОВЕРЯЕТСЯ И НА ССЫЛКАХ, А НЕ ТОЛЬКО НА РЯДЕ В ШАПКЕ.
-
-    Ряд зовёт refreshView сам, но память браузера пишет и переключатель над
-    лентой форума. Игрок перещёлкивает её на 44-й и жмёт «Рейтинг» — экран
-    собран из данных 33-го под заголовком, называющим 44-й. Это ровно то
-    вранье, ради которого весь шаг и делался, поэтому набор перечитывается.
-
-    Живые вкладки не ждём: они читают свою таблицу, а данным сайта они должны
-    только плашкой хроники, та перерисуется по приходе ответа.
-  */
-  if (viewServerLoaded !== viewServer()) {
-    if (!live) app.innerHTML = '<div class="loading">Загружаем данные…</div>';
-    refreshView();
-    if (!live) return;
-  }
   liveMountKey = live;
 
   let path;
@@ -670,12 +641,6 @@ function render() {
   if (!keepScroll) window.scrollTo(0, 0);
 
   trackPageview(path);
-  /*
-    Ряд серверов перекрашивается в самый конец: ему нужно знать и открытую
-    страницу (на форуме своего ряда хватает), и выбранный сервер, а оба этих
-    факта становятся достоверны только когда экран собран.
-  */
-  syncServerSwitch();
 }
 
 /**
@@ -735,26 +700,14 @@ function dataNotice() {
       уже с точкой, и без этой чистки страница выдавала «Проверьте интернет..».
       Два знака подряд читаются как опечатка, а опечатка в тексте про аварию
       выглядит так, будто ей не верят.
-
-      Отдельная фраза — про выбранный сервер. Копия `data/live.json` снята с
-      одного набора, и под чужим сервером сайт обязан сказать, что спасения
-      копией нет, а не просто «не дошли»: человек, выбравший 44-й, прочитал бы
-      молчание как «44-й не работает», хотя не работает только путь к базе.
     */
     const reason = (lastLoad.primaryError || 'ни база, ни снимок рядом с сайтом не ответили')
       .replace(/[.\s]+$/, '');
-    const own = siteServer();
-    const foreign = lastLoad.server != null && lastLoad.server !== own;
     box.hidden = false;
     box.innerHTML =
       '<b>Данные не дошли</b>: '
       + esc(reason)
       + '.'
-      + (foreign
-        ? ` Копия данных сайта есть только для сервера сайта`
-          + (own == null ? '' : ` (${own})`)
-          + `, а для ${lastLoad.server} её нет.`
-        : '')
       + ' Рейтинг и летопись пусты, справочник и правила работают. '
       + '<button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button>';
     return;
@@ -820,48 +773,21 @@ async function boot() {
   app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
   if (liveFirst) {
     view = emptyView();
-    /*
-      Пустой контур живой вкладки — честный ответ «данных пока нет», а не
-      набор чужого сервера, поэтому проверка в render() не должна считать его
-      устаревшим и звать вторую загрузку подряд с первой.
-    */
-    viewServerLoaded = viewServer();
     render();
   }
 
-  /*
-    Ряд сервера в шапке стартует рядом с лентой, а не после данных сайта:
-    ему нужен только список серверов, и ждать ради него рейтинг значило бы
-    показывать шапку без выбора там, где выбор уже был бы уместен.
-  */
-  loadServerSwitch();
   await refreshView();
 }
 
 /**
- * ДАННЫЕ САЙТА ЗАНОВО: один и тот же путь при входе на страницу и после
- * щелчка по ряду серверов.
- *
- * Разведено в две функции не для красоты: переключателю нужно перечитать
- * рейтинг, не перемонтируя форум и не теряя незавершённые запросы ленты, а
- * входу нужно ещё и решить, рисовать ли пустой контур. Всё, что относится к
- * ответу базы, — общее, и вторая копия этого куска однажды разошлась бы с
- * первой: молчание при смене сервера выглядело бы как «сайт не обновился».
+ * ДАННЫЕ САЙТА ЗАНОВО: один путь при входе на страницу и при повторе после
+ * аварии.
  */
 async function refreshView() {
   armSlowBootNotice();
 
-  /*
-    Сервер, ради которого ждём ответ, запоминаем до запроса: ряд в шапке
-    позволяет несколько щелчков подряд, и если поздний выбор прилетел, пока ранний
-    запрос ещё в пути, старый ответ не должен перетирать экран.
-  */
-  const requested = viewServer();
-
   try {
     const data = await loadAll();
-    if (requested !== viewServer()) return;
-    viewServerLoaded = requested;
     dataArrived = true;
 
     // В разработке сразу ругаемся на кривые данные, а не показываем пустые клетки.
@@ -910,12 +836,6 @@ async function refreshView() {
     finishBootLoader();
   } catch (err) {
     console.error(err);
-    // Тот же порядок, что в удачной ветке: опоздавшая авария не должна
-    // затушить экран, который поздний запрос уже наполняет.
-    if (requested !== viewServer()) return;
-    // Пустой набор тоже относится к названному серверу: иначе render()
-    // звал бы перечитывание на каждой перерисовке страницы.
-    viewServerLoaded = requested;
     // Ответ получен, пусть и с ошибкой: объяснять молчание больше нечего.
     dataArrived = true;
 
@@ -943,20 +863,6 @@ async function refreshView() {
 }
 
 window.addEventListener('hashchange', render);
-
-/*
-  ЩЕЛЧОК ПО РЯДУ СЕРВЕРОВ.
-
-  Модуль ряда сделал своё: записал выбор в память браузера и в адрес и перекрасил
-  кнопки. Перечитать рейтинг он сам не может — данные сайта живут здесь, — и
-  поэтому зовёт через событие, а не импортирует refreshView: круговая зависимость
-  main.js ↔ server-switch.js оборвала бы загрузку страницы целиком.
-
-  Форум при этом не перемонтируется: refreshView только меняет view и зовёт
-  render(), а render() для живой вкладки отдан ленте, которая сама перечитает
-  ленту по своему ряду.
-*/
-window.addEventListener('zr33:server-change', () => { refreshView(); });
 
 boot();
 

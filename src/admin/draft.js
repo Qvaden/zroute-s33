@@ -164,10 +164,19 @@ export function draftWeekIds() {
 function listBucket(key, list) {
   const parsed = readRaw(key);
   // Старый вид: `{ list: [...], savedAt }` без папок. Это сервер сайта.
-  const buckets = parsed && Array.isArray(parsed.list) ? { [home()]: parsed } : parsed && typeof parsed === 'object' ? parsed : {};
+  const flat = Boolean(parsed) && Array.isArray(parsed.list);
+  const buckets = flat ? { [home()]: parsed } : parsed && typeof parsed === 'object' ? parsed : {};
 
   if (list !== undefined) {
     buckets[current()] = { list, savedAt: new Date().toISOString() };
+    writeRaw(key, buckets);
+  } else if (flat) {
+    /*
+      Переезд пишется сразу, а не живёт до первой правки: пока плоский список
+      не разложен по папке, каждое чтение приписывает его тому серверу, что
+      назван в config.js сегодня. Сменится число — и чужая несохранённая
+      летопись выглядела бы как своя.
+    */
     writeRaw(key, buckets);
   }
   return buckets;

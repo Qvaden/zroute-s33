@@ -1699,21 +1699,20 @@ console.log('\nM. Правка хронологии');
     внутри него другая: «public/» в имени объекта означало бы папку с таким
     названием, а не публичный доступ — он задаётся правами на хранилище.
 
-    Цель панели в тесте называется до проверки: без неё `panelServer()` обязан
-    отказать, а не придумать номер, и этот отказ — часть контракта.
+    Цель панели называется config.js, поэтому она не зависит от того, прочитаны
+    ли права: путь обязан назвать сервер сайта и до ответа `myServerRoles`, и
+    после `forgetRights()`. Переключателя серверов на сайте больше нет, значит
+    выдумать номер неоткуда.
   */
   const target = await import('../src/admin/target.js');
-  target.adoptRights({ account: { role: 'admin' }, roles: null, servers: [] });
-  check('без выбранной цели путь фотографии не выдумывается',
+  target.adoptRights({ account: { role: 'admin' }, roles: null });
+  check('папка фотографии называет сервер сайта, даже когда права не прочитаны',
     (() => {
       target.forgetRights();
       try {
-        uploadPath('jpg');
-        return false;
-      } catch {
-        return true;
+        return uploadPath('jpg').startsWith(`${target.panelServer()}/events/`);
       } finally {
-        target.adoptRights({ account: { role: 'admin' }, roles: null, servers: [] });
+        target.adoptRights({ account: { role: 'admin' }, roles: null });
       }
     })());
   check('путь загрузки лежит в папке событий своего сервера',
@@ -10635,9 +10634,17 @@ console.log('\nAM. Фид магазина: обновление и событи
     bootSrc.includes('boot-loader__slow') && /app\.querySelector\('\.loading'\)/.test(bootSrc));
   check('пришедшие данные уже не объясняют чужое молчание',
     /function showSlowBootNotice\(\)\s*\{\s*if \(dataArrived\) return;/.test(bootSrc)
-      && /const data = await loadAll\(\);\r?\n\s*if \(requested !== viewServer\(\)\) return;\r?\n\s*viewServerLoaded = requested;\r?\n\s*dataArrived = true;/.test(bootSrc));
-  check('опоздавший ответ чужого сервера не перетирает экран',
-    (bootSrc.match(/if \(requested !== viewServer\(\)\) return;/g) || []).length === 2);
+      && /const data = await loadAll\(\);\r?\n\s*dataArrived = true;/.test(bootSrc));
+  /*
+    Раньше здесь же проверяли, что «опоздавший ответ чужого сервера не
+    перетирает экран»: страница держала выбранный номер и сравнивала его с
+    ответом. Переключателя серверов на сайте больше нет, набор один — значит
+    и сравнивать нечего. Проверка стала проще и строже: страница не должна
+    вообще знать, что сервер бывает чужим.
+  */
+  check('страница не помнит про выбор сервера: перетирать нечего',
+    !bootSrc.includes('viewServer') && !bootSrc.includes('zr33:server-change')
+      && !bootSrc.includes('server-switch'));
   check('у объяснения есть повтор, и он идёт тем же путём, что открытие страницы',
     bootSrc.includes('data-boot-retry')
       && /data-boot-retry\]'\)\)\s*\r?\n?\s*boot\(\);/.test(bootSrc));
@@ -10806,21 +10813,16 @@ console.log('\nAM. Фид магазина: обновление и событи
   }
 
   /*
-    Сервер выбран зрителем, а копия снята с набора сайта: оба числа подаёт
-    тест, иначе ветка «под чужим сервером копию не зовём» осталась бы
-    непроверенной — а это ровно та ветка, где сайт соврал бы цифрами 33-го
-    под надписью «Сервер 44».
+    Сервер на сайте один — тот, что назван в config.js, — и копия снята ровно
+    с него, поэтому обоим адаптерам тест подаёт только поведение: кто отвечает,
+    кто молчит.
   */
-  function runLoadAll(selected, snapshot, choice = {}) {
-    const view = choice.view === undefined ? 33 : choice.view;
-    const site = choice.site === undefined ? 33 : choice.site;
-    const harness = new Function('selected', 'json', 'viewServer', 'siteServer',
-      "let lastLoad = { source: selected.name, snapshotAt: null, primaryError: '',"
-      + ' server: siteServer() };'
+  function runLoadAll(primary, snapshot) {
+    const harness = new Function('selected', 'json',
+      "let lastLoad = { source: '', snapshotAt: null, primaryError: '' };"
       + readAllSrc + loadAllSrc
       + '; return { loadAll, peek: () => lastLoad };');
-    // Точная копия настоящего viewServer: пустой выбор заканчивается сервером сайта.
-    return harness(selected, snapshot, () => view ?? site, () => site);
+    return harness(primary, snapshot);
   }
 
   const liveBase = fakeAdapter('supabase', false);
@@ -10860,36 +10862,15 @@ console.log('\nAM. Фид магазина: обновление и событи
     onlyError.includes('json: сети нет') && onlyRun.peek().source === '');
 
   /*
-    Шаг 2: выбранный сервер. Копия `data/live.json` снята с одного набора —
-    сервера сайта, — и под чужим выбором она не спасение, а подмена: цифры
-    33-го под заголовком «Сервер 44». Эти проверки держат отказ в обоих
-    режимах: аварийном (база молчит) и черновом (копия — основной источник).
+    Здесь жила проверка «под выбранным чужим сервером копию не зовём»: зритель
+    мог выбрать 44-й, а `data/live.json` снят только с 33-го, и показать её под
+    чужим заголовком значило соврать цифрами. Выбор сервера с сайта убран,
+    набор один, поэтому такого отказа больше нет. Осталось обратное — точка
+    переключения не имеет права о серверах даже заикнуться: иначе выбор
+    вернут, а копию forgotten.
   */
-  const freshSnapshot = fakeAdapter('json', false);
-  const foreignSnapRun = runLoadAll(deadBase, freshSnapshot, { view: 44 });
-  const foreignError = await foreignSnapRun.loadAll().then(() => '', (e) => String(e.message));
-  check('под выбранным чужим сервером копия не выдаёт цифры своего набора',
-    foreignError.includes('Копии данных сайта для сервера 44 нет')
-      && foreignSnapRun.peek().source === '' && freshSnapshot.reads === 0);
-  check('отказ помнит, какой сервер человек выбрал, чтобы сказать это вслух',
-    foreignSnapRun.peek().server === 44);
-
-  const liveJson = fakeAdapter('json', false);
-  const foreignJsonRun = runLoadAll(liveJson, liveJson, { view: 44 });
-  const foreignJsonError = await foreignJsonRun.loadAll().then(() => '', (e) => String(e.message));
-  check('в черновом режиме чужому серверу копия отказывает до первого чтения',
-    foreignJsonError.includes('Копии данных сайта для сервера 44 нет') && liveJson.reads === 0);
-
-  const ownRun = runLoadAll(deadBase, fakeAdapter('json', false), { view: null });
-  await ownRun.loadAll();
-  check('без выбора остаётся сервер сайта, и копия по-прежнему спасает',
-    ownRun.peek().source === 'снимок' && ownRun.peek().server === 33);
-
-  const blankRun = runLoadAll(deadBase, fakeAdapter('json', false),
-    { view: null, site: null });
-  await blankRun.loadAll();
-  check('если в config.js номера нет, отказ не выдуман: пустой выбор снимок не прячет',
-    blankRun.peek().source === 'снимок' && blankRun.peek().server === null);
+  check('точка переключения источников не знает, что серверов может быть несколько',
+    !/server/i.test(dataSrc) && !mainSrc.includes('Копия данных сайта есть только'));
 
   check('час снятия читается из того же файла, что и данные',
     /export async function getPulledAt\(\)/.test(jsonAdapterSrc)
@@ -10904,15 +10885,15 @@ console.log('\nAM. Фид магазина: обновление и событи
       && noticeSrc.includes('function snapshotStamp(')
       && noticeSrc.includes('function sourceBadge('));
 
-  const runNotice = new Function('lastLoad', 'document', 'esc', 'db', 'siteServer',
+  const runNotice = new Function('lastLoad', 'document', 'esc', 'db',
     noticeSrc + '; return { dataNotice, snapshotStamp, sourceBadge };');
 
-  function paint(state, sourceName, ownServer = 33) {
+  function paint(state, sourceName) {
     const box = { hidden: true, innerHTML: '' };
     const badge = { textContent: '' };
     const doc = { getElementById: (id) => (id === 'data-notice' ? box : badge) };
     const run = runNotice(state, doc, (s) => '[' + String(s) + ']',
-      { name: sourceName }, () => ownServer);
+      { name: sourceName });
     run.dataNotice();
     run.sourceBadge();
     return { box, badge, run };
@@ -10961,29 +10942,15 @@ console.log('\nAM. Фид магазина: обновление и событи
       return dotted.box.innerHTML.includes('интернет]. Рейтинг');
     })());
   /*
-    Полоска под выбранным чужим сервером. Без этой фразы человек, выбравший
-    44-й, прочитал бы «данные не дошли» как «не работает 44-й», хотя не
-    работает только путь к базе, а копии другого набора просто не существует.
+    Здесь была полоска «Копия данных сайта есть только для сервера сайта (33),
+    а для 44 её нет»: она спасала зрителя, выбравшего чужой набор, от того,
+    чтобы прочесть «данные не дошли» как «не работает 44-й». Выбора больше
+    нет, поэтому фраза про чужой сервер ушла из текста страницы — и проверка
+    держит именно это: в объяснении не должно оставаться намека на то, что
+    серверов может быть несколько.
   */
-  check('под чужим сервером полоска называет и свой номер, и выбранный',
-    (() => {
-      const foreign = paint(
-        { source: '', snapshotAt: null, primaryError: 'базы нет', server: 44 },
-        'supabase'
-      );
-      return foreign.box.innerHTML.includes('Копия данных сайта есть только')
-        && foreign.box.innerHTML.includes('сервера сайта (33)')
-        && foreign.box.innerHTML.includes('а для 44 её нет');
-    })());
-  check('своему серверу лишняя фраза про копию не добавляется',
-    (() => {
-      const own = paint(
-        { source: '', snapshotAt: null, primaryError: 'базы нет', server: 33 },
-        'supabase'
-      );
-      return own.box.innerHTML.includes('Данные не дошли')
-        && !own.box.innerHTML.includes('Копия данных сайта');
-    })());
+  check('объяснение пустоты не упоминает другие серверы',
+    !noticeSrc.includes('Копия данных сайта') && !/для сервера \(/.test(noticeSrc));
   check('в исправном состоянии полоска скрыта, а подвал называет базу',
     (() => {
       const clean = paint(
@@ -11043,6 +11010,11 @@ console.log('\nAM. Фид магазина: обновление и событи
 
    Поэтому адрес и черновой адаптер прогоняют делом, а боевой адаптер читают по
    строкам: его запрос уходит в базу, которой у теста нет.
+
+   ЗРИТЕЛЬ ВЫБОРА НЕ ИМЕЕТ. Номер ленты берётся из config.js, в адрес страницы
+   он не пишется и в памяти браузера не живёт — эти проверки держат как раз
+   отсутствие измерения, а не работу переключателя. Колонка в базе остаётся:
+   она нужна, чтобы чужие темы не примешивались к нашей ленте.
 ────────────────────────────────────────────────────────────────────────────── */
 {
   const { readFile } = await import('node:fs/promises');
@@ -11056,19 +11028,21 @@ console.log('\nAM. Фид магазина: обновление и событи
   const readmeSrc = await readFile('supabase/README.md', 'utf8');
   const url = await import('../src/forum/feed-url.js');
   const urlSrc = await readFile('src/forum/feed-url.js', 'utf8');
-  const choice = await import('../src/logic/server-choice.js');
-  const choiceSrc = await readFile('src/logic/server-choice.js', 'utf8');
 
-  /* ── Одно число сервера в базе, в адресе и в браузере ── */
+  /* ── Одно число сервера: границы знает база, клиента касается одна из них ── */
   const bounds = /create table if not exists public\.forum_servers \([\s\S]{0,200}?check \(id between (\d+) and (\d+)\)/
     .exec(sql);
   check('база проверяет номер ряда границами', bounds != null);
-  equal('адрес принимает ровно те же границы, что база',
-    [choice.SERVER_MIN, choice.SERVER_MAX], [Number(bounds[1]), Number(bounds[2])]);
-  equal('и сохранённый выбор проверяет их тем же способом',
-    [Number(/id >= SERVER_MIN/.test(choiceSrc)), Number(/id <= SERVER_MAX/.test(choiceSrc))], [1, 1]);
-  check('границы эти живут в одном модуле, а не в копии каждого экрана',
-    !/SERVER_MIN|SERVER_MAX/.test(mountSrc) && !/SERVER_MIN|SERVER_MAX/.test(urlSrc));
+  check('единственный номер, который клиент сегодня просит, лежит внутри этих границ',
+    Number(CONFIG.server) >= Number(bounds[1]) && Number(CONFIG.server) <= Number(bounds[2]));
+  /*
+    Раньше эти же границы держал общий модуль `src/logic/server-choice.js`: он
+    проверял число из адреса и из памяти браузера. Обоих источников выбора
+    больше нет, и копия границ в клиенте стала бы местом, где правку забывают.
+  */
+  check('границы держит база, и ни один экран их не повторяет',
+    !/SERVER_MIN|SERVER_MAX/.test(mountSrc) && !/SERVER_MIN|SERVER_MAX/.test(urlSrc)
+      && !urlSrc.includes('server'));
 
   const dbDefault = Number(
     /add column if not exists server_id integer\s+not null default (\d+)/.exec(sql)?.[1]
@@ -11101,27 +11075,17 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('файл переживает второй прогон: ряд сервера вставляется без отказа',
     sql.includes('on conflict (id) do nothing') && !/raise exception/.test(sql));
 
-  /* ── Адрес: выбор переживает перезагрузку и пересылку ссылки ── */
-  check('лента разбирает и пишет сервер тем же модулем, а не своими строками',
-    urlSrc.includes("import { serverFromSearch, putServerParam } from '../logic/server-choice.js';")
-      && urlSrc.includes('putServerParam(params, filters.server, filters.defaultServer)'));
-  equal('номер из адреса прочитан', choice.serverFromSearch('server=44'), 44);
-  equal('вне таблицы — не адрес',
-    [choice.serverFromSearch('server=0'), choice.serverFromSearch('server=1000')], [null, null]);
-  equal('не число в адресе — обычный вид ленты, а не ошибка',
-    [choice.serverFromSearch('server=abc'), choice.serverFromSearch('server=7.5'), choice.serverFromSearch('cat=vs')],
-    [null, null, null]);
+  /* ── Адрес: номера сервера в ссылке нет ни при чтении, ни при записи ── */
+  check('лента больше не разбирает и не пишет сервер: общий модуль выбора удалён',
+    !urlSrc.includes('server-choice') && !urlSrc.includes('putServerParam')
+      && !mountSrc.includes('server-choice'));
 
   const known = { categories: ['vs'], tags: [], sorts: ['top'] };
   const picked = url.filtersFromSearch('server=44&cat=vs&sort=top', known);
-  equal('адрес → состояние: сервер читается рядом с фильтрами',
-    [picked.server, picked.category, picked.sort], [44, 'vs', 'top']);
-  equal('обратно в адрес — тем же числом',
-    choice.serverFromSearch(url.searchFromFilters({ ...picked, defaultServer: 33 })), 44);
-  equal('сервер сайта в адрес не пишется: общий вид остаётся общим',
-    url.searchFromFilters({ ...picked, server: 33, defaultServer: 33 }), 'cat=vs&sort=top');
-  equal('пустой выбор не оставляет в адресе несуществующий сервер',
-    url.searchFromFilters({ ...picked, server: null, defaultServer: 33 }), 'cat=vs&sort=top');
+  equal('чужая ссылка с номером сервера открывается обычным видом ленты',
+    [Object.hasOwn(picked, 'server'), picked.category, picked.sort], [false, 'vs', 'top']);
+  equal('в адрес обратно сервер не пишется: ссылка остаётся ссылкой на раздел',
+    url.searchFromFilters({ ...picked, server: 44 }), 'cat=vs&sort=top');
 
   /* ── Черновой режим: те же развилки, что в базе ── */
   const local = await import('../src/forum/adapters/local.js');
@@ -11197,56 +11161,55 @@ console.log('\nAM. Фид магазина: обновление и событи
     [/export async function listServers\(\)/.test(supaSrc), /export async function listServers\(\)/.test(localSrc)],
     [true, true]);
 
-  /* ── Порядок выбора и память экрана ── */
-  check('адрес важнее сохранённого, сохранённое важнее номера сайта',
-    mountSrc.includes('resolveServer({ address: server, stored: readServerChoice() })')
-      && /return address \?\? stored \?\? null;/.test(choiceSrc));
-  check('номер сайта передаётся в адрес как дефолт, а не пишется в ссылку',
-    mountSrc.includes('...state, server: state.serverId, defaultServer: Number(CONFIG.server)'));
-  equal('один ключ памяти на весь сайт: форум и рейтинг помнят выбор друг друга',
-    [choice.SERVER_CHOICE_KEY, mountSrc.includes('zr33.forum.server')], ['zr33.server', false]);
-  check('и чтение, и запись выбора делают общим модулем, а не своей склейкой',
-    mountSrc.includes('readServerChoice()') && mountSrc.includes('writeServerChoice(id)')
-      && !/function readServerChoice/.test(mountSrc)
-      && /localStorage\.getItem\(SERVER_CHOICE_KEY\)/.test(choiceSrc));
+  /* ── Сервер ленты: один, из config.js, без памяти, адреса и клика ── */
+  const gone = async (p) => { try { await readFile(p); return false; } catch { return true; } };
+  check('лента берёт номер из config.js, а не из выбора зрителя',
+    mountSrc.includes('serverId: siteServer()')
+      && !mountSrc.includes('readServerChoice') && !mountSrc.includes('writeServerChoice')
+      && !mountSrc.includes('resolveServer'));
+  check('в памяти браузера выбора сервера не осталось: ни общий ключ, ни forum-ключ',
+    !mountSrc.includes('zr33.server') && !mountSrc.includes('zr33.forum.server')
+      && !urlSrc.includes('zr33.server'));
+  equal('общий модуль выбора и ряд в шапке удалены из проекта',
+    [await gone('src/logic/server-choice.js'), await gone('src/ui/server-switch.js')],
+    [true, true]);
   check('сервера спрашивают рядом с лентой, а не перед ней',
-    /const content = postId \? loadThread\(postId\) : loadFeed\(\);[\s\S]{0,400}if \(!postId\) loadServers\(content\);/.test(mountSrc));
-  check('перезапрос дожидается первого ответа: два ответа не переспорят экран',
-    /await Promise\.resolve\(feedPromise\)\.catch\(\(\) => \{\}\);/.test(mountSrc));
-  check('в теме списка серверов не спрашивают: перезапрос не превратит тему в ленту',
-    mountSrc.includes('if (!postId) loadServers(content);'));
-  check('сервер — часть подписи памяти ленты: чужой экран не подмешивается',
-    /state\.serverId \?\? 'все',/.test(mountSrc));
-  check('тему пишут на том сервере, который человек читает',
+    /const content = postId \? loadThread\(postId\) : loadFeed\(\);[\s\S]{0,400}if \(!postId\) loadServers\(\);/.test(mountSrc));
+  check('в теме списка серверов не спрашивают: он нужен только ленте',
+    mountSrc.includes('if (!postId) loadServers();'));
+  check('сервер ушёл из подписи памяти ленты: подмена номера была бы чужим экраном',
+    !/state\.serverId/.test((mountSrc.match(/function feedSignature\(\)[\s\S]{0,400}/) || [''])[0])
+      && /state\.saved \? 'saved' : 'all',/.test(mountSrc));
+  check('тему пишут на сервере сайта, и пустой config не выдумывает номер',
     mountSrc.includes('if (state.serverId != null) draft.serverId = state.serverId;'));
-  check('заголовок вкладки говорит, чей форум открыт',
-    mountSrc.includes('serverTabTitle(BASE_TITLE, server && server.title)')
-      && /return String\(baseTitle\)\.replace\(/.test(choiceSrc)
-      && choiceSrc.includes('/^Сервер \\d+/'));
-  check('и снимается при уходе с форума: название сервера — про ленту',
-    /unmountForum\(\)[\s\S]{0,400}document\.title = BASE_TITLE;/.test(mountSrc));
-  check('клик по серверу перезапрашивает ленту и помнит выбор',
-    /data-forum-server[\s\S]{0,300}writeServerChoice\(id\);[\s\S]{0,120}await loadFeed\(\);/.test(mountSrc));
+  check('заголовок вкладки никто не переписывает: подпись сервера была про выбор ленты',
+    !mountSrc.includes('serverTabTitle') && !mountSrc.includes('BASE_TITLE'));
 
-  /* ── Экран: переключатель появляется только тогда, когда есть выбор ── */
+  /* ── Экран: ни ряда, ни намёка на то, что лент другая ── */
   const { renderForum: renderServerFrame } = await import('../src/pages/forum.js');
-  const frame = (servers, serverId) => renderServerFrame(
+  const pageSrc = await readFile('src/pages/forum.js', 'utf8');
+  const frame = (servers, serverId, extra = {}) => renderServerFrame(
     { events: [], texts: [], alliances: [] },
-    { ready: true, loading: false, posts: [], total: 0, servers, serverId }
+    { ready: true, loading: false, posts: [], total: 0, servers, serverId, ...extra }
   );
-  check('над одной лентой переключателя нет — это шум, а не выбор',
-    !frame([{ id: 33, title: 'Сервер 33', enabled: true }], 33).includes('data-forum-server'));
-  const bar = frame([
-    { id: 33, title: 'Сервер 33', enabled: true },
-    { id: 44, title: 'Сервер 44', enabled: false },
-  ], 44);
-  check('оба сервера в ряду, выбранный помечен нажатой кнопкой',
-    /data-forum-server="44"\s+aria-pressed="true"/.test(bar)
-      && /data-forum-server="33"\s+aria-pressed="false"/.test(bar));
-  check('закрытый сервер остаётся в ленте, но назван закрытым для тем',
-    bar.includes('приём тем закрыт'));
-  check('ряд подписан стилем, которым нарисовано остальное',
-    cssSrc.includes('.seg--server'));
+  check('над лентой ряда серверов нет, и слов «Читать форум N» страница не знает',
+    !frame([{ id: 33, title: 'Сервер 33', enabled: true }], 33).includes('data-forum-server')
+      && !pageSrc.includes('data-forum-server') && !pageSrc.includes('Читать форум'));
+  check('под лентой чужой сервер не упоминается, даже когда база его знает',
+    !frame([
+      { id: 33, title: 'Сервер 33', enabled: true },
+      { id: 44, title: 'Сервер 44', enabled: false },
+    ], 33).includes('Сервер 44'));
+  /*
+    Ради этой строки список серверов и грузят: приём новых тем в ленте
+    закрывается модерацией базы, и человек обязан увидеть это до отправки,
+    а не получить отказ после.
+  */
+  check('при закрытом приёме тем форма заменена строкой, а не отказом после отправки',
+    frame([{ id: 33, title: 'Сервер 33', enabled: false }], 33, { me: { role: 'member' } })
+      .includes('Приём новых тем в этот сервер закрыт модерацией'));
+  check('стиля ряда больше нет ни в ленте, ни в шапке сайта',
+    !cssSrc.includes('.seg--server') && !(await readFile('index.html', 'utf8')).includes('server-switch'));
 
   /* ── Документы ── */
   check('миграция стоит в реестре и описана там, где её ищут',
@@ -11977,8 +11940,16 @@ console.log('\nAM. Фид магазина: обновление и событи
     adapterSrc.includes("'/rpc/site_dataset'") && storeSrc.includes("'/rpc/site_dataset'")
       && /body: datasetBody\(server\)/.test(adapterSrc)
       && /body: datasetBody\(panelServer\(\)\)/.test(storeSrc));
-  check('панель не следует за переключателем зрителя: у неё свой сервер',
-    !storeSrc.includes('viewServer') && !storeSrc.includes('siteServer')
+  /*
+    Два места с одним числом — это ровно тот случай, где ошибка не видна
+    глазами: панель показывала бы строки одного набора, а сохраняла бы их в
+    другой. Поэтому у сайта и у панели разные источники номера (`siteServer()`
+    и `panelServer()`), но оба ведут в `config.js`, и ни один из них не читает
+    выбор зрителя — выбора больше нет.
+  */
+  check('ни сайт, ни панель не спрашивают сервер у зрителя',
+    !storeSrc.includes('viewServer') && !storeSrc.includes('readServerChoice')
+      && !adapterSrc.includes('viewServer')
       && serverSrc.includes('export function datasetBody(server = siteServer())'));
 
   /* ── Свободный номер альянса ── */
@@ -12041,10 +12012,10 @@ console.log('\nAM. Фид магазина: обновление и событи
       && readmeSrc.includes('20261004-site-next-id-anon.sql')
       && readmeSrc.includes('обязан быть прогнан до пуша')
       && readmeSrc.includes('Очередь пуста'));
-  check('реестр объясняет, чего в шаге нет: отдельного снимка на сервер, а права уже сделаны',
-    readmeSrc.includes('отдельный снимок `data/live.json` на каждый сервер')
-      && readmeSrc.includes('Право вносить данные по серверу даёт не этот файл')
-      && !readmeSrc.includes('), переключатель сервера в шапке сайта'));
+  check('реестр объясняет, чего в шаге нет: права даёт следующий файл, а снимок на сервер не нужен',
+    readmeSrc.includes('Право вносить данные по серверу даёт не этот файл')
+      && readmeSrc.includes('Отдельный снимок `data/live.json` на каждый сервер пунктом незакрытого не стоит')
+      && !readmeSrc.includes('Незакрытым остаётся отдельный снимок'));
   check('документ переезда называет шаг и его проверку одной строкой',
     migDoc.includes('20261004-site-server-scope.sql') && migDoc.includes('site_dataset(p_server)'));
   check('и называет исправление прав тем же способом — файлом из истории',
@@ -12052,268 +12023,174 @@ console.log('\nAM. Фид магазина: обновление и событи
       && migDoc.includes('permission denied for function site_next_alliance_id'));
 }
 
-/* ── 17. Мультиаренда сайта, шаг 2: один выбор сервера на весь сайт ─────────
+/* ── 17. Данные сайта: выбор сервера был и убран, измерение осталось ────────
 
-   Шаг 1 дал данным сайта измерение «сервер», но прочитать его мог только
-   config.js: рейтинг показывал 33-й под лентой 44-го. С этого шага выбор один
-   — адрес и память браузера, — и ряд в шапке стоит на страницах данных.
+   Шаг 2 научил сайт переключать наборы: ряд в шапке, `?server=` в адресе,
+   память `zr33.server` и общий модуль выбора на форум и данные
+   (`src/logic/server-choice.js`, `src/ui/server-switch.js`). 05.10.2026 по
+   решению владельца выбор снят: сайт — про 33-й, второй ленты зрителю не
+   надо. Измерение «сервер» из шага 1 при этом осталось в базе, поэтому клиент
+   обязан называть один номер в каждом вызове — и брать его ему больше негде,
+   кроме `config.js`.
 
-   Что здесь ломается молча:
+   Что ломается молча после такого удаления:
 
-     1. Два переключателя на одном экране. Ряд в шапке и ряд ленты называют
-        один и тот же выбор; показывай шапка его на форуме, и человек получает
-        две кнопки «44» с двумя разными реакциями.
-     2. Кэш ответа. Один промис на все выборы — и обратный щелчок отдаёт чужой
-        набор: цифры настоящие, просто не оттуда.
-     3. Снимок `data/live.json`. Он снят с одного набора, и под чужим сервером
-        спасает не данными, а ложью.
-     4. Память браузера. Общий ключ и одна проверка числа: две копии склейки
-        разошлись бы тихо — форум помнил бы 44-й, рейтинг читал бы своё.
-     5. Панель. Её цель — сервер сайта; повелись она за зрителем, случайный
-        щелчок отправил бы правку в чужой набор тем же самым интерфейсом.
+     1. Половина снятого выбора. Ряд исчез, а разбор `?server=` остался бы:
+        ссылка на чужой набор открылась бы страницей своего. Цифры настоящие,
+        просто не оттуда.
+     2. Два числа вместо одного. Данные сайта и панель берут номер из разных
+        модулей; разолись бы — панель правит один набор, страница показывает
+        другой, и по виду это не различить.
+     3. Кэш ответа. Когда серверов могло быть несколько, один промис на все
+        выборы отдавал обратному щелчку чужой набор. Теперь верен обратный
+        случай: карта по серверам осталась бы мёртвым кодом, который надо
+        поддерживать.
+     4. Ссылка на удалённый модуль. Импорт несуществующего файла роняет
+        страницу целиком, а `sw.js` с таким именем в предкеьше не ждёт ответа
+        вообще.
+     5. Документ, обещающий кнопку. Человек ищет переключатель, не находит и
+        решает, что у него сняли право.
 
-   Разбор адреса, память и ряд исполняются делом; кэш и запросы читают по
-   строкам — боевой вызов уходит в базу, которой у теста нет.
+   Разбор адреса и память проверяются делом — тем, что их нет; кэш и запросы
+   читаются по строкам, боевого обращения к базе у теста нет.
 ────────────────────────────────────────────────────────────────────────────── */
 {
   const { readFile } = await import('node:fs/promises');
-  const choice = await import('../src/logic/server-choice.js');
-  const { esc } = await import('../src/ui/helpers.js');
-  const mainSrc = await readFile('src/main.js', 'utf8');
-  const switchSrc = await readFile('src/ui/server-switch.js', 'utf8');
+  const data = await import('../src/data/server.js');
   const serverSrc = await readFile('src/data/server.js', 'utf8');
   const adapterSrc = await readFile('src/data/adapters/supabase.js', 'utf8');
-  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const dataIdxSrc = await readFile('src/data/index.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
   const siteHtml = await readFile('index.html', 'utf8');
   const cssSrc = await readFile('src/forum.css', 'utf8');
+  const swSrc = await readFile('sw.js', 'utf8');
 
-  /* ── Порядок выбора: адрес → память → сервер сайта ── */
-  equal('адрес спорит с памятью и выигрывает',
-    choice.resolveServer({ address: 44, stored: 33 }), 44);
-  equal('без адреса выбор берётся из памяти',
-    choice.resolveServer({ address: null, stored: 44 }), 44);
-  equal('ничего не выбрано — это null, а не ноль',
-    choice.resolveServer({}), null);
-  equal('хвост адреса читается целиком, вместе со страницей карточки',
-    [choice.serverFromHash('#/ladder?server=44'),
-      choice.serverFromHash('#/alliance/404?server=7'),
-      choice.serverFromHash('#/ladder')],
-    [44, 7, null]);
-  equal('чужой ключ адреса не превращается в сервер',
-    [choice.serverFromHash('#/forum?cat=vs'), choice.serverFromHash(undefined)], [null, null]);
-
-  /* ── Память браузера: один общий ключ на весь сайт ── */
-  const store = new Map();
-  globalThis.localStorage = {
-    getItem: (k) => (store.has(k) ? store.get(k) : null),
-    setItem: (k, v) => store.set(k, String(v)),
-    removeItem: (k) => store.delete(k),
-  };
-  choice.writeServerChoice(44);
-  equal('выбор сохранён под общим ключом и читается оттуда же',
-    [store.get(choice.SERVER_CHOICE_KEY), choice.readServerChoice()], ['44', 44]);
-  choice.writeServerChoice(null);
-  equal('пустой выбор забывает, а не пишет строку «null»', [...store.keys()], []);
-  store.set(choice.SERVER_CHOICE_KEY, 'abc');
-  equal('соринка в памяти не ломает страницу', choice.readServerChoice(), null);
-  store.set(choice.SERVER_CHOICE_KEY, '1000');
-  equal('и число вне таблицы — тоже «не выбрано»', choice.readServerChoice(), null);
-  store.clear();
-
-  equal('форумный ключ больше не читается ни на одной стороне',
-    [choice.SERVER_CHOICE_KEY,
-      /zr33\.forum\.server/.test(mainSrc + switchSrc + serverSrc + mountSrc)],
-    ['zr33.server', false]);
-  check('а склейка с хранилищем одна: экраны не заводят своих разборщиков',
-    !/function (readServerChoice|writeServerChoice)/.test(mountSrc + mainSrc + switchSrc + serverSrc));
-
-  /* ── viewServer: адрес, память, а иначе сервер сайта ── */
-  const dataServer = await import('../src/data/server.js');
-  globalThis.location = { hash: '#/ladder?server=44', hostname: 'zroute.bond' };
-  equal('адрес страницы задаёт набор данных', dataServer.viewServer(), 44);
-  choice.writeServerChoice(77);
-  globalThis.location = { hash: '#/ladder', hostname: 'zroute.bond' };
-  equal('без адреса память', dataServer.viewServer(), 77);
-  choice.writeServerChoice(null);
-  equal('без адреса и памяти остаётся сервер сайта',
-    dataServer.viewServer(), Number(CONFIG.server));
+  /* ── Одно число на весь сайт ── */
+  equal('номер сервера сайта — то же число, что в config.js',
+    data.siteServer(), Number(CONFIG.server));
   equal('набор просят телом с номером, и без номера тело пустое',
-    [dataServer.datasetBody(44), dataServer.datasetBody(null)],
-    [{ p_server: 44 }, {}]);
-  equal('вызов без аргумента — сервер сайта, а не выбор зрителя: панель при своём',
-    dataServer.datasetBody(), { p_server: Number(CONFIG.server) });
-  delete globalThis.location;
+    [data.datasetBody(44), data.datasetBody(null)], [{ p_server: 44 }, {}]);
+  equal('вызов без аргумента называет сервер сайта, а не догадывается',
+    data.datasetBody(), { p_server: Number(CONFIG.server) });
+  check('число берётся из config.js и только: в этом модуле нет ни адреса, ни памяти',
+    serverSrc.includes('const raw = CONFIG.server;')
+      && !serverSrc.includes('location') && !serverSrc.includes('localStorage')
+      && !serverSrc.includes('hash'));
+  check('пустое поле в config.js не превращается в сервер №0',
+    /if \(raw === null \|\| raw === undefined \|\| String\(raw\)\.trim\(\) === ''\) return null;/.test(serverSrc)
+      && /return Number\.isInteger\(n\) \? n : null;/.test(serverSrc));
 
-  /* ── Ряд в шапке: где он есть и где его нет ── */
-  equal('ряд наполняется только на страницах данных сайта',
-    switchSrc.match(/const DATA_PAGES = new Set\(\[([^\]]+)\]/)[1]
-      .split(',').map((s) => s.trim().replace(/'/g, '')),
-    ['home', 'quarter', 'ladder', 'timeline', 'guide', 'alliance']);
-  check('контейнер ряда есть в разметке и стартует пустым и скрытым',
-    /<div id="server-switch" class="server-switch" hidden><\/div>/.test(siteHtml));
-  check('над одним набором переключателя не бывает',
-    /const show = dataPage && servers\.length > 1;/.test(switchSrc));
-  check('молчание базы не превращается в пустой ряд: список ждёт ответа',
-    /Promise\.resolve\(forum\.listServers\(\)\)\.catch\(\(\) => \[\]\)/.test(switchSrc)
-      && switchSrc.includes('if (loaded) paint();'));
+  /* ── Путь чтения: ни слова о выборе ── */
+  check('в чтении данных сайта выбора сервера не осталось и в помине',
+    !/viewServer|readServerChoice|writeServerChoice|resolveServer|server-choice/.test(
+      serverSrc + adapterSrc + dataIdxSrc + mainSrc));
+  check('номер адаптер берёт у того же модуля, что и панель: два числа разошлись бы молча',
+    adapterSrc.includes("import { datasetBody, siteServer } from '../server.js';")
+      && /const server = siteServer\(\);/.test(adapterSrc)
+      && /body: datasetBody\(server\)/.test(adapterSrc));
 
-  /* Кнопки ряда исполняются на подставном списке серверов. */
-  const widgetSrc = switchSrc.slice(
-    switchSrc.indexOf('function paint() {'),
-    switchSrc.indexOf('document.addEventListener')
-  );
-  const runWidget = new Function('servers', 'DATA_PAGES', 'pageId', 'viewServer',
-    'document', 'esc', 'serverTabTitle', 'BASE_TITLE', widgetSrc + '; return paint;');
-  const rows = [{ id: 33, title: 'Сервер 33', enabled: true },
-    { id: 44, title: 'Сервер 44' }, { id: 55, title: 'Закрытый', enabled: false }];
+  /* ── Кэш ответа: один промис, а не карта серверов ── */
+  check('кэш — один промис на страницу: при одном наборе карта по серверам была бы мёртвым кодом',
+    /let running = null;/.test(adapterSrc) && !/cache\.get\(server\)/.test(adapterSrc)
+      && !adapterSrc.includes('cache.clear()'));
+  check('сброс кэша сбрасывает этот единственный промис',
+    /export function clearCache\(\) \{\s*\n\s*running = null;/.test(adapterSrc));
+  check('из кэша вычищается только упавший запрос: чужая авария не трогает удачный',
+    /pending\.catch\(\(\) => \{\s*\n\s*if \(running === pending\) running = null;/.test(adapterSrc));
 
-  function frame(hash, shown, current) {
-    const box = { hidden: true, innerHTML: '' };
-    const doc = { title: 'Сервер 33 · Z Route: Redemption', getElementById: () => box };
-    runWidget(shown, new Set(['home', 'quarter', 'ladder', 'timeline', 'guide', 'alliance']),
-      () => hash.replace(/^#\/?/, '').split('?')[0].split('/')[0], () => current,
-      doc, esc, choice.serverTabTitle, 'Сервер 33 · Z Route: Redemption')();
-    return { box, doc };
-  }
-
-  const ladder = frame('#/ladder', rows, 44);
-  check('на странице рейтинга ряд показан, подписан и подсвечивает выбранный сервер',
-    ladder.box.hidden === false
-      && ladder.box.innerHTML.includes('>Сервер<')
-      && /data-site-server="44"[^>]*aria-pressed="true"/.test(ladder.box.innerHTML)
-      && /data-site-server="33"[^>]*aria-pressed="false"/.test(ladder.box.innerHTML));
-  check('закрытый сервер в ряду остаётся: читать его ленту можно, писать — нет',
-    ladder.box.innerHTML.includes('приём тем закрыт'));
-  equal('заголовок вкладки называет выбранный сервер, название сайта остаётся',
-    ladder.doc.title, 'Сервер 44 · Z Route: Redemption');
-  check('на форуме и на панели ряда нет, и контейнер пуст',
-    (() => {
-      const forum = frame('#/forum', rows, 44);
-      const admin = frame('#/admin', rows, 44);
-      return forum.box.hidden === true && forum.box.innerHTML === ''
-        && admin.box.hidden === true && admin.box.innerHTML === '';
-    })());
-  equal('при одном сервере ряда нет, при двух — есть',
-    [frame('#/ladder', [rows[0]], 33).box.hidden, frame('#/ladder', rows.slice(0, 2), 33).box.hidden],
-    [true, false]);
-  check('названия серверов из базы проходят через экранирование',
-    frame('#/ladder', [{ id: 1, title: '<b>x</b>' }, { id: 2, title: 'y' }], 1)
-      .box.innerHTML.includes('&lt;b&gt;x&lt;/b&gt;'));
-
-  /* Адрес после щелчка: ссылка обязана открыть собеседнику тот же сервер. */
-  const addrSrc = switchSrc.slice(
-    switchSrc.indexOf('function addressFor(server) {'),
-    switchSrc.indexOf('function paint() {')
-  );
-  const runAddress = new Function('location', 'siteServer', 'putServerParam',
-    addrSrc + '; return addressFor;');
-  const addressFor = (hash, server, own = 33) =>
-    runAddress({ hash }, () => own, choice.putServerParam)(server);
-  equal('щелчок по чужому серверу переписывает адрес страницы',
-    addressFor('#/ladder', 44), '#/ladder?server=44');
-  equal('щелчок по своему серверу ключ убирает: адрес не спорит с памятью',
-    addressFor('#/ladder?server=44', 33), '#/ladder');
-  equal('адрес карточки альянса ряд сохраняет, а не выбрасывает',
-    addressFor('#/alliance/404', 44), '#/alliance/404?server=44');
-  equal('свой сервер в карточке оставляет адрес без ключа',
-    addressFor('#/alliance/404?server=44', 33), '#/alliance/404');
-
-  /* ── Кэш ответа разделён по серверам ── */
-  check('кэш держит по промису на сервер, а не один на все выборы',
-    /const cache = new Map\(\);/.test(adapterSrc)
-      && /const server = viewServer\(\);\r?\n\s*const running = cache\.get\(server\);/.test(adapterSrc)
-      && adapterSrc.includes('cache.set(server, pending)'));
-  check('из кэша вычищается только упавший запрос: чужая авария не трогает набор',
-    /pending\.catch\(\(\) => \{[\s\S]{0,90}cache\.get\(server\) === pending[\s\S]{0,40}cache\.delete\(server\)/.test(adapterSrc));
-  check('сброс кэша чистит все серверы разом', adapterSrc.includes('cache.clear();'));
-
-  /* ── Смена сервера перечитывает данные ── */
-  check('щелчок по ряду не перемонтирует страницу: адрес меняется через replaceState',
-    /history\.replaceState\(null, '', hash\)/.test(switchSrc) && !/location\.hash = /.test(switchSrc));
-  check('ряд пишет выбор в память и зовёт перечитать через событие',
-    /writeServerChoice\(server\);[\s\S]{0,300}zr33:server-change/.test(switchSrc));
-  check('main.js слушает этот зов и перечитывает данные сайта',
-    /addEventListener\('zr33:server-change'[\s\S]{0,80}refreshView\(\)/.test(mainSrc));
-  check('вход и щелчок идут одним путём: boot зовёт refreshView',
+  /* ── Перечитывание: один путь, без события про смену сервера ── */
+  check('данные читает refreshView, и вход идёт тем же путём',
     /async function refreshView\(\) \{/.test(mainSrc) && /\bawait refreshView\(\);/.test(mainSrc));
-  check('ряд стартует рядом с лентой, а не после данных сайта',
-    /loadServerSwitch\(\);\r?\n\s*await refreshView\(\);/.test(mainSrc));
-  check('после перерисовки страницы ряд перекрашивается под новую вкладку',
-    /trackPageview\(path\);(?:\s*\/\*[\s\S]*?\*\/)?\s*\r?\n\s*syncServerSwitch\(\);/.test(mainSrc));
-  check('ссылка с чужим сервером не рисует старый набор: страница сверяется с памятью',
-    /if \(viewServerLoaded !== viewServer\(\)\) \{[\s\S]{0,160}refreshView\(\);/.test(mainSrc));
-  check('живая вкладка ради данных сайта не задерживается: ждёт только статичная страница',
-    /if \(!live\) app\.innerHTML = '<div class="loading">[\s\S]{0,80}if \(!live\) return;/.test(mainSrc));
-  check('чей набор лежит в view, записывается в обеих ветках ответа',
-    (mainSrc.match(/viewServerLoaded = requested;/g) || []).length === 2,
-    `нашлось: ${(mainSrc.match(/viewServerLoaded = ?requested;/g) || []).length}`);
-  check('пустой контур живой вкладки при входе не считается устаревшим набором',
-    /view = emptyView\(\);(?:\s*\/\*[\s\S]*?\*\/)?\s*\r?\n\s*viewServerLoaded = viewServer\(\);/.test(mainSrc));
-  check('данные сайта берут номер у выбора зрителя, а не из config.js',
-    adapterSrc.includes("import { datasetBody, viewServer } from '../server.js';")
-      && serverSrc.includes("import { serverFromHash, readServerChoice, resolveServer } from '../logic/server-choice.js';"));
+  check('события смены сервера никто не слушает: ряда нет, звать перечитывать некому',
+    !mainSrc.includes('zr33:server-change') && !mainSrc.includes('syncServerSwitch')
+      && !mainSrc.includes('loadServerSwitch'));
 
-  /* ── Вид: ряд живёт в шапке и на телефоне уезжает под неё ── */
-  check('ряд описан стилем, которым нарисовано остальное, и на телефоне переносится',
-    cssSrc.includes('.server-switch__label') && cssSrc.includes('.server-switch .seg--server')
-      && /\.server-switch \{ flex: 1 0 100%; \}/.test(cssSrc));
+  /* ── Следы удалённого выбора: ни в разметке, ни в стилях, ни в запасе ── */
+  check('в разметке страницы контейнера ряда нет', !siteHtml.includes('server-switch'));
+  check('стиля ряда не осталось', !cssSrc.includes('.server-switch') && !cssSrc.includes('.seg--server'));
+  check('сервисный работник не ждёт файлы удалённого выбора',
+    !swSrc.includes('server-switch') && !swSrc.includes('server-choice'));
+  check('и в адресной строке номера сервера нет ни у одной вкладки сайта',
+    !siteHtml.includes('?server=') && !mainSrc.includes('putServerParam'));
 
-  /* ── Документы ── */
+  /* ── Документы: про переключатель говорят только в прошедшем времени ── */
   const archSrc = await readFile('docs/ARCHITECTURE.md', 'utf8');
   const forumDocSrc = await readFile('docs/FORUM.md', 'utf8');
   const hostDocSrc = await readFile('docs/HOSTING.md', 'utf8');
+  const adminDocSrc = await readFile('docs/ADMIN.md', 'utf8');
+  const editorDocSrc = await readFile('docs/EDITOR-GUIDE.md', 'utf8');
   const migDocSrc = await readFile('docs/MIGRATION.md', 'utf8');
   const queueSrc = await readFile('supabase/README.md', 'utf8');
 
-  check('архитектура описывает один выбор сервера и почему панель при своём',
-    archSrc.includes('## Один выбор сервера на весь сайт')
-      && archSrc.includes('Панель за переключателем не следует')
-      && archSrc.includes('src/ui/server-switch.js'));
-  check('раздел про снимок говорит, что под чужим сервером копия не спасает',
-    archSrc.includes('Выбранный чужой сервер'));
-  check('документ форума называет общий модуль выбора и прежний ключ мёртвым',
-    forumDocSrc.includes('src/logic/server-choice.js')
-      && forumDocSrc.includes('zr33.server')
-      && forumDocSrc.includes('Прежний форумный ключ `zr33.forum.server` не читается'));
-  check('раздача объясняет полоску про чужой сервер словами, а не кодом',
-    hostDocSrc.includes('Оговорка про переключатель сервера в шапке'));
-  check('документ переезда называет шаг клиентским: миграции у него нет',
-    migDocSrc.includes('шаг клиентский, миграции у него нет'));
-  check('реестр миграций не обещает переключатель в списке незакрытого',
-    queueSrc.includes('Переключатель сервера в шапке сайта (шаг 2 после этого файла)')
-      && !queueSrc.includes('переключатель сервера в шапке сайта и отдельный снимок'));
+  /*
+    Про выбор сервера документы обязаны говорить в прошедшем времени.
+    Разбор идёт по абзацам, а не по строкам: абзацы в документах перенесены
+    вручную, и слово «убран» нередко стоит через две строки от слова
+    «переключатель». Построчная проверка такую пару не нашла бы и требовала бы
+    править документ под тест, а не под читателя.
+  */
+  const ABOUT = /переключател\w* сервер|сервер\w* переключател|ряд серверов|ряд в шапке|ряду в шапке|\?server=|выбранный сервер/i;
+  const GONE = /убран|снято|снят|отмен|удал|не было|больше нет|нет выбора|не показыв|не следует|не ждал|жил один день|был общий модуль|обычным видом/i;
+  for (const [doc, text] of [
+    ['ARCHITECTURE.md', archSrc], ['FORUM.md', forumDocSrc], ['HOSTING.md', hostDocSrc],
+    ['ADMIN.md', adminDocSrc], ['EDITOR-GUIDE.md', editorDocSrc],
+    ['MIGRATION.md', migDocSrc], ['supabase/README.md', queueSrc],
+  ]) {
+    check(`${doc}: ссылок на удалённые модули выбора нет`,
+      !text.includes('server-choice.js') && !text.includes('server-switch.js'));
+    const alive = text.split(/\r?\n\r?\n/).filter((p) => ABOUT.test(p) && !GONE.test(p));
+    equal(`${doc}: выбор сервера упоминается только как снятый`,
+      alive.join(' | ').replace(/\r?\n/g, ' ').slice(0, 160), '');
+  }
+
+  check('архитектура называет решение и объясняет, что после него осталось',
+    archSrc.includes('## Сайт — про один сервер')
+      && archSrc.includes('Измерение в базе'));
+  check('раздача объясняет копию данных как копию того же набора, что показывает страница',
+    hostDocSrc.includes('она снимается с набора сервера сайта'));
+  check('документ переезда называет отменённый шаг отменённым, а не живым',
+    migDocSrc.includes('Этот шаг отменён на клиенте'));
+  check('реестр миграций не оставляет в незакрытом снимок на каждый сервер',
+    !queueSrc.includes('Незакрытым остаётся отдельный снимок'));
 }
 
 /* ── 18. Мультиаренда сайта, шаг 3: право вносить данные по серверу ────────
 
-   Шаг 1 дал данным сайта сервер, шаг 2 позволил зрителю выбрать его глазами.
-   Право писать при этом осталось одноклассным: политики смотрели на человека
-   (`site_can_edit()`), и модератор 44-го равнял чужую неделю на 33-м. С этого
-   шага граница — строка `server_id`, а у панели есть осознанная цель.
+   Шаг 1 дал данным сайта сервер, шаг 3 поставил на запись границу по строке:
+   политики смотрят не на человека (`site_can_edit()`), а на `server_id`, и
+   модератор 44-го больше не равняет чужую неделю на 33-м.
+
+   Выбора сервера здесь больше нет ни у кого. Зрительский ряд убран 05.10.2026
+   (секция 17), и панель за ним последовала: её цель — сервер сайта из
+   `config.js`. Проверки поэтому делятся на две половины: база обязана держать
+   границу по строке, а клиент — не иметь ни одного пути эту цель изменить.
 
    Что здесь ломается молча, если разъехалось:
 
-     1. Право по человеку вместо права по строке. Панель покажет ряд серверов,
-        база откажет в записи — человек узнает об этом после работы, а не до.
-     2. Две цели в одном файле. Если запись спрашивает номер не там, где чтение,
-        панель показывает один набор и сохраняет в другой, а глазами это
-        неразличимо: интерфейс тот же, цифры те же.
+     1. Право по человеку вместо права по строке. Панель открыта модератору
+        44-го, база отказывает каждому его нажатию — человек узнает об этом
+        после работы, а не до.
+     2. Две цели в одном файле. Если запись спрашивает номер не там, где
+        чтение, панель показывает один набор и сохраняет в другой, а глазами
+        это неразличимо: интерфейс тот же, цифры те же.
      3. Пустая карта прав вместо «прав не спрашивали». На пустой карте панель
-        обязана закрыться, на null — открыться серверу сайта; перепутать их
+        обязана закрыться, на null — открыться модерации сайта; перепутать их
         значит либо оставить владельца без панели, либо выпустить чужого
-        редактора в ряд записи.
+        редактора в запись.
      4. Черновик без папки сервера. «W1» на 33-м и на 44-м — разные недели, и
         прочитанный не из своей папки черновик выглядит ровно как свой.
      5. Путь фотографии без номера. База читает сервер из первой части пути, и
         панель, положившая файл в общую папку, лишила бы своего модератора
         половины экрана молча.
-     6. Журнал без сервера. Модератор сайта видит правки всех наборов, и запись
-        «изменена W1» без номера выглядит как его собственная.
-     7. Ряд в шапке сайта как цель панели. Ссылка «смотри, что у нас на 44-м»,
-        открытая редактором, перенаправила бы его правку в чужой набор.
+     6. Журнал без сервера. Правило доступа модерации сайта отдаёт правки всех
+        наборов, и панель обязана отсеивать их сама — иначе запись «изменена
+        W1» чужого набора выглядит своей.
+     7. Возврат ряда. Номер в шапке — не украшение, а подпись того, куда уходит
+        запись; кнопка переключения рядом означала бы, что правка однажды
+        уйдёт в чужую историю.
 
-   Миграция, цель панели, черновики, путь фото и ряд выбора проверяются делом и
-   по строкам; живого обращения к базе у теста нет.
+   Миграция, цель панели, черновики и путь фото проверяются делом и по
+   строкам; живого обращения к базе у теста нет.
 ────────────────────────────────────────────────────────────────────────────── */
 {
   const { readFile } = await import('node:fs/promises');
@@ -12396,11 +12273,14 @@ console.log('\nAM. Фид магазина: обновление и событи
     /insert into public\.site_audit\s+\(actor_id, actor_nick, entity, entity_id, action, details, server_id\)/.test(mig));
   check('индекс под тот порядок, которым журнал читают: сервер и свежие записи',
     mig.includes('create index if not exists site_audit_server_idx on public.site_audit (server_id, at desc);'));
-  check('панель отдаёт экрану номер строки и не спорит с правами фильтрам',
-    /server: Number\.isInteger\(r\.server_id\) \? r\.server_id : null/.test(storeSrc)
-      && !/site_audit\?[^`]*server_id=eq/.test(storeSrc));
-  check('обзор рисует сервер у правки: без него соседняя запись чужого набора выглядит своей',
-    /c\.server \? `<span class="muted">сервер \$\{esc\(c\.server\)\}<\/span>`/.test(overviewSrc));
+  check('панель берёт журнал фильтром по серверу сайта, а не вырезает чужие строки на глазу',
+    /`\/site_audit\?server_id=eq\.\$\{panelServer\(\)\}&select=\*&order=at\.desc&limit=\$\{Number\(limit\)\}`/.test(storeSrc));
+  check('номера строк экрану не отдают: в журнале одна лента, и значок чужого сервера рядом был бы намёком на неё',
+    (() => {
+      const start = storeSrc.indexOf('export async function recentChanges');
+      const finish = storeSrc.indexOf('Итоги недели', start);
+      return !/server:/.test(storeSrc.slice(start, finish));
+    })() && !/c\.server/.test(overviewSrc));
 
   /* ── Фотографии: номер сервера в пути ── */
   check('сервер фотографии база читает из первой части пути и только если это число',
@@ -12431,41 +12311,41 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('дверь выдачи права названа готовым вызовом: экрана выдачи ещё нет',
     mig.includes('select public.forum_set_server_member(') && mig.includes("'moderator')"));
 
-  /* ── Панель: цель читает право, а не роль вообще ── */
-  check('право спрашивается у цели, а не у человека: прежняя проверка закрыла бы модератора сервера',
-    !/canEditSite/.test(mainCode)
-      && /function mayEdit\(\) \{\s*\n\s*return hasTarget\(\) && canEditServer\(panelServer\(\), account\);/.test(mainSrc));
+  /* ── Панель: право спрашивают у сервера сайта, а цель не выбирают ── */
+  check('решает один короткий вызов: прочитанная карта и роль вошедшего из одного места',
+    /function mayEdit\(\) \{\s*\n\s*return rightsRead\(\) && canEditSite\(account\);/.test(mainSrc));
   equal('все места, где решает кнопка записи, зовут mayEdit',
     (mainSrc.match(/(?:view\.canPush = |canPush: )mayEdit\(\)/g) || []).length, 6);
-  check('цель без права и право без цели — оба отказа: права могли снять, пока вкладка открыта',
-    /hasTarget\(\) && canEditServer\(panelServer\(\), account\)/.test(mainSrc));
-  check('право читается до данных: набор лежит в таблице, размеченной по серверам',
-    /await readRights\(\);\s*\n\s*if \(!hasTarget\(\)\) \{/.test(mainSrc));
-  check('без цели панель не открывается пустым экраном, а объясняет, кто даёт право',
-    /if \(!hasTarget\(\)\) \{\s*\n\s*showNoAccess\(account\);/.test(mainSrc));
-  check('отказ обоих запросов о правах означает «миграции нет», а не «прав нет»',
-    /forum\.myServerRoles\(\)\.catch\(\(\) => null\)[\s\S]{0,220}forum\.listServers\(\)\.catch\(\(\) => \[\]\)/.test(mainSrc));
-  check('выход стирает карту прав и цель: следующему вошедшему не достанется чужой набор',
+  check('имена удалённого ряда не живут даже в коде: панель не знает, что цель можно менять',
+    !/hasTarget|canEditServer|writableServers|choosePanelServer|panelServerTitle/.test(mainCode)
+      && !/hasTarget|canEditServer|writableServers|choosePanelServer|panelServerTitle|listServers/.test(targetSrc));
+  check('право читается до данных: экран отказа не строится на наборе, куда человека не пустят',
+    /await readRights\(\);\s*\n\s*if \(!mayEdit\(\)\) \{/.test(mainSrc));
+  check('без права панель не открывается пустым экраном, а объясняет, кто даёт право',
+    /if \(!mayEdit\(\)\) \{\s*\n\s*showNoAccess\(account\);/.test(mainSrc)
+      && /Роль модератора сайта выдаёт владелец/.test(mainSrc));
+  check('отказ вопроса о правах означает «миграции нет», а не «прав нет»: null проглатывается, пустая карта — нет',
+    /forum\.myServerRoles\(\)\.catch\(\(\) => null\)/.test(mainSrc)
+      && /return adoptRights\(\{ account, roles \}\);/.test(mainSrc));
+  check('выход стирает карту прав: следующему вошедшему не достанется чужой ответ',
     /await signOut\(\);\s*\n\s*account = null;\s*\n\s*forgetRights\(\);/.test(mainSrc));
-  check('щелчок по ряду перечитывает набор целиком, а не перекрашивает кнопки',
-    /const serverButton = e\.target\.closest\('\[data-panel-server\]'\);[\s\S]{0,300}view = null;\s*\n\s*try \{/.test(mainSrc));
-  check('устаревший ряд (право сняли) ведёт в перечитывание прав, а не в запись',
-    /if \(choosePanelServer\(next, account\)\) \{[\s\S]{0,260}\n    \}\n    await boot\(\);/.test(mainSrc));
   check('свободный номер альянса спрашивается только при праве на запись',
     /let allianceFloor = 0;\s*\n\s*if \(mayEdit\(\)\) \{/.test(mainSrc));
-  check('публикация называет набор, куда ушли данные',
-    /Данные ушли в «\$\{esc\(panelServerTitle\(\)\)\}»/.test(mainSrc));
-  check('шапка получает цель и ряд из того же места, что и запись',
-    /server: panelServer\(\),\s*\n\s*serverTitle: panelServerTitle\(\),\s*\n\s*servers: writableServers\(account\),/.test(mainSrc)
-      && /server: view\.server,\s*\n\s*servers: view\.servers,/.test(mainSrc));
-  check('у панели своя память и она не читает выбор зрителя',
-    targetSrc.includes("const KEY = 'zr33.admin.server'") && !/server-choice/.test(targetSrc));
+  check('публикация не называет набор: вместе с рядом ушло и его имя в тексте отказа и успеха',
+    /<b>Опубликовано\.<\/b> \$\{esc\(describeChanges\(changes\)\)\}/.test(mainSrc)
+      && !/Данные ушли в/.test(mainSrc));
+  check('шапка получает цель из того же места, что и запись, и списка серверов не видит',
+    /server: panelServer\(\),/.test(mainSrc) && /server: view\.server,/.test(mainSrc)
+      && !/servers/.test(mainSrc));
+  check('у панели нет своей памяти о цели: номер берут из config.js, а не из переписки с браузером',
+    !/localStorage/.test(targetSrc)
+      && !/zr33\.admin\.server/.test(targetSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')));
   check('вход и отказ называют три круга прав и не обещают кнопку, которой ещё нет',
     loginSrc.includes('модераторам отдельного') && /пока\s+заводит\s+только\s+в\s+базе/.test(loginSrc)
-      && /пока\s+заводит\s+только\s+в\s+базе/.test(mainSrc));
-  check('обзор подписан названием набора, а не вечным «Данные сайта»',
-    overviewSrc.includes('const serverTitle = view.serverTitle')
-      && overviewSrc.includes('правка — «${esc(serverTitle)}»'));
+      && /модераторам\s+сервера/.test(mainSrc));
+  check('обзор подписан сервером сайта, а не подписью набора из снятого ряда',
+    /const serverTitle = view\.server == null \? 'Данные сайта' : `Сервер \$\{view\.server\}`/.test(overviewSrc)
+      && !/view\.serverTitle/.test(overviewSrc));
 
   /* ── Семантика прав: target.js исполняется делом ── */
   const mem = new Map();
@@ -12478,58 +12358,59 @@ console.log('\nAM. Фид магазина: обновление и событи
   const OWNER = { role: 'admin', nick: 'Владелец' };
   const SITE_MOD = { role: 'moderator', nick: 'Модератор сайта' };
   const SERVER_MOD = { role: 'player', nick: 'Модератор 44-го' };
-  const BOTH = { 33: 'moderator', 44: 'moderator' };
-  const ONLY44 = { 44: 'moderator', 33: 'member' };
-  const LIST = [{ id: 33, title: 'Сервер 33' }, { id: 44, title: 'Сервер 44' }];
+  const savedServer = CONFIG.server;
 
   target.forgetRights();
-  mem.clear();
-  equal('пока прав не спрашивали, панель открыта модерации сайта и только на её сервер',
-    [target.adoptRights({ account: OWNER, roles: null, servers: [] }),
-      target.canEditServer(33, OWNER), target.canEditServer(44, OWNER)], [33, true, false]);
-  check('гостю и забаненному не помогает ни роль сайта, ни карта прав',
-    [target.canEditServer(33, null), target.canEditServer(44, { role: 'player', banned: true }),
-      target.writableServers({ role: 'admin', banned: true }).length]
-      .join() === 'false,false,0');
+  check('пока прав не спрашивали, панель не готова отвечать: rightsRead лжёт, а роль ещё решает',
+    [target.rightsRead(), target.canEditSite(OWNER)].join() === 'false,true');
+  equal('карта null — это «миграции нет»: панель открывается модерации сайта на её сервере',
+    [target.adoptRights({ account: OWNER, roles: null }), target.rightsRead()], [33, true]);
+  check('гостю и забаненному не помогает ни роль сайта, ни прочитанная карта',
+    [target.canEditSite(null), target.canEditSite({ role: 'admin', banned: true }),
+      target.canEditSite({ role: 'moderator', banned: true })].join() === 'false,false,false');
 
-  mem.clear();
-  equal('правая карта прочитана и пустая: это «нигде», и панель закрывается',
-    [target.adoptRights({ account: SITE_MOD, roles: {}, servers: LIST }), target.hasTarget()], [null, false]);
-  check('на закрытой панели цель не выдумывается: запись отказывает до запроса',
+  equal('правая карта прочитана и пустая: это «нигде», и панель закрывается даже владельцу',
+    [target.adoptRights({ account: OWNER, roles: {} }), target.canEditSite(OWNER)], [null, false]);
+  equal('право на сервер сайта панель открывает, участие в чужом наборе роли не даёт',
+    target.adoptRights({ account: SITE_MOD, roles: { 33: 'moderator', 44: 'member' } }), 33);
+  equal('модератор чужого набора панелью не пользуется: прав на сервер сайта у него нет',
+    target.adoptRights({ account: SERVER_MOD, roles: { 33: 'member', 44: 'moderator' } }), null);
+  check('на закрытой панели запись не выдумывает цель: отказ идёт до всякого запроса',
+    target.panelServer() === Number(savedServer));
+
+  CONFIG.server = 44;
+  equal('цель и право берут одно число из config.js: смена строки переносит панель на другой набор',
+    [target.adoptRights({ account: SERVER_MOD, roles: { 33: 'member', 44: 'moderator' } }),
+      target.panelServer()], [44, 44]);
+  CONFIG.server = savedServer;
+  check('а на прежнем числе тот же человек снова вне панели: цель не следует за человеком',
+    target.adoptRights({ account: SERVER_MOD, roles: { 33: 'member', 44: 'moderator' } }) === null);
+  CONFIG.server = '';
+  check('пустой config.js: панель отказывает записью с объяснением, а не молчаливым нулём',
     (() => {
       try {
         target.panelServer();
         return false;
       } catch (err) {
-        return /Править данные сайта нечем/.test(String(err.message));
+        return /не заполнен server/.test(String(err.message));
       }
+    })() && target.rightsRead() === false && target.draftServer() === null);
+  CONFIG.server = savedServer;
+  equal('вернувшийся номер возвращает и панель',
+    target.adoptRights({ account: OWNER, roles: { 33: 'moderator' } }), 33);
+  check('участник без модераторства права на данные сайта не получает',
+    [target.adoptRights({ account: SERVER_MOD, roles: { 33: 'member' } }),
+      target.canEditSite(SERVER_MOD)].map(String).join() === 'null,false');
+  check('выход сбрасывает карту: после него снова «прав не спрашивали», а не «прав нет»',
+    (() => {
+      target.forgetRights();
+      return [target.rightsRead(), target.canEditSite(OWNER)].join() === 'false,true';
     })());
-
-  mem.clear();
-  equal('без памяти панель открывается серверу сайта, а не первому попавшемуся набору',
-    target.adoptRights({ account: OWNER, roles: BOTH, servers: LIST }), 33);
-  mem.set('zr33.admin.server', '44');
-  equal('память бьёт сервер сайта: редактор возвращается туда, где работал',
-    target.adoptRights({ account: OWNER, roles: BOTH, servers: LIST }), 44);
-  mem.set('zr33.admin.server', '77');
-  equal('память про сервер, куда права нет, не принимается: цель берётся из прав',
-    [target.adoptRights({ account: SERVER_MOD, roles: ONLY44, servers: LIST }), target.hasTarget()], [44, true]);
-  equal('ряд выбора показывает только то, где право есть, и называет это подписью сервера',
-    target.writableServers(SERVER_MOD), [{ id: 44, title: 'Сервер 44' }]);
-  check('подпись цели берётся из того же места, что и номер',
-    target.panelServerTitle() === 'Сервер 44');
-  check('переключение на чужой сервер отвергается, и цель остаётся своей',
-    target.choosePanelServer(33, SERVER_MOD) === false && target.panelServer() === 44);
-  check('тот же сервер повторно не перемонтируется, а память не пишется впустую',
-    target.choosePanelServer(44, SERVER_MOD) === false && mem.get('zr33.admin.server') === '44');
-  mem.clear();
-  check('участник без модераторства не получает ни одного сервера',
-    target.adoptRights({ account: SERVER_MOD, roles: { 33: 'member', 44: 'none' }, servers: LIST }) === null);
 
   /* ── Черновики: папка сервера вместо общего ключа ── */
   const draft = await import('../src/admin/draft.js');
   mem.clear();
-  target.adoptRights({ account: OWNER, roles: BOTH, servers: LIST });   // цель 33
+  target.adoptRights({ account: OWNER, roles: { 33: 'moderator' } });
   mem.set('zr33.admin.drafts', JSON.stringify({ W9: { marks: { a05: 'win' }, savedAt: '2026-10-01T00:00:00.000Z' } }));
   equal('плоский черновик до мультиаренды читается как черновик сервера сайта',
     draft.getDraft('W9'), { a05: 'win' });
@@ -12538,55 +12419,69 @@ console.log('\nAM. Фид магазина: обновление и событи
       const raw = JSON.parse(mem.get('zr33.admin.drafts'));
       return '33' in raw && !('W9' in raw);
     })());
-  target.choosePanelServer(44, OWNER);
-  equal('на другом сервере тот же id недели — пустая клетка, а не чужой ввод',
+  CONFIG.server = 44;
+  equal('на другом наборе тот же id недели — пустая клетка, а не чужой ввод',
     draft.getDraft('W9'), null);
   draft.saveDraft('W9', { a07: 'loss' });
-  target.choosePanelServer(33, OWNER);
+  CONFIG.server = savedServer;
   equal('черновик своего сервера пережил поездку к соседу', draft.getDraft('W9'), { a05: 'win' });
   draft.dropDraft('W9');
-  target.choosePanelServer(44, OWNER);
+  CONFIG.server = 44;
   equal('снятие черновика не трогает чужую папку', draft.getDraft('W9'), { a07: 'loss' });
+  CONFIG.server = savedServer;
   check('списки летописи, альянсов и текстов лежат в тех же папках',
     draftSrc.includes('function listBucket(key, list)') && draftSrc.includes('buckets[current()] = { list, savedAt'))
       && !/localStorage\.removeItem/.test(draftSrc);
   mem.set('zr33.admin.events', JSON.stringify({ list: [{ id: 'e1' }], savedAt: '2026-10-01T00:00:00.000Z' }));
-  target.choosePanelServer(33, OWNER);
   equal('старый список летописи так же относится к серверу сайта', draft.getEventsDraft(), [{ id: 'e1' }]);
-  target.choosePanelServer(44, OWNER);
-  check('а на другом сервере летописи ещё нет', draft.getEventsDraft() === null);
+  check('и переезжает в папку сразу, а не ждёт первой правки: до записи чтение приписывало бы его любому числу',
+    (() => {
+      const raw = JSON.parse(mem.get('zr33.admin.events'));
+      return Array.isArray(raw['33']?.list) && !Array.isArray(raw.list);
+    })());
+  CONFIG.server = 44;
+  check('а на другом наборе летописи ещё нет', draft.getEventsDraft() === null);
   draft.saveEventsDraft([{ id: 'e2' }]);
   draft.dropEventsDraft();
-  target.choosePanelServer(33, OWNER);
+  CONFIG.server = savedServer;
   equal('сброс списка стирает только свою папку', draft.getEventsDraft(), [{ id: 'e1' }]);
+  check('черновик зовёт draftServer, а не panelServer: без номера он не бросает, а читает дом',
+    draftSrc.includes("import { draftServer } from './target.js'") && !/panelServer\(\)/.test(draftSrc));
   target.forgetRights();
-  check('черновик зовёт draftServer, а не panelServer: без цели он не бросает, а читает дом',
-    draftSrc.includes("import { draftServer } from './target.js'") && !/panelServer\(\)/.test(draftSrc)
-      && JSON.stringify(draft.getEventsDraft()) === JSON.stringify([{ id: 'e1' }]));
+  CONFIG.server = '';
+  check('при пустом config.js черновик остаётся читаемым: папка «site» вместо сорванной отрисовки экрана',
+    (() => {
+      try {
+        draft.getEventsDraft();
+        draft.getDraft('W9');
+        return true;
+      } catch {
+        return false;
+      }
+    })() && draftSrc.includes("return server === null || server === undefined ? 'site' : String(server)"));
+  CONFIG.server = savedServer;
 
-  /* ── Вид: ряд в каркасе панели ── */
+  /* ── Вид: каркас панели не знает, что цель меняют ── */
   const { renderShell } = await import('../src/admin/shell.js');
   const base = { screens: [{ id: 'overview', label: 'Обзор' }], activeId: 'overview', inner: '<p>тело</p>' };
-  const one = renderShell({ ...base, server: 33, servers: [{ id: 33, title: 'Сервер 33' }] });
-  const two = renderShell({ ...base, server: 44, servers: LIST });
-  check('под одним сервером ряда нет: переключатель-шум', !one.includes('adm-servers'));
-  check('ряд называет каждый сервер кнопкой с его номером',
-    two.includes('data-panel-server="33"') && two.includes('data-panel-server="44"'));
-  check('активная кнопка помечена и для экрана, и для читалки экрана',
-    /data-panel-server="44" aria-pressed="true"/.test(two) && two.includes('adm-servers__btn is-on'));
-  check('в бренде цель панели, а не сервер из config.js', two.includes('<b>44</b>') && !two.includes('<b>33</b>'));
-  check('подвал называет сервер словами, а цель без выбора — прочерком, а не нулём',
-    two.includes('панель правит сервер 44')
-      && renderShell({ ...base, server: null, servers: [] }).includes('<b>—</b>'));
-  check('ряд описан стилем, которым нарисовано остальное',
-    cssSrc.includes('.adm-servers') && cssSrc.includes('.adm-servers__btn.is-on'));
+  const one = renderShell({ ...base, server: 33 });
+  check('в бренде и подвале — сервер сайта, тот же номер, что стоит в config.js',
+    one.includes('<b>33</b>') && one.includes('панель правит сервер 33'));
+  check('ряда выбора нет ни в разметке, ни в стилях, ни в обработчиках нажатий',
+    !one.includes('adm-servers') && !cssSrc.includes('.adm-servers')
+      && !/data-panel-server/.test(shellSrc + mainSrc));
+  check('каркас не просит список серверов: такого параметра у него нет',
+    !/servers/.test(shellSrc));
+  check('цель без номера — прочерк в бренде и внятные слова в подвале, а не ноль',
+    renderShell({ ...base, server: null }).includes('<b>—</b>')
+      && renderShell({ ...base, server: null }).includes('сервер, который не назван в config.js'));
   /*
     Шапка на десктопе не переносится, а навигация — десять ссылок, которые не
-    сжимаются. Ряд серверов добавился в этот же ряд, и без этих двух правил он
-    вытеснил бы ссылки за правый край шапки на узком окне.
+    сжимаются. Ряд серверов жил в этом же ряду и вытеснял ссылки за правый край
+    на узком окне; правило про листание ссылок осталось и без него.
   */
-  check('ряд не вытесняет навигацию: кнопки целые, ссылки листаются',
-    /@media \(min-width: 900px\)[\s\S]{0,300}\.adm-servers \{ flex: none; \}[\s\S]{0,160}\.adm-nav \{[^}]*min-width: 0[^}]*overflow-x: auto/.test(cssSrc));
+  check('навигация листается, а не вытесняется: снятый ряд не увёл за собой это правило',
+    /@media \(min-width: 900px\)[\s\S]{0,220}\.adm-nav \{[^}]*min-width: 0[^}]*overflow-x: auto/.test(cssSrc));
 
   /* ── Документы ── */
   const queueSrc = await readFile('supabase/README.md', 'utf8');
@@ -12607,14 +12502,18 @@ console.log('\nAM. Фид магазина: обновление и событи
     !queueSrc.includes('Не здесь: права на внесение по серверу (модератор одного сервера сегодня правит чужую неделю'));
   check('документ переезда описывает шаг 3 и не врёт про прежние два признака прав',
     migDocSrc.includes('20261005-site-server-rights.sql') && !migDocSrc.includes('can_edit_site'));
-  check('архитектура называет цель панели и почему она не следует за зрителем',
+  check('архитектура называет цель панели и различает «прав не спрашивали» и «прав нигде»',
     archSrc.includes('## Право вносить данные по серверу')
       && archSrc.includes('src/admin/target.js')
-      && archSrc.includes('panelServer()'));
-  check('документ панели описывает ряд выбора и отказ без права',
-    adminDocSrc.includes('zr33.admin.server') && adminDocSrc.includes('данные только этого сервера'));
-  check('документ панели называет цель модулем и порядок выбора, а не догадку',
-    adminDocSrc.includes('src/admin/target.js') && /[Пп]амять браузера/.test(adminDocSrc)
+      && archSrc.includes('panelServer()')
+      && archSrc.includes('«прав не спрашивали»'));
+  check('документ панели описывает три круга прав и данные только своего сервера',
+    adminDocSrc.includes('данные только этого сервера')
+      && adminDocSrc.includes('Модератор сервера')
+      && adminDocSrc.includes('forum_set_server_member'));
+  check('документ панели называет целью модуль, а память ряда — убранной, а не живой',
+    adminDocSrc.includes('src/admin/target.js')
+      && /память `zr33\.admin\.server`\s*\n?убраны/.test(adminDocSrc)
       && adminDocSrc.includes('сервер сайта'));
   check('документы панели не обещают вход эпохи токена и не зовут на несуществующий экран',
     !/токен GitHub|Токен не принят|api\.github\.com|Как получить токен/.test(adminDocSrc)

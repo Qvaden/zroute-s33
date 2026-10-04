@@ -26,16 +26,6 @@
  * это можно без браузера, поэтому здесь нет ни DOM, ни обращений к состоянию.
  */
 
-/**
- * Сервер в адресе — его номер, а не название.
- *
- * Разбор, границы и правило «дефолт в адрес не пишем» живут в
- * `src/logic/server-choice.js`: с шага мультиаренды данных сайта выбор сервера
- * один на весь сайт, и две копии этих чисел разошлись бы в первый же день,
- * когда список серверов вырастет.
- */
-import { serverFromSearch, putServerParam } from '../logic/server-choice.js';
-
 /** Сколько символов поиска держим в адресе: длиннее — только ради длинной ссылки. */
 export const QUERY_MAX = 80;
 
@@ -72,7 +62,6 @@ export function filtersFromSearch(search, known) {
     query: (params.get('q') ?? '').slice(0, QUERY_MAX),
     // Не «1» — значит выключено: чужой или битый адрес не обязан что-то значить.
     saved: params.get('saved') === SAVED_FLAG,
-    server: serverFromSearch(search),
   };
 }
 
@@ -83,7 +72,7 @@ export function filtersFromSearch(search, known) {
  * видит в строке браузера и копирует оттуда, «+» посреди русского слова
  * выглядит поломкой, а не пробелом. Берём %20.
  *
- * @param {{category: string, tag: string, sort: string, query: string, saved?: boolean, server?: number|null, defaultServer?: number|null}} filters
+ * @param {{category: string, tag: string, sort: string, query: string, saved?: boolean}} filters
  */
 export function searchFromFilters(filters) {
   const params = new URLSearchParams();
@@ -92,7 +81,6 @@ export function searchFromFilters(filters) {
   if (filters.sort && filters.sort !== DEFAULT_SORT) params.set('sort', filters.sort);
   if (filters.query) params.set('q', filters.query);
   if (filters.saved) params.set('saved', SAVED_FLAG);
-  putServerParam(params, filters.server, filters.defaultServer);
   return params.toString().replace(/\+/g, '%20');
 }
 

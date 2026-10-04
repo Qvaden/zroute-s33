@@ -1834,27 +1834,14 @@ function renderFeedControls(s) {
     .find((c) => c.id === s.category) ?? { id: 'all', label: 'Все' };
 
   /*
-    Ряд серверов. Показывается только когда их в базе больше одного: над одной
-    лентой переключатель — это шум, а не выбор, и человек стоял бы перед двумя
-    одинаковыми кнопками.
-
-    Закрытый сервер в ряду остаётся: читать его ленту можно, новую тему там не
-    начинают. Это решает база, а не кнопка, поэтому ряд только подписывает.
+    Ряд серверов был: по кнопке на набор, и подпись такой кнопки называла номер
+    форума. Их убрали по решению владельца — сайт про один сервер, а ряд
+    обещал вторую ленту, которой для зрителя нет. Признаком «приём тем закрыт»
+    заведует теперь не кнопка, а строка над формой (serverWriteNotice).
   */
-  const servers = Array.isArray(s.servers) ? s.servers : [];
-  const serverBar = servers.length > 1 ? `
-      <div class="seg seg--server" role="group" aria-label="Игровой сервер">
-        ${servers.map((srv) => {
-          const on = Number(s.serverId) === srv.id;
-          return `<button type="button" class="seg__btn ${on ? 'is-on' : ''}"
-                  data-forum-server="${esc(srv.id)}" aria-pressed="${on ? 'true' : 'false'}"
-                  title="${esc(srv.title)}${srv.enabled === false ? ' — приём тем закрыт' : ''}">${esc(srv.title)}</button>`;
-        }).join('')}
-      </div>` : '';
 
   return `
     <div class="ctl ctl--forum">
-      ${serverBar}
       <label class="search forum-search">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>

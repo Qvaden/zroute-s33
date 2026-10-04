@@ -31,7 +31,6 @@
  * о снимке говорит и об этом.
  */
 import { CONFIG } from '../../config.js';
-import { siteServer, viewServer } from './server.js';
 import * as json from './adapters/json.js';
 import * as sheets from './adapters/sheets.js';
 import * as pocketbase from './adapters/pocketbase.js';
@@ -59,14 +58,9 @@ export const db = selected;
  * снят), и не пришло ничего (`source` = ''). `primaryError` хранит, чем именно
  * ответил основной источник, — без этой строки объяснение на странице
  * свелось бы к «что-то не загрузилось».
- *
- * `server` — чей набор показали на экране. С переключателем в шапке у одного
- * и того же вызова стало два возможных ответа, и без этого числа полоска не
- * могла бы сказать правду: «снимок от 14:23» под выбранным 44-м означал бы
- * цифры 33-го, а человек принял бы их за свой сервер.
  */
 export let lastLoad = {
-  source: selected.name, snapshotAt: null, primaryError: '', server: siteServer(),
+  source: selected.name, snapshotAt: null, primaryError: '',
 };
 
 /** @type {import('./types.js').Capabilities} */
@@ -90,52 +84,16 @@ async function readAll(adapter) {
 }
 
 /*
-  Копия данных сайта относится к своему серверу, и кодом это не обходятся.
-
-  Воркфлоу `backup-from-db.yml` снимает в `data/live.json` ровно тот набор, о
-  котором договорились в config.js, — одного номера на весь файл. Поэтому под
-  выбранным чужим сервером копия не спасает, а врёт: цифры 33-го под надписью
-  «Сервер 44» человек прочитал бы как результаты 44-го. Их и нет на экране, и
-  сайт говорит это словами, а не молчанием.
-
-  Тот же отказ работает и в другую сторону: когда `data/live.json` — не
-  аварийный выход, а основной источник (черновой режим сайта), просить у него
-  чужой сервер не у кого, и молча отдать свой набор значило бы соврать с
-  самого первого экрана.
+  Копия `data/live.json` снята с того набора, о котором договорились в
+  config.js, и сервер на сайте один — поэтому спасать ей больше нечего и
+  объяснять расхождение выбора с копией некому.
 */
-function snapshotOf(server) {
-  return server === null || server === siteServer();
-}
-
-/**
- * Чем объясняем пустой экран, когда копий чужого сервера нет.
- *
- * Строка короткая и для консоли: человек эту причину читает в полоске
- * `dataNotice` в `src/main.js`, и текст для экрана живёт там, где экран его
- * собирает. Здесь только запрет: молча отдать свой набор под чужим выбором —
- * самое тихое из возможных вранья.
- */
-function noCopyError(server) {
-  return new Error(`Копии данных сайта для сервера ${server} нет`);
-}
-
 export async function loadAll() {
-  /*
-    Сервер читаем один раз и держим при себе до конца вызова: переключатель
-    человек двигает руками, и если выбор поменяется, пока идёт запрос, в
-    объяснении на экране не должно появиться третье значение.
-  */
-  const server = viewServer();
   let primaryError = '';
-
-  if (selected === json && !snapshotOf(server)) {
-    lastLoad = { source: '', snapshotAt: null, primaryError: '', server };
-    throw noCopyError(server);
-  }
 
   try {
     const data = await readAll(selected);
-    lastLoad = { source: selected.name, snapshotAt: null, primaryError: '', server };
+    lastLoad = { source: selected.name, snapshotAt: null, primaryError: '' };
     return data;
   } catch (err) {
     primaryError = String(err?.message ?? err);
@@ -144,14 +102,9 @@ export async function loadAll() {
       сам не ответил, нечего. Ошибку отдаём наружу как раньше.
     */
     if (selected === json) {
-      lastLoad = { source: '', snapshotAt: null, primaryError, server };
+      lastLoad = { source: '', snapshotAt: null, primaryError };
       throw err;
     }
-  }
-
-  if (!snapshotOf(server)) {
-    lastLoad = { source: '', snapshotAt: null, primaryError, server };
-    throw noCopyError(server);
   }
 
   /*
@@ -165,11 +118,10 @@ export async function loadAll() {
       source: 'снимок',
       snapshotAt: await json.getPulledAt(),
       primaryError,
-      server,
     };
     return data;
   } catch (err) {
-    lastLoad = { source: '', snapshotAt: null, primaryError, server };
+    lastLoad = { source: '', snapshotAt: null, primaryError };
     throw err;
   }
 }
