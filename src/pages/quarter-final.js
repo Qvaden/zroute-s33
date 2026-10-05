@@ -1,4 +1,5 @@
-import { esc, formDots, plural } from '../ui/helpers.js?v=86';
+import { esc, formDots, plural } from '../ui/helpers.js?v=87';
+import { formatQuarterLeft } from '../ui/quarter-timer.js?v=87';
 
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,
@@ -37,6 +38,12 @@ export function renderQuarter({ standings, quarter } = {}) {
   const progress = Math.min(4, period.playedWeeks ?? (period.weeks ?? []).length);
 
   // Расчёт даты конца текущего Кварта и дней до следующего.
+  //
+  // Строка счётчика берётся из formatQuarterLeft — из того же места, которым
+  // её потом подменяет таймер (ui/quarter-timer.js). Пока формат собирался
+  // здесь («13 дней»), а таймер переставлял только число, страница после
+  // первого тика показывала «12д 10ч 52м дней»: единица времени оставалась
+  // в разметке и удваивалась.
   const now = new Date();
   const endDate = period.endDate instanceof Date ? period.endDate : null;
   const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - now) / 86400000)) : null;
@@ -63,7 +70,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         </div>
         <div class="quart-hero__bottom">
           <span><b>${progress}</b> из 4 недель периода</span>
-          ${daysLeft != null ? `<span class="quart-hero__countdown" data-quarter-end="${endDate ? endDate.getTime() : ''}">До конца Кварта: <span class="quart-countdown-num">${daysLeft}</span> ${plural(daysLeft, 'день', 'дня', 'дней')}${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
+          ${daysLeft != null ? `<span class="quart-hero__countdown" data-quarter-end="${endDate ? endDate.getTime() : ''}">До конца Кварта: <span class="quart-countdown-num">${formatQuarterLeft(endDate.getTime())}</span>${nextQuarterLabel ? ` · Следующий начнётся ${nextQuarterLabel}` : ''}</span>` : ''}
           <span class="quart-hero__legend" aria-hidden="true">${[1, 2, 3, 4].map((n) => `<i class="quart-led${n <= progress ? ' quart-led--on' : ''}"></i>`).join('')}</span>
         </div>
       </header>

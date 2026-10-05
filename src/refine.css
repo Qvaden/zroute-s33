@@ -2148,8 +2148,16 @@ body:has(.chat-layout) .site-foot { display: none; }
   /* Номер читается по цифрам, разрядка между ними только мешает. */
   letter-spacing: 0;
 }
+
+/*
+  Размер номера — тот же, что у значка соседних меток (7.5px), а не тот,
+  что у ника. Без этой строки `<b>№33</b>` внутри метки попадает под правило
+  `.forum-post__by b { font-size: 13px }`: селектор тяжелее, чем `.role-badge`,
+  и метка вырастает вдвое против короны и галочки рядом, раздувая строку.
+*/
+.role-badge--server b { font-size: 7.5px; }
 .forum-post__by .role-badge--server b,
-.forum-comment__head .role-badge--server b { display: inline; }
+.forum-comment__head .role-badge--server b { display: inline; font-size: 7.5px; }
 
 /* ── Подтверждение ника и журнал имён (страница участника) ────────────────────
    Панель подтверждения видна только лидеру альянса игрока и модерации,

@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=86';
-import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=86';
-import { validateDataset } from './data/contract.js?v=86';
+import { CONFIG } from '../config.js?v=87';
+import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=87';
+import { validateDataset } from './data/contract.js?v=87';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,31 +9,31 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=86';
-import { renderHome } from './pages/home.js?v=86';
-import { renderLadder } from './pages/ladder.js?v=86';
-import { renderQuarter } from './pages/quarter-final.js?v=86';
-import { renderTimeline } from './pages/timeline.js?v=86';
-import { renderGuide } from './pages/guide.js?v=86';
-import { renderBot } from './pages/bot.js?v=86';
-import { renderHandbook } from './pages/handbook.js?v=86';
-import { renderAbout } from './pages/about.js?v=86';
-import { renderAlliance } from './pages/alliance.js?v=86';
-import { computeAchievements } from './logic/achievements.js?v=86';
-import { esc } from './ui/helpers.js?v=86';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=86';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=86';
+} from './logic/standings.js?v=87';
+import { renderHome } from './pages/home.js?v=87';
+import { renderLadder } from './pages/ladder.js?v=87';
+import { renderQuarter } from './pages/quarter-final.js?v=87';
+import { renderTimeline } from './pages/timeline.js?v=87';
+import { renderGuide } from './pages/guide.js?v=87';
+import { renderBot } from './pages/bot.js?v=87';
+import { renderHandbook } from './pages/handbook.js?v=87';
+import { renderAbout } from './pages/about.js?v=87';
+import { renderAlliance } from './pages/alliance.js?v=87';
+import { computeAchievements } from './logic/achievements.js?v=87';
+import { esc } from './ui/helpers.js?v=87';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=87';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=87';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=86';
-import './ui/timeline-controls.js?v=86';
+import './ui/ladder-controls.js?v=87';
+import './ui/timeline-controls.js?v=87';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=86';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=86';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=86';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=86';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=86';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=86';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=86';
+import './ui/handbook-controls.js?v=87';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=87';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=87';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=87';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=87';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=87';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=87';
 
 /*
   РАЗДЕЛЫ.

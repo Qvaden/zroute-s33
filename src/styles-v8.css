@@ -333,6 +333,7 @@ h1,h2,h3,h4 {
 /* ── Главная: герой ─────────────────────────────────────────────────────── */
 .hero {
   position: relative; overflow: hidden;
+  isolation: isolate;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background:
@@ -345,13 +346,21 @@ h1,h2,h3,h4 {
 @media (min-width: 760px) { .hero { padding: 30px 32px; } }
 
 /* Диагональная штриховка — единственный «фактурный» элемент на странице.
-   Один раз и по делу: даёт индустриальный характер, не превращаясь в шум. */
+   Один раз и по делу: даёт индустриальный характер, не превращаясь в шум.
+
+   isolation на герое и -1 у штриховки нужны, чтобы фактура лежала ПОД
+   содержимым. Без них это позиционированный слой с автоматическим z-index,
+   а он по порядку отрисовки идёт выше обычных блоков — и полосы ложатся
+   поверх плашек летописи и кнопки «Показать все». Раньше от этого спасал
+   z-index: 1 у .hero__top, но в герое есть и другие дети, и на телефоне,
+   где штриховка занимает две трети блока, это стало видно. */
 .hero::after {
   content: ''; position: absolute;
   top: -30%; right: -6%; width: 220px; height: 170%;
   background: repeating-linear-gradient(58deg, rgba(255,106,43,.075) 0 3px, transparent 3px 13px);
   transform: rotate(4deg);
   pointer-events: none;
+  z-index: -1;
 }
 
 .hero__top { position: relative; z-index: 1; }

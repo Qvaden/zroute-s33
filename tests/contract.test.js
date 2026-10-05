@@ -13056,7 +13056,14 @@ console.log('\nAM. Фид магазина: обновление и событи
     /verifiedBadge\(user\.isVerified\)\}\$\{serverBadge\(user\.serverId\)\}/.test(playersSrc));
   check('правило «в ленте слово роли спрятано» существует и не съедает номер',
     /\.forum-post__by \.role-badge b,\n\.forum-comment__head \.role-badge b \{ display: none; \}/.test(mobileSrc)
-      && /\.forum-post__by \.role-badge--server b,\n\.forum-comment__head \.role-badge--server b \{ display: inline; \}/.test(refineSrc));
+      && /\.forum-post__by \.role-badge--server b,\n\.forum-comment__head \.role-badge--server b \{ display: inline; font-size: 7\.5px; \}/.test(refineSrc));
+  /*
+    Кегль номера держится отдельно от правила про слово. Без него `<b>№33</b>`
+    попадает под `.forum-post__by b { font-size: 13px }` — селектор тяжелее,
+    чем `.role-badge`, — и метка вдвое перерастает корону и галочку рядом.
+  */
+  check('номер сервера не наследует кегль ника, а держит размер значка',
+    /\.role-badge--server b \{ font-size: 7\.5px; \}/.test(refineSrc));
   equal('цвет метки задан один раз и не повторяет соседние статусы',
     (refineSrc.match(/--role-tone: #6d8bb8/g) || []).length, 1);
 }
