@@ -161,7 +161,7 @@ sheets-адаптеру поддельный CSV и проверяет, что �
 
 ## Сервер как свойство человека
 
-[`supabase/20261005-player-server.sql`](../supabase/20261005-player-server.sql)
+[`supabase/applied/20261005-player-server.sql`](../supabase/applied/20261005-player-server.sql)
 заводит третий способ, которым в проекте существует номер сервера, и он
 намеренно не похож на два прежних:
 

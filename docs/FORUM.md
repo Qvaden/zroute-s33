@@ -1868,7 +1868,7 @@ localStorage — иначе закрытой ленты до базы не ув�
 - **второй ленты и фильтра по серверу автора**. Зритель один раз уже увидел
   ряд из двух кнопок, за которым ничего не стояло, и возвращать его нельзя.
 
-Код: [`supabase/20261005-player-server.sql`](../supabase/20261005-player-server.sql)
+Код: [`supabase/applied/20261005-player-server.sql`](../supabase/applied/20261005-player-server.sql)
 — `server_id integer` и `server_set_at timestamptz` у `forum_users` (границы
 1..999 тем же `check`, что у `forum_servers.id`), отдельный триггер
 `forum_users_server_guard` и четыре `create or replace view` с добавкой в конце

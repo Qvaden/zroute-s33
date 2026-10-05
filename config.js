@@ -591,7 +591,7 @@ export const CONFIG = {
       slaDueSoonHours: 24,
       slaOverdueHours: 72,
       /*
-        Сервер игрока (supabase/20261005-player-server.sql). Номер человек
+        Сервер игрока (supabase/applied/20261005-player-server.sql). Номер человек
         называет сам в профиле и при регистрации, и держит его не лента, а
         значок у ника.
 

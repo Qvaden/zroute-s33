@@ -73,7 +73,7 @@ export function accountFrom(row) {
     /*
       Сервер, который человек назвал сам. Пусто — «не указан»: значка у ника
       нет, и это не ноль и не 33 по умолчанию. До прогона
-      supabase/20261005-player-server.sql колонки в строке просто нет, поэтому
+      supabase/applied/20261005-player-server.sql колонки в строке просто нет, поэтому
       здесь она так же null, а не 0.
     */
     serverId: row.server_id == null ? null : Number(row.server_id),

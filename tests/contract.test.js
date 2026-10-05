@@ -12943,7 +12943,7 @@ console.log('\nAM. Фид магазина: обновление и событи
   const L = CONFIG.forum.limits;
   const { SERVER_RANGE } = await import('../src/forum/rules.js');
 
-  const mig = await text('supabase/20261005-player-server.sql');
+  const mig = await text('supabase/applied/20261005-player-server.sql');
   const rulesSrc = await text('src/forum/rules.js');
   const supSrc = await text('src/forum/adapters/supabase.js');
   const localSrc = await text('src/forum/adapters/local.js');
@@ -12985,9 +12985,10 @@ console.log('\nAM. Фид магазина: обновление и событи
     !/alter table public\.forum_posts/.test(mig) && !/update public\.forum_posts/.test(mig));
   check('шаг заканчивается перезагрузкой схемы, иначе API не отдал бы новую колонку',
     /notify pgrst, 'reload schema';/.test(mig));
-  check('реестр держит шаг в очереди и напоминает порядок: сначала прогон, потом пуш кода',
-    queueSrc.includes('20261005-player-server.sql')
-      && queueSrc.includes('прогнать его нужно до пуша'));
+  check('реестр числит шаг прогнанным и не зовёт в базу вторично',
+    queueSrc.includes('supabase/applied/20261005-player-server.sql')
+      && /20261005-player-server\.sql` — \*\*прогнан 05\.10\.2026/.test(queueSrc)
+      && !queueSrc.includes('ещё не прогнан'));
 
   /* ── Слова и числа клиента ── */
   check('форма собирает свои отказные фразы из чисел config.js, а не из памяти',
