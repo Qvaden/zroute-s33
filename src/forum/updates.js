@@ -2,9 +2,9 @@
  * ПУЛЬС ОБНОВЛЕНИЙ ИГРЫ — поведение.
  *
  * Состояние в одном объекте, разметку возвращает строкой pages/updates.js.
- * Живое: читает список, показывает форму модерации, публикует и убирает.
+ * Живое: читает список, показывает форму модерации, публикует и удаляет.
  *
- * Прав здесь этот файл не держит: публикацию и архив разрешает база своей
+ * Прав здесь этот файл не держит: публикацию и удаление разрешает база своей
  * функцией, и её отказ страница отдаёт как есть. Роль вошедшего смотрим только
  * затем, чтобы не показывать форму человеку, который её не нажмёт.
  */
@@ -19,7 +19,7 @@ const state = {
   me: null,
   /** Есть ли у вошедшего роль модерации — признак видимости формы. */
   canManage: false,
-  /** Строки ForumUpdateNote: опубликованные, а модерации — ещё и архив. */
+  /** Строки ForumUpdateNote: список, который база отдаёт целиком. */
   notes: [],
   loading: true,
   error: '',
@@ -64,7 +64,7 @@ function paint() {
   if (!host) return;
   /*
     Форма переживает перерисовку целиком. Список обновляется после чужого
-    нажатия «убрать в архив», а человек в этот момент мог печатать заметку —
+    нажатия «удалить», а человек в этот момент мог печатать заметку —
     потерять семь полей из-за одного клика значит больше, чем потерять саму
     страницу. Курсор возвращаем тому же полю.
   */
@@ -230,8 +230,8 @@ function hideFormError() {
 
 /**
  * Одно действие над одной заметкой. Отказ показываем в карточке, а не над
- * всем списком: «эта заметка уже в архиве» относится ровно к одной строке, и
- * вешать его на страницу значило бы намекать, что сломался весь пульс.
+ * всем списком: «заметка не найдена» относится ровно к одной строке, и вешать
+ * его на страницу значило бы намекать, что сломался весь пульс.
  */
 async function runNoteAction(btn, fn) {
   if (btn) btn.disabled = true;
@@ -249,15 +249,14 @@ async function runNoteAction(btn, fn) {
 
 /*
   Одно действие над одним событием. Отказ, как и у заметки, показываем в
-  карточке: «это событие уже в архиве» относится ровно к одной строке, а блок
-  событий при этом живой и никуда не денется.
+  карточке: «событие не найдено» относится ровно к одной строке, а блок событий
+  при этом живой и никуда не денется.
 */
-async function runFeedAction(btn, archived) {
-  if (!forum.setStoreEventArchived) return;
-  const id = btn.dataset[archived ? 'feedArchive' : 'feedRestore'];
+async function runFeedAction(btn) {
+  if (!forum.deleteStoreEvent) return;
   btn.disabled = true;
   try {
-    await forum.setStoreEventArchived(id, archived);
+    await forum.deleteStoreEvent(btn.dataset.feedDelete);
     await reload();
   } catch (err) {
     const card = btn.closest('.feed-card');
@@ -266,6 +265,25 @@ async function runFeedAction(btn, archived) {
     }
     btn.disabled = false;
   }
+}
+
+/*
+  Название в вопросе о подтверждении. Удаление — единственное действие на этой
+  странице, у которого нет возврата, поэтому спрашивать обязан клик, а не база:
+  отказ «строки нет» приходит слишком поздно, когда человек уже согласился.
+  Заголовок берём из самой карточки: он там есть, и второй копии в атрибуте
+  кнопки не нужно.
+*/
+function cardTitle(btn, selector) {
+  return btn?.closest(selector)?.querySelector('.upd-card__title, .feed-card__title')?.textContent?.trim() || '';
+}
+
+function confirmRemoval(title, what) {
+  const name = title ? ` «${title}»` : '';
+  return confirm(
+    `${what}${name} удалить навсегда? Архива больше нет: строка уходит из базы,`
+    + ' и автомат не приносит её обратно.'
+  );
 }
 
 function wire() {
@@ -299,26 +317,18 @@ function wire() {
       return;
     }
 
-    const archive = t.closest('[data-upd-archive]');
-    if (archive && forum.setUpdateNoteArchived) {
-      await runNoteAction(archive, () => forum.setUpdateNoteArchived(archive.dataset.updArchive, true));
+    const drop = t.closest('[data-upd-delete]');
+    if (drop && forum.deleteUpdateNote) {
+      if (!confirmRemoval(cardTitle(drop, '.upd-card'), 'Заметку')) return;
+      await runNoteAction(drop, () => forum.deleteUpdateNote(drop.dataset.updDelete));
       return;
     }
 
-    const restore = t.closest('[data-upd-restore]');
-    if (restore && forum.setUpdateNoteArchived) {
-      await runNoteAction(restore, () => forum.setUpdateNoteArchived(restore.dataset.updRestore, false));
-      return;
+    const feedOff = t.closest('[data-feed-delete]');
+    if (feedOff && forum.deleteStoreEvent) {
+      if (!confirmRemoval(cardTitle(feedOff, '.feed-card'), 'Событие')) return;
+      await runFeedAction(feedOff);
     }
-
-    const feedOff = t.closest('[data-feed-archive]');
-    if (feedOff) {
-      await runFeedAction(feedOff, true);
-      return;
-    }
-
-    const feedBack = t.closest('[data-feed-restore]');
-    if (feedBack) await runFeedAction(feedBack, false);
   });
 
   /*

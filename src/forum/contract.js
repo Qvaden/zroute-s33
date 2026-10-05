@@ -490,18 +490,19 @@
  * @property {(id: string) => Promise<void>} [cancelGuideRequest]  Отзыв своей открытой заявки.
  * @property {(id: string, status: 'linked'|'closed', answer: string, guideId?: string|null) => Promise<void>} [resolveGuideRequest]  Решение модерации; для игрока — отказ.
  *
- * Пульс обновлений игры (см. supabase/applied/20260926-update-pulse.sql). Заметку
- * кладёт модерация руками — либо планировщик, который входит в форум обычным
- * аккаунтом. Браузер посетителя наружу не ходит ни в каком режиме: серверной
- * части у сайта нет вовсе, и этот рубеж не двигается.
- * @property {() => Promise<ForumUpdateNote[]>} [listUpdateNotes]  Свежие сверху; опубликованные видят и невошедшие, архив — только модерация. Ошибку вызывающий не глушит: по ней страница называет файл миграции.
+ * Пульс обновлений игры (см. supabase/applied/20260926-update-pulse.sql и
+ * supabase/20261005-feed-final-delete.sql). Заметку кладёт модерация руками —
+ * либо планировщик, который входит в форум обычным аккаунтом и читает стену
+ * официальной группы ВК. Браузер посетителя наружу не ходит ни в каком режиме:
+ * серверной части у сайта нет вовсе, и этот рубеж не двигается.
+ * @property {() => Promise<ForumUpdateNote[]>} [listUpdateNotes]  Свежие сверху; список читает и невошедший. Ошибку вызывающий не глушит: по ней страница называет файл миграции.
  * @property {(draft: {kind: string, title: string, summary: string, sourceName: string, sourceUrl: string, sourceAt: string, gameVersion?: string}) => Promise<ForumUpdateNote>} [publishUpdateNote]  Порядок отказов одинаков в обоих режимах: право → тип → заголовок → содержание → источник → дата → версия.
- * @property {(id: string, archived: boolean) => Promise<void>} [setUpdateNoteArchived]  Убрать и вернуть одной функцией: правка текста после публикации не разрешена намеренно.
+ * @property {(id: string) => Promise<void>} [deleteUpdateNote]  Убирает строку без возврата: правка текста после публикации не разрешена намеренно, а архива больше нет. Ключ заметки остаётся в отметках фида — автомат не приносит удалённое обратно.
  *
  * Фид магазина (см. supabase/applied/20260930-store-feed.sql): события из Google Play,
  * которые приносит планировщик, и одна строка о том, когда он их приносил.
- * @property {() => Promise<ForumStoreEvent[]>} [listStoreEvents]  Ближайшие сверху; пережитое страница прячет сама, архив видит только модерация.
- * @property {(id: string, archived: boolean) => Promise<void>} [setStoreEventArchived]  Убрать и вернуть одной функцией: у события нет правки, магазин перепишет его сам на следующем обходе.
+ * @property {() => Promise<ForumStoreEvent[]>} [listStoreEvents]  Ближайшие сверху; пережитое страница прячет сама.
+ * @property {(id: string) => Promise<void>} [deleteStoreEvent]  Удаляет без возврата: у события нет правки, а магазин перепишет живое сам на следующем обходе. Удалённое он не повторяет — по отметке ключа.
  * @property {() => Promise<ForumStoreStatus|null>} [getStoreStatus]  Строка состояния обхода; null — миграции ещё нет, и страница по этому молчанию не врёт про «автомат не работал».
  * @property {() => Promise<{newForumPost: boolean, newForumReply: boolean, quietStart: number|null, quietEnd: number|null}>} [getPushPrefs]  Окно тихих часов — минуты от полуночи локального времени игрока; null в обеих — окно не задано.
  * @property {(prefs: {newForumPost?: boolean, newForumReply?: boolean, quietStart?: number|null, quietEnd?: number|null}) => Promise<void>} [setPushPrefs]  null здесь значит «стереть», поэтому выключить окно можно одной записью; база не примет половину окна и совпавшие границы.
@@ -587,9 +588,9 @@
  * перемены в игре, а не то, когда её пересказал дежурный модератор.
  *
  * Правки у заметки нет сознательно: это датированное свидетельство, и текст,
- * который можно переписать молча, перестаёт им быть. Ошиблись — в архив и
- * новую, поэтому `archivedAt` и `archivedByNick` описывают ровно одно
- * движение.
+ * который можно переписать молча, перестаёт им быть. Ошиблись — удалить и
+ * новую. Архива тоже нет: строка в таблице и есть заметка, а убранное уходит
+ * из базы без возврата.
  *
  * @typedef {Object} ForumUpdateNote
  * @property {string} id
@@ -600,11 +601,8 @@
  * @property {string} sourceUrl  Только HTTPS; ссылка на то, откуда это взято.
  * @property {Date} sourceAt  Дата публикации у первоисточника.
  * @property {string} gameVersion  Пустая строка, если версии нет.
- * @property {'published'|'archived'} status
  * @property {string} authorNick  Кто положил заметку в список.
  * @property {Date} createdAt
- * @property {Date|null} archivedAt
- * @property {string|null} archivedByNick  Кто убрал; пусто, пока заметка открыта.
  */
 
 /**
@@ -618,18 +616,15 @@
  *
  * @typedef {Object} ForumStoreEvent
  * @property {string} id
- * @property {string} feedKey  По нему планировщик между обходами узнаёт эту же строку.
+ * @property {string} feedKey  По нему планировщик между обходами узнаёт эту же строку; удалённый ключ остаётся в отметках фида.
  * @property {string} title
  * @property {string} summary  Пустое поле — норма: магазин подписывает карточку названием.
  * @property {'android'|'ios'|'other'} platform
  * @property {Date} startsAt
  * @property {Date|null} endsAt  null — магазин не назвал конец, а не «бессрочно».
  * @property {string} sourceUrl  Пустое — ссылка на страницу приложения, а не на событие.
- * @property {'published'|'archived'} status
  * @property {Date} firstSeenAt  Первый обход, который принёс это событие.
  * @property {Date} lastSeenAt  Последний обход, где оно ещё стоит в магазине.
- * @property {Date|null} archivedAt
- * @property {string|null} archivedByNick
  */
 
 /**

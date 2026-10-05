@@ -1,11 +1,20 @@
 /**
- * Игровой фид: приносит из магазинов то же, что модератор вводит руками, —
- * текст обновления и события.
+ * Игровой фид: приносит из магазинов и из официальной группы ВК то же, что
+ * модератор вводит руками, — текст обновления и события.
  *
  * ЗАЧЕМ ОТДЕЛЬНЫЙ СКРИПТ. Страница посетителя не имеет права ходиться в чужие
  * сайты: браузер не пустит (same-origin), а пусти — чужой текст попал бы на
  * сайт без проверки. Поэтому читает магазины планировщик GitHub Actions, а
  * сюда приходят за разбором и за границами, которые знает база.
+ *
+ * ПОЧЕМУ ВК НАРАВНЕ С МАГАЗИНАМИ. С осени 2026 года страница Google Play не
+ * отдаёт в HTML ни раздела «Что нового», ни блока событий, а App Store на
+ * свежий патч отвечает строкой «Исправлены ошибки.», которая короче нижнего
+ * порога заметки. Список изменений разработчики по-прежнему печатают словами
+ * только в своём сообществе, и оно читается так же открыто, как страница
+ * магазина. Молчание двух магазинов при живом третьем источнике — это не
+ * «разработчики ничего не сделали», а наш пропуск, и выглядит оно ровно так же
+ * тихо.
  *
  * РЕЖИМЫ. По умолчанию скрипт сухой: он ничего не пишет и печатает в журнал
  * всё, что нашёл, — включая кусок вёрстки вокруг нужного блока. Это не
@@ -30,12 +39,14 @@ import {
   readPlayPage, playPageUrl, itunesLookupUrl, composeStoreNote, toStoreIso,
   htmlToText, extractEventPage, STORE_SECTION_HEADS,
 } from '../src/forum/feed.js';
+import { pickVkNotes, vkWallUrl, decodeVkBytes } from '../src/forum/vk-feed.js';
 
 const APPLY = process.argv.includes('--писать') || process.argv.includes('--apply');
 const NICK = process.env.STORE_FEED_NICK || '';
 const PASSWORD = process.env.STORE_FEED_PASSWORD || '';
 const CFG = CONFIG.supabase ?? CONFIG.forum?.supabase ?? {};
 const STORE = CONFIG.forum.store || {};
+const VK = STORE.vk || {};
 
 /** Корень проекта: из config приходит уже с хвостом /rest/v1, его срезаем. */
 const ROOT = String(CFG.url || '').replace(/\/(rest|auth|storage)\/v1\/?$/, '').replace(/\/+$/, '');
@@ -71,8 +82,13 @@ async function rest(path, { method = 'GET', body, token } = {}) {
  * Чужий сайт просим без нашего ключа в заголовках: apikey туда не обязан
  * уезжать. Язык просим русский — у описаний и дат региональная привязка есть,
  * и без заголовка магазин вправе вернуть английский.
+ *
+ * Режим 'bytes' нужен одному источнику: группа ВК отвечает windows-1251, а
+ * `res.text()` читает тело как UTF-8 и превращает русскую букву в две
+ * латинские с диакритикой. Байты отдаются как есть, а кодировку знает тот, кто
+ * её выбирал (см. `decodeVkBytes`).
  */
-async function fetchExternal(url, wantJson = false) {
+async function fetchExternal(url, want = 'text') {
   const res = await fetch(url, {
     headers: {
       'Accept-Language': `${STORE.country || 'ru'},ru;q=0.9,en;q=0.5`,
@@ -82,7 +98,9 @@ async function fetchExternal(url, wantJson = false) {
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
-  return wantJson ? res.json() : res.text();
+  if (want === 'json') return res.json();
+  if (want === 'bytes') return new Uint8Array(await res.arrayBuffer());
+  return res.text();
 }
 
 /*
@@ -162,6 +180,26 @@ async function knownVersions() {
   }
 }
 
+/*
+  Ключи заметок, которые автомат уже приносил. Спрашиваются у таблицы отметок,
+  а не у списка заметок: у записей ВК номера версии нет, опознать их больше нечем,
+  и главное — удалённая заметка уносит с собой свою строку, а отметка остаётся.
+  Иначе «убрано насовсем» означало бы «вернётся через час».
+
+  Пустой список при отказе — не пустота: без отметок каждый обход заново
+  нёс бы все посты окна. Поэтому отказ называется и попадает в отчёт запуска,
+  а публикации за этот раз не будет.
+*/
+async function knownNoteKeys() {
+  try {
+    const rows = await rest('/forum_feed_marks?select=feed_key&what=eq.note');
+    const keys = (Array.isArray(rows) ? rows : []).map((r) => r.feed_key);
+    return { keys, count: keys.length, why: '' };
+  } catch (e) {
+    return { keys: [], count: 0, why: `отметки фида не прочитаны: ${e.message}` };
+  }
+}
+
 /* ── Основной путь ─────────────────────────────────────────────────────────── */
 
 async function main() {
@@ -174,14 +212,15 @@ async function main() {
   const lookup = itunesLookupUrl(STORE);
 
   /*
-    Площадки читаются параллельно и независимо: отказ одной не имеет права
-    отменить обход другой. Молчавшую половину пост собирает без неё — иначе
+    Источники читаются параллельно и независимо: отказ одного не имеет права
+    отменить обход другого. Молчавшую половину пост собирает без неё — иначе
     сорванная сеть до магазина превращалась бы в заметку о том, что у нас
     сорвана сеть.
   */
-  const [playRes, iosRes] = await Promise.allSettled([
+  const [playRes, iosRes, vkRes] = await Promise.allSettled([
     fetchExternal(play),
-    fetchExternal(lookup, true),
+    fetchExternal(lookup, 'json'),
+    VK.group ? fetchExternal(vkWallUrl(VK), 'bytes') : Promise.reject(new Error('в config.js нет номера группы')),
   ]);
 
   const android = playRes.status === 'fulfilled'
@@ -228,18 +267,55 @@ async function main() {
     error: iosRes.status === 'rejected' ? iosRes.reason.message : '',
   };
 
-  const known = await knownVersions();
+  /*
+    Группа читается после того, как получены отметки: без списка «что уже
+    приносили» разбор не имеет права называть пост новым. Отказ чтения отметок
+    не останавливает обход — он останавливает публикацию, и в отчёте это две
+    разные фразы.
+  */
+  const [known, marks] = await Promise.all([knownVersions(), knownNoteKeys()]);
+  const vk = readVk(vkRes, marks.keys);
   const note = composeStoreNote({ android, ios, known });
 
-  const wrote = APPLY ? await apply({ note, dated, android, ios }) : '';
-  report({ android, ios, known, note, dated, undated, wrote });
+  const wrote = APPLY ? await apply({ note, dated, android, ios, vk }) : '';
+  report({ android, ios, known, marks, note, dated, undated, vk, wrote });
 
+  /*
+    Успехом запуска считается не «пост написан», а «разборщик жив». Отсюда два
+    разных выхода: заметка собрана, но база её не приняла, — провал; страница
+    группы не разобрана вовсе — тоже провал, и громкий, потому что молчание
+    ВК при молчаливых магазинах означает, что у фида не осталось ни одного
+    голоса, а выглядит это как «разработчики две недели ничего не делали».
+  */
   if (APPLY && note.fields && !wrote.includes('заметка')) process.exit(1);
+  if (vk.how === 'no-page' || vk.how === 'login') process.exit(1);
+}
+
+/*
+  Что дала стена группы: список заметок и диагноз, если списка нет. «no-page»
+  и «login» — поломка на нашей стороне или закрытая группа; «no-posts» — стена
+  живая, но записей сообщества на ней нет; «ok» — разбор увидел посты, и
+  сколько из них годится в заметки, видно по skipped.
+*/
+function readVk(res, knownKeys) {
+  if (res.status === 'rejected') {
+    return { notes: [], written: [], how: 'no-page', total: 0, skipped: {}, error: res.reason.message };
+  }
+  const html = decodeVkBytes(res.value);
+  const picked = pickVkNotes(html, { known: knownKeys, cfg: VK });
+  const vk = { ...picked, written: [], bytes: html.length, pageTitle: pageTitle(html) };
+  if (picked.how === 'no-page') {
+    vk.debug = `адрес: ${vkWallUrl(VK)}\n`
+      + `первые 400 знаков ответа: ${html.slice(0, 400)}\n`
+      + `разметка постов: ${/id="post-\d+_\d+"/.test(html) ? 'есть' : 'нет'};`
+      + ` кириллица в ответе: ${/[а-яёА-ЯЁ]/.test(html) ? 'есть' : 'нет — похоже на сбой кодировки'}`;
+  }
+  return vk;
 }
 
 /* ── Отчёт ─────────────────────────────────────────────────────────────────── */
 
-function report({ android, ios, known, note, dated, undated, wrote }) {
+function report({ android, ios, known, marks, note, dated, undated, vk, wrote }) {
   head('Android — страница Google Play');
   if (android.bytes) {
     say(`пришло: ${android.bytes} знаков, заголовок ответа: ${android.pageTitle}`);
@@ -258,8 +334,32 @@ function report({ android, ios, known, note, dated, undated, wrote }) {
   say(`текст релиза: ${ios.releaseNotes ? ios.releaseNotes.slice(0, 300) : '— пустой —'}`);
   if (ios.error) say(`⚠ App Store не ответил: ${ios.error}`);
 
+  /*
+    Раздел группы идёт третьим и печатается всегда, включая случай «постов нет»:
+    две молчаливые площадки и необъяснённая пустая страница — это уже не ответ
+    на вопрос «что нового», а симптом.
+  */
+  head('ВК — официальная группа');
+  if (vk.bytes) say(`пришло: ${vk.bytes} знаков, заголовок ответа: ${vk.pageTitle}`);
+  if (vk.error) say(`⚠ страница не пришла: ${vk.error}`);
+  say(`как нашли: ${vk.how}; постов группы на странице: ${vk.total}`);
+  if (vk.how === 'no-page' || vk.how === 'login') {
+    say(`⚠ ${vk.how === 'login' ? 'вместо стены — страница входа: группа закрылась или ВК требует аккаунт' : 'стена не разобрана — по этим строкам это и чинят'}`);
+    if (vk.debug) say(vk.debug);
+  }
+  if (vk.skipped && (vk.skipped.published || vk.skipped.silent || vk.skipped.tooOld)) {
+    say(`пропущено: уже опубликовано ${vk.skipped.published}, не про перемену ${vk.skipped.silent}, старше окна ${vk.skipped.tooOld}`);
+  }
+  for (const n of vk.notes) {
+    say(`· [${n.fields.kind}] ${n.fields.title}`);
+    say(`  ${n.feedKey} | ${n.fields.sourceAt} | ${n.fields.sourceUrl}`);
+    say(`  ${n.fields.summary.slice(0, 240).replace(/\n/g, ' / ')}`);
+  }
+  if (!vk.notes.length && vk.how === 'ok') say('новых заметок этот обход не принёс.');
+
   head('Что уже знает база');
   say(`опубликовано: Android ${known.android || '—'}, iOS ${known.ios || '—'}`);
+  say(`отметок фида: ${marks.count}${marks.why ? ` — ⚠ ${marks.why}` : ''}`);
   if (known.lastRunAt) say(`последний обход: ${known.lastRunAt} — ${known.lastText}`);
   else say('последнего обхода ещё не было: состояние заведено миграцией, автомат молчал');
   if (known.why) say(`оговорка: ${known.why}`);
@@ -277,6 +377,9 @@ function report({ android, ios, known, note, dated, undated, wrote }) {
   } else {
     say(`не пишем: ${note.why}`);
   }
+  if (vk.notes.length) {
+    say(`заметок из группы: ${vk.notes.length} — ${APPLY ? 'пишем' : 'в сухом прогоне не писали'}`);
+  }
 
   head('События со страницы');
   say(`разобрано карточек: ${(android.events?.events || []).length} (способ: ${android.events?.how})`);
@@ -291,7 +394,7 @@ function report({ android, ios, known, note, dated, undated, wrote }) {
 
 /* ── Запись ────────────────────────────────────────────────────────────────── */
 
-async function apply({ note, dated, android, ios }) {
+async function apply({ note, dated, android, ios, vk }) {
   if (!NICK || !PASSWORD) {
     say('Нет STORE_FEED_NICK или STORE_FEED_PASSWORD — в базу не пишем.');
     return '';
@@ -328,6 +431,34 @@ async function apply({ note, dated, android, ios }) {
       parts.push(`заметка ${note.publishedId || id}`);
     } catch (e) {
       say(`База не приняла заметку: ${e.message}`);
+    }
+  }
+
+  for (const item of vk.notes) {
+    try {
+      await rest('/rpc/forum_publish_update_note', {
+        method: 'POST',
+        token,
+        body: {
+          p_kind: item.fields.kind,
+          p_title: item.fields.title,
+          p_summary: item.fields.summary,
+          p_source_name: item.fields.sourceName,
+          p_source_url: item.fields.sourceUrl,
+          p_source_at: toStoreIso(item.fields.sourceAt),
+          p_game_version: item.fields.gameVersion,
+          /*
+            Ключ едет в саму публикацию, а не отдельным «запомни» после неё:
+            между двумя запросами есть обрыв, а обрыв планировщик читает как
+            успех. Отметка, заведённая в одной операции со строкой, и есть то,
+            что делает удаление заметки окончательным.
+          */
+          p_feed_key: item.feedKey,
+        },
+      });
+      vk.written.push(item.fields.title);
+    } catch (e) {
+      say(`База не приняла заметку из группы «${item.fields.title}»: ${e.message}`);
     }
   }
 
@@ -380,7 +511,7 @@ async function apply({ note, dated, android, ios }) {
           p_platform: platform,
           p_version: version,
           p_at: at,
-          p_text: summarizeRun(note),
+          p_text: summarizeRun(note, vk),
           p_note_id: note.publishedId || null,
         },
       });
@@ -405,7 +536,7 @@ async function login() {
 }
 
 /** Коротко и по-русски: что запуск принёс. Это увидит модератор на странице. */
-function summarizeRun(note) {
+function summarizeRun(note, vk) {
   /*
     Молчание магазина — новость для модерации, а не для читателей: в состоянии
     обхода оно названо, чтобы через неделю не выяснилось, что «автомат молчит,
@@ -421,8 +552,18 @@ function summarizeRun(note) {
   const lag = note.stale?.length
     ? `; ${note.stale.join(' и ')} ${note.stale.length > 1 ? 'отдали' : 'отдал'} версию старше опубликованной (задержка магазина)`
     : '';
-  if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}${lag}`.trim();
-  return `${note.why || 'нового нет'}${gone}`;
+  /*
+    Группа отвечает тремя разными пустотами, и путать их нельзя: «постов нет»
+    значит, что разработчики молчат, а «стена не разобрана» значит, что молчим
+    мы. По этой строке за неделю видно, какой из двух ремонтов нужен.
+  */
+  const vkWord = vk.written.length
+    ? `; из группы «${vk.written[0]}»${vk.written.length > 1 ? ` и ещё ${vk.written.length - 1}` : ''}`
+    : vk.how === 'login' ? '; группа закрылась за страницей входа'
+      : vk.error ? '; страница группы не ответила'
+        : vk.how === 'no-page' ? '; стена группы не разобрана' : '';
+  if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}${lag}${vkWord}`.trim();
+  return `${note.why || 'нового нет'}${gone}${vkWord}`;
 }
 
 main().catch((e) => {

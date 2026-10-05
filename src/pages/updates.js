@@ -19,9 +19,18 @@
  *
  * Кнопки «изменить» на этой странице нет, и это не экономия: заметка —
  * датированное свидетельство о чужом тексте, а текст, который можно переписать
- * молча, перестаёт им быть. Ошибка — это «в архив» и новая заметка.
+ * молча, перестаёт им быть. Ошибка — это удалить и написать новую.
+ *
+ * ПОЧЕМУ УБРАННОЕ НЕ ВОЗВРАЩАЕТСЯ.
+ *
+ * Архив был, и от него отказались: список, у которого есть скрытое дно,
+ * читатель не может проверить, а модератор со временем перестаёт в него
+ * заглядывать. Теперь убранное уходит насовсем, и за это надо отвечать —
+ * поэтому кнопка одна, она называется «удалить», и она спрашивает. Автомат при
+ * этом убранное обратно не приносит: ключ удалённой строки остаётся в отметках
+ * фида, и обход видит «это уже решено убрать».
  */
-import { esc, plural, pluralWord } from '../ui/helpers.js';
+import { esc, pluralWord } from '../ui/helpers.js';
 import { UPDATE_KINDS, updateKindLabel } from '../forum/rules.js';
 import { pickStoreEvents } from '../forum/feed.js';
 import { localInputValue } from '../forum/event-format.js';
@@ -96,13 +105,13 @@ function renderForm(s) {
     <form class="upd-form" data-upd-form novalidate>
       <p class="upd-form__lead">
         Заметку видит весь форум сразу после публикации, и поменять её нельзя:
-        ошиблись — уберите в архив и напишите новую.
+        ошиблись — удалите и напишите новую.
       </p>
 
       <label class="upd-field upd-paste">
         <span>Текст обновления из магазина</span>
         <textarea name="paste" rows="4" maxlength="${L.updatePasteMax}"
-                  placeholder="Вставьте сюда «Что нового» со страницы Google Play или App Store — разложу по полям."></textarea>
+                  placeholder="Вставьте сюда «Что нового» со страницы Google Play, App Store или пост группы ВК — разложу по полям."></textarea>
         <small class="muted">
           Форум не открывает чужие страницы сам: текст приносит человек, а код
           только раскладывает его по полям формы. Ничего не придумываю — чего нет
@@ -196,11 +205,10 @@ function eventCountdown(e) {
 
 /**
  * @param {{id: string, title: string, summary: string, platform: string,
- *          startsAt: Date, endsAt: Date|null, status: string, phase: string,
+ *          startsAt: Date, endsAt: Date|null, phase: string,
  *          days: number|null}} event
  */
 function renderEventCard(e, s) {
-  const archived = e.status === 'archived';
   const when = e.endsAt
     ? `${shortDate(e.startsAt)} — ${shortDate(e.endsAt)}`
     : `с ${shortDate(e.startsAt)}`;
@@ -208,7 +216,7 @@ function renderEventCard(e, s) {
   const href = sourceHref(e.sourceUrl);
 
   return `
-    <li class="feed-card feed-card--${esc(e.phase)}${archived ? ' feed-card--archived' : ''}">
+    <li class="feed-card feed-card--${esc(e.phase)}">
       ${PHASE_LABEL[e.phase] ? `<span class="feed-card__phase">${esc(PHASE_LABEL[e.phase])}</span>` : ''}
       <span class="feed-card__title">${esc(e.title)}</span>
       <time class="feed-card__when" datetime="${esc(new Date(e.startsAt).toISOString())}">${esc(when)}</time>
@@ -216,7 +224,7 @@ function renderEventCard(e, s) {
       ${e.summary ? `<p class="feed-card__text">${esc(e.summary)}</p>` : ''}
       ${href ? `<a class="feed-card__source" href="${esc(href)}" target="_blank" rel="noreferrer noopener nofollow">в магазине ↗</a>` : ''}
       ${s.canManage
-        ? `<button type="button" class="feed-card__action" data-feed-${archived ? 'restore' : 'archive'}="${esc(e.id)}">${archived ? 'вернуть' : 'убрать'}</button>`
+        ? `<button type="button" class="feed-card__action" data-feed-delete="${esc(e.id)}">удалить</button>`
         : ''}
     </li>`;
 }
@@ -235,10 +243,7 @@ function runLine(status) {
 
 function renderFeed(s) {
   const all = Array.isArray(s.storeEvents) ? s.storeEvents : [];
-  const shown = pickStoreEvents(all.filter((e) => e.status !== 'archived'), s.now ?? Date.now());
-  const hidden = s.canManage
-    ? pickStoreEvents(all.filter((e) => e.status === 'archived'), s.now ?? Date.now())
-    : [];
+  const shown = pickStoreEvents(all, s.now ?? Date.now());
 
   const list = shown.length
     ? `<ul class="feed-list">${shown.map((e) => renderEventCard(e, s)).join('')}</ul>`
@@ -265,10 +270,6 @@ function renderFeed(s) {
       </p>
       ${list}
       ${hint ? `<p class="feed__error">${esc(hint)}</p>` : ''}
-      ${s.canManage && hidden.length
-        ? `<p class="feed__arch">Убрано автоматом или модерацией · ${hidden.length}</p>
-           <ul class="feed-list feed-list--arch">${hidden.map((e) => renderEventCard(e, s)).join('')}</ul>`
-        : ''}
       ${runLine(s.storeStatus) ? `<p class="feed__run">${esc(runLine(s.storeStatus))}</p>` : ''}
     </section>`;
 }
@@ -276,18 +277,13 @@ function renderFeed(s) {
 /**
  * @param {{id: string, kind: string, title: string, summary: string,
  *          sourceName: string, sourceUrl: string, sourceAt: Date,
- *          gameVersion: string, authorNick?: string, archivedByNick?: string,
- *          archivedAt?: Date|null}} note
+ *          gameVersion: string, authorNick?: string}} note
  */
 function renderCard(note, s) {
   const href = sourceHref(note.sourceUrl);
-  const archived = note.status === 'archived';
-  const action = archived
-    ? { attr: 'upd-restore', label: 'вернуть в список' }
-    : { attr: 'upd-archive', label: 'убрать в архив' };
 
   return `
-    <article class="upd-card${archived ? ' upd-card--archived' : ''}">
+    <article class="upd-card">
       <header class="upd-card__head">
         <span class="upd-kind upd-kind--${esc(note.kind)}">${esc(updateKindLabel(note.kind))}</span>
         <time class="upd-card__date" datetime="${esc(new Date(note.sourceAt).toISOString())}">${esc(updateDate(note.sourceAt))}</time>
@@ -301,12 +297,9 @@ function renderCard(note, s) {
           : `<span class="upd-card__source upd-card__source--broken" title="Ссылка не на https-адрес, поэтому она не открылась">${esc(note.sourceName)}</span>`}
         <span class="upd-card__by">от ${esc(note.authorNick || 'модерации')}</span>
         ${s.canManage
-          ? `<button type="button" class="upd-card__action" data-${action.attr}="${esc(note.id)}">${esc(action.label)}</button>`
+          ? `<button type="button" class="upd-card__action" data-upd-delete="${esc(note.id)}">удалить</button>`
           : ''}
       </footer>
-      ${archived && note.archivedAt
-        ? `<p class="upd-card__was">Убрана ${esc(updateDate(note.archivedAt))}${note.archivedByNick ? ` — ${esc(note.archivedByNick)}` : ''}</p>`
-        : ''}
     </article>`;
 }
 
@@ -319,8 +312,6 @@ function renderCard(note, s) {
  */
 export function renderUpdates(s) {
   const notes = Array.isArray(s.notes) ? s.notes : [];
-  const published = notes.filter((n) => n.status === 'published');
-  const archived = notes.filter((n) => n.status === 'archived');
   const lim = CONFIG.forum.limits;
 
   const body = !s.ready
@@ -330,23 +321,14 @@ export function renderUpdates(s) {
       : s.error
         ? `<p class="upd-none">Список не открылся: ${esc(s.error)}</p>
            ${migrationHint(s.error) ? `<p class="upd-none">${esc(migrationHint(s.error))}</p>` : ''}`
-        : `${published.length
-          ? published.map((n) => renderCard(n, s)).join('')
+        : `${notes.length
+          ? notes.map((n) => renderCard(n, s)).join('')
           : `<p class="upd-none">
               Заметок пока нет. Список заполняет то же чтение магазинов, что
               и события ниже: как только в обновлении появляется текст, заметка
               выходит сама. Руками её кладёт модерация — например когда
-              первоисточник не магазин, а пост в ВК.
-            </p>`}${
-          s.canManage && archived.length
-            ? `<section class="upd-archived">
-                 <h2 class="upd-archived__head">Убрано из списка · ${archived.length}</h2>
-                 <p class="muted">Архив видите только вы: устаревшая заметка читателю
-                   врёт, а тому, кто ведёт список, объясняет решение.</p>
-                 ${archived.map((n) => renderCard(n, s)).join('')}
-               </section>`
-            : ''
-        }`;
+              первоисточник не страница магазина, а пост в чате разработчиков.
+            </p>`}`;
 
   return `
     <section class="panel upd-page">

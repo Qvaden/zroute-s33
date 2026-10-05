@@ -8407,11 +8407,19 @@ console.log('\nAF. Пульс обновлений игры');
     поэтому читателя кормит не робот, а человек, и обязанность эту он
     подтверждает ссылкой на первоисточник. Проверяем три вещи: что база и
     черновой режим отказывают одними словами в одном порядке, что страница не
-    печатает ссылку, которую база не приняла бы, и что архив не виден никому,
-    кроме модерации.
+    печатает ссылку, которую база не приняла бы, и что убранная заметка
+    удаляется, а не прячется — вместе со столбцами архива, которые раньше
+    позволяли ей вернуться.
   */
   const { readFile } = await import('node:fs/promises');
   const sql = await readFile('supabase/applied/20260926-update-pulse.sql', 'utf8');
+  /*
+    Таблица обязана своим видом старому файлу, а вот дверь публикации с ключом
+    источника, дверь удаления, отметки фида и представления без архивных
+    колонок — новому. Поэтому читаем оба и каждый проверяем за своё: старый
+    отвечает на «из чего таблица сделана», новый — на «что база умеет сегодня».
+  */
+  const finalSrc = await readFile('supabase/20261005-feed-final-delete.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -8426,17 +8434,22 @@ console.log('\nAF. Пульс обновлений игры');
   const L = CONFIG.forum.limits;
 
   const flat = sql.replace(/\s+/g, ' ');
-  const pubSql = sql.slice(sql.indexOf('create or replace function public.forum_publish_update_note'),
-    sql.indexOf('-- ── Шаг 3.')).replace(/\s+/g, ' ');
-  const archSql = sql.slice(sql.indexOf('create or replace function public.forum_set_update_note_archive'))
-    .replace(/\s+/g, ' ');
+  const finalFlat = finalSrc.replace(/\s+/g, ' ');
+  const pubSql = finalSrc.slice(finalSrc.indexOf('create or replace function public.forum_publish_update_note'),
+    finalSrc.indexOf('-- ── Шаг 3.')).replace(/\s+/g, ' ');
+  const delSql = finalSrc.slice(finalSrc.indexOf('create or replace function public.forum_delete_update_note'),
+    finalSrc.indexOf('create or replace function public.forum_delete_store_event')).replace(/\s+/g, ' ');
+  const marksSql = finalSrc.slice(0, finalSrc.indexOf('-- ── Шаг 2.')).replace(/\s+/g, ' ');
   const pubLocal = localSrc.slice(localSrc.indexOf('export async function publishUpdateNote'),
-    localSrc.indexOf('export async function setUpdateNoteArchived'));
-  const archLocal = localSrc.slice(localSrc.indexOf('export async function setUpdateNoteArchived'),
-    localSrc.indexOf('/* ── Push-настройки'));
+    localSrc.indexOf('export async function deleteUpdateNote'));
+  const delLocal = localSrc.slice(localSrc.indexOf('export async function deleteUpdateNote'),
+    localSrc.indexOf('/* ── Фид магазина'));
   const supaPulse = supaSrc.slice(supaSrc.indexOf('function updateNoteOut(row)'),
-    supaSrc.indexOf('/* ── Push-'));
-  const pulseContract = contractSrc.slice(contractSrc.indexOf('Пульс обновлений игры (см.'));
+    supaSrc.indexOf('/* ── Фид магазина'));
+  const pulseContract = contractSrc.slice(contractSrc.indexOf('Пульс обновлений игры (см.'),
+    contractSrc.indexOf('Фид магазина (см.'));
+  const noteTypedef = contractSrc.slice(contractSrc.indexOf('@typedef {Object} ForumUpdateNote'),
+    contractSrc.indexOf('@typedef {Object} ForumStoreEvent'));
 
   /* Отказы публикации: один и тот же порядок в базе и в черновом режиме. */
   const PUBLISH_REFUSALS = [
@@ -8456,12 +8469,20 @@ console.log('\nAF. Пульс обновлений игры');
     'Дата первоисточника раньше',
     'Номер версии длиннее',
   ];
-  const ARCHIVE_REFUSALS = [
-    'Заметку об обновлении убирает и возвращает модерация',
+  /*
+    Ключ внешнего источника — последнее поле двери и стоит оно после всех
+    полей заметки: смысл проверки в том, что заметка уже разборчива, а
+    расхождение касается только того, приносили её или нет. Границы ключа
+    тот же смысл, что у ключа события, — второго числа на одно понятие нет.
+  */
+  const KEY_REFUSALS = [
+    'Ключ источника короче',
+    'Ключ источника длиннее',
+    'Этот источник уже приносил заметку: повторная публикация означает, что первую убрали насовсем',
+  ];
+  const DELETE_REFUSALS = [
+    'Заметку об обновлении удаляет модерация',
     'Заметка не найдена',
-    'Эта заметка уже в архиве',
-    'Эта заметка и так опубликована',
-    'Заметка уже изменена',
   ];
 
   /** Фразы идут в тексте именно в этом порядке. */
@@ -8483,13 +8504,23 @@ console.log('\nAF. Пульс обновлений игры');
   check('дата у первоисточника — свой столбец, а не дата записи',
     flat.includes('source_at timestamptz not null')
       && flat.includes('created_at timestamptz not null default now()'));
-  check('список читается по дате источника',
-    flat.includes('on public.forum_update_notes (status, source_at desc, created_at desc)'));
-  check('архив — состояние строки, а не удаление',
+  check('список читается по дате источника, а не по состоянию строки',
+    finalFlat.includes('on public.forum_update_notes (source_at desc, created_at desc)'));
+  /*
+    Старый файл заводит архив как колонку — так и надо читать историю. Но
+    сегодня этой колонки нет: новый файл снимает её вместе с временем и ником
+    убравшего, потому что «убрано» больше не пауза, а удаление.
+  */
+  check('архив был состоянием строки — и этим состоянием перестал быть',
     flat.includes(`status text not null default 'published' check (status in ('published', 'archived'))`)
-      && !/delete from/i.test(sql));
-  check('и он назван своим временем и ником',
-    flat.includes('archived_at timestamptz') && flat.includes('archived_by uuid'));
+      && finalFlat.includes('alter table public.forum_update_notes drop column if exists status, drop column if exists archived_at, drop column if exists archived_by'));
+  check('дверь архива снята, а не оставлена «на всякий случай»',
+    finalFlat.includes('drop function if exists public.forum_set_update_note_archive(uuid, boolean);')
+      && !/create or replace function public\.forum_set_update_note_archive/.test(finalSrc));
+  check('убранное называется удалением: заметка уходит из таблицы вместе с решением',
+    delSql.includes('delete from public.forum_update_notes where id = p_target returning id into v_id'));
+  check('а уже убранные руками строки миграция выносит при прогоне',
+    finalFlat.includes(`delete from public.forum_update_notes where status = 'archived';`));
   check('номер версии необязателен: пустая строка, а не null',
     flat.includes("game_version text not null default ''"));
 
@@ -8510,30 +8541,36 @@ console.log('\nAF. Пульс обновлений игры');
     pubSql.includes(`left(v_title, ${L.updateTitleMax})`));
 
   /* ── Право: читает каждый, пишет только модерация ── */
-  check('опубликованное видит невошедший, архив — только модерация',
-    flat.includes(`for select using (status = 'published' or public.forum_is_staff());`));
-  check('ни одной политики на запись: браузер в таблицу не пишет',
-    !/for insert|for update|for delete/i.test(sql));
+  check('в таблице лежит ровно то, что видит читатель: состояний у строки больше нет',
+    finalFlat.includes(`create policy forum_update_notes_read on public.forum_update_notes for select using (true);`)
+      && flat.includes(`for select using (status = 'published' or public.forum_is_staff());`));
+  check('ни одной политики на запись: браузер в таблицу не пишет, и удаляет тоже функция',
+    !/for insert|for update|for delete/i.test(sql + finalSrc));
   check('право чтения дано и гостю, и вошедшему — таблице и представлению',
     flat.includes('grant select on public.forum_update_notes to anon, authenticated;')
       && flat.includes('grant select on public.forum_update_note_list to anon, authenticated;'));
   check('список выходит представлением, которое спрашивает права читателя',
-    flat.includes('create or replace view public.forum_update_note_list with (security_invoker = on) as'));
+    finalFlat.includes('create or replace view public.forum_update_note_list with (security_invoker = on) as'));
   check('ники берутся из вью профилей, а не дублируются в таблице',
-    flat.includes('join public.forum_profiles a on a.id = n.author_id')
-      && flat.includes('left join public.forum_profiles b on b.id = n.archived_by'));
-  check('публикация и архив — две двери, и обе спрашивают роль сами',
-    (sql.match(/language plpgsql security definer/g) || []).length === 2
+    finalFlat.includes('join public.forum_profiles a on a.id = n.author_id'));
+  check('и в представлении не осталось ни колонки архива, ни имени убравшего',
+    !/archived|status/.test(finalSrc.slice(finalSrc.indexOf('create or replace view public.forum_update_note_list'),
+      finalSrc.indexOf('grant select on public.forum_update_note_list'))));
+  check('публикация и удаление — свои двери, и каждая спрашивает роль сама',
+    (finalSrc.match(/language plpgsql security definer/g) || []).length === 4
       && pubSql.includes('if not public.forum_is_staff() then')
-      && archSql.includes('if not public.forum_is_staff() then'));
+      && delSql.includes('if not public.forum_is_staff() then'));
   check('ни триггеров, ни присоединения к темам и гайдам',
     !/create trigger/i.test(sql) && !/forum_posts|forum_guides/.test(sql));
   check('внешних запросов нет ни в базе, ни в коде страницы',
     !/net\.http|udf\.|pg_net/i.test(sql) && !/fetch\(/.test(pageSrc + updSrc));
-  check('функции закрыты от гостя и открыты вошедшему',
-    flat.includes('revoke all on function public.forum_publish_update_note( text, text, text, text, text, timestamptz, text ) from public, anon;')
-      && flat.includes('revoke all on function public.forum_set_update_note_archive(uuid, boolean) from public, anon;')
-      && flat.includes('grant execute on function public.forum_set_update_note_archive(uuid, boolean) to authenticated;'));
+  check('функции закрыты от гостя и открыты вошедшему: и дверь публикации, и дверь удаления',
+    finalFlat.includes('revoke all on function public.forum_publish_update_note( text, text, text, text, text, timestamptz, text, text ) from public, anon;')
+      && finalFlat.includes('grant execute on function public.forum_publish_update_note( text, text, text, text, text, timestamptz, text, text ) to authenticated;')
+      && finalFlat.includes('revoke all on function public.forum_delete_update_note(uuid) from public, anon;')
+      && finalFlat.includes('grant execute on function public.forum_delete_update_note(uuid) to authenticated;'));
+  check('старая семипараметрическая дверь снята: перегрузку PostgREST не выбрал бы сам',
+    finalFlat.includes('drop function if exists public.forum_publish_update_note( text, text, text, text, text, timestamptz, text );'));
   check('автором становится тот, кто вошёл, а не тот, о ком попросили',
     pubSql.includes('auth.uid()') && !/p_author/.test(pubSql));
 
@@ -8545,23 +8582,43 @@ console.log('\nAF. Пульс обновлений игры');
   check('прописная схема приводится к строчной — иначе её отверг бы CHECK',
     pubSql.includes(`v_url := 'https://' || substring(v_url from 9);`)
       && pubLocal.includes("https://${rawUrl.slice("));
-  check('архив и возврат меняют строку по прежнему состоянию: гонка двух модераторов видна',
-    archSql.includes(`and status = case when p_archived then 'published' else 'archived' end;`));
+  /*
+    Отметка ключа заведена ровно ради того, чтобы пережить строку, поэтому
+    дверь удаления её не трогает: снять отметку значило бы вернуть «убрано
+    насовсем» к «автомат принесёт это через час». Висячий указатель на
+    последнюю заметку в состоянии обхода при этом гасится — журнал обязан
+    оставаться правдой.
+  */
+  check('удаление заметки оставляет её ключ в отметках и гасит висячую ссылку состояния',
+    !/delete from public\.forum_feed_marks/.test(delSql)
+      && delSql.includes('update public.forum_store_state set last_note_id = null where last_note_id = p_target;'));
 
   /* ── Один порядок и одни слова в обоих режимах ── */
   check('публикация отказывает в одном порядке в базе и в черновом режиме',
     inOrder(pubSql, PUBLISH_REFUSALS) && inOrder(pubLocal, PUBLISH_REFUSALS));
+  check('ключ источника дверь проверяет последним, после всех полей заметки',
+    inOrder(pubSql, [...PUBLISH_REFUSALS, ...KEY_REFUSALS])
+      && pubSql.includes(`if v_key <> '' then`)
+      && pubSql.includes(`insert into public.forum_feed_marks (feed_key, what, title) values (v_key, 'note', left(v_title, 120));`));
+  check('отметка заводится в той же операции, что и заметка: обрыва между ними нет',
+    pubSql.indexOf('insert into public.forum_update_notes') < pubSql.indexOf('insert into public.forum_feed_marks'));
   /*
-    «Заметка уже изменена» есть только в базе: там два клика могут пересечься
-    по сети, и UPDATE с условием по статусу это ловит. В localStorage клики
-    идут строго один за другим, поэтому выдумывать гонку черновому адаптеру
-    значило бы проверять фразу, которую он никогда не скажет.
+    Отметка живёт отдельной таблицей именно потому, что колонка в таблице
+    заметок умерла бы вместе со строкой. Политики на запись у неё нет тоже не
+    зря: возможность молча запретить автомату любую фразу, которую некому и
+    нечем проверить, — это дыра, а не настройка.
   */
-  const ARCHIVE_SHARED = ARCHIVE_REFUSALS.filter((p) => p !== 'Заметка уже изменена');
-  check('архив — тот же порядок отказов',
-    inOrder(archSql, ARCHIVE_REFUSALS) && inOrder(archLocal, ARCHIVE_SHARED));
-  check('отказ гонки знает одна база',
-    archSql.includes('Заметка уже изменена') && !archLocal.includes('Заметка уже изменена'));
+  check('отметка ключа переживает удаление: своя таблица, чтение только для модерации, записи из браузера нет',
+    marksSql.includes('create table if not exists public.forum_feed_marks (')
+      && marksSql.includes(`what text not null check (what in ('note', 'event'))`)
+      && marksSql.includes('for select using (public.forum_is_staff());')
+      && !/for insert|for update|for delete/i.test(marksSql));
+  check('границы ключа заметки — те же числа, что у ключа события: одного понятия два числа не бывает',
+    marksSql.includes(`char_length(feed_key) between ${L.storeEventKeyMin} and ${L.storeEventKeyMax}`)
+      && pubSql.includes(`if char_length(v_key) < ${L.storeEventKeyMin} then`)
+      && pubSql.includes(`if char_length(v_key) > ${L.storeEventKeyMax} then`));
+  check('удаление — тот же порядок отказов в базе и в черновом режиме',
+    inOrder(delSql, DELETE_REFUSALS) && inOrder(delLocal, DELETE_REFUSALS));
   check('черновой режим берёт границы из конфига, а не переписывает числа руками',
     (pubLocal.match(/L\.update/g) || []).length >= 11 && !/= 1500/.test(pubLocal));
   check('типы он знает из правил, а не из своего списка',
@@ -8574,16 +8631,20 @@ console.log('\nAF. Пульс обновлений игры');
   check('неизвестный тип не превращается в пустую метку', updateKindLabel('quest') === 'quest');
   check('название типа печатает разметка, а не свой список', pageSrc.includes('updateKindLabel('));
   check('контракт обещает три функции и форму заметки',
-    ['listUpdateNotes', 'publishUpdateNote', 'setUpdateNoteArchived'].every((n) => contractSrc.includes(`[${n}]`))
+    ['listUpdateNotes', 'publishUpdateNote', 'deleteUpdateNote'].every((n) => contractSrc.includes(`[${n}]`))
       && contractSrc.includes('@typedef {Object} ForumUpdateNote')
       && contractSrc.includes('@property {Date} sourceAt'));
   check('и называет отсутствующие правки сознательным ограничением',
     /правка текста после публикации не разрешена/.test(pulseContract));
+  check('состояния строки контракт больше не обещает: архивных полей в заметке нет',
+    !/setUpdateNoteArchived/.test(contractSrc)
+      && !/@property \{[^}]*\} (status|archivedAt|archivedByNick)/.test(noteTypedef)
+      && /архива больше нет/.test(pulseContract));
   check('боевой режим читает представление и зовёт функции базы',
     supaPulse.includes('/forum_update_note_list?select=*&order=source_at.desc')
       && supaPulse.includes("'/rpc/forum_publish_update_note'")
-      && supaPulse.includes("'/rpc/forum_set_update_note_archive'")
-      && supaPulse.includes('p_archived: Boolean(archived)'));
+      && supaPulse.includes("'/rpc/forum_delete_update_note'")
+      && supaPulse.includes('p_target: id'));
   check('дата уходит в базу строкой, а не объектом',
     supaPulse.includes('p_source_at: String(draft.sourceAt'));
   check('после публикации заметка дочитывается, а не додумывается',
@@ -8595,13 +8656,9 @@ console.log('\nAF. Пульс обновлений игры');
     summary: 'Карты убраны из ротации, бонус за них больше не начисляется.',
     sourceName: 'Официальный сайт', sourceUrl: 'https://example.com/patch-notes',
     sourceAt: new Date('2026-09-20T12:00:00Z'), gameVersion: '1.4.2',
-    status: 'published', authorNick: 'Дежурный', createdAt: new Date('2026-09-21T08:00:00Z'),
-    archivedAt: null, archivedByNick: null,
+    authorNick: 'Дежурный', createdAt: new Date('2026-09-21T08:00:00Z'),
   };
-  const archivedNote = {
-    ...baseNote, id: 'n2', kind: 'issue', title: 'Голос в чате пропадал после патча',
-    status: 'archived', archivedAt: new Date('2026-09-24T09:00:00Z'), archivedByNick: 'Дежурный',
-  };
+  const secondNote = { ...baseNote, id: 'n2', kind: 'issue', title: 'Голос в чате пропадал после патча' };
   const page = (over) => renderUpdates({
     ready: true, shared: true, me: null, canManage: false, notes: [],
     loading: false, error: '', composing: false, ...over,
@@ -8620,17 +8677,21 @@ console.log('\nAF. Пульс обновлений игры');
     !evil.includes('href="javascript') && evil.includes('upd-card__source--broken'));
   check('данные, которые правит человек, экранируются',
     page({ notes: [{ ...baseNote, title: '<img src=x onerror=alert(1)>' }] }).includes('&lt;img'));
-  check('невошедший не видит ни формы, ни кнопок архива',
+  check('невошедший не видит ни формы, ни кнопки удаления',
     !page({ notes: [baseNote] }).includes('<form')
       && !page({ notes: [baseNote] }).includes('data-upd-new')
-      && !page({ notes: [baseNote] }).includes('data-upd-archive'));
-  check('модератор видит и кнопку новой заметки, и архивирование',
+      && !page({ notes: [baseNote] }).includes('data-upd-delete'));
+  check('модератор видит и кнопку новой заметки, и удаление своей строки',
     page({ canManage: true, notes: [baseNote] }).includes('data-upd-new')
-      && page({ canManage: true, notes: [baseNote] }).includes('data-upd-archive'));
-  check('архив виден только модерации и называется архивом',
-    page({ canManage: true, notes: [archivedNote] }).includes('Убрано из списка · 1')
-      && page({ canManage: true, notes: [archivedNote] }).includes('вернуть в список')
-      && !page({ notes: [archivedNote] }).includes('Убрано из списка'));
+      && page({ canManage: true, notes: [baseNote] }).includes('data-upd-delete="n1"'));
+  /*
+    Второго движения у строки нет, поэтому проверка «архива нет» важнее
+    проверки кнопки: секция «Убрано из списка» исчезает из разметки вместе со
+    смыслом, а не прячется стилями.
+  */
+  check('второй кнопки и убранного списка в разметке нет',
+    !/data-upd-archive|data-upd-restore|upd-archived|Убрано из списка|вернуть в список/.test(pageSrc + updSrc)
+      && !page({ canManage: true, notes: [baseNote, secondNote] }).includes('Убрано'));
   const form = page({ canManage: true, composing: true });
   /*
     Список полей формы живёт в поведении одной строкой, а разметка обязана
@@ -8654,6 +8715,18 @@ console.log('\nAF. Пульс обновлений игры');
     form.includes(`min="${L.updateSourceYearFloor}-01-01T00:00"`) && form.includes('max="'));
   check('правок нет ни в разметке, ни в поведении',
     !/data-upd-edit|data-upd-update/.test(pageSrc + updSrc));
+  /*
+    Удаление без возврата спрашивают всегда: одна случайная кнопка в списке
+    стирает то, что модерация решала осознанно, а отменить действие нельзя.
+    Поэтому подтверждение живёт в поведении, а не в разметке, и текст его
+    называет и предмет, и необратимость.
+  */
+  check('перед удалением поведение спрашивает, и называет чем оно окончательное',
+    updSrc.includes('function confirmRemoval(')
+      && /if \(!confirmRemoval\(cardTitle\(drop, '\.upd-card'\), 'Заметку'\)\) return;/.test(updSrc)
+      && /удалить навсегда\? Архива больше нет/.test(updSrc));
+  check('и форма говорит человеку правду про обратный ход',
+    form.includes('удалите') && form.includes('новую'));
   check('пустой список объясняет, почему он пуст',
     page().includes('Заметок пока нет'));
   const broken = page({ error: 'relation "forum_update_note_list" does not exist' });
@@ -8665,9 +8738,11 @@ console.log('\nAF. Пульс обновлений игры');
   check('подвал обещает ровно столько заметок, сколько умеет',
     page().includes(String(L.updateListMax)));
   check('черновой режим сказан вслух', page({ shared: false }).includes('Черновой режим'));
-  check('карточка, форма и архив одеты стилем',
-    ['upd-card', 'upd-form', 'upd-archived', 'upd-kind--patch', 'upd-card__source--broken', 'upd-error']
+  check('карточка, форма и отказ удаления одеты стилем',
+    ['upd-card', 'upd-form', 'upd-kind--patch', 'upd-card__source--broken', 'upd-error', 'upd-card__error', 'upd-card__action']
       .every((c) => cssSrc.includes(`.${c}`)));
+  check('архивных классов в стиле больше нет: их не стало ни в разметке, ни здесь',
+    !/\.upd-archived|\.upd-card--archived|\.upd-card__was/.test(cssSrc));
 
   /* ── Маршрут ── */
   check('страница стоит в меню и живёт по своему адресу',
@@ -8691,6 +8766,15 @@ console.log('\nAF. Пульс обновлений игры');
     docsSrc.includes('## Пульс обновлений игры') && docsSrc.includes('20260926-update-pulse.sql')
       && readmeSrc.includes('20260926-update-pulse.sql')
       && readmeSrc.indexOf('20260926-starter-checklist.sql') < readmeSrc.indexOf('20260926-update-pulse.sql'));
+  /*
+    Про «убрано насовсем» нельзя молчать в документе: читатель документа и
+    читатель кнопки должны понимать одно и то же правило. Отметки фида называются
+    своим именем, иначе через месяц их никто не найдёт.
+  */
+  check('и про удаление без возврата сказано в документе, а не только в коде',
+    docsSrc.replace(/\s+/g, ' ').includes('убрано насовсем')
+      && docsSrc.includes('forum_feed_marks') && docsSrc.includes('forum_delete_update_note')
+      && readmeSrc.includes('20261005-feed-final-delete.sql'));
 
   /* ── Живой черновой прогон: те же слова, что сказала бы база ── */
   const local = await import('../src/forum/adapters/local.js');
@@ -8752,11 +8836,11 @@ console.log('\nAF. Пульс обновлений игры');
 
   const note1 = await local.publishUpdateNote(valid());
   check('заметка принята и названа целиком, с ником автора',
-    note1.status === 'published' && note1.title === 'Перечисление карт вышло из ротации'
-      && note1.authorNick === 'Дежурный');
+    note1.title === 'Перечисление карт вышло из ротации' && note1.authorNick === 'Дежурный');
   check('дата первоисточника пришла датой, а не строкой',
     note1.sourceAt instanceof Date && note1.createdAt instanceof Date);
-  check('у свежей заметки архива нет', note1.archivedAt === null && note1.archivedByNick === null);
+  check('и состояний у неё больше нет: ни статуса, ни следов архива',
+    note1.status === undefined && note1.archivedAt === undefined);
 
   /* Схема приводится к нижнему регистру — ровно как в функции базы. */
   const note2 = await local.publishUpdateNote(valid({
@@ -8776,43 +8860,36 @@ console.log('\nAF. Пульс обновлений игры');
     'Перечисление карт вышло из ротации | Работы на сервере в воскресенье | Обещание нового сезона');
 
   await local.signOut();
-  equal('невошедший читает опубликованное', (await local.listUpdateNotes()).length, 3);
+  equal('невошедший читает тот же список, что и модерация: состояний нет',
+    (await local.listUpdateNotes()).length, 3);
 
   await local.signIn('Обычный');
-  equal('игрок без прав не уберёт и не вернёт',
-    await says(() => local.setUpdateNoteArchived(note1.id, true)),
-    'Заметку об обновлении убирает и возвращает модерация');
+  equal('игрок без прав не удалит',
+    await says(() => local.deleteUpdateNote(note1.id)),
+    'Заметку об обновлении удаляет модерация');
+  equal('и ничего не удалил: список цел', (await local.listUpdateNotes()).length, 3);
   await local.signOut();
   await local.signIn('Дежурный');
 
   equal('заметки с таким id нет',
-    await says(() => local.setUpdateNoteArchived('нет-такой', true)), 'Заметка не найдена');
-  await local.setUpdateNoteArchived(note3.id, true);
-  equal('повторный архив не перетирает решение',
-    await says(() => local.setUpdateNoteArchived(note3.id, true)), 'Эта заметка уже в архиве');
-  equal('возврат открытой заметки — отказ',
-    await says(() => local.setUpdateNoteArchived(note1.id, false)), 'Эта заметка и так опубликована');
-  for (const words of ARCHIVE_REFUSALS) {
-    check(`слова «${words}» записаны и в базе`, archSql.includes(words));
+    await says(() => local.deleteUpdateNote('нет-такой')), 'Заметка не найдена');
+  await local.deleteUpdateNote(note3.id);
+  equal('удалённая заметка исчезает из списка, а не ложится в архив',
+    (await local.listUpdateNotes()).map((n) => n.title).join(' | '),
+    'Перечисление карт вышло из ротации | Работы на сервере в воскресенье');
+  equal('повторное удаление называет отсутствие строки, а не «уже убрана»',
+    await says(() => local.deleteUpdateNote(note3.id)), 'Заметка не найдена');
+  check('и в черновом состоянии её больше нет: удаление правда стирает строку',
+    raw().updateNotes.length === 2);
+  for (const words of DELETE_REFUSALS) {
+    check(`слова «${words}» записаны и в базе`, delSql.includes(words));
   }
 
-  await local.setUpdateNoteArchived(note1.id, true);
   await local.signOut();
-  const guestList = await local.listUpdateNotes();
-  check('гость архива не видит', guestList.every((n) => n.status === 'published'));
-  equal('и у него только опубликованное', guestList.length, 1);
+  equal('гость видит ровно то же, что и модерация', (await local.listUpdateNotes()).length, 2);
   await local.signIn('Дежурный');
-  const hidden = (await local.listUpdateNotes()).find((n) => n.id === note1.id);
-  check('модерация видит убранную заметку, её время и свой ник',
-    hidden.status === 'archived' && hidden.archivedAt instanceof Date
-      && hidden.archivedByNick === 'Дежурный');
-  await local.setUpdateNoteArchived(note1.id, false);
-  const back = (await local.listUpdateNotes()).find((n) => n.id === note1.id);
-  equal('возврат работает: правки-то нет', back.status, 'published');
-  check('и у возвращённой заметки следов архива не осталось',
-    back.archivedAt === null && back.archivedByNick === null);
-  check('строка не удалялась ни разу: решение переживает саму заметку',
-    raw().updateNotes.length === 3);
+  check('второй раз за день одну и ту же заметку не уберёт никто: строки уже нет',
+    (await local.listUpdateNotes()).every((n) => n.id !== note3.id));
 
   /* Предел списка — число конфига, а не «сколько прислали». */
   const padded = raw();
@@ -8820,8 +8897,8 @@ console.log('\nAF. Пульс обновлений игры');
     id: `upn_${i}`, kind: 'patch', title: `Заметка номер ${i}`,
     summary: 'текст заметки о перемене в игре', sourceName: 'Официальный сайт',
     sourceUrl: 'https://example.com/n', sourceAt: new Date(Date.now() - i * hour).toISOString(),
-    gameVersion: '', status: 'published', authorId: 'u_1', authorNick: 'Дежурный',
-    createdAt: new Date().toISOString(), archivedAt: null, archivedBy: null, archivedByNick: null,
+    gameVersion: '', authorId: 'u_1', authorNick: 'Дежурный',
+    createdAt: new Date().toISOString(),
   }));
   fresh.set('zr33.forum.local', JSON.stringify(padded));
   equal('длиннее предела список не становится', (await local.listUpdateNotes()).length, L.updateListMax);
@@ -9862,6 +9939,9 @@ console.log('\nAM. Фид магазина: обновление и событи
          именно потому, что «идёт сейчас» датой быть не может.
       4. Числа, тексты отказов и их порядок в базе, в черновом режиме и в
          разборе — одни и те же.
+      5. Убранное из списка уходит из базы насовсем: второго движения нет, а
+         ключ строки переживает удаление в таблице отметок, и следующий обход
+         магазина не приносит карточку обратно.
 
     Фикстуры взяты с живой страницы: карточка события с настоящей припиской
     jslog, настоящий служебный JSON с версией и датой, настоящий заголовок
@@ -9874,6 +9954,7 @@ console.log('\nAM. Фид магазина: обновление и событи
   const flowSrc = await readFile('.github/workflows/store-feed.yml', 'utf8');
   const sql = await readFile('supabase/applied/20260930-store-feed.sql', 'utf8');
   const pulseSql = await readFile('supabase/applied/20260926-update-pulse.sql', 'utf8');
+  const finalSrc = await readFile('supabase/20261005-feed-final-delete.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -9916,18 +9997,29 @@ console.log('\nAM. Фид магазина: обновление и событи
     + ' property="og:description" /></head><body>Трасса Z</body></html>';
 
   const flat = sql.replace(/\s+/g, ' ');
-  const recSql = sql.slice(sql.indexOf('create or replace function public.forum_record_store_event'),
-    sql.indexOf('-- ── Шаг 4.')).replace(/\s+/g, ' ');
-  const archSql = sql.slice(sql.indexOf('create or replace function public.forum_set_store_event_archive'),
-    sql.indexOf('-- ── Шаг 5.')).replace(/\s+/g, ' ');
+  const finalFlat = finalSrc.replace(/\s+/g, ' ');
+  /*
+    Дверь записи, представление списка и двери удаления читаем из новой
+    миграции: прежний файл остался в истории ровно тем, как был запущен, а
+    решение об отсутствии у события второго движения принималось уже здесь.
+  */
+  const recSql = finalSrc.slice(finalSrc.indexOf('create or replace function public.forum_record_store_event'),
+    finalSrc.indexOf('-- ── Шаг 4.')).replace(/\s+/g, ' ');
+  const delEventSql = finalSrc.slice(finalSrc.indexOf('create or replace function public.forum_delete_store_event'),
+    finalSrc.indexOf('-- ── Шаг 5.')).replace(/\s+/g, ' ');
+  const marksSql = finalSrc.slice(0, finalSrc.indexOf('-- ── Шаг 2.')).replace(/\s+/g, ' ');
+  const teardownSql = finalSrc.slice(finalSrc.indexOf('-- ── Шаг 5.'),
+    finalSrc.indexOf('-- ── Шаг 6.')).replace(/\s+/g, ' ');
   const localFeed = localSrc.slice(localSrc.indexOf('/* ── Фид магазина в локальном режиме'));
   const supaFeed = supaSrc.slice(supaSrc.indexOf('function storeEventOut(row)'));
+  const eventTypedef = contractSrc.slice(contractSrc.indexOf('@typedef {Object} ForumStoreEvent'),
+    contractSrc.indexOf('@typedef {Object} ForumStoreStatus'));
   /* Заголовок обращения к чужому сайту: нашего ключа базы там быть не должно. */
   const externalCall = scriptSrc.slice(scriptSrc.indexOf('async function fetchExternal'),
     scriptSrc.indexOf('const DEBUG_HEADS'));
   /* Только представление списка, без его grant: в нём фильтров быть не должно. */
-  const listViewSql = flat.slice(flat.indexOf('create or replace view public.forum_store_event_list'),
-    flat.indexOf('grant select on public.forum_store_event_list'));
+  const listViewSql = finalSrc.slice(finalSrc.indexOf('create or replace view public.forum_store_event_list'),
+    finalSrc.indexOf('grant select on public.forum_store_event_list')).replace(/\s+/g, ' ');
 
   /** Фразы идут в тексте именно в этом порядке. */
   function inOrder(src, phrases) {
@@ -10201,33 +10293,49 @@ console.log('\nAM. Фид магазина: обновление и событи
   ];
   check('дверь события отказывает в названном порядке и своими словами',
     inOrder(recSql, RECORD_REFUSALS));
-  const ARCHIVE_REFUSALS = [
-    'Событие из магазина убирает и возвращает модерация',
+  const DELETE_EVENT_REFUSALS = [
+    'Событие из магазина удаляет модерация',
     'Событие не найдено',
-    'Это событие уже в архиве',
-    'Это событие и так опубликовано',
   ];
-  check('архив события — те же слова и тот же порядок в обоих режимах',
-    inOrder(archSql, ARCHIVE_REFUSALS) && inOrder(localFeed, ARCHIVE_REFUSALS));
-  check('отказ гонки знает одна база: в черновом режиме бросать его некому',
-    archSql.includes('Событие уже изменено')
-      && !/throw new Error\(['"`]Событие уже изменено/.test(localFeed));
+  check('удаление события — те же слова и тот же порядок в обоих режимах',
+    inOrder(delEventSql, DELETE_EVENT_REFUSALS) && inOrder(localFeed, DELETE_EVENT_REFUSALS));
+  check('убранное не возвращается: дверь удаляет строку и не трогает отметку ключа',
+    delEventSql.includes('delete from public.forum_store_events where id = p_target')
+      && !/delete from public\.forum_feed_marks/.test(finalFlat));
+  check('слово «уже было» берётся из отметки, а не из индекса: удалённую строку индекс молчит',
+    recSql.includes('if exists (select 1 from public.forum_feed_marks where feed_key = v_key) then')
+      && recSql.includes("return 'уже было';"));
+  check('живое событие обновляется до спрашивания отметки: магазин правит даты, а не заводит дубль',
+    inOrder(recSql, ['update public.forum_store_events', "return 'обновлено';",
+      'from public.forum_feed_marks', 'insert into public.forum_store_events', "return 'новое';"]));
+  check('новое событие оставляет отметку в том же вызове двери, что и строку',
+    inOrder(recSql, ['insert into public.forum_store_events',
+      'insert into public.forum_feed_marks (feed_key, what, title)', "values (v_key, 'event'"]));
+  check('отметка события живёт своей таблицей и на запись себе права не даёт',
+    marksSql.includes('create table if not exists public.forum_feed_marks (')
+      && marksSql.includes("what text not null check (what in ('note', 'event'))")
+      && marksSql.includes('grant select on public.forum_feed_marks to authenticated;')
+      && !/for insert|for update|for delete/i.test(marksSql));
   check('ни одной политики на запись: браузер в таблицы фида не пишет',
-    !/for insert|for update|for delete/i.test(sql));
+    !/for insert|for update|for delete/i.test(sql + finalSrc));
   check('читает список и гость, и вошедший — таблицей и представлением',
     flat.includes('grant select on public.forum_store_events to anon, authenticated;')
-      && flat.includes('grant select on public.forum_store_event_list to anon, authenticated;')
+      && finalFlat.includes('grant select on public.forum_store_event_list to anon, authenticated;')
       && flat.includes('grant select on public.forum_store_status to anon, authenticated;'));
-  check('публикованное видит невошедший, архив — только модерация',
-    flat.includes(`for select using (status = 'published' or public.forum_is_staff());`));
-  check('три двери, и каждая спрашивает роль сама',
+  check('разных состояний у строки больше нет, поэтому и правило чтения не различает читателей',
+    finalFlat.includes('for select using (true);')
+      && !/status = 'published' or public\.forum_is_staff\(\)/.test(finalFlat));
+  check('дверей стало больше, и каждая спрашивает роль сама',
     (sql.match(/language plpgsql security definer/g) || []).length === 3
-      && recSql.includes('if not public.forum_is_staff() then'));
+      && (finalSrc.match(/language plpgsql security definer/g) || []).length === 4
+      && recSql.includes('if not public.forum_is_staff() then')
+      && delEventSql.includes('if not public.forum_is_staff() then'));
   check('двери закрыты от гостя и открыты вошедшему',
     flat.includes('revoke all on function public.forum_record_store_event(')
-      && flat.includes('grant execute on function public.forum_mark_store_run('));
+      && flat.includes('grant execute on function public.forum_mark_store_run(')
+      && finalFlat.includes('grant execute on function public.forum_delete_store_event(uuid) to authenticated;'));
   check('автором остаётся тот, кто вошёл: просить чужой ник не о чем',
-    !/p_author|p_nick/.test(sql) && archSql.includes('auth.uid()'));
+    !/p_author|p_nick/.test(sql + finalSrc) && finalSrc.includes('auth.uid()'));
   check('состояние обхода — одна строка, и это проверяет база, а не договорённость',
     flat.includes('id boolean primary key default true check (id)'));
   check('единственная строка заведена миграцией: иначе отчёт пропал бы молча',
@@ -10246,13 +10354,19 @@ console.log('\nAM. Фид магазина: обновление и событи
       && flat.includes('alter table public.forum_store_state alter column last_run_at drop not null;')
       && flat.includes('set last_run_at = null where last_run_at is not null and last_run_text = \'\'')
       && flat.includes('and android_version = \'\' and ios_version = \'\' and last_note_id is null;'));
-  check('убранное автоматом возвращается, а не удаляется',
-    !/delete from/i.test(sql) && flat.includes(`status = case when p_archived then 'archived' else 'published' end`));
+  check('убранное уходит из базы, а его ключ уже записан в отметки',
+    inOrder(teardownSql, ['insert into public.forum_feed_marks (feed_key, what, title)',
+      "delete from public.forum_store_events where status = 'archived';",
+      "delete from public.forum_update_notes where status = 'archived';"])
+      && teardownSql.includes('on conflict (feed_key) do nothing;'));
+  check('архив снесён как состояние: колонки ушли вместе с дверью',
+    /alter table public\.forum_store_events\s+drop column if exists status,?\s+drop column if exists archived_at,?\s+drop column if exists archived_by/.test(finalSrc)
+      && finalFlat.includes('drop function if exists public.forum_set_store_event_archive(uuid, boolean);'));
   check('представления спрашивают права читателя',
-    flat.includes('create or replace view public.forum_store_event_list with (security_invoker = on) as')
+    finalFlat.includes('create or replace view public.forum_store_event_list with (security_invoker = on) as')
       && flat.includes('create or replace view public.forum_store_status with (security_invoker = on) as'));
-  check('ник убравшего берётся из вью профилей, второй копии имён нет',
-    flat.includes('left join public.forum_profiles p_arch on p_arch.id = e.archived_by'));
+  check('в списке событий нет ни архивной колонки, ни второго joins ради ника убравшего',
+    !/archiv/i.test(listViewSql) && !/left join public\.forum_profiles p_arch/.test(finalFlat));
 
   /* ── 6. Граница «кто ходит наружу» ── */
   check('в разборе страницы нет ни одного обращения наружу',
@@ -10308,26 +10422,31 @@ console.log('\nAM. Фид магазина: обновление и событи
     scriptSrc.includes('страница не разобрана') && scriptSrc.includes('headsAudit('));
 
   /* ── 7. Контракт, адаптеры и то, что видит читатель ── */
-  check('контракт обещает два чтения и одно решение по событию',
-    ['listStoreEvents', 'getStoreStatus', 'setStoreEventArchived']
+  check('контракт обещает два чтения и одно удаление по событию',
+    ['listStoreEvents', 'getStoreStatus', 'deleteStoreEvent']
       .every((n) => contractSrc.includes(`[${n}]`))
       && contractSrc.includes('@typedef {Object} ForumStoreEvent'));
-  check('боевой режим читает представления и зовёт функции базы',
+  check('у события нет ни статуса, ни имени убравшего: у него одно состояние',
+    !/@property \{[^}]*\} (status|archivedAt|archivedByNick)/.test(eventTypedef)
+      && !/setStoreEventArchived|forum_set_store_event_archive/.test(contractSrc));
+  check('боевой режим читает представление и зовёт дверь удаления',
     supaFeed.includes('/forum_store_event_list?select=*&order=starts_at.desc')
-      && supaFeed.includes("'/rpc/forum_set_store_event_archive'")
+      && supaFeed.includes("'/rpc/forum_delete_store_event'")
+      && supaFeed.includes('p_target: id')
       && supaFeed.includes('/forum_store_status?select=*&limit=1'));
   check('поля строки приходят из столбцов базы, а не выдумываются',
-    supaFeed.includes('feedKey: row.feed_key') && supaFeed.includes('archivedByNick: row.archived_by_nick'));
+    supaFeed.includes('feedKey: row.feed_key') && !/row\.archived_by_nick/.test(supaFeed));
   check('черновой режим называет границы тем же числом списка',
     localFeed.includes('L.storeEventListMax') && supaFeed.includes('limits.storeEventListMax'));
   {
     const live = {
       id: 'e1', title: EVENT_TITLE, summary: 'Экипажи, общий сбор!', platform: 'android',
       startsAt: new Date('2026-09-28T02:00:00Z'), endsAt: new Date('2026-10-04T02:00:00Z'),
-      status: 'published', sourceUrl: `https://play.google.com/store/apps/eventdetails/${EVENT_ID}`,
+      sourceUrl: `https://play.google.com/store/apps/eventdetails/${EVENT_ID}`,
     };
-    const removed = {
-      ...live, id: 'e2', title: 'Ночной заезд', status: 'archived',
+    /* Недавнее завершённое событие: оно ещё в сроке показа и обязано быть видно. */
+    const recent = {
+      ...live, id: 'e2', title: 'Ночной заезд',
       startsAt: new Date('2026-09-19T02:00:00Z'), endsAt: new Date('2026-09-27T02:00:00Z'),
     };
     /* Пережитое дальше срока не видно никому: ни читателю, ни модератору. */
@@ -10340,7 +10459,7 @@ console.log('\nAM. Фид магазина: обновление и событи
       error: '', composing: false, storeEvents: [], storeStatus: null, feedError: '',
       now: NOW, ...over,
     });
-    const feedPage = (over) => page({ storeEvents: [live, removed, farEnded], ...over });
+    const feedPage = (over) => page({ storeEvents: [live, recent, farEnded], ...over });
 
     check('блок назван и объяснён: карточки принесли магазины, разговор — на форуме',
       feedPage().includes('События игры') && feedPage().includes('href="#/forum"'));
@@ -10359,14 +10478,15 @@ console.log('\nAM. Фид магазина: обновление и событи
     check('данные магазина экранируются, как и всё, что принёс человек',
       page({ storeEvents: [{ ...live, title: '<img src=x onerror=alert(1)>' }] })
         .includes('&lt;img'));
-    check('невошедший не видит ни кнопки убрать, ни убранное',
-      !feedPage().includes('data-feed-archive') && !feedPage().includes('Убрано автоматом')
-        && !feedPage().includes('Ночной заезд'));
-    check('модератор видит кнопку убрать и свежее убранное, а не всё подряд',
-      feedPage({ canManage: true }).includes('data-feed-archive')
-        && feedPage({ canManage: true }).includes('Убрано автоматом')
-        && feedPage({ canManage: true }).includes('Ночной заезд')
-        && !feedPage({ canManage: true }).includes('Конвой в пустыне'));
+    check('невошедший не видит кнопки удалить, а карточки видит те же, что и модератор',
+      !feedPage().includes('data-feed-delete') && feedPage().includes('Ночной заезд')
+        && feedPage({ canManage: true }).includes('Ночной заезд'));
+    check('модератор у каждой показанной карточки видит одну кнопку, а не пару',
+      (feedPage({ canManage: true }).match(/data-feed-delete="/g) || []).length === 2
+        && feedPage({ canManage: true }).includes('data-feed-delete="e2"')
+        && !feedPage({ canManage: true }).includes('data-feed-delete="e3"'));
+    check('на странице не осталось ни следа убранного состояния',
+      !/data-feed-archive|data-feed-restore|Убрано автоматом|вернуть в список/.test(pageSrc + updSrc));
     check('пустой блок не врёт про игру: он называет две возможные причины',
       page({}).includes('автомат ещё ни разу не заходил'));
     check('отказ списка называется именем нужной миграции',
@@ -10379,9 +10499,10 @@ console.log('\nAM. Фид магазина: обновление и событи
         .includes('Планировщик заходил'));
     check('подпись стадии и срок прячутся по числам, а не по догадке разметки',
       pageSrc.includes('pickStoreEvents(') && feedSrc.includes('storeEventPhase'));
-    check('поле, карточка и строка обхода одеты стилем',
+    check('поле, карточка, кнопка удаления и строка обхода одеты стилем',
       cssSrc.includes('.feed-card__source') && cssSrc.includes('.feed-list')
-        && cssSrc.includes('.feed__run'));
+        && cssSrc.includes('.feed__run') && cssSrc.includes('.feed-card__action')
+        && cssSrc.includes('.feed-card__error') && !/\.feed-card--archived/.test(cssSrc));
     check('список и состояние читаются двумя запросами, и отказ одного не убивает другой',
       inOrder(updSrc.slice(updSrc.indexOf('async function loadFeed')),
         ['state.storeEvents = (await forum.listStoreEvents())', 'state.feedError = String',
@@ -10389,11 +10510,81 @@ console.log('\nAM. Фид магазина: обновление и событи
         && /catch \{\s*\n\s*state\.storeStatus = null;/.test(updSrc));
   }
 
+  /* ── 7.1 Живой черновой прогон: событие уходит из состояния, а не прячется ── */
+  {
+    const local = await import('../src/forum/adapters/local.js');
+    const feedStore = new Map();
+    globalThis.localStorage = {
+      getItem: (k) => (feedStore.has(k) ? feedStore.get(k) : null),
+      setItem: (k, v) => feedStore.set(k, String(v)),
+      removeItem: (k) => feedStore.delete(k),
+    };
+    const rawFeed = () => JSON.parse(feedStore.get('zr33.forum.local'));
+    const saysFeed = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+
+    await local.signUp('Дежурный');            // первый в черновой базе — владелец
+    await local.signUp('Обычный');
+    await local.signOut();
+
+    /*
+      События в черновом режиме не пишет никто: планировщик ходит в боевую базу.
+      Поэтому строки кладём в состояние руками — проверяем не источник, а решение.
+    */
+    const st = rawFeed();
+    st.storeEvents = [
+      {
+        id: 'ev-1', feedKey: 'play:4829466076333755096', title: EVENT_TITLE, summary: '',
+        platform: 'android', startsAt: '2026-09-28T02:00:00.000Z', endsAt: '2026-10-04T02:00:00.000Z',
+        sourceUrl: `https://play.google.com/store/apps/eventdetails/${EVENT_ID}`,
+        firstSeenAt: '2026-09-28T03:00:00.000Z', lastSeenAt: '2026-09-30T03:00:00.000Z',
+      },
+      {
+        id: 'ev-2', feedKey: 'play:5092240000000000000', title: 'Ночной заезд', summary: '',
+        platform: 'android', startsAt: '2026-09-19T02:00:00.000Z', endsAt: '2026-09-27T02:00:00.000Z',
+        sourceUrl: '', firstSeenAt: '2026-09-19T03:00:00.000Z', lastSeenAt: '2026-09-29T03:00:00.000Z',
+      },
+    ];
+    feedStore.set('zr33.forum.local', JSON.stringify(st));
+
+    await local.signIn('Обычный');
+    equal('игрок без прав не удалит событие', await saysFeed(() => local.deleteStoreEvent('ev-1')),
+      'Событие из магазина удаляет модерация');
+    equal('и ничего не удалил: список цел', (await local.listStoreEvents()).length, 2);
+    await local.signOut();
+
+    await local.signIn('Дежурный');
+    equal('события с таким id нет', await saysFeed(() => local.deleteStoreEvent('нет-такой')),
+      'Событие не найдено');
+    await local.deleteStoreEvent('ev-1');
+    equal('удалённое событие исчезает из списка, а не ложится в архив',
+      (await local.listStoreEvents()).map((e) => e.title).join(' | '), 'Ночной заезд');
+    equal('повторное удаление называет отсутствие строки, а не «уже убрано»',
+      await saysFeed(() => local.deleteStoreEvent('ev-1')), 'Событие не найдено');
+    check('и в черновом состоянии строки больше нет: удаление правда стирает её',
+      rawFeed().storeEvents.length === 1);
+    check('у оставшейся карточки нет ни статуса, ни следа убравшего',
+      (await local.listStoreEvents())[0].status === undefined
+        && (await local.listStoreEvents())[0].archivedAt === undefined);
+    check('а состояние обхода черновой режим не выдумывает: его приносит боевая база',
+      (await local.getStoreStatus()) === null);
+    for (const words of DELETE_EVENT_REFUSALS) {
+      check(`и те же слова записаны в базе: ${words}`, delEventSql.includes(words));
+    }
+    check('перед удалением события поведение спрашивает, и называет его окончательным',
+      /if \(!confirmRemoval\(cardTitle\(feedOff, '\.feed-card'\), 'Событие'\)\) return;/.test(updSrc));
+  }
+
   /* ── 8. Документы ── */
   check('миграция названа в документах форума, в порядке запуска и в планировщике',
     docsSrc.includes('20260930-store-feed.sql')
       && readmeSrc.includes('20260930-store-feed.sql')
       && readmeSrc.replace(/\s+/g, ' ').includes('`20260929-player-guides.sql`, `20260930-store-feed.sql`'));
+  check('и новая миграция стоит в реестре рядом с остальными',
+    readmeSrc.includes('20261005-feed-final-delete.sql')
+      && docsSrc.includes('20261005-feed-final-delete.sql'));
+  check('документ фида называет удаление и отметки, а не прежнюю дверь архива',
+    docsSrc.includes('forum_delete_store_event') && docsSrc.includes('forum_feed_marks')
+      && !/forum_set_store_event_archive|setStoreEventArchived/.test(docsSrc + readmeSrc));
   check('документ объясняет, почему автомат живёт вне браузера, и как его включить',
     docsSrc.includes('## Фид магазина') && docsSrc.includes('STORE_FEED_NICK')
       && docsSrc.includes('.github/workflows/store-feed.yml'));
@@ -10408,6 +10599,147 @@ console.log('\nAM. Фид магазина: обновление и событи
     !pulseSql.includes('Автоматического чтения чужих страниц')
       && pulseSql.includes('20260930-store-feed.sql')
       && docsSrc.includes('- **Чтения чужих страниц из браузера посетителя.**'));
+
+  /* ── 8.1 Официальная группа ВК: голос, который слышно без человека ────────
+
+     С осени 2026 года страница Google Play не печатает в своём HTML ни «Что
+     нового», ни блока событий, а App Store на текущий патч отвечает строкой
+     короче нижнего порога заметки. Словами перемены игра описывает только
+     официальная группа, и именно поэтому у фида появился четвёртый источник.
+     Проверяем то, что в этом источнике нельзя отдать на отмажку:
+
+       1. Читаем ровно то, что видит посетитель: открытая страница «Посты
+          сообщества», без входа, без чужих токенов и без комментариев игроков.
+       2. Стена отдаётся в windows-1251, и про это нельзя молчать: прочитанное
+          как UTF-8 дало бы список карточек из кракозябр, а не ошибку.
+       3. Дата заметки — метка самой записи, а не день обхода.
+       4. В список попадает только то, что называет уже случившуюся перемену;
+          розыгрыш, опрос и «событие на подходе» проходят мимо — до запроса, а
+          не после отказа базы.
+       5. Окно стены и потолок запусков держит разбор, иначе первый же
+          настоящий прогон вывалил бы в список полуторагодовалый архив.
+       6. Ключ записи переживает удалённую заметку: он уходит в базу вместе с
+          нею, а не отдельным «запомни» после.
+
+     Фикстура — настоящие куски живой стены (`tests/vk-wall-fixture.html`,
+     байты ответа как они пришли), а ожидаемые значения получены прогоном на
+     ней, а не на глаз.
+  ───────────────────────────────────────────────────────────────────────── */
+  {
+    const vkSrc = await readFile('src/forum/vk-feed.js', 'utf8');
+    const vk = await import('../src/forum/vk-feed.js');
+    const VK = CONFIG.forum.store.vk;
+    const wallBytes = await readFile('tests/vk-wall-fixture.html');
+    const wall = vk.decodeVkBytes(new Uint8Array(wallBytes));
+    const page = vk.readVkWall(wall, VK);
+    const NOW_VK = Date.parse('2026-10-05T12:00:00Z');
+    const picked = vk.pickVkNotes(wall, { now: NOW_VK, cfg: VK });
+    const notePatch = picked.notes.find((n) => n.feedKey.endsWith('_39747'));
+    const noteNotice = picked.notes.find((n) => n.feedKey.endsWith('_41250'));
+
+    /* ── Адрес и числа ── */
+    check('стена берётся страницей «Посты сообщества», и минус в номере группы стоит один',
+      vk.vkWallUrl(VK) === 'https://vk.com/wall-236547214?own=1'
+        && !vk.vkWallUrl(VK).includes('wall--'));
+    check('постоянная ссылка записи собирается тем же способом: адрес стены и номер поста',
+      vk.vkPostUrl('-236547214_39747', VK) === 'https://vk.com/wall-236547214_39747'
+        && vk.vkPostUrl('236547214_39747', VK) === 'https://vk.com/wall-236547214_39747'
+        && vk.vkPostUrl('', VK) === '');
+    check('окно стены, потолок запусков и подпись первоисточника — числа config',
+      VK.group === '-236547214' && VK.freshDays === 40 && VK.perRun === 5
+        && VK.sourceName === 'Официальная группа ВК');
+
+    /* ── Кодировка ── */
+    check('байты стены раскрываются в windows-1251: по-другому русский не читается',
+      vk.VK_ENCODING === 'windows-1251' && wall.includes('30 сентября - Обновление версии')
+        && !new TextDecoder('utf-8').decode(wallBytes).includes('Обновление'));
+    check('в браузерный путь фид ВК не тянет сеть: разбор умеет только читать строку',
+      !/fetch\(|XMLHttpRequest/.test(vkSrc)
+        && !(await readFile('src/pages/updates.js', 'utf8')).includes('vk-feed')
+        && !(await readFile('src/forum/updates.js', 'utf8')).includes('vk-feed'));
+
+    /* ── Разбор живой страницы ── */
+    check('из пяти рядов стены разбор видел четыре подписанные группой записи',
+      page.how === 'ok' && page.posts.length === 4);
+    check('у ключа остаётся знак группы: без минуса это уже другой объект',
+      page.posts.map((p) => p.id).join(',') === '-236547214_41250,-236547214_40597,-236547214_39747,-236547214_33413'
+        && picked.notes.map((n) => n.feedKey).join(',') === 'vk:-236547214_41250,vk:-236547214_39747');
+    check('записи идут от новых к старым, а дата взята из метки страницы',
+      page.posts[0].atMs === 1790938011000
+        && page.posts[3].atMs === 1790328595000
+        && notePatch.fields.sourceAt === '2026-09-30T08:41:33Z'
+        && noteNotice.fields.sourceAt === '2026-10-02T10:46:51Z');
+    check('чужая запись стены не становится голосом группы',
+      vk.readVkWall('<div id="post-236547214_1" data-post-author-id="100000001"'
+        + ' data-post-signer-or-author-id="100000001"></div>', VK).how === 'no-posts');
+    check('пустой ответ и страница входа — два разных диагноза, и оба названы',
+      vk.readVkWall('<html><body>капча</body></html>', VK).how === 'no-page'
+        && vk.readVkWall('<form><input name="email"></form><span>Войти</span>', VK).how === 'login'
+        && /if \(vk\.how === 'no-page' \|\| vk\.how === 'login'\) process\.exit\(1\);/.test(scriptSrc));
+
+    /* ── Что публикуем, а что нет ── */
+    const linesOf = (num) => (page.posts.find((p) => p.id.endsWith(num)) || {}).lines || [];
+    check('пост, назвавший перемену, — заметка; объявление о будущем — заметка-анонс',
+      vk.vkPostKind(linesOf('39747')) === 'patch' && vk.vkPostKind(linesOf('41250')) === 'notice');
+    check('опрос и тизер «событие на подходе» не становятся заметками',
+      vk.vkPostKind(linesOf('40597')) === '' && vk.vkPostKind(linesOf('33413')) === ''
+        && picked.skipped.silent === 2);
+    check('ссылка из поста не уезжает в заметку вместе со своим адресом',
+      !/https:\/\/s\.zrouteofficial\.com/.test(linesOf('40597').join('\n'))
+        && linesOf('40597').join('\n').includes('s.zrouteofficial.com/s/ck56t1')
+        && !/\[#alias\|/.test(linesOf('40597').join('\n')));
+    check('разбор даёт те же границы, что и ручная вставка: заголовок и тело в пределах базы',
+      notePatch.fields.title.length <= L.updateTitleMax
+        && notePatch.fields.summary.length <= L.updateSummaryMax
+        && notePatch.fields.summary.includes('Улучшен визуальный стиль некоторых интерфейсов')
+        && notePatch.fields.sourceName === 'Официальная группа ВК'
+        && notePatch.fields.sourceUrl === 'https://vk.com/wall-236547214_39747');
+
+    /* ── Окно, потолок и память ── */
+    check('за окном стены посты не становятся заметками, и это видно в отчёте',
+      vk.pickVkNotes(wall, { now: NOW_VK, cfg: { ...VK, freshDays: 3 } }).skipped.tooOld === 4
+        && vk.pickVkNotes(wall, { now: NOW_VK, cfg: { ...VK, freshDays: 3 } }).notes.length === 0);
+    check('потолок за один запуск держит разбор: первый прогон не выливает архив',
+      vk.pickVkNotes(wall, { now: NOW_VK, cfg: { ...VK, perRun: 1 } }).notes.length === 1
+        && vk.pickVkNotes(wall, { now: NOW_VK, cfg: { ...VK, perRun: 1 } }).notes[0].feedKey === 'vk:-236547214_41250');
+    check('уже принесённое узнаётся по отметке, а не по живой строке заметки',
+      vk.pickVkNotes(wall, {
+        now: NOW_VK,
+        cfg: VK,
+        known: page.posts.map((p) => `vk:${p.id}`),
+      }).skipped.published === 4
+        && scriptSrc.includes("rest('/forum_feed_marks?select=feed_key&what=eq.note')"));
+    check('планировщик в отметки только заглядывает: пишет в них база одной операцией',
+      (scriptSrc.match(/forum_feed_marks/g) || []).length === 1);
+
+    /* ── Дверь публикации ── */
+    const pubSql = finalSrc.slice(finalSrc.indexOf('-- ── Шаг 2.'), finalSrc.indexOf('-- ── Шаг 3.'));
+    const pubFlat = pubSql.replace(/\s+/g, ' ');
+    check('у двери восемь параметров, и прежнюю семистрочную подпись сняли перед этим',
+      pubSql.includes('p_feed_key     text default null')
+        && pubFlat.includes('drop function if exists public.forum_publish_update_note( text, text, text, text, text, timestamptz, text );')
+        && pubSql.indexOf('drop function if exists') < pubSql.indexOf('create or replace function public.forum_publish_update_note'));
+    check('ключ проверяется до вставки, а отметка заводится сразу после неё',
+      pubFlat.indexOf('if exists (select 1 from public.forum_feed_marks where feed_key = v_key)')
+        < pubFlat.indexOf('insert into public.forum_update_notes')
+        && pubFlat.indexOf('insert into public.forum_update_notes')
+        < pubFlat.indexOf("insert into public.forum_feed_marks (feed_key, what, title) values (v_key, 'note', left(v_title, 120));"));
+    check('повторный источник база отвергает словом, а не молча заводит дубль',
+      pubSql.includes('Этот источник уже приносил заметку: повторная публикация означает, что первую убрали насовсем')
+        && pubSql.includes('Ключ источника короче 8 символов')
+        && pubSql.includes('Ключ источника длиннее 80 символов'));
+    check('ключ едет только в заметке из фида: у ручной заметки его нет',
+      !scriptSrc.slice(0, scriptSrc.indexOf('for (const item of vk.notes)')).includes('p_feed_key')
+        && scriptSrc.slice(scriptSrc.indexOf('for (const item of vk.notes)')).includes('p_feed_key: item.feedKey'));
+
+    /* ── Документ ── */
+    check('документ называет группу источником и объясняет, чем она живее магазинов',
+      docsSrc.includes('## Группа ВК — третий голос фида')
+        && docsSrc.includes('src/forum/vk-feed.js')
+        && docsSrc.includes('wall-236547214'));
+    check('и говорит, что новых ключей для неё не требуется',
+      docsSrc.replace(/\s+/g, ' ').includes('Группа ВК не добавляет ни секретов, ни планировщиков'));
+  }
 
   /* ── 9. Вход на форум: один монтаж, ранняя лента, память первого экрана ──
      *
@@ -12007,11 +12339,11 @@ console.log('\nAM. Фид магазина: обновление и событи
   );
 
   /* ── Реестр и документы ── */
-  check('реестр говорит, что шаг и его исправление прогнаны, а очередь называет пустой',
+  check('реестр говорит, что шаг и его исправление прогнаны, а очередь называет свой файл',
     readmeSrc.includes('Прогнан 04.10.2026')
       && readmeSrc.includes('20261004-site-next-id-anon.sql')
       && readmeSrc.includes('обязан быть прогнан до пуша')
-      && readmeSrc.includes('Очередь пуста'));
+      && readmeSrc.includes('В очереди один шаг'));
   check('реестр объясняет, чего в шаге нет: права даёт следующий файл, а снимок на сервер не нужен',
     readmeSrc.includes('Право вносить данные по серверу даёт не этот файл')
       && readmeSrc.includes('Отдельный снимок `data/live.json` на каждый сервер пунктом незакрытого не стоит')
@@ -12519,3 +12851,15 @@ console.log('\nAM. Фид магазина: обновление и событи
     !/токен GitHub|Токен не принят|api\.github\.com|Как получить токен/.test(adminDocSrc)
       && !/файл успели изменить|одним коммитом/.test(adminDocSrc + editorDocSrc));
 }
+
+/* ── Итог запуска ────────────────────────────────────────────────────────────
+
+   Счётчик существовал с первых строк файла, но никто его не печатал: запуск
+   заканчивался молча и с нулевым кодом, поэтому «упало семь проверок» и
+   «всё чисто» различались только глазами по выводу. Это ровно тот случай,
+   где молчаливый успех дороже громкого падения: человек прогоняет тесты перед
+   коммитом и верит числу, а не ищет слово FAIL в четырёх тысячах строк.
+   Код выхода нужен и `npm test`: без него падение не мешает сборке.
+────────────────────────────────────────────────────────────────────────────── */
+console.log(`\nИтог: пройдено ${passed}, падений ${failed}.`);
+if (failed) process.exitCode = 1;

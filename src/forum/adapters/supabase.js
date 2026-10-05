@@ -2216,20 +2216,17 @@ function updateNoteOut(row) {
     sourceUrl: row.source_url || '',
     sourceAt: toDate(row.source_at) ?? new Date(),
     gameVersion: row.game_version || '',
-    status: row.status || 'published',
     authorNick: row.author_nick || '',
     createdAt: toDate(row.created_at) ?? new Date(),
-    archivedAt: toDate(row.archived_at),
-    archivedByNick: row.archived_by_nick || null,
   };
 }
 
 /*
-  Список выходит представлением с никами: авторов у заметки две и ни у одной
-  ник не хранится в самой таблице. Порядок задаёт source_at, а не created_at:
-  читатель спрашивает, что изменилось в игре и когда, а не когда об этом
-  вспомнил дежурный модератор. Ошибку не глушим: по ней страница называет файл
-  миграции, которого не хватает, вместо вида «заметок нет».
+  Список выходит представлением: ник автора в таблице заметок не хранится, а
+  менять его нечем — правки у заметки нет. Порядок задаёт source_at, а не
+  created_at: читатель спрашивает, что изменилось в игре и когда, а не когда об
+  этом вспомнил дежурный модератор. Ошибку не глушим: по ней страница называет
+  файл миграции, которого не хватает, вместо вида «заметок нет».
 */
 export async function listUpdateNotes() {
   const limit = CONFIG.forum.limits.updateListMax;
@@ -2266,11 +2263,14 @@ export async function publishUpdateNote(draft) {
   return updateNoteOut(row);
 }
 
-export async function setUpdateNoteArchived(id, archived) {
-  await rest('/rpc/forum_set_update_note_archive', {
-    method: 'POST',
-    body: { p_target: id, p_archived: Boolean(archived) },
-  });
+/*
+  Удаляет функция базы, а не запрос DELETE к таблице: политиков на запись у
+  заметок нет намеренно, и прямой запрос вместо отказа «заметка не найдена»
+  выдал бы «violates row-level security policy». Отдельная отметка ключа
+  остаётся в базе — автомат по ней видит, что эту заметку убрали окончательно.
+*/
+export async function deleteUpdateNote(id) {
+  await rest('/rpc/forum_delete_update_note', { method: 'POST', body: { p_target: id } });
 }
 
 /* ── Фид магазина: события из Google Play и состояние обхода ───────────────── */
@@ -2285,11 +2285,8 @@ function storeEventOut(row) {
     startsAt: toDate(row.starts_at) ?? new Date(),
     endsAt: toDate(row.ends_at),
     sourceUrl: row.source_url || '',
-    status: row.status || 'published',
     firstSeenAt: toDate(row.first_seen_at) ?? new Date(),
     lastSeenAt: toDate(row.last_seen_at) ?? new Date(),
-    archivedAt: toDate(row.archived_at),
-    archivedByNick: row.archived_by_nick || null,
   };
 }
 
@@ -2308,11 +2305,13 @@ export async function listStoreEvents() {
   return (Array.isArray(rows) ? rows : []).map(storeEventOut);
 }
 
-export async function setStoreEventArchived(id, archived) {
-  await rest('/rpc/forum_set_store_event_archive', {
-    method: 'POST',
-    body: { p_target: id, p_archived: Boolean(archived) },
-  });
+/*
+  Та же причина, что у заметки: политиков на запись у событий нет, наружу
+  выходит только чтение, а решение принимает функция базы. Удалённое событие
+  остаётся отметкой ключа, поэтому следующий обход не кладёт карточку обратно.
+*/
+export async function deleteStoreEvent(id) {
+  await rest('/rpc/forum_delete_store_event', { method: 'POST', body: { p_target: id } });
 }
 
 /*

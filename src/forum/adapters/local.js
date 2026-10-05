@@ -3761,26 +3761,20 @@ function updateNoteOut(r) {
     sourceUrl: r.sourceUrl || '',
     sourceAt: toDate(r.sourceAt) ?? new Date(),
     gameVersion: r.gameVersion || '',
-    status: r.status,
     authorNick: r.authorNick || '',
     createdAt: toDate(r.createdAt) ?? new Date(),
-    archivedAt: toDate(r.archivedAt),
-    archivedByNick: r.archivedByNick || null,
   };
 }
 
 /*
-  Архив видит только модерация — та же граница, что держит политика
-  forum_update_notes в бою. Порядок сортировки по sourceAt, а не по createdAt:
+  Состояния «архив» у заметки больше нет: строка в списке и есть заметка, а
+  убранная удаляется. Порядок сортировки по sourceAt, а не по createdAt:
   страница отвечает на вопрос «что изменилось в игре и когда».
 */
 export async function listUpdateNotes() {
   const L = CONFIG.forum.limits;
   const s = read();
-  const me = s.users.find((u) => u.id === s.me) || null;
-  const staff = isStaff(me);
   return (s.updateNotes || [])
-    .filter((n) => n.status === 'published' || staff)
     .sort((a, b) => String(b.sourceAt).localeCompare(String(a.sourceAt)))
     .slice(0, L.updateListMax)
     .map(updateNoteOut);
@@ -3868,13 +3862,9 @@ export async function publishUpdateNote(draft) {
     sourceUrl: sourceUrl.slice(0, L.updateUrlMax),
     sourceAt: sourceAt.toISOString(),
     gameVersion: gameVersion.slice(0, L.updateVersionMax),
-    status: 'published',
     authorId: me.id,
     authorNick: me.nick,
     createdAt: new Date().toISOString(),
-    archivedAt: null,
-    archivedBy: null,
-    archivedByNick: null,
   };
   if (!s.updateNotes) s.updateNotes = [];
   s.updateNotes.push(row);
@@ -3883,24 +3873,19 @@ export async function publishUpdateNote(draft) {
 }
 
 /*
-  Убрать и вернуть — одна функция, как в базе: два движения над одним полем, и
-  отказ у них общий. Удалять заметку нельзя: «мы это публиковали и потом
-  убрали» — факт, который обязан пережить саму заметку.
+  Удаление — единственное движение над готовой заметкой, как в двери базы:
+  правки нет, архива нет. Слова отказа повторяют forum_delete_update_note в том
+  же порядке: право → поиск строки.
 */
-export async function setUpdateNoteArchived(id, archived) {
+export async function deleteUpdateNote(id) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me) || null;
-  if (!isStaff(me)) throw new Error('Заметку об обновлении убирает и возвращает модерация');
+  if (!isStaff(me)) throw new Error('Заметку об обновлении удаляет модерация');
 
-  const row = (s.updateNotes || []).find((n) => n.id === id);
-  if (!row) throw new Error('Заметка не найдена');
-  if (archived && row.status === 'archived') throw new Error('Эта заметка уже в архиве');
-  if (!archived && row.status === 'published') throw new Error('Эта заметка и так опубликована');
-
-  row.status = archived ? 'archived' : 'published';
-  row.archivedAt = archived ? new Date().toISOString() : null;
-  row.archivedBy = archived ? me.id : null;
-  row.archivedByNick = archived ? me.nick : null;
+  const list = s.updateNotes || [];
+  const at = list.findIndex((n) => n.id === id);
+  if (at < 0) throw new Error('Заметка не найдена');
+  list.splice(at, 1);
   write(s);
 }
 
@@ -3911,9 +3896,8 @@ export async function setUpdateNoteArchived(id, archived) {
   localStorage ему брать нечего. Пока строки сюда не положены, список пуст, а
   подпись «автомат ещё не приходил» объясняет читателю пустоту — ровно то же
   он увидит до первой миграции.
-  Слова archive-отказа повторяют forum_set_store_event_archive в том же порядке
-  и без «Событие уже изменено»: в localStorage два клика не пересекаются по
-  сети, а выдумывать гонку значило бы проверять фразу, которой здесь не бывает.
+  Слова отказа delete повторяют forum_delete_store_event в том же порядке:
+  право → поиск строки.
 */
 function storeEventOut(r) {
   return {
@@ -3925,20 +3909,15 @@ function storeEventOut(r) {
     startsAt: toDate(r.startsAt) ?? new Date(),
     endsAt: toDate(r.endsAt),
     sourceUrl: r.sourceUrl || '',
-    status: r.status,
     firstSeenAt: toDate(r.firstSeenAt) ?? new Date(),
     lastSeenAt: toDate(r.lastSeenAt) ?? new Date(),
-    archivedAt: toDate(r.archivedAt),
-    archivedByNick: r.archivedByNick || null,
   };
 }
 
 export async function listStoreEvents() {
   const L = CONFIG.forum.limits;
   const s = read();
-  const me = s.users.find((u) => u.id === s.me) || null;
   return (s.storeEvents || [])
-    .filter((e) => e.status === 'published' || isStaff(me))
     .sort((a, b) => String(b.startsAt).localeCompare(String(a.startsAt)))
     .slice(0, L.storeEventListMax)
     .map(storeEventOut);
@@ -3948,20 +3927,15 @@ export async function getStoreStatus() {
   return null;
 }
 
-export async function setStoreEventArchived(id, archived) {
+export async function deleteStoreEvent(id) {
   const s = read();
   const me = s.users.find((u) => u.id === s.me) || null;
-  if (!isStaff(me)) throw new Error('Событие из магазина убирает и возвращает модерация');
+  if (!isStaff(me)) throw new Error('Событие из магазина удаляет модерация');
 
-  const row = (s.storeEvents || []).find((e) => e.id === id);
-  if (!row) throw new Error('Событие не найдено');
-  if (archived && row.status === 'archived') throw new Error('Это событие уже в архиве');
-  if (!archived && row.status === 'published') throw new Error('Это событие и так опубликовано');
-
-  row.status = archived ? 'archived' : 'published';
-  row.archivedAt = archived ? new Date().toISOString() : null;
-  row.archivedBy = archived ? me.id : null;
-  row.archivedByNick = archived ? me.nick : null;
+  const list = s.storeEvents || [];
+  const at = list.findIndex((e) => e.id === id);
+  if (at < 0) throw new Error('Событие не найдено');
+  list.splice(at, 1);
   write(s);
 }
 
