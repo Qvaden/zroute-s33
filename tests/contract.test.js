@@ -10605,16 +10605,19 @@ console.log('\nAM. Фид магазина: обновление и событи
     Состояние фида — кэш того, что опубликовано, и оно умеет разъехаться со
     списком: разовая чистка дублей 01.10 унесла заметку, на которую ссылка
     ведёт до сих пор. Такое состояние молчит вечно, и выглядит это как
-    «разработчики ничего не делают». Правка лежит в очереди и обязана брать
-    номера версий из таблицы заметок, а не из текста, и трогать только
-    порванную ссылку.
+    «разработчики ничего не делают». Правка прогнана 05.10.2026 и обязана была
+    брать номера версий из таблицы заметок, а не из текста, и трогать только
+    порванную ссылку — она и заготовка на следующий разрыв.
   */
-  const stateFixSrc = await readFile('supabase/20261005-store-state-note.sql', 'utf8');
+  const stateFixSrc = await readFile('supabase/applied/20261005-store-state-note.sql', 'utf8');
   check('состояние фида сверяется со списком, а не чинится числом вписанным',
     /from public\.forum_update_notes/.test(stateFixSrc)
       && /set android_version = coalesce\(newest\.android/.test(stateFixSrc)
       && !/set[^;]*'\d+\.\d+/.test(stateFixSrc)
       && readmeSrc.includes('20261005-store-state-note.sql'));
+  check('правка названа прогнанной и не осталась висеть в очереди',
+    readmeSrc.replace(/\s+/g, ' ').includes('`20261005-store-state-note.sql` — **прогнан 05.10.2026')
+      && docsSrc.includes('supabase/applied/20261005-store-state-note.sql'));
   check('правка безвредна там, где ломать нечего: условие — порванная ссылка на заметку',
     /left join public\.forum_update_notes n on n\.id = s\.last_note_id/.test(stateFixSrc)
       && /and n\.id is null/.test(stateFixSrc));
