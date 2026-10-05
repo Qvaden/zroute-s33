@@ -25,9 +25,11 @@
  * раз написать правду, а читатель открывает вкладку ради ответа «что
  * изменилось».
  *
- * ДАТА У ЗАМЕТКИ — ДАТА ПОСТА. Она лежит в самой странице целым числом секунд,
- * а не надписью «3 окт в 18:23», которую ещё надо связать с годом: возраст
- * изменения и есть то, ради чего список существует.
+ * ДАТА У ЗАМЕТКИ — ДАТА ПОСТА, НАСТОЛЬКО ТОЧНАЯ, НАСКОЛЬКО ЕЁ ВИДНО. Когда
+ * страница приходит от самой группы, дата берётся целым числом секунд из
+ * атрибута `data-exec`. Когда её принесли через читалку (см. ниже), в ответе
+ * остаётся только надпись «2 d ago» — её раскладывают до дня, и в состоянии
+ * обхода это честно названо: автомат знает день, а не минуту.
  */
 import { CONFIG } from '../../config.js';
 import { parseUpdateSource, updateSourceFromLink } from './rules.js';
@@ -125,6 +127,14 @@ export function vkPostToLines(html) {
       return n >= 32 && n < 1114112 ? String.fromCodePoint(n) : '';
     })
     .replace(/[\u00A0\u2007\u202F\uFEFF]/g, ' ')
+    /*
+      Модификаторы варианта (U+FE0F и соседи) — половинки эмодзи. На живой
+      странице эмодзи приходит цельным символом и этот хвост безвреден, а
+      перерисованную страницу ВК отдаёт картинкой, оставляя от знака один
+      невидимый модификатор: висячий «хвостик» в конце строки был бы в
+      карточке мусором.
+    */
+    .replace(/[\uFE00-\uFE0F]/g, '')
     .replace(/[ \t]+/g, ' ')
     .replace(/ ?\n ?/g, '\n')
     .replace(/\n{3,}/g, '\n\n');
@@ -227,8 +237,12 @@ export function vkNoteFromPost(post, cfg = VK) {
  * принадлежит группе. Молчание автомата и отсутствие постов — два разных
  * диагноза, и путать их нельзя: первый чиним мы, второй означает просто
  * «разработчики сегодня ничего не писали».
+ *
+ * `now` нужен перерисованной странице: у неё даты — надписи «3 d ago»
+ * относительно момента обхода, и окном свежести должен править тот же час,
+ * а не два разных.
  */
-export function readVkWall(html, cfg = VK) {
+export function readVkWall(html, cfg = VK, now = Date.now()) {
   const source = String(html ?? '');
   const owner = String(cfg.group ?? '');
   const starts = [];
@@ -267,7 +281,17 @@ export function readVkWall(html, cfg = VK) {
     });
   }
   posts.sort((a, b) => b.atMs - a.atMs);
-  return { posts, how: posts.length ? 'ok' : 'no-posts' };
+  if (posts.length) return { posts, how: 'ok' };
+
+  /*
+    Ни одной секундной метки на странице нет — пробуем прочесть её так, как
+    видит человек: перерисованный ответ. Если это живая страница группы, посты
+    найдутся и там, только дата будет с точностью до дня.
+  */
+  const drawn = readVkWallRendered(source, cfg, now);
+  if (drawn.posts.length) return drawn;
+  /* До этой строки блок стены всегда найден, иначе вышли бы выше как «не стена». */
+  return { posts: [], how: 'no-posts' };
 }
 
 /** JSON одной записи из атрибута; кривой или отсутствующий объект — null. */
@@ -291,7 +315,145 @@ function readVkItem(blob) {
 }
 
 /**
- * Признак того, что вместо стены пришла страница входа. ВК отдаёт её и на
+ * Страница, которую открыл браузер за нас.
+ *
+ * ЗАЧЕМ ОНА НУЖНА. ВК отдаёт стену только тем, кому доверяет как человеку, и
+ * запрос с адреса дата-центра — а именно оттуда идёт обход GitHub — не
+ * пускает. Доходит стена до нас через читалку, которая открывает её настоящим
+ * браузером. Такая страница уже прошла через руки ВК: его React выбрасывает
+ * атрибут `data-exec`, где лежали секундные метки и целые тексты, а дату
+ * оставляет надписью «2 d ago».
+ *
+ * ЧЕМ ЗА ЭТО ПЛАТЯТ, ИЗМЕРЕНО НА ЖИВОЙ СТРАНИЦЕ ИЗ 20 ЗАПИСЕЙ: секундных
+ * меток в перерисованном ответе нет ни у одной, эмодзи превращены в картинки
+ * и пропадают, к тексту изредка примешаны подписи интерфейса. Остальное —
+ * номер записи, подпись автора и полный текст — на месте. Согласились на это
+ * сознательно: две молчаливые площадки и недельная тишина в списке стоят
+ * дороже точности до минуты.
+ */
+const DRAWN_POST = /<div id="post-(\d+)_(\d+)" class="[^"]*_post post[^"]*"/g;
+const DRAWN_TEXT = /<div class="[^"]*wall_post_text_wrapper[^"]*"[^>]*>/;
+const DRAWN_DATE = /data-testid="post_date_block_preview"[^>]*>([^<]*)</;
+
+/** Месяц по английскому имени: читалка открывает страницу под en-US. */
+const DRAWN_MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+const DAY = 86400000;
+
+/**
+ * Надпись с датой → метка времени.
+ *
+ * Держимся того, что измерено: браузер читалки считает дни по UTC, а не по
+ * московскому времени (запись трёхдневной давности, открытая в 21:12 UTC,
+ * названа «3 d ago»), и целые сутки считает вниз, а не по календарю. Поэтому
+ * «N d ago» — это сутки, отнятые от момента обхода, а не календарный сдвиг.
+ *
+ * Точность надписи известна, и её не прячем: «минуты назад» и «10:23 pm»
+ * дают минуту, «N d ago», «вчера» и «27 Sep» дают только день. Для дня берём
+ * полдень — единственная минута суток, которая показывает тот же календарный
+ * день и игроку в Москве, и игроку за океаном.
+ *
+ * Год в надписи «27 Sep» стоит невидимый: берём тот, у которого эта дата
+ * уже прошла, — пост из будущего фиду не нужен ни при каком раскладе.
+ */
+export function drawnDateToMs(label, now = Date.now()) {
+  const text = String(label ?? '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!text) return null;
+
+  const clock = /(?:^|\s)(\d{1,2}):(\d{2}) ?([ap])m?(?:\s|$)/.exec(text);
+  let hour = 12;
+  let minute = 0;
+  if (clock) {
+    hour = Number(clock[1]) % 12 + (clock[3] === 'p' ? 12 : 0);
+    minute = Number(clock[2]);
+  }
+  const noonUtc = (d) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), clock ? hour : 12, clock ? minute : 0);
+
+  if (/^just now|^только что/.test(text)) return { atMs: now, exact: true };
+  const min = /(\d+)\s*min/.exec(text);
+  if (min) return { atMs: now - Number(min[1]) * 60000, exact: true };
+  const hours = /(\d+)\s*(?:h\b|hour)/.exec(text);
+  if (hours) return { atMs: now - Number(hours[1]) * 3600000, exact: false };
+
+  const days = /(\d+)\s*(?:d\b|day)/.exec(text);
+  if (days) return { atMs: noonUtc(new Date(now - Number(days[1]) * DAY)), exact: false };
+  if (/yesterday|вчера/.test(text)) return { atMs: noonUtc(new Date(now - DAY)), exact: false };
+
+  const dated = /(\d{1,2})\s*([a-z]{3,})/.exec(text);
+  const month = dated ? DRAWN_MONTHS[dated[2].slice(0, 3)] : undefined;
+  if (dated && month !== undefined) {
+    const day = Number(dated[1]);
+    const thisYear = new Date(now).getUTCFullYear();
+    const at = (year) => Date.UTC(year, month, day, clock ? hour : 12, clock ? minute : 0);
+    return { atMs: at(at(thisYear) > now ? thisYear - 1 : thisYear), exact: false };
+  }
+
+  if (clock) return { atMs: noonUtc(new Date(now)), exact: true };
+  return null;
+}
+
+/** Текст поста на перерисованной странице: содержимое блока текста целиком. */
+function drawnText(block) {
+  const open = DRAWN_TEXT.exec(block);
+  if (!open) return '';
+  /*
+    Границу ищем подсчётом вложенных div, а не «до следующего закрывающего
+    тега»: внутри текста вложенных блоков несколько, и первый </div> обрезал бы
+    пост на первой же строке.
+  */
+  const tags = /<div\b[^>]*>|<\/div>/gi;
+  tags.lastIndex = open.index;
+  let depth = 0;
+  let found = tags.exec(block);
+  while (found) {
+    if (found[0][1] === '/') depth -= 1;
+    else depth += 1;
+    if (depth === 0) return block.slice(open.index + open[0].length, found.index);
+    found = tags.exec(block);
+  }
+  return block.slice(open.index + open[0].length);
+}
+
+/**
+ * Все подписанные группой записи с перерисованной страницы стены.
+ *
+ * Те же поля, что отдаёт `readVkWall`, и тот же ответ про пустоту, чтобы
+ * публикация ничего не заметила: у перерисованной страницы общие границы
+ * раздела — верхний блок записи с классом `_post`, комментарии игроков в
+ * список не попадают, а автор берётся теми же атрибутами, что и на живой
+ * странице.
+ */
+export function readVkWallRendered(html, cfg = VK, now = Date.now()) {
+  const source = String(html ?? '');
+  const owner = String(cfg.group ?? '');
+  DRAWN_POST.lastIndex = 0;
+  const starts = [];
+  let match = DRAWN_POST.exec(source);
+  while (match) {
+    starts.push({ num: match[2], at: match.index });
+    match = DRAWN_POST.exec(source);
+  }
+  if (!starts.length) return { posts: [], how: 'no-page', drawn: false };
+
+  const posts = [];
+  for (let i = 0; i < starts.length; i += 1) {
+    const block = source.slice(starts[i].at, i + 1 < starts.length ? starts[i + 1].at : source.length);
+    const author = BLOCK_AUTHOR.exec(block) || [];
+    const signer = SIGNER.exec(block) || [];
+    if (author[1] !== owner && signer[1] !== owner) continue;
+    const label = DRAWN_DATE.exec(block);
+    const at = label ? drawnDateToMs(label[1], now) : null;
+    if (!at) continue;
+    const lines = vkPostToLines(drawnText(block));
+    if (!lines.length) continue;
+    const id = `${owner}_${starts[i].num}`;
+    posts.push({ id, atMs: at.atMs, atExact: at.exact, url: vkPostUrl(id, cfg), lines });
+  }
+  posts.sort((a, b) => b.atMs - a.atMs);
+  return { posts, how: posts.length ? 'ok' : 'no-posts', drawn: posts.length > 0 };
+}
+
+/**
  * запрос из дата-центра, и когда группа закрылась: оба случая — не «постов
  * нет», а «нам сюда нельзя», и назвать это молчанием значит соврать.
  */
@@ -312,7 +474,7 @@ function isVkLoginPage(html) {
  * стену.
  */
 export function pickVkNotes(html, { known = [], now = Date.now(), cfg = VK } = {}) {
-  const page = readVkWall(html, cfg);
+  const page = readVkWall(html, cfg, now);
   const seen = new Set((Array.isArray(known) ? known : []).map(String));
   const windowFrom = now - (cfg.freshDays || 40) * 86400000;
   const skipped = { tooOld: 0, published: 0, silent: 0 };
@@ -326,7 +488,14 @@ export function pickVkNotes(html, { known = [], now = Date.now(), cfg = VK } = {
     notes.push(note);
     if (notes.length >= (cfg.perRun || 5)) break;
   }
-  return { notes, how: page.how, total: page.posts.length, skipped };
+  return {
+    notes,
+    how: page.how,
+    total: page.posts.length,
+    skipped,
+    /* Заметки пришли с перерисованной страницы: даты в них — день, а не минута. */
+    drawn: page.drawn === true,
+  };
 }
 
 /** Название источника — из той же таблицы доменов, что и у формы модерации. */

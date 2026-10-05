@@ -10716,8 +10716,10 @@ console.log('\nAM. Фид магазина: обновление и событи
         + ' data-post-signer-or-author-id="100000001"></div>', VK).how === 'no-posts');
     check('пустой ответ и страница входа — два разных диагноза, и оба названы',
       vk.readVkWall('<html><body>капча</body></html>', VK).how === 'no-page'
-        && vk.readVkWall('<form><input name="email"></form><span>Войти</span>', VK).how === 'login'
-        && /if \(vk\.how === 'no-page' \|\| vk\.how === 'login'\) process\.exit\(1\);/.test(scriptSrc));
+        && vk.readVkWall('<form><input name="email"></form><span>Войти</span>', VK).how === 'login');
+    check('автомат выходит красным при любом ответе, который он не прочитал',
+      /if \(!vkReadable\(vk\)\) process\.exit\(1\);/.test(scriptSrc)
+        && /if \(vk\.how === 'no-page' \|\| vk\.how === 'login'\) \{/.test(scriptSrc));
 
     /* ── Что публикуем, а что нет ── */
     const linesOf = (num) => (page.posts.find((p) => p.id.endsWith(num)) || {}).lines || [];
@@ -10793,6 +10795,85 @@ console.log('\nAM. Фид магазина: обновление и событи
       !scriptSrc.slice(0, scriptSrc.indexOf('for (const item of vk.notes)')).includes('p_feed_key')
         && scriptSrc.slice(scriptSrc.indexOf('for (const item of vk.notes)')).includes('p_feed_key: item.feedKey'));
 
+
+    /* ── Запасная дверь: страницу открыл браузер читалки ──
+       *
+       * ВК отдаёт стену только тем, кому доверяет как человеку, и адреса
+       * чужих дата-центров в этот список не входят. Единственная найденная
+       * дверь — публичный ридер, который открывает страницу настоящим
+       * браузером; то, что остаётся от стены после его рук, и проверяет
+       * этот раздел. Ожидания снова измерены, а не придуманы: живой и
+       * перерисованный ответы на одну и ту же стену лежат в `tests/` двумя
+       * фикстурами, и их расхождение — это и есть цена двери.
+       */
+    const drawnSrc = await readFile('tests/vk-wall-rendered-fixture.html', 'utf8');
+    const drawnPage = vk.readVkWallRendered(drawnSrc, VK, NOW_VK);
+    const viaWall = vk.readVkWall(drawnSrc, VK, NOW_VK);
+    const drawnPicked = vk.pickVkNotes(drawnSrc, { now: NOW_VK, cfg: VK });
+    const iso = (ms) => new Date(ms).toISOString().replace('.000Z', 'Z');
+    const day = (ms) => new Date(ms).toISOString().slice(0, 10);
+    const liveOf = (id) => page.posts.find((p) => p.id === id);
+
+    check('надпись читалки о времени переводится в метку, а точность называется по ней',
+      (() => {
+        const at = (label) => vk.drawnDateToMs(label, NOW_VK);
+        return iso(at('Just now').atMs) === '2026-10-05T12:00:00Z' && at('Just now').exact
+          && iso(at('5 min ago').atMs) === '2026-10-05T11:55:00Z' && at('5 min ago').exact
+          && iso(at('2 h ago').atMs) === '2026-10-05T10:00:00Z' && !at('2 h ago').exact
+          && iso(at('2 d ago').atMs) === '2026-10-03T12:00:00Z' && !at('2 d ago').exact
+          && iso(at('yesterday').atMs) === '2026-10-04T12:00:00Z' && !at('yesterday').exact
+          && iso(at('27&nbsp;Sep').atMs) === '2026-09-27T12:00:00Z'
+          && iso(at('3 Oct at 3:23 pm').atMs) === '2026-10-03T15:23:00Z'
+          && iso(at('10:23 am').atMs) === '2026-10-05T10:23:00Z' && at('10:23 am').exact
+          && at('завтрака не было') === null && at('') === null;
+      })());
+    check('у надписи без года год берётся ближайший прошедший: январский обход не берёт пост из будущего',
+      vk.drawnDateToMs('27 Sep', Date.parse('2027-01-05T12:00:00Z')).atMs
+        === Date.parse('2026-09-27T12:00:00Z'));
+    check('с перерисованной стены читаются те же записи группы: номер, автор и порядок',
+      drawnPage.how === 'ok' && drawnPage.drawn === true
+        && drawnPage.posts.map((p) => p.id).join(',') === '-236547214_41250,-236547214_39747'
+        && drawnPage.posts.every((p) => p.url === `https://vk.com/wall${p.id}`));
+    check('дата заметки из зеркала — день, полдень UTC, и это тот же календарный день, что у живой страницы',
+      drawnPage.posts.length > 0
+        && drawnPage.posts.every((p) => p.atExact === false
+          && iso(p.atMs).endsWith('T12:00:00Z')
+          && day(p.atMs) === day(liveOf(p.id).atMs)));
+    check('текст поста перерисованная страница отдаёт построчно тем же: теряются только эмодзи',
+      drawnPage.posts.every((p) => {
+        const live = liveOf(p.id);
+        return p.lines.length === live.lines.length
+          && p.lines.every((line, i) => live.lines[i].includes(line));
+      })
+      && page.posts.find((p) => p.id.endsWith('_41250')).lines[0].length
+        > drawnPage.posts.find((p) => p.id.endsWith('_41250')).lines[0].length);
+    check('общий вход один: без секундных меток readVkWall сам переходит на рисованный разбор',
+      viaWall.how === 'ok' && viaWall.drawn === true
+        && JSON.stringify(viaWall.posts) === JSON.stringify(drawnPage.posts));
+    check('и на перерисованной странице чужая запись не становится голосом группы',
+      vk.readVkWallRendered('<div id="post-236547214_9" class="atomPost_post post"'
+        + '<div data-post-author-id="777" data-post-signer-or-author-id="777"></div>'
+        + '<div class="wall_post_text_wrapper vkuiDiv__host">текст</div>'
+        + '<span data-testid="post_date_block_preview">2 d ago</span></div>', VK, NOW_VK).how === 'no-posts');
+    check('заметки из зеркала собираются теми же ключами и честно помечены нарисованными',
+      drawnPicked.drawn === true && picked.drawn === false
+        && drawnPicked.notes.map((n) => n.feedKey).join(',') === 'vk:-236547214_41250,vk:-236547214_39747'
+        && drawnPicked.notes[0].fields.sourceAt === '2026-10-02T12:00:00Z'
+        && drawnPicked.notes.map((n) => n.fields.kind).join(',') === 'notice,patch');
+    check('огрызок читалки не принимается за молчание разработчиков: зеркало пустым не доверяет',
+      /function vkReadable\(vk\) \{\s*if \(vk\.how === 'ok'\) return true;\s*return vk\.via === 'vk\.com' && vk\.how === 'no-posts';\s*\}/.test(scriptSrc)
+        && scriptSrc.includes('читалка вернула стену без единой записи группы — это не тишина разработчиков'));
+    check('прямой запрос идёт первым, а зеркало подключается только когда ВК отдал не стену',
+      /if \(!ONLY_MIRROR\) attempts\.push\(\(\) => Promise\.resolve\(vkFromResponse\(res, knownKeys\)\)\);/.test(scriptSrc)
+        && scriptSrc.includes("process.argv.includes('--только-зеркало')")
+        && /for \(const mirror of VK_MIRRORS\)/.test(scriptSrc));
+    check('зеркало отличается от группы и заголовком, и кодировкой: ридер отвечает UTF-8',
+      scriptSrc.includes("'X-Return-Format': 'html'")
+        && scriptSrc.includes("'User-Agent': 'zroute-s33-store-feed/1.0'")
+        && /new TextDecoder\('utf-8', \{ fatal: true \}\)/.test(scriptSrc));
+    check('отчёт обхода называет источник стены и цену точности дня',
+      scriptSrc.includes('страницу перерисовала читалка: у заметок дата — день вместо минуты')
+        && scriptSrc.includes("`; стена через ${vk.via}${vk.drawn ? ' (дата заметок — с точностью до дня)' : ''}`"));
     /* ── Документ ── */
     check('документ называет группу источником и объясняет, чем она живее магазинов',
       docsSrc.includes('## Группа ВК — третий голос фида')
@@ -10800,6 +10881,12 @@ console.log('\nAM. Фид магазина: обновление и событи
         && docsSrc.includes('wall-236547214'));
     check('и говорит, что новых ключей для неё не требуется',
       docsSrc.replace(/\s+/g, ' ').includes('Группа ВК не добавляет ни секретов, ни планировщиков'));
+    check('документ называет дверь, цену точности и то, что пустая читалка — не тишина разработчиков',
+      docsSrc.includes('### Запасная дверь: стену читает браузер читалки')
+        && docsSrc.includes('r.jina.ai')
+        && docsSrc.includes('tests/vk-wall-rendered-fixture.html')
+        && docsSrc.replace(/s+/g, ' ').includes('дата заметок — с точностью до дня')
+        && docsSrc.replace(/s+/g, ' ').includes('только когда прямой ответ — не стена вовсе'));
   }
 
   /* ── 9. Вход на форум: один монтаж, ранняя лента, память первого экрана ──

@@ -42,11 +42,47 @@ import {
 import { pickVkNotes, vkWallUrl, decodeVkBytes } from '../src/forum/vk-feed.js';
 
 const APPLY = process.argv.includes('--писать') || process.argv.includes('--apply');
+/*
+  Только зеркало: проверить запасную дверь, не дожидаясь, пока основная
+  сломается. Нужна для живой проверки с машины, откуда ВК видит стену.
+*/
+const ONLY_MIRROR = process.argv.includes('--только-зеркало');
 const NICK = process.env.STORE_FEED_NICK || '';
 const PASSWORD = process.env.STORE_FEED_PASSWORD || '';
 const CFG = CONFIG.supabase ?? CONFIG.forum?.supabase ?? {};
 const STORE = CONFIG.forum.store || {};
 const VK = STORE.vk || {};
+
+/*
+  Запасная дверь для стены группы.
+
+  ВК не отдаёт стену серверам GitHub Actions: ответ приходит, но без единого
+  поста, и автомат читает это как «разработчики молчат». Замер 05.10.2026:
+  адрес `wall-236547214?own=1` отдаёт с машины в России 2,2 млн знаков и 20
+  записей, а из чужого дата-центра — пустую обёртку навигации. Пока второй
+  голос фида нужен, его читают через публичный ридер: он приносит тот же
+  HTML, но со своей сетью на выходе.
+
+  Порядок важнее экономии: сначала напрямую, зеркало — только когда прямой
+  ответ не стена вовсе («no-page», «login») или не ответил. Стена с нулём
+  постов — это настоящая тишина разработчиков, и подменять её зеркалом
+  нельзя: автомат начал бы прятать отсутствие новостей за чужим адресом.
+
+  Ридер отвечает в UTF-8, группа — в windows-1251, поэтому кодировку зеркал
+  определяют по содержимому, а не по имени источника (см. `decodeVkAuto`).
+*/
+const VK_MIRRORS = [
+  {
+    name: 'ридер r.jina.ai',
+    url: (target) => `https://r.jina.ai/${target}`,
+    /*
+      Чужой заголовок User-Agent ридеру не отдают: под браузер он отвечает
+      страницей «Just a moment...» и кодом 403. Просим как есть — автомат,
+      читающий одну публичную страницу раз в час.
+    */
+    headers: { 'X-Return-Format': 'html', 'User-Agent': 'zroute-s33-store-feed/1.0' },
+  },
+];
 
 /** Корень проекта: из config приходит уже с хвостом /rest/v1, его срезаем. */
 const ROOT = String(CFG.url || '').replace(/\/(rest|auth|storage)\/v1\/?$/, '').replace(/\/+$/, '');
@@ -88,11 +124,12 @@ async function rest(path, { method = 'GET', body, token } = {}) {
  * латинские с диакритикой. Байты отдаются как есть, а кодировку знает тот, кто
  * её выбирал (см. `decodeVkBytes`).
  */
-async function fetchExternal(url, want = 'text') {
+async function fetchExternal(url, want = 'text', extraHeaders = null) {
   const res = await fetch(url, {
     headers: {
       'Accept-Language': `${STORE.country || 'ru'},ru;q=0.9,en;q=0.5`,
       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      ...(extraHeaders || {}),
     },
     signal: AbortSignal.timeout(20000),
     cache: 'no-store',
@@ -220,7 +257,9 @@ async function main() {
   const [playRes, iosRes, vkRes] = await Promise.allSettled([
     fetchExternal(play),
     fetchExternal(lookup, 'json'),
-    VK.group ? fetchExternal(vkWallUrl(VK), 'bytes') : Promise.reject(new Error('в config.js нет номера группы')),
+    VK.group && !ONLY_MIRROR
+      ? fetchExternal(vkWallUrl(VK), 'bytes')
+      : Promise.reject(new Error(ONLY_MIRROR ? 'прямой запрос к ВК пропущен флагом' : 'в config.js нет номера группы')),
   ]);
 
   const android = playRes.status === 'fulfilled'
@@ -274,7 +313,7 @@ async function main() {
     разные фразы.
   */
   const [known, marks] = await Promise.all([knownVersions(), knownNoteKeys()]);
-  const vk = readVk(vkRes, marks.keys);
+  const vk = await readVk(vkRes, marks.keys);
   const note = composeStoreNote({ android, ios, known });
 
   const wrote = APPLY ? await apply({ note, dated, android, ios, vk }) : '';
@@ -282,13 +321,16 @@ async function main() {
 
   /*
     Успехом запуска считается не «пост написан», а «разборщик жив». Отсюда два
-    разных выхода: заметка собрана, но база её не приняла, — провал; страница
-    группы не разобрана вовсе — тоже провал, и громкий, потому что молчание
-    ВК при молчаливых магазинах означает, что у фида не осталось ни одного
-    голоса, а выглядит это как «разработчики две недели ничего не делали».
+    разных выхода: заметка собрана, но база её не приняла, — провал; стена не
+    прочитана ни одним источником — тоже провал, и громкий, потому что
+    молчание ВК при молчаливых магазинах означает, что у фида не осталось ни
+    одного голоса, а выглядит это как «разработчики две недели ничего не
+    делали». Провал наступает после всех источников: `readVk` сам перебирает
+    зеркала, и красный прогон значит теперь, что не дал ни один из них — или
+    дал такое, из чего нельзя ничего собрать.
   */
   if (APPLY && note.fields && !wrote.includes('заметка')) process.exit(1);
-  if (vk.how === 'no-page' || vk.how === 'login') process.exit(1);
+  if (!vkReadable(vk)) process.exit(1);
 }
 
 /*
@@ -296,21 +338,100 @@ async function main() {
   и «login» — поломка на нашей стороне или закрытая группа; «no-posts» — стена
   живая, но записей сообщества на ней нет; «ok» — разбор увидел посты, и
   сколько из них годится в заметки, видно по skipped.
+
+  Чтение идёт по списку источников: сначала сама группа, потом зеркала, и
+  результат каждой попытки описывает одним и тем же словом `via`, чтобы в
+  отчёте обхода было видно, чей именно ответ лёг в список.
 */
-function readVk(res, knownKeys) {
+
+/**
+  Кодировка по содержимому, а не по имени источника.
+
+  Группа отвечает в windows-1251, ридер пересобирает страницу в UTF-8, и
+  ошибиться здесь дорого: русский текст превращается в латиницу с
+  диакритикой, таблицу публикуемого ни один пост не проходит, а в списке
+  висит фраза «разработчики молчат». Признак дешёвый и точный: настоящие
+  UTF-8-байты читаются как UTF-8, а windows-1251 с кириллицей — нет.
+*/
+function decodeVkAuto(bytes) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return decodeVkBytes(bytes);
+  }
+}
+
+/**
+ * Стена прочитана, если разбор видит её целиком: пустая страница — не тишина.
+ *
+ * Для зеркала правило строже, чем для самой группы. Живой ВК отвечает по
+ * атрибутам, и «блоков стены полно, а подписанных группой среди них нет» —
+ * это настоящая тишина разработчиков. Перерисованный ответ с нулём постов так
+ * сказать не может: там пустота одинаково значит и «группа молчала неделю», и
+ * «читалка вернула огрызок». Выдавать огрызок за тишину значило бы замолчать
+ * насовсем, поэтому зеркало принимается только с хотя бы одной записью.
+ */
+function vkReadable(vk) {
+  if (vk.how === 'ok') return true;
+  return vk.via === 'vk.com' && vk.how === 'no-posts';
+}
+
+function vkNoPageDebug(address, html) {
+  return `адрес: ${address}\n`
+    + `первые 400 знаков ответа: ${html.slice(0, 400)}\n`
+    + `разметка постов: ${/id="post-\d+_\d+"/.test(html) ? 'есть' : 'нет'};`
+    + ` кириллица в ответе: ${/[а-яёА-ЯЁ]/.test(html) ? 'есть' : 'нет — похоже на сбой кодировки'}`;
+}
+
+/** Ответ уже начатого прямого запроса — в той же форме, что и попытка зеркала. */
+function vkFromResponse(res, knownKeys) {
   if (res.status === 'rejected') {
-    return { notes: [], written: [], how: 'no-page', total: 0, skipped: {}, error: res.reason.message };
+    return {
+      notes: [], written: [], how: 'no-page', total: 0, skipped: {},
+      error: res.reason.message, via: 'vk.com',
+    };
   }
   const html = decodeVkBytes(res.value);
   const picked = pickVkNotes(html, { known: knownKeys, cfg: VK });
-  const vk = { ...picked, written: [], bytes: html.length, pageTitle: pageTitle(html) };
-  if (picked.how === 'no-page') {
-    vk.debug = `адрес: ${vkWallUrl(VK)}\n`
-      + `первые 400 знаков ответа: ${html.slice(0, 400)}\n`
-      + `разметка постов: ${/id="post-\d+_\d+"/.test(html) ? 'есть' : 'нет'};`
-      + ` кириллица в ответе: ${/[а-яёА-ЯЁ]/.test(html) ? 'есть' : 'нет — похоже на сбой кодировки'}`;
-  }
+  const vk = { ...picked, written: [], bytes: html.length, pageTitle: pageTitle(html), via: 'vk.com' };
+  if (picked.how === 'no-page') vk.debug = vkNoPageDebug(vkWallUrl(VK), html);
   return vk;
+}
+
+async function vkFromMirror(mirror, knownKeys) {
+  const address = mirror.url(vkWallUrl(VK));
+  let html = '';
+  try {
+    html = decodeVkAuto(await fetchExternal(address, 'bytes', mirror.headers));
+  } catch (e) {
+    return {
+      notes: [], written: [], how: 'no-page', total: 0, skipped: {},
+      error: `${mirror.name}: ${e.message}`, via: mirror.name,
+    };
+  }
+  const picked = pickVkNotes(html, { known: knownKeys, cfg: VK });
+  const vk = { ...picked, written: [], bytes: html.length, pageTitle: pageTitle(html), via: mirror.name };
+  if (picked.how === 'no-page') vk.debug = vkNoPageDebug(address, html);
+  return vk;
+}
+
+async function readVk(res, knownKeys) {
+  const attempts = [];
+  if (!ONLY_MIRROR) attempts.push(() => Promise.resolve(vkFromResponse(res, knownKeys)));
+  for (const mirror of VK_MIRRORS) {
+    attempts.push(() => vkFromMirror(mirror, knownKeys));
+  }
+
+  let last = null;
+  for (const attempt of attempts) {
+    last = await attempt();
+    if (vkReadable(last)) {
+      if (last.via !== 'vk.com') say(`Стена получена через ${last.via}: напрямую ВК отдал не стену.`);
+      return last;
+    }
+    if (attempts.length > 1) say(`Через ${last.via} стены нет (${last.error || last.how}) — пробуем следующий источник.`);
+  }
+  return last;
 }
 
 /* ── Отчёт ─────────────────────────────────────────────────────────────────── */
@@ -342,10 +463,15 @@ function report({ android, ios, known, marks, note, dated, undated, vk, wrote })
   head('ВК — официальная группа');
   if (vk.bytes) say(`пришло: ${vk.bytes} знаков, заголовок ответа: ${vk.pageTitle}`);
   if (vk.error) say(`⚠ страница не пришла: ${vk.error}`);
-  say(`как нашли: ${vk.how}; постов группы на странице: ${vk.total}`);
+  say(`как нашли: ${vk.how}${vk.via && vk.via !== 'vk.com' ? ` через ${vk.via}` : ''}; постов группы на странице: ${vk.total}`);
+  if (vk.drawn) {
+    say('страницу перерисовала читалка: у заметок дата — день вместо минуты, эмодзи в заголовке теряются');
+  }
   if (vk.how === 'no-page' || vk.how === 'login') {
     say(`⚠ ${vk.how === 'login' ? 'вместо стены — страница входа: группа закрылась или ВК требует аккаунт' : 'стена не разобрана — по этим строкам это и чинят'}`);
     if (vk.debug) say(vk.debug);
+  } else if (!vkReadable(vk)) {
+    say('⚠ читалка вернула стену без единой подписанной группой записи — это не ответ «разработчики молчат», а пустой её ответ; следующий обход попробует снова');
   }
   if (vk.skipped && (vk.skipped.published || vk.skipped.silent || vk.skipped.tooOld)) {
     say(`пропущено: уже опубликовано ${vk.skipped.published}, не про перемену ${vk.skipped.silent}, старше окна ${vk.skipped.tooOld}`);
@@ -561,9 +687,18 @@ function summarizeRun(note, vk) {
     ? `; из группы «${vk.written[0]}»${vk.written.length > 1 ? ` и ещё ${vk.written.length - 1}` : ''}`
     : vk.how === 'login' ? '; группа закрылась за страницей входа'
       : vk.error ? '; страница группы не ответила'
-        : vk.how === 'no-page' ? '; стена группы не разобрана' : '';
-  if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}${lag}${vkWord}`.trim();
-  return `${note.why || 'нового нет'}${gone}${vkWord}`;
+        : vk.how === 'no-page' ? '; стена группы не разобрана'
+          : vk.how === 'no-posts' && !vkReadable(vk) ? '; читалка вернула стену без единой записи группы — это не тишина разработчиков' : '';
+  /*
+    Чем читалась стена, модератор обязан видеть: если список собран через
+    зеркало, а зеркало однажды перестанет отвечать, молчание фида надо
+    объяснять сменой источника, а не «разработчики пропали».
+  */
+  const via = vk.via && vk.via !== 'vk.com' && vkReadable(vk)
+    ? `; стена через ${vk.via}${vk.drawn ? ' (дата заметок — с точностью до дня)' : ''}`
+    : '';
+  if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}${lag}${vkWord}${via}`.trim();
+  return `${note.why || 'нового нет'}${gone}${vkWord}${via}`;
 }
 
 main().catch((e) => {
