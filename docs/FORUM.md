@@ -1250,7 +1250,7 @@ delete без единой update-политики и триггер `forum_set_
 `forum_delete_update_note`, представление `forum_update_note_list` —
 [`supabase/applied/20260926-update-pulse.sql`](../supabase/applied/20260926-update-pulse.sql).
 Дверь удаления, таблица отметок фида и снос архива — отдельным шагом,
-[`supabase/20261005-feed-final-delete.sql`](../supabase/20261005-feed-final-delete.sql).
+[`supabase/applied/20261005-feed-final-delete.sql`](../supabase/applied/20261005-feed-final-delete.sql).
 Обе двери — `security definer`: публикация и удаление меняют чужие строки, и у
 каждого отказа там есть своё слово («Нужна прямая HTTPS-ссылка на
 первоисточник»), которого политика не даст. Списка политик на запись нет вовсе: браузер в таблицу не
@@ -1406,7 +1406,7 @@ Android идёт над строкой iOS, и площадка, которая 
 
 Как включить (разово, после прогона
 [`supabase/applied/20260930-store-feed.sql`](../supabase/applied/20260930-store-feed.sql)
-и [`supabase/20261005-feed-final-delete.sql`](../supabase/20261005-feed-final-delete.sql),
+и [`supabase/applied/20261005-feed-final-delete.sql`](../supabase/applied/20261005-feed-final-delete.sql),
 которая заводит отметки фида и снимает архив):
 зарегистрировать на сайте учётную запись бота, выдать ей роль модератора в
 панели, и в GitHub → Settings → Secrets and variables → Actions завести два
@@ -1499,9 +1499,10 @@ App Store на текущий патч отвечает строкой «Исп�
 **Ничего нового включать не надо.** Группа ВК не добавляет ни секретов, ни
 планировщиков: её читает тот же часовой автомат
 [`store-feed.yml`](../.github/workflows/store-feed.yml), тем же ботом, под
-теми же правами модерации. Нужен только прогон
-[`supabase/20261005-feed-final-delete.sql`](../supabase/20261005-feed-final-delete.sql) —
-без него двери публикации не умеют принимать ключ.
+теми же правами модерации. Единственная предпосылка — прогнанный шаг
+[`supabase/applied/20261005-feed-final-delete.sql`](../supabase/applied/20261005-feed-final-delete.sql):
+без него двери публикации не умеют принимать ключ. На нашей базе он прогнан
+05.10.2026.
 
 **Если ВК перестроит стену**, автомат не смолчит: разбор различает «no-page»
 (пришла не стена — форма входа, заглушка, капча), «login» (группа закрылась за

@@ -8419,7 +8419,7 @@ console.log('\nAF. Пульс обновлений игры');
     колонок — новому. Поэтому читаем оба и каждый проверяем за своё: старый
     отвечает на «из чего таблица сделана», новый — на «что база умеет сегодня».
   */
-  const finalSrc = await readFile('supabase/20261005-feed-final-delete.sql', 'utf8');
+  const finalSrc = await readFile('supabase/applied/20261005-feed-final-delete.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -9970,7 +9970,7 @@ console.log('\nAM. Фид магазина: обновление и событи
   const flowSrc = await readFile('.github/workflows/store-feed.yml', 'utf8');
   const sql = await readFile('supabase/applied/20260930-store-feed.sql', 'utf8');
   const pulseSql = await readFile('supabase/applied/20260926-update-pulse.sql', 'utf8');
-  const finalSrc = await readFile('supabase/20261005-feed-final-delete.sql', 'utf8');
+  const finalSrc = await readFile('supabase/applied/20261005-feed-final-delete.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
   const contractSrc = await readFile('src/forum/contract.js', 'utf8');
@@ -10598,6 +10598,12 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('и новая миграция стоит в реестре рядом с остальными',
     readmeSrc.includes('20261005-feed-final-delete.sql')
       && docsSrc.includes('20261005-feed-final-delete.sql'));
+  check('шаг прогнан и уехал в историю: документы ведут его по пути applied/',
+    docsSrc.includes('supabase/applied/20261005-feed-final-delete.sql')
+      && readmeSrc.includes('Прогнан 05.10.2026'));
+  /* Прежний путь с уровня очереди здесь не повторяют нарочно: проверка
+     «пути миграции на месте» обходит весь репозиторий и падает на любом
+     названии файла, которого на диске нет. */
   check('документ фида называет удаление и отметки, а не прежнюю дверь архива',
     docsSrc.includes('forum_delete_store_event') && docsSrc.includes('forum_feed_marks')
       && !/forum_set_store_event_archive|setStoreEventArchived/.test(docsSrc + readmeSrc));
@@ -12355,11 +12361,11 @@ console.log('\nAM. Фид магазина: обновление и событи
   );
 
   /* ── Реестр и документы ── */
-  check('реестр говорит, что шаг и его исправление прогнаны, а очередь называет свой файл',
+  check('реестр говорит, что шаг и его исправление прогнаны, а очередь — пустой',
     readmeSrc.includes('Прогнан 04.10.2026')
       && readmeSrc.includes('20261004-site-next-id-anon.sql')
       && readmeSrc.includes('обязан быть прогнан до пуша')
-      && readmeSrc.includes('В очереди один шаг'));
+      && readmeSrc.includes('Очередь пуста'));
   check('реестр объясняет, чего в шаге нет: права даёт следующий файл, а снимок на сервер не нужен',
     readmeSrc.includes('Право вносить данные по серверу даёт не этот файл')
       && readmeSrc.includes('Отдельный снимок `data/live.json` на каждый сервер пунктом незакрытого не стоит')

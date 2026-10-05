@@ -491,7 +491,7 @@
  * @property {(id: string, status: 'linked'|'closed', answer: string, guideId?: string|null) => Promise<void>} [resolveGuideRequest]  Решение модерации; для игрока — отказ.
  *
  * Пульс обновлений игры (см. supabase/applied/20260926-update-pulse.sql и
- * supabase/20261005-feed-final-delete.sql). Заметку кладёт модерация руками —
+ * supabase/applied/20261005-feed-final-delete.sql). Заметку кладёт модерация руками —
  * либо планировщик, который входит в форум обычным аккаунтом и читает стену
  * официальной группы ВК. Браузер посетителя наружу не ходит ни в каком режиме:
  * серверной части у сайта нет вовсе, и этот рубеж не двигается.
