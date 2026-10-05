@@ -152,9 +152,16 @@
   `overflow-wrap: break-word` возвращает кнопке ширину слова: в отличие от
   `anywhere` оно не участвует в расчёте минимальной ширины, поэтому строка
   сначала перенесёт кнопку целиком и только в самом крайнем случае разрежет.
+
+  Перенос плашек — не только спасение для ника, но и новый дефект: вторая
+  строка с «Новостями», «Вашим следом» и «2 новых ответа» начинается у самого
+  левого края карточки, то есть левее ника, который стоит за аватаркой. Куча
+  значков выглядела прилипшей к границе. `justify-content: center` центрирует
+  каждую перенесённую строку, а на первой не действует: там блок автора
+  тянется на всё свободное место, и свободных концов просто нет.
 */
 @media (max-width: 760px) {
-  .forum-post__head { flex-wrap: wrap; }
+  .forum-post__head { flex-wrap: wrap; justify-content: center; }
   .forum-post__by { flex: 1 1 140px; }
 
   .forum-comment__foot, .forum-post__foot { flex-wrap: wrap; }
@@ -1395,6 +1402,7 @@ body { min-height: 100svh; }
 @media (hover: none) and (pointer: coarse) {
   body .forum-post__foot .forum-react__btn,
   body .forum-comment__foot .forum-react__btn,
+  body .forum-post__foot .forum-post__comments,
   body .forum-post__acts .forum-act,
   body .forum-act-menu__list .forum-act { min-height: 36px; }
   body .forum-me .forum-btn { min-height: 40px; padding: 8px 12px; }
