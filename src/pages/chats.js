@@ -10,7 +10,7 @@
  */
 import { esc, plural } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial, avatarHtml, excerpt } from '../forum/format.js';
-import { roleBadge, verifiedBadge } from '../forum/roles.js';
+import { roleBadge, verifiedBadge, serverBadge } from '../forum/roles.js';
 import { renderMdBar } from './forum.js';
 import { CONFIG } from '../../config.js';
 
@@ -523,6 +523,7 @@ export function renderMessage(m, s, isMgr, grouped) {
             <a class="forum-nick" href="#/user/${encodeURIComponent(m.authorNick)}">${esc(m.authorNick)}</a>
             ${roleBadge({ role: m.authorRole }, { short: true })}
             ${verifiedBadge(m.authorIsVerified)}
+            ${serverBadge(m.authorServer)}
             ${m.authorIsLeader ? leaderBadge() : ''}
             ${m.authorAlliance ? `<small class="chat-msg__tag">${esc(m.authorAlliance)}</small>` : ''}
           </div>`}

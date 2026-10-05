@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsBarterLines, needsEventDate, needsExpiry, reactionMeta } from '../rules.js';
+import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsBarterLines, needsEventDate, needsExpiry, reactionMeta, serverChangeProblem, validateServerId } from '../rules.js';
 import { normalizeQuietWindow } from '../quiet.js';
 import { textOf } from '../sanitize.js';
 
@@ -292,6 +292,13 @@ function userOut(u) {
     avatarUrl: u.avatarUrl || '',
     about: u.about || '',
     allianceTag: u.allianceTag || '',
+    /*
+      Сервер и дата его смены — те же два поля, что отдаёт база. Дата нужна
+      экрану профиля, чтобы сказать «следующая смена после …» до отправки,
+      а не после отказа.
+    */
+    serverId: u.serverId == null ? null : Number(u.serverId),
+    serverSetAt: toDate(u.serverSetAt),
     isBlogger: Boolean(u.isBlogger),
     isLeader: Boolean(u.isLeader || (u.leaderOf ?? '') !== ''),
     leaderOf: u.leaderOf || '',
@@ -327,8 +334,13 @@ export function viewerKey() {
 /**
  * Регистрация. Первый зарегистрировавшийся становится администратором —
  * иначе в локальном режиме модерацию нельзя было бы даже посмотреть.
+ *
+ * Пароль принят и выброшен: здесь его нечем проверять (см. шапку файла),
+ * а место в списке параметров занимать обязан — иначе вызов
+ * `signUp(nick, пароль, сервер)` из одного экрана работал бы по-разному
+ * в двух режимах.
  */
-export async function signUp(nick) {
+export async function signUp(nick, password, serverId) {
   const s = read();
   const nb = String(nick).trim();
   const key = nickKey(nb);
@@ -341,11 +353,22 @@ export async function signUp(nick) {
     throw new Error('Такой ник уже занят');
   }
 
+  /*
+    Номер сервера проверяется теми же двумя словами, что поднимает триггер
+    базы, и отказ приходит ДО создания аккаунта: в черновом режиме человек
+    должен спотыкаться ровно там же, где он споткнется на живой базе, иначе
+    проверка формы ничего не стоит.
+  */
+  const server = validateServerId(serverId);
+  if (!server.ok) throw new Error(server.error);
+
   const user = {
     id: newId('u'),
     nick: String(nick).trim(),
     role: s.users.length === 0 ? 'admin' : 'member',
     createdAt: new Date().toISOString(),
+    serverId: server.value,
+    serverSetAt: server.value == null ? null : new Date().toISOString(),
     mutedUntil: null,
     banned: false,
     banReason: '',
@@ -467,6 +490,12 @@ function postOut(state, p) {
     */
     authorAvatar: author?.avatarUrl || '',
     authorAlliance: author?.allianceTag || '',
+    /*
+      Сервер автора — его теперешний номер, а не номер темы. В ленте оба поля
+      называются похоже и означают разное: `serverId` у темы решает, в какой
+      список она попадает, а `authorServer` рисует значок под ником.
+    */
+    authorServer: author?.serverId ?? null,
     authorRole: author?.role || 'member',
     authorIsBlogger: Boolean(author?.isBlogger),
     authorIsVerified: Boolean(author?.isVerified),
@@ -1189,6 +1218,8 @@ function commentOut(state, c) {
     authorId: c.authorId,
     authorNick: c.authorNick,
     authorAvatar: author?.avatarUrl || '',
+    authorAlliance: author?.allianceTag || '',
+    authorServer: author?.serverId ?? null,
     authorRole: author?.role || 'member',
     authorIsBlogger: Boolean(author?.isBlogger),
     authorIsVerified: Boolean(author?.isVerified),
@@ -1962,8 +1993,15 @@ export async function getProfile(nick) {
     return (s.eventRsvps || []).some((r) => r.postId === p.id && r.status === 'going' && r.userId !== u.id);
   }).length;
 
+  /*
+    Дату выбора номера профиль не отдаёт — ровно как `forum_profiles` на живой
+    схеме: её видит только владелец через `forum_users`, а экран профиля берёт
+    её из своего аккаунта. Оставить поле здесь значило бы научить черновик
+    тому, чего бой не даёт, и следующий код прочитал бы `profile.serverSetAt`.
+  */
+  const { serverSetAt: setAt, ...publicProfile } = userOut(u);
   return {
-    ...userOut(u),
+    ...publicProfile,
     postCount: mine.length,
     commentCount: myComments.length,
     likesReceived: likes,
@@ -2009,6 +2047,33 @@ export async function saveProfile(patch) {
   if (patch.about != null) me.about = String(patch.about).trim().slice(0, 200);
   if (patch.allianceTag != null) {
     me.allianceTag = String(patch.allianceTag).trim().toUpperCase().replace(/\s+/g, '').slice(0, 12);
+  }
+  /*
+    СЕРВЕР. Правила те же и теми же словами, что у триггера
+    `forum_users_server_guard`: форма в черновом режиме обязана отказывать там
+    же, где откажет живая база, иначе человек проверит её только в бою.
+
+    Снятие номера — тоже смена: пустое место рядом с ником читается как
+    «человек ушёл с сервера», и разрешить это в любой день значило бы
+    обнулять ожидание в одну кнопку.
+
+    Модерации ожидания нет: она правит чужую ошибку, в том числе ту, которую
+    человек успел вписать до того, как правило начало его стопить.
+  */
+  if ('serverId' in patch) {
+    const check = validateServerId(patch.serverId);
+    if (!check.ok) throw new Error(check.error);
+    const hold = isStaff(me) ? '' : serverChangeProblem(me.serverId ?? null, me.serverSetAt, check.value);
+    if (hold) throw new Error(hold);
+    if (check.value !== (me.serverId ?? null)) {
+      me.serverId = check.value;
+      /*
+        Дата ставится при любой смене, включая снятие: триггер базы делает
+        ровно так же, и «почти свободный» ход в одну кнопку не должен
+        обнулять ожидание.
+      */
+      me.serverSetAt = new Date().toISOString();
+    }
   }
   write(s);
 }
@@ -2985,6 +3050,7 @@ export async function listChatMessages(chatId, { limit = 60, before = null } = {
       createdAt: new Date(x.createdAt),
       authorAvatar: u?.avatarUrl ?? '',
       authorAlliance: u?.allianceTag ?? '',
+      authorServer: u?.serverId ?? null,
       authorRole: u?.role ?? 'member',
       authorIsLeader: Boolean(u?.isLeader),
       authorIsVerified: Boolean(u?.isVerified),
@@ -3034,6 +3100,7 @@ export async function sendChatMessage(chatId, body, opts = {}) {
     createdAt: new Date(m.createdAt),
     authorAvatar: me.avatarUrl ?? '',
     authorAlliance: me.allianceTag ?? '',
+    authorServer: me.serverId ?? null,
     authorRole: me.role,
     authorIsLeader: Boolean(me.isLeader),
     // Метка проверки нужна сразу: своё сообщение не должно мелькать

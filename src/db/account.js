@@ -50,6 +50,8 @@ import { nickToEmail } from '../forum/nick-email.js';
  * @property {string}  avatarUrl
  * @property {string}  about
  * @property {string}  allianceTag
+ * @property {number|null} serverId   Сервер, который человек назвал сам; null — не указан.
+ * @property {Date|null} serverSetAt  Когда номер выбрали в последний раз.
  */
 
 const toDate = (v) => (v ? new Date(v) : null);
@@ -68,6 +70,14 @@ export function accountFrom(row) {
     avatarUrl: row.avatar_url || '',
     about: row.about || '',
     allianceTag: row.alliance_tag || '',
+    /*
+      Сервер, который человек назвал сам. Пусто — «не указан»: значка у ника
+      нет, и это не ноль и не 33 по умолчанию. До прогона
+      supabase/20261005-player-server.sql колонки в строке просто нет, поэтому
+      здесь она так же null, а не 0.
+    */
+    serverId: row.server_id == null ? null : Number(row.server_id),
+    serverSetAt: toDate(row.server_set_at),
   };
 }
 

@@ -25,7 +25,7 @@ import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
   CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines, EVENT_TAG_ID,
-  EVENT_RSVP_IDS,
+  EVENT_RSVP_IDS, validateServerId,
 } from './rules.js';
 import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
@@ -1291,6 +1291,19 @@ async function handleAuth(form, mode, submitter) {
   }
 
   /*
+    Сервер спрашиваем только при регистрации: при входе поле на форме стоит
+    рядом и может быть заполнено, но оно там ничего не решает — номер
+    меняется в профиле, где держится срок в 30 дней. Проверяем тем же
+    правилом, что и база, чтобы отказ звучал одним текстом в обоих режимах.
+  */
+  let signupServer = null;
+  if (mode === 'signup') {
+    const server = validateServerId(form.serverId.value);
+    if (!server.ok) return showError('[data-forum-auth-error]', server.error);
+    signupServer = server.value;
+  }
+
+  /*
     Пока запрос идёт, гасим ОБЕ кнопки формы. Выключенной становится только
     нажатая — вторая остаётся живой, и при неспешной сети человек жмёт
     «Зарегистрироваться» следом за «Войти». Это два аккаунта, которые потом
@@ -1303,7 +1316,7 @@ async function handleAuth(form, mode, submitter) {
 
   try {
     state.me = mode === 'signup'
-      ? await forum.signUp(nick.value, password.value)
+      ? await forum.signUp(nick.value, password.value, signupServer)
       : await forum.signIn(nick.value, password.value);
     await loadNotifications();
     await loadPushPrefs();
@@ -2986,6 +2999,13 @@ function wire() {
         if (!v.ok) return showError('[data-profile-error]', v.error);
       }
 
+      /*
+        Номер валидируем до сохранения не ради отказа — он тот же в
+        saveProfile, — а ради сравнения ниже: дата последней смены живёт в
+        аккаунте, её надо перечитать после нового выбора.
+      */
+      const server = validateServerId(form.serverId.value);
+
       await withBusy(submitter, 'Сохраняем…', async () => {
         try {
           if (state.me && newNick !== state.me.nick) {
@@ -2999,7 +3019,19 @@ function wire() {
           await saveProfile({
             about: form.about.value,
             allianceTag: form.allianceTag.value,
+            // Пустое поле значит «снять номер»: profile.js передаст null,
+            // а база засчитает это как смену — срок тогда не обходят.
+            serverId: form.serverId.value,
           });
+          /*
+            Когда номер выбрали только что, дата смены в аккаунте стала
+            другой, а представление профиля её не отдаёт. Без перечитывания
+            подсказка под полем и проверка частоты до конца сеанса держали бы
+            прежний срок, и второй выбор прошёл бы сразу.
+          */
+          if (state.me && server.ok && server.value !== (state.me.serverId ?? null)) {
+            state.me = await forum.currentUser();
+          }
           if (String(form.about.value || '').trim() || String(form.allianceTag.value || '').trim()) {
             closeStarterStep('profile');
           }

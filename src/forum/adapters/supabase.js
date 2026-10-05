@@ -109,6 +109,13 @@ function userOut(row) {
     isVerified: Boolean(row.is_verified),
     verifiedBy: row.verified_by || null,
     verifiedAt: toDate(row.verified_at),
+    /*
+      Сервер, который человек назвал сам, и когда он его выбирал. Дата нужна
+      экрану профиля: по ней форма говорит, после какого числа смена пройдёт,
+      а не отказывает загадочным «подождите». Пусто — «не указан».
+    */
+    serverId: row.server_id == null ? null : Number(row.server_id),
+    serverSetAt: toDate(row.server_set_at),
   };
 }
 
@@ -174,7 +181,7 @@ export async function currentUser() {
   return userOut(me);
 }
 
-export async function signUp(nick, password) {
+export async function signUp(nick, password, serverId) {
   const email = emailFor(nick);
 
   /*
@@ -198,6 +205,30 @@ export async function signUp(nick, password) {
 
   const me = await currentUser();
   if (!me) throw new Error('Профиль не создан — проверьте схему базы');
+
+  /*
+    Номер сервера ставится ВТОРЫМ запросом, сразу после того как профиль
+    создан. Первым — нельзя: строку профиля рисует триггер на момент
+    регистрации, и своей колонки в запросе входа нет.
+
+    Ошибку этого шага не поднимаем намеренно. Аккаунт уже создан, ник занят,
+    и повторная регистрация того же ника невозможна: отказаться от входа
+    из-за непрописанной цифры — значит оставить человека без доступа к
+    сайту, который он уже себе зарегистрировал. Он допишет сервер сам на
+    странице профиля, и скажет ему об этом отсутствие значка, а не отказ.
+  */
+  if (serverId != null && serverId !== '') {
+    const id = Number(serverId);
+    /*
+      Успех записываем в тот же объект, чтобы экран не показывал пустой сервер
+      у человека, который его только что назвал; при неудаче оставляем как есть
+      — значка нет, и это честная картина, а не выдуманный ноль.
+    */
+    await rest(`/forum_users?id=eq.${encodeURIComponent(me.id)}`, {
+      method: 'PATCH',
+      body: { server_id: id },
+    }).then(() => { me.serverId = id; }, () => {});
+  }
   return me;
 }
 
@@ -259,6 +290,17 @@ function postOut(row) {
     */
     authorAvatar: row.author_avatar || '',
     authorAlliance: row.author_alliance || '',
+    /*
+      Сервер автора — тот же номер, что стоит у него в профиле, и приходит он
+      строкой ниже, а не отдельным запросом: значек у ника в ленте обязан
+      рисоваться из того же чтения, что и сам ник, иначе половина ленты ждала
+      бы второй запрос и показывала бы номер там, где человек его уже снял.
+      «Как сейчас», а не «как в момент поста» — намеренно: это подпись живого
+      участника, а не архивная строка.
+      До прогона supabase/20261005-player-server.sql поля в ответе нет, и это
+      не поломка, а просто отсутствие значка у ника.
+    */
+    authorServer: row.author_server == null ? null : Number(row.author_server),
     /*
       Роль автора нужна для метки рядом с ником: читатель должен понимать,
       кто перед ним, когда речь о правилах или решении по жалобе — иначе слово
@@ -807,6 +849,15 @@ function commentOut(row) {
     authorId: row.author_id,
     authorNick: row.author_nick,
     authorAvatar: row.author_avatar || '',
+    /*
+      Альянс и сервер автора комментария приходят из того же
+      `forum_comment_list`, что и аватарка, но раньше в этот объект не
+      попадали: страница подключала значок у ника комментария, а боевой
+      адаптер молча отдавал пустоту. Значок под ником — одна подпись
+      участника везде: в ленте, в комментарии и в чате.
+    */
+    authorAlliance: row.author_alliance || '',
+    authorServer: row.author_server == null ? null : Number(row.author_server),
     authorRole: row.author_role || 'member',
     authorIsBlogger: Boolean(row.author_is_blogger),
     authorIsVerified: Boolean(row.author_is_verified),
@@ -1626,6 +1677,7 @@ function chatMessageOut(row) {
     authorNick: row.author_nick || '',
     authorAvatar: row.author_avatar || '',
     authorAlliance: row.author_alliance || '',
+    authorServer: row.author_server == null ? null : Number(row.author_server),
     authorRole: row.author_role || 'member',
     authorIsLeader: Boolean(row.author_is_leader),
     authorIsVerified: Boolean(row.author_is_verified),
@@ -1737,6 +1789,13 @@ export async function sendChatMessage(chatId, body, opts = {}) {
   */
   if (!out.authorAvatar && me?.avatarUrl) out.authorAvatar = me.avatarUrl;
   if (!out.authorAlliance && me?.allianceTag) out.authorAlliance = me.allianceTag;
+  /*
+    Сервер — из того же профиля: иначе собственное сообщение теряло бы значок
+    на минуту, до ближайшего чтения чата, а человек видел бы, как его номер
+    мигает. Номер 0 не бывает (предел 1..999), поэтому проверка на пустоту
+    честная.
+  */
+  if (out.authorServer == null && me?.serverId) out.authorServer = me.serverId;
   if (!out.authorRole && me?.role) out.authorRole = me.role;
   if (!out.authorIsLeader && me?.isLeader) out.authorIsLeader = Boolean(me.isLeader);
   // Сырая строка не знает о верификации — без подстановки своё только что

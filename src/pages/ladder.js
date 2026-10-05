@@ -1,4 +1,4 @@
-import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v=85';
+import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v=86';
 
 /**
  * Общий рейтинг — главная ценность сайта.

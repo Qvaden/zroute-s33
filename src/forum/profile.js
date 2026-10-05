@@ -11,6 +11,7 @@
  */
 import { rest, uploadFile, publicFileUrl, currentUserId } from '../db/client.js';
 import { prepareImage, uploadPath } from '../ui/image-prep.js';
+import { validateServerId } from './rules.js';
 import { forum } from './index.js';
 
 /*
@@ -42,6 +43,12 @@ const toDate = (v) => (v ? new Date(v) : null);
  * @property {number} [eventsHeld]      Встреч, которые человек провёл.
  * @property {number} [repGrantPoints]  Сумма наград владельца, в очках.
  * @property {number} [repGrantCount]   Сколько наград выдали.
+ * @property {number|null} [serverId]   Сервер, который человек назвал сам;
+ *                                    null — не указан. Дату смены здесь нет:
+ *                                    она нужна только владельцу профиля, а её
+ *                                    отдаёт его аккаунт (src/db/account.js),
+ *                                    чужому человеку она не показывает ничего
+ *                                    интересного.
  */
 
 /** @param {any} row */
@@ -53,6 +60,12 @@ function profileFrom(row) {
     avatarUrl: row.avatar_url || '',
     about: row.about || '',
     allianceTag: row.alliance_tag || '',
+    /*
+      Сервер — последняя колонка `forum_profiles` (20261005-player-server.sql).
+      До её прогона поля в строке нет, и это не поломка страницы: просто
+      значок под ником не рисуется.
+    */
+    serverId: row.server_id == null ? null : Number(row.server_id),
     role: row.role,
     isBlogger: Boolean(row.is_blogger),
     createdAt: toDate(row.created_at) ?? new Date(),
@@ -127,7 +140,12 @@ export async function getUserPosts(userId, limit = 10) {
  * копии ника в постах, комментариях, чатах и уведомлениях и пишет строку в
  * журнал переименований. Форму профиль вызывает её сам, до сохранения.
  *
- * @param {{about?: string, allianceTag?: string}} patch
+ * Частоту смены сервера здесь никто не пересчитывает: её держит триггер базы
+ * `forum_users_server_guard`, и его отказ приходит человеку тем же текстом,
+ * что и подсказка формы. Проверять срок двумя местами — значит иметь две
+ * разные версии одного правила, и они разошлись бы при первой же правке.
+ *
+ * @param {{about?: string, allianceTag?: string, serverId?: number|string|null}} patch
  */
 export async function saveProfile(patch) {
   if (ownProfiles) return forum.saveProfile(patch);
@@ -143,6 +161,17 @@ export async function saveProfile(patch) {
       альянсами в списке участников.
     */
     body.alliance_tag = String(patch.allianceTag).trim().toUpperCase().replace(/\s+/g, '').slice(0, 12);
+  }
+  /*
+    Сервер: пустая строка означает «снять номер» — то же самое, что в
+    черновом режиме. Число записывается как число: строка «12» в колонку
+    integer база не примет, а отказ был бы непонятен человеку, который ввёл
+    всё правильно.
+  */
+  if ('serverId' in patch) {
+    const check = validateServerId(patch.serverId);
+    if (!check.ok) throw new Error(check.error);
+    body.server_id = check.value;
   }
 
   if (!Object.keys(body).length) return;

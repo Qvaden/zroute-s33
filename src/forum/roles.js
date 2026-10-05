@@ -148,3 +148,25 @@ export function verifiedBadge(isVerified) {
     '</span>'
   );
 }
+
+/**
+ * Метка сервера участника: `№7`.
+ *
+ * Короткая намеренно — она стоит в каждой строке ленты и в каждом
+ * комментарии, где место рядом с ником дорого. «Сервер 7» из трёх-четырёх
+ * символов превратилось бы в полосу шума, а `№7` читается за glance.
+ *
+ * Без сервера метки нет: пустая строка, а не «№—». Участник, не указавший
+ * номер, не должен получать знак, который надо объяснять.
+ *
+ * @param {any} serverId
+ */
+export function serverBadge(serverId) {
+  const n = Number(serverId);
+  if (!Number.isInteger(n) || n <= 0) return '';
+  return (
+    `<span class="role-badge role-badge--server" title="Сервер ${n}" role="img" aria-label="Сервер ${n}">` +
+    `<b>№${n}</b>` +
+    '</span>'
+  );
+}

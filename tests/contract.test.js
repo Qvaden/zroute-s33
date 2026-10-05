@@ -12913,6 +12913,248 @@ console.log('\nAM. Фид магазина: обновление и событи
       && !/файл успели изменить|одним коммитом/.test(adminDocSrc + editorDocSrc));
 }
 
+/* ── 19. Сервер у игрока: номер рядом с ником ────────────────────────────────
+
+   Зрителю выбор ленты убрали (секция 17), и на его месте появилось другое:
+   сервер как свойство человека. Темы по-прежнему лежат в одной общей ленте, а
+   номер только рисуется возле ника — в ленте, в ответах, в чате, на странице
+   участника и в списке игроков панели.
+
+   Что ломается молча, если разъехалось:
+
+     1. Колонка в представлении раньше базы. Лента читается `select=*`, и
+        отсутствие `author_server` выглядит как «значка нет ни у кого», а не
+        как «миграцию не прогнали».
+     2. Одни и те же числа в трёх местах. Границы 1..999 и срок в 30 дней
+        держат миграция, `config.js` и триггер; разъедутся — форма начнёт
+        пропускать то, что база отвергает, и отказ придёт уже после нажатия.
+     3. Срок, посчитанный браузером. Дату ставит только триггер, а экран
+        перечитывает её из аккаунта: локальные часы обошли бы клиентское
+        правило бесплатно.
+     4. Снятие номера как «не смена». Тогда лимит обходился бы двумя правками
+        подряд и за вечер можно побывать «своим» на трёх серверах.
+     5. Метка, съеденная чужим правилом. В строках постов слово роли спрятано
+        `display: none` по `<b>`; номер лежит в том же `<b>`, и без исключения
+        он исчез бы ровно там, где нужен больше всего.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const { readFile } = await import('node:fs/promises');
+  const text = async (p) => (await readFile(p, 'utf8')).replace(/\r\n/g, '\n');
+  const L = CONFIG.forum.limits;
+  const { SERVER_RANGE } = await import('../src/forum/rules.js');
+
+  const mig = await text('supabase/20261005-player-server.sql');
+  const rulesSrc = await text('src/forum/rules.js');
+  const supSrc = await text('src/forum/adapters/supabase.js');
+  const localSrc = await text('src/forum/adapters/local.js');
+  const contractSrc = await text('src/forum/contract.js');
+  const profileSrc = await text('src/forum/profile.js');
+  const mountSrc = await text('src/forum/mount.js');
+  const feedSrc = await text('src/pages/forum.js');
+  const userPageSrc = await text('src/pages/user.js');
+  const mobileSrc = await text('src/mobile.css');
+  const refineSrc = await text('src/refine.css');
+  const queueSrc = await text('supabase/README.md');
+
+  /* ── Миграция: колонка, отказ, срок, представления ── */
+  check('номер и дата появляются одной правкой таблицы и переживают повторный прогон',
+    /add column if not exists server_id integer,\n\s*add column if not exists server_set_at timestamptz;/.test(mig));
+  check('«не указан» остаётся null: ни нуля, ни сервера сайта по умолчанию',
+    /check \(server_id is null or server_id between/.test(mig) && !/server_id integer default/.test(mig));
+  check('границы номера в базе и в config.js — одни и те же числа',
+    mig.includes(`between ${L.serverIdMin} and ${L.serverIdMax}`)
+      && mig.includes(`new.server_id < ${L.serverIdMin} or new.server_id > ${L.serverIdMax}`));
+  check('срок в триггере и в config.js — одна мера',
+    mig.includes(`interval '${L.serverChangeDays} days'`)
+      && mig.includes(`Сервер можно менять раз в ${L.serverChangeDays} дней`));
+  check('отказ про номер звучит ровно тем же словом, что проверяет форма',
+    mig.includes(SERVER_RANGE));
+  check('дату смены триггер берёт из строки, а не из запроса: PATCH с датой трёхлетней давности ничего не двигает',
+    mig.indexOf('new.server_set_at := old.server_set_at;') < mig.indexOf('raise exception'));
+  check('снятие номера засчитывается сменой: проверка стоит до того, как посмотрели на null',
+    mig.indexOf('is not distinct from old.server_id') < mig.indexOf('v_wait then'));
+  check('служебному ключу и модерации ожидание не мешает: лечить чужую ошибку можно всегда',
+    /if auth\.uid\(\) is null then/.test(mig) && /if public\.forum_is_staff\(\) then/.test(mig));
+  check('триггер висит и на дате: правка одной даты не пройдёт мимо правила',
+    /before update of server_id, server_set_at/.test(mig));
+  equal('сервер автора — последняя колонка во всех трёх списках',
+    (mig.match(/prof\.server_id as author_server\nfrom /g) || []).length, 3);
+  check('профили отдают номер человека тем же порядком — добавкой в конец',
+    /,\n  u\.server_id\nfrom public\.forum_users u;/.test(mig));
+  check('лента не разъезжается по серверам: шаг не трогает сервер темы',
+    !/alter table public\.forum_posts/.test(mig) && !/update public\.forum_posts/.test(mig));
+  check('шаг заканчивается перезагрузкой схемы, иначе API не отдал бы новую колонку',
+    /notify pgrst, 'reload schema';/.test(mig));
+  check('реестр держит шаг в очереди и напоминает порядок: сначала прогон, потом пуш кода',
+    queueSrc.includes('20261005-player-server.sql')
+      && queueSrc.includes('прогнать его нужно до пуша'));
+
+  /* ── Слова и числа клиента ── */
+  check('форма собирает свои отказные фразы из чисел config.js, а не из памяти',
+    rulesSrc.includes('L.serverIdMin') && rulesSrc.includes('L.serverIdMax')
+      && rulesSrc.includes('L.serverChangeDays')
+      && !/от 1 до 999/.test(rulesSrc));
+  equal('мера ожидания вычисляется в одном месте: у отказа и подсказки один источник',
+    (rulesSrc.match(/L\.serverChangeDays \* 86400000/g) || []).length, 1);
+  check('дата печатается по UTC, как `to_char` в отказе базы',
+    /getUTCDate\(\)/.test(rulesSrc) && /to_char\(old\.server_set_at \+ v_wait, 'DD\.MM\.YYYY'\)/.test(mig));
+
+  /* ── Контракт и оба адаптера ── */
+  check('регистрация дописывает номер вторым запросом и не роняет уже созданный аккаунт',
+    /export async function signUp\(nick, password, serverId\)/.test(supSrc)
+      && supSrc.includes('body: { server_id: id },')
+      && supSrc.includes('}).then(() => { me.serverId = id; }, () => {});'));
+  equal('лента, ответы и чат читают номер автора из той же строки, без второго запроса',
+    (supSrc.match(/authorServer: row\.author_server == null \? null : Number\(row\.author_server\)/g) || []).length, 3);
+  check('ответ прокидывает и тег альянса, и номер: чип альянса в комментариях жив',
+    (supSrc.match(/authorAlliance: row\.author_alliance/g) || []).length >= 2);
+  check('своё сообщение в чате получает номер из аккаунта, пока представление не обновилось',
+    supSrc.includes('if (out.authorServer == null && me?.serverId) out.authorServer = me.serverId;'));
+  check('аккаунт несёт и номер, и дату выбора: датой делится только владелец через `forum_users`',
+    supSrc.includes('serverSetAt: toDate(row.server_set_at)')
+      && supSrc.includes('serverId: row.server_id == null ? null : Number(row.server_id)'));
+  check('контракт описывает новые поля и третий параметр регистрации',
+    contractSrc.includes('@property {number|null} [serverId]')
+      && contractSrc.includes('@property {Date|null} [serverSetAt]')
+      && (contractSrc.match(/@property \{number\|null\} \[?authorServer\]?/g) || []).length >= 3
+      && /\(nick: string, password: string, serverId\?:/.test(contractSrc));
+  check('боевой путь не считает срок сам: частоту держит триггер, и только черновик повторяет её словами',
+    !profileSrc.includes('serverChangeProblem') && localSrc.includes('serverChangeProblem'));
+  check('черновик проверяет номер до создания аккаунта: отказ не оставляет половинки записи',
+    localSrc.indexOf('const server = validateServerId(serverId);')
+      < localSrc.indexOf('s.users.push(user);'));
+
+  /* ── Экраны ── */
+  check('форма входа спрашивает номер и говорит, зачем он',
+    feedSrc.includes('<span>Твой сервер</span>') && /name="serverId"/.test(feedSrc));
+  check('при входе номер не трогают, при регистрации передают третьим аргументом',
+    /if \(mode === 'signup'\) \{[\s\S]{0,260}validateServerId\(form\.serverId\.value\)/.test(mountSrc)
+      && mountSrc.includes('await forum.signUp(nick.value, password.value, signupServer)')
+      && !/signIn\(nick\.value, password\.value, /.test(mountSrc));
+  check('профиль: поле с текущим номером и подсказка, после какого числа смена пройдёт',
+    /name="serverId"/.test(userPageSrc) && userPageSrc.includes('serverChangeHint(me?.serverSetAt)'));
+  check('после нового выбора аккаунт перечитывается: иначе срок в этом сеансе сбрасывался бы незаметно',
+    mountSrc.includes('server.value !== (state.me.serverId ?? null)')
+      && /if \(state\.me && server\.ok[\s\S]{0,120}state\.me = await forum\.currentUser\(\);/.test(mountSrc));
+  check('снятие номера — тоже правка профиля: пустое поле значит «метки нет»',
+    profileSrc.includes("if ('serverId' in patch) {") && profileSrc.includes('body.server_id = check.value;'));
+
+  /* ── Метка: разметка и стили ── */
+  const { serverBadge } = await import('../src/forum/roles.js');
+  equal('без номера метки нет, а не пустой значок', serverBadge(null) + serverBadge('') + serverBadge(0) + serverBadge(-3) + serverBadge(7.5), '');
+  equal('номер подписывается коротко и называется в подсказке',
+    serverBadge(33),
+    '<span class="role-badge role-badge--server" title="Сервер 33" role="img" aria-label="Сервер 33"><b>№33</b></span>');
+  equal('строка из базы («33») считается номером, а не мусором', serverBadge('12').includes('<b>№12</b>'), true);
+
+  const chatsPageSrc = await text('src/pages/chats.js');
+  const playersSrc = await text('src/admin/screens/players.js');
+  equal('метка стоит у ника во всех пяти местах, где ник уже с метками',
+    [feedSrc, chatsPageSrc, userPageSrc, playersSrc].filter((src) => src.includes('serverBadge(')).length, 4);
+  check('в панели номер виден вместе с проверкой ника',
+    /verifiedBadge\(user\.isVerified\)\}\$\{serverBadge\(user\.serverId\)\}/.test(playersSrc));
+  check('правило «в ленте слово роли спрятано» существует и не съедает номер',
+    /\.forum-post__by \.role-badge b,\n\.forum-comment__head \.role-badge b \{ display: none; \}/.test(mobileSrc)
+      && /\.forum-post__by \.role-badge--server b,\n\.forum-comment__head \.role-badge--server b \{ display: inline; \}/.test(refineSrc));
+  equal('цвет метки задан один раз и не повторяет соседние статусы',
+    (refineSrc.match(/--role-tone: #6d8bb8/g) || []).length, 1);
+}
+
+/* ── 20. Сервер у игрока: черновой режим держит те же правила и слова ────────
+
+   Здесь проверки не читают исходники, а поступают: регистрируют, меняют,
+   снимают и ждут отказ. Именно так видно расхождение, которое глазами в
+   черновом режиме не найти — форма пропускает, база отвергает.
+────────────────────────────────────────────────────────────────────────────── */
+{
+  const L = CONFIG.forum.limits;
+  const { SERVER_RANGE, serverDate } = await import('../src/forum/rules.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const local = await import('../src/forum/adapters/local.js');
+  const { CATEGORY_IDS } = await import('../src/forum/rules.js');
+  const KEY = 'zr33.forum.local';
+  const raw = () => JSON.parse(store.get(KEY));
+  const put = (s) => store.set(KEY, JSON.stringify(s));
+  /* Отматываем назад и дату выбора, и день регистрации: иначе вмешивается
+     выдержка на публикации нового аккаунта, и отказ пришёл бы не за номер. */
+  const backdate = (days) => {
+    const s = raw();
+    for (const u of s.users) {
+      const at = new Date(Date.now() - days * 86400000).toISOString();
+      u.createdAt = at;
+      if (u.serverSetAt) u.serverSetAt = at;
+    }
+    put(s);
+  };
+  const who = () => raw().users.find((u) => u.id === raw().me);
+  const fail = async (fn) => {
+    try {
+      await fn();
+      return null;
+    } catch (e) {
+      return String(e?.message ?? e);
+    }
+  };
+
+  await local.signUp('Владелец', 'пароль', 12);
+  equal('регистрация сохраняет названный номер', (await local.currentUser()).serverId, 12);
+
+  const range = await fail(() => local.signUp('Заперепис', 'пароль', L.serverIdMax + 1));
+  equal('номер вне границ отвергается теми же словами, что и база', range, SERVER_RANGE);
+  check('отказ в номере не оставляет половинки аккаунта',
+    !raw().users.some((u) => u.nick === 'Заперепис'));
+
+  /* Первый вошедший в черновом режиме — служебный, его срок не держит. */
+  check('модерации ожидание не мешает: она правит чужую ошибку в любой день',
+    (await fail(async () => {
+      await local.signIn('Владелец');
+      await local.saveProfile({ serverId: 77 });
+    })) === null && (await local.currentUser()).serverId === 77);
+
+  await local.signUp('Ковыль', 'пароль', 12);
+  const setAt = who().serverSetAt;
+  const hold = await fail(() => local.saveProfile({ serverId: 55 }));
+  check('участник в ожидании: отказ называет дату, после которой смена пройдёт',
+    hold === `Сервер можно менять раз в ${L.serverChangeDays} дней. Следующая смена — после ${serverDate(new Date(new Date(setAt).getTime() + L.serverChangeDays * 86400000))}`,
+    hold);
+  check('снятие номера в тот же день тоже держится: лимит не обходится двумя правками',
+    (await fail(() => local.saveProfile({ serverId: '' })))?.startsWith('Сервер можно менять раз в'));
+  check('такой же номер сохранить можно: правило про смену, а не про правку профиля',
+    (await fail(() => local.saveProfile({ serverId: 12 }))) === null);
+
+  backdate(L.serverChangeDays + 1);
+  check('срок истёк — выбор проходит и дата передвигается',
+    (await fail(() => local.saveProfile({ allianceTag: 'KOP', serverId: 44 }))) === null
+      && (await local.currentUser()).serverId === 44
+      && new Date(who().serverSetAt).getTime() > Date.now() - 60000);
+
+  const post = await local.createPost({
+    title: 'Тема для значка', body: '<p>текст темы, достаточный по длине</p>', category: CATEGORY_IDS[0],
+  });
+  equal('тема получает номер автора', post.authorServer, 44);
+  const comment = await local.addComment(post.id, '<p>ответ на тему</p>');
+  check('ответ получает номер автора и его тег: лента и чип альянса рисуются из одной строки',
+    comment.authorServer === 44 && comment.authorAlliance === 'KOP');
+  const listed = await local.listPosts({ limit: 5 });
+  equal('в списке тем номер тоже есть', listed.posts[0].authorServer, 44);
+  const gotPost = await local.getPost(post.id);
+  equal('открытая тема не теряет номер', gotPost.authorServer, 44);
+  const prof = await local.getProfile('Ковыль');
+  check('страница участника отдаёт номер и не отдаёт дату смены',
+    prof.serverId === 44 && prof.serverSetAt === undefined);
+
+  backdate(L.serverChangeDays + 1);
+  check('снятие после срока разрешено и остаётся сменой: дата ставится заново',
+    (await fail(() => local.saveProfile({ serverId: '' }))) === null
+      && (await local.currentUser()).serverId === null
+      && who().serverSetAt !== null);
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

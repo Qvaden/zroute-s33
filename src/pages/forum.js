@@ -25,7 +25,7 @@ import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STE
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
-import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
+import { roleBadge, roleLabel, verifiedBadge, serverBadge } from '../forum/roles.js';
 import { canModerateServer, serverWriteNotice, writingServerId } from '../forum/server-rights.js';
 import { formatRecoveryKey, formatHoldLeft } from '../forum/recovery.js';
 import { formatQuietTime } from '../forum/quiet.js';
@@ -1103,6 +1103,17 @@ ${renderPushPrefs(s)}`;
           <input type="password" name="password" autocomplete="current-password" required
                  minlength="${L.passwordMin}" placeholder="от ${L.passwordMin} символов">
         </label>
+
+        <label class="forum-field">
+          <span>Твой сервер</span>
+          <input type="text" name="serverId" inputmode="numeric" maxlength="${String(L.serverIdMax).length}"
+                 placeholder="например 33" autocomplete="off">
+          <small class="muted">
+            Номер как в игре: рядом с вашим ником везде появится метка «№33».
+            Поле нужно при регистрации; потом меняется в профиле, раз
+            в ${L.serverChangeDays} дней. Можно оставить пустым.
+          </small>
+        </label>
       </div>
       <div class="forum-auth__actions">
         <button type="submit" class="forum-btn" data-forum-mode="signin">Войти</button>
@@ -2109,7 +2120,7 @@ export function renderPostCard(p, s) {
             roleBadge({ role: p.authorRole }, { short: true })
           }${
             verifiedBadge(p.authorIsVerified)
-          }${
+          }${serverBadge(p.authorServer)}${
             p.authorAlliance ? ` ${allianceCard(p.authorAlliance, s.alliances)}` : ''
           }</b>
           <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
@@ -2440,7 +2451,7 @@ function renderComments(post, s) {
                   roleBadge({ role: c.authorRole }, { short: true })
                 }${
                   verifiedBadge(c.authorIsVerified)
-                }${
+                }${serverBadge(c.authorServer)}${
                   c.authorAlliance ? ` ${allianceCard(c.authorAlliance, s.alliances)}` : ''
                 }</b>
                 <time title="${esc(fullTime(c.createdAt))}">${esc(timeAgo(c.createdAt))}</time>

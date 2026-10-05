@@ -34,6 +34,14 @@
  * @property {boolean} [isVerified] Ник подтверждён лидером/модерацией; непроверенный не может создавать чаты.
  * @property {string|null} [verifiedBy] Кто подтвердил ник.
  * @property {Date|null} [verifiedAt]
+ * @property {number|null} [serverId]  Игровой сервер, который человек назвал
+ *                                    сам; null — не указан. Это свойство
+ *                                    человека, а не темы: лента одна, и номер
+ *                                    нужен только подписью под ником
+ *                                    (supabase/20261005-player-server.sql).
+ * @property {Date|null} [serverSetAt] Когда номер выбран в последний раз. По ней
+ *                                    и считается, наступила ли пора менять
+ *                                    (раз в 30 дней, срок держит триггер).
  */
 
 /**
@@ -55,6 +63,12 @@
  * @property {string}  authorNick     Копией, чтобы лента не ходила за автором.
  * @property {boolean} [authorIsBlogger]  Автор ведёт блог: метка и ссылка на него.
  * @property {boolean} [authorIsVerified] Ник автора подтверждён; непроверенный виден с меткой.
+ * @property {number|null} [authorServer] Сервер автора — теперешний номер из
+ *                                   его профиля, а не номер темы. Приходит
+ *                                   той же строкой, что ник и аватарка
+ *                                   (author_server в forum_post_list), чтобы
+ *                                   значок под ником не требовал второго
+ *                                   запроса. null — человек сервер не назвал.
  * @property {string}  category       Из CATEGORIES в rules.js.
  * @property {string[]} [tags]        Метки темы для навигации внутри раздела.
  * @property {string}  title
@@ -132,6 +146,10 @@
  * @property {string}  authorId
  * @property {boolean} [authorIsVerified] Ник автора подтверждён.
  * @property {string} [authorAlliance] Тег альянса автора на момент чтения.
+ * @property {number|null} [authorServer] Сервер автора — тот же значок, что
+ *                                    в ленте. Приходит строкой из
+ *                                    `forum_comment_list`, отдельным запросом
+ *                                    ради него не ходят.
  * @property {string}  authorNick
  * @property {string}  body
  * @property {Date}    createdAt
@@ -332,7 +350,7 @@
  * @property {ForumCapabilities} capabilities
  * @property {() => Promise<boolean>} isReady        Настроен ли источник.
  * @property {() => Promise<ForumUser|null>} currentUser
- * @property {(nick: string, password: string) => Promise<ForumUser>} signUp
+ * @property {(nick: string, password: string, serverId?: number|string|null) => Promise<ForumUser>} signUp  Сервер — третий, необязательный аргумент: «не указан» тоже ответ. В боевом режиме номер дописывается вторым запросом уже после создания профиля, и неудача этой дописи НЕ отменяет регистрацию — аккаунт есть, ник занят, а отказ заставил бы человека регистрироваться заново под тем же ником, чего база не позволит.
  * @property {(nick: string, password: string) => Promise<ForumUser>} signIn
  * @property {() => Promise<void>} signOut
  * @property {() => Promise<ForumServer[]>} [listServers]  Пустой список — это «миграции 20261001-server-scope.sql нет», а не «серверов нет»: по пустому ответу строка про закрытый приём тем не показывается, а лента читается фильтром из `config.js`.
@@ -716,6 +734,9 @@
  * @property {string} authorNick
  * @property {string} authorAvatar
  * @property {string} authorAlliance
+ * @property {number|null} authorServer  Сервер автора на момент чтения — значок
+ *                                    под ником в чате стоит там же, где в ленте
+ *                                    и в комментариях.
  * @property {string} authorRole
  * @property {boolean} authorIsLeader
  * @property {boolean} authorIsVerified

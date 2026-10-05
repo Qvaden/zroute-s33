@@ -58,9 +58,11 @@ export const RULES = [
     id: 'topic',
     title: 'По делу: 33 сервер и Z Route',
     body:
-      'Форум про наш сервер и про игру. Для болтовни не по теме есть раздел ' +
-      '«Флудилка», для всего остального про сообщество — «Разное». Реклама ' +
-      'и торговля остаются под запретом где угодно.',
+      'Форум про наш сервер и про игру. Игроки с других серверов тоже нужны: ' +
+      'свой номер каждый называет в профиле, и он виден рядом с ником — спор ' +
+      'из другой игры не считается чужим, пока он про Z Route. Для болтовни не ' +
+      'по теме есть раздел «Флудилка», для всего остального про сообщество — ' +
+      '«Разное». Реклама и торговля остаются под запретом где угодно.',
   },
   {
     id: 'ads',
@@ -810,4 +812,100 @@ export function guideBodyProblem(body) {
   if (len < L.guideBodyMin) return GUIDE_BODY_SHORT;
   if (len > L.guideBodyMax) return GUIDE_BODY_LONG;
   return '';
+}
+
+/* ── Сервер игрока: номер, ожидание между сменами ──────────────────────────
+
+   Сервер у человека, а не у ленты: он называет номер сам, и тот виден рядом
+   с его ником. Проверяется только форма (целое в границах и срок с прошлой
+   смены), а не «правду ли сказал» — проверить это кодом невозможно, и правка
+   всегда открыта модерации.
+
+   Границы и срок держит база (supabase/20261005-player-server.sql: проверка
+   `between 1 and 999` и интервал `interval '30 days'` в триггере
+   `forum_users_server_guard`), а здесь те же числа нужны, чтобы форма
+   отказывала тем же словом, что и база: игрок обязан получить одинальную
+   фразу и в черновом режиме, и на живой схеме.
+────────────────────────────────────────────────────────────────────────── */
+
+/** Тем же словом, что поднимает триггер. */
+export const SERVER_RANGE = `Номер сервера — целое от ${L.serverIdMin} до ${L.serverIdMax}`;
+
+/**
+ * Дата в том же виде, что печатает отказ базы: `to_char(..., 'DD.MM.YYYY')`
+ * считает по UTC, поэтому и здесь дни, месяц и год берутся из UTC — иначе
+ * игрок видел бы «после 04.11» в форме и «после 03.11» в отказе базы.
+ */
+export function serverDate(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+}
+
+/**
+ * Введённый номер. Пусто — «не указан»: это разрешённое состояние, значка у
+ * ника просто нет.
+ *
+ * @param {string|number|null|undefined} raw
+ * @returns {{ok: true, value: number|null} | {ok: false, error: string}}
+ */
+export function validateServerId(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return { ok: true, value: null };
+  if (!/^\d+$/.test(text)) return { ok: false, error: SERVER_RANGE };
+  const value = Number(text);
+  if (value < L.serverIdMin || value > L.serverIdMax) return { ok: false, error: SERVER_RANGE };
+  return { ok: true, value };
+}
+
+/**
+ * Когда станет можно следующий выбор номера. Срок живёт в одном месте: отсюда
+ * его берут и отказ (serverChangeProblem), и подсказка под полем
+ * (serverChangeHint) — иначе форма могла бы обещать дату, которую база не
+ * соблюдает.
+ *
+ * @param {Date|string|null} setAt
+ * @returns {Date|null}  Null, если дату менять не с чего: номера ещё нет.
+ */
+export function serverChangeAllowedAt(setAt) {
+  const since = setAt ? new Date(setAt) : null;
+  if (!since || Number.isNaN(since.getTime())) return null;
+  return new Date(since.getTime() + L.serverChangeDays * 86400000);
+}
+
+/**
+ * Нельзя ли сейчас ставить другой номер. Пустой ответ — менять можно.
+ *
+ * Снятие номера считается сменой: иначе лимит обходился бы двумя правками
+ * («снять сегодня, поставить новый завтра»). Первый номер ожиданием не держится:
+ * у того, кто его ещё не выбирал, отнимать право нельзя.
+ *
+ * @param {number|null} current  Номер в профиле сейчас.
+ * @param {Date|string|null} setAt  Когда его выбирали в последний раз.
+ * @param {number|null} desired  Что ставят.
+ * @param {Date} [now]
+ */
+export function serverChangeProblem(current, setAt, desired, now = new Date()) {
+  if (desired === (current ?? null)) return '';
+  if (current == null) return '';
+  const allowedAt = serverChangeAllowedAt(setAt);
+  if (allowedAt && allowedAt > now) {
+    return `Сервер можно менять раз в ${L.serverChangeDays} дней. Следующая смена — после ${serverDate(allowedAt)}`;
+  }
+  return '';
+}
+
+/**
+ * Подсказка под полем выбора — та же граница, что в отказе, но сказанная
+ * до нажатия кнопки: человек видит срок, пока ещё ничего не сломалось.
+ *
+ * @param {Date|string|null} setAt
+ * @param {Date} [now]
+ */
+export function serverChangeHint(setAt, now = new Date()) {
+  const period = `Менять номер можно раз в ${L.serverChangeDays} дней`;
+  const allowedAt = serverChangeAllowedAt(setAt);
+  if (!allowedAt || allowedAt <= now) return `${period}.`;
+  return `${period}. Следующая смена — после ${serverDate(allowedAt)}.`;
 }

@@ -1,6 +1,6 @@
 ﻿import { esc } from '../../ui/helpers.js';
 import { CATEGORIES, RULES, categoryLabel } from '../../forum/rules.js';
-import { roleBadge, roleLabel, verifiedBadge } from '../../forum/roles.js';
+import { roleBadge, roleLabel, verifiedBadge, serverBadge } from '../../forum/roles.js';
 import { formatHoldLeft } from '../../forum/recovery.js';
 import { CONFIG } from '../../../config.js';
 
@@ -338,7 +338,7 @@ function renderRow(user, me) {
     <div class="adm-player" data-player="${esc(user.id)}" data-player-search-text="${esc(`${user.nick} ${user.allianceTag || ''} ${user.role} ${user.isLeader ? 'лидер' : ''} ${user.isVerified ? 'проверен' : ''}`.toLowerCase())}">
       <div class="adm-player__who">
         <div class="adm-player__name">
-          <b>${esc(user.nick)}</b>${roleBadge(user, { short: true })}${verifiedBadge(user.isVerified)}
+          <b>${esc(user.nick)}</b>${roleBadge(user, { short: true })}${verifiedBadge(user.isVerified)}${serverBadge(user.serverId)}
           ${isMe ? '<span class="adm-player__self">вы</span>' : ''}
         </div>
         <small>На форуме с ${esc(shortDate(user.createdAt))}${user.allianceTag ? ` · ${esc(user.allianceTag.toUpperCase())}` : ''}</small>

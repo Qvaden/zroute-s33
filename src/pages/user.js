@@ -14,7 +14,9 @@
  */
 import { esc, pluralWord, plural } from '../ui/helpers.js';
 import { excerpt, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
-import { roleBadge, roleLabel, verifiedBadge } from '../forum/roles.js';
+import { roleBadge, roleLabel, verifiedBadge, serverBadge } from '../forum/roles.js';
+import { serverChangeHint } from '../forum/rules.js';
+import { CONFIG } from '../../config.js';
 
 function isOnline(lastSeen) {
   if (!lastSeen) return false;
@@ -72,7 +74,7 @@ export function renderUserPage(state = {}) {
     ${renderCard(profile, isMe, editing)}
     ${renderVerify(profile, me)}
     ${renderNickLog(profile, me, history, isMe)}
-    ${editing && isMe ? renderEditForm(profile) : ''}
+    ${editing && isMe ? renderEditForm(profile, me) : ''}
     ${renderStats(profile)}
     ${renderActivity(activity, isMe)}
     ${profile.isBlogger ? renderBlog(profile, posts) : ''}
@@ -93,6 +95,7 @@ function renderCard(p, isMe, editing) {
           <div class="forum-profile__meta">
             ${roleBadge(p) || `<span class="forum-profile__role">${esc(roleLabel(p))}</span>`}
             ${verifiedBadge(p.isVerified)}
+            ${serverBadge(p.serverId)}
             ${p.isBlogger ? '<span class="forum-profile__role forum-profile__role--blogger" title="Ведёт свой блог">✍️ Блогер</span>' : ''}
             ${p.allianceTag ? `<span class="forum-profile__ally">${esc(p.allianceTag)}</span>` : ''}
             <span class="muted">с ${esc(joinDate(p.createdAt))}</span>
@@ -252,7 +255,8 @@ function renderAvatar(p, size = 'md') {
 
 /* ── Правка ───────────────────────────────────────────────────────────────── */
 
-function renderEditForm(p) {
+function renderEditForm(p, me) {
+  const L = CONFIG.forum.limits;
   return `
     <section class="panel forum-profile-edit">
       <header class="panel__head">
@@ -287,6 +291,17 @@ function renderEditForm(p) {
           <small class="muted">
             Смена ника разрешена: старые записи переподписываются новым именем,
             а история переименований остаётся в журнале владельца.
+          </small>
+        </label>
+
+        <label class="forum-field">
+          <span>Сервер</span>
+          <input type="text" name="serverId" inputmode="numeric" maxlength="${String(L.serverIdMax).length}"
+                 value="${p.serverId ?? ''}" placeholder="например 33" autocomplete="off">
+          <small class="muted">
+            Рядом с вашим ником в ленте, ответах и чате появится метка
+            «№${p.serverId ?? '…'}». ${esc(serverChangeHint(me?.serverSetAt))}
+            Пустое поле — метки нет.
           </small>
         </label>
 
