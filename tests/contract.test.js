@@ -8544,6 +8544,22 @@ console.log('\nAF. Пульс обновлений игры');
   check('в таблице лежит ровно то, что видит читатель: состояний у строки больше нет',
     finalFlat.includes(`create policy forum_update_notes_read on public.forum_update_notes for select using (true);`)
       && flat.includes(`for select using (status = 'published' or public.forum_is_staff());`));
+  /*
+    Порядок шагов 5 сторожится словами, а не молча: на живой базе переставлено
+    место дало отказ `cannot drop column status … policy depends on it` и
+    прогон встал посередине — представления уже сняты, колонки ещё на месте.
+    Политика, индекс и представление висят на колонке, поэтому все три уходят
+    раньше, чем колонка.
+  */
+  check('правило чтения снято ДО сноса колонки: политика держит столбец, и база не отдаёт',
+    finalSrc.indexOf('create policy forum_update_notes_read')
+      < finalSrc.indexOf('alter table public.forum_update_notes')
+      && finalSrc.indexOf('create policy forum_store_events_read')
+      < finalSrc.indexOf('alter table public.forum_store_events')
+      && finalSrc.indexOf('drop view if exists public.forum_update_note_list')
+      < finalSrc.indexOf('alter table public.forum_update_notes')
+      && finalSrc.indexOf('drop index if exists public.forum_store_events_list_idx')
+      < finalSrc.indexOf('alter table public.forum_store_events'));
   check('ни одной политики на запись: браузер в таблицу не пишет, и удаляет тоже функция',
     !/for insert|for update|for delete/i.test(sql + finalSrc));
   check('право чтения дано и гостю, и вошедшему — таблице и представлению',

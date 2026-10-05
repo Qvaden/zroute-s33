@@ -532,6 +532,24 @@ drop view if exists public.forum_store_event_list;
 drop index if exists public.forum_update_notes_list_idx;
 drop index if exists public.forum_store_events_list_idx;
 
+/*
+  Разных состояний у строки больше нет, поэтому и правило чтения перестаёт
+  различать читателей: в таблице лежит ровно то, что видит посетитель. Политика
+  остаётся — без неё при включённом RLS не прочитал бы никто.
+
+  Порядок здесь не косметика: политика, висящая на колонке, мешает эту колонку
+  вычесть, и база отвечает `cannot drop column status … policy depends on it`.
+  Поэтому правило меняется ДО сноса столбцов, а не после — как представления и
+  индекс выше, которые по той же причине опущены раньше.
+*/
+drop policy if exists forum_update_notes_read on public.forum_update_notes;
+create policy forum_update_notes_read on public.forum_update_notes
+  for select using (true);
+
+drop policy if exists forum_store_events_read on public.forum_store_events;
+create policy forum_store_events_read on public.forum_store_events
+  for select using (true);
+
 alter table public.forum_update_notes
   drop column if exists status,
   drop column if exists archived_at,
@@ -547,19 +565,6 @@ create index if not exists forum_update_notes_list_idx
 
 create index if not exists forum_store_events_list_idx
   on public.forum_store_events (starts_at desc, ends_at desc);
-
-/*
-  Разных состояний у строки больше нет, поэтому и правило чтения перестаёт
-  различать читателей: в таблице лежит ровно то, что видит посетитель. Политика
-  остаётся — без неё при включённом RLS не прочитал бы никто.
-*/
-drop policy if exists forum_update_notes_read on public.forum_update_notes;
-create policy forum_update_notes_read on public.forum_update_notes
-  for select using (true);
-
-drop policy if exists forum_store_events_read on public.forum_store_events;
-create policy forum_store_events_read on public.forum_store_events
-  for select using (true);
 
 comment on table public.forum_update_notes is
   'Заметки об обновлениях игры: заметка, опубликованная модерацией или планировщиком фида. Строка в таблице и есть опубликованная заметка — убранное из списка удаляется и обратно не возвращается.';
