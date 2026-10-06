@@ -6533,14 +6533,14 @@ console.log('\nY. Календарь встреч');
       && mountSrc.includes('draft.tags = tags;'));
   check('отмеченные метки возвращаются из черновика до первой отрисовки',
     /if \(!state\.composerTags\.length\) state\.composerTags = composerTagsFromDraft\(\);/.test(mountSrc));
-  check('намерение из адреса — и встречи, и объявления: не перетирается пустым адресом и гаснет, только когда форма показалась',
-    /state\.eventDraft = state\.eventDraft \|\| composeIntentFromSearch\(search\) === 'event';\s*state\.accountDraft = state\.accountDraft \|\| composeIntentFromSearch\(search\) === 'accounts';/.test(mountSrc)
-      && /if \(host\.querySelector\('\[data-forum-composer\]'\)\) \{[\s\S]{0,400}?state\.eventDraft = false;\s*state\.accountDraft = false;\s*\}/.test(mountSrc));
+  check('намерение из адреса — одно, встреча: не перетирается пустым адресом и гаснет, только когда форма показалась',
+    /state\.eventDraft = state\.eventDraft \|\| composeIntentFromSearch\(search\) === 'event';/.test(mountSrc)
+      && /if \(host\.querySelector\('\[data-forum-composer\]'\)\) \{[\s\S]{0,400}?state\.eventDraft = false;\s*\}/.test(mountSrc));
   check('раскрытие формы — тоже состояние, и его снимает только сам человек',
     mountSrc.includes('composerOpen: false') && mountSrc.includes('state.composerOpen = true;')
       && /addEventListener\('toggle',[\s\S]{0,240}data-forum-composer[\s\S]{0,200}\}, true\)/.test(mountSrc));
   check('уход с форума сбрасывает и намерение, и метки, и раскрытую форму',
-    /state\.eventDraft = false;\s*state\.accountDraft = false;\s*state\.composerTags = \[\];\s*state\.composerOpen = false;/.test(mountSrc));
+    /state\.eventDraft = false;\s*state\.composerTags = \[\];\s*state\.composerOpen = false;/.test(mountSrc));
   check('поля встречи не требуют заполнения молча: required у них нет',
     !/name="event_[^"]*"[^>]*required/.test(pagesSrc) && /data-forum-event-fields/.test(pagesSrc));
   check('и дата, и места уходят в черновик поста отдельными полями',
@@ -11153,9 +11153,12 @@ console.log('\nAN. Доска аккаунтов');
     места между собой, а не наличие слов.
 
     Витрина — не второй ящик с объявлениями: она читает ту же ленту фильтром по
-    метке. Значит, здесь же стоит сверить точки подключения вкладки (адрес,
-    живость, размонтирование соседними страницами) и то, что снятые объявления
-    режет экран, а не запрос.
+    метке. Но форма у неё своя, и это решение, а не случайность: композер форума
+    метку «Аккаунты» больше не предлагает (см. `shopOnly` в правилах), поэтому
+    здесь стоит сверять и точки подключения вкладки (адрес, живость,
+    размонтирование соседними страницами, редирект старой ссылки), и то, что в
+    ленте не осталось ни полей доски, ни колонок в запросе, и что снятые
+    объявления режет экран, а не запрос.
   */
   const { readFile } = await import('node:fs/promises');
   /*
@@ -11291,6 +11294,14 @@ console.log('\nAN. Доска аккаунтов');
       && /accountOffer: needsAccountLines\(tags\) \? String\(draft\.accountOffer \?\? ''\)\.trim\(\) : ''/.test(localSrc));
   check('черновик повторяет отказ про метку своим словом',
     localSrc.includes('Снимать с доски можно только объявление с меткой «Аккаунты»'));
+  check('правка объявления есть в контракте и у обоих адаптеров: один PATCH, а не два шага',
+    /patch: \{offer\?: string, price\?: string, title\?: string, expiresAt\?: string\|null\}\) => Promise<ForumPost>\} updateAccountAd/.test(contractSrc)
+      && /export async function updateAccountAd\(id, patch = \{\}\)/.test(localSrc)
+      && /export async function updateAccountAd\(id, patch = \{\}\)/.test(supaSrc));
+  check('черновик правит тем же порядком проверок и теми же словами отказа, что база',
+    /const accountError = accountProblem\(tags, offer, price\);/.test(localSrc)
+      && /const expiryError = expiryProblem\(tags, when\);/.test(localSrc)
+      && localSrc.includes('Править на доске можно только объявление с меткой «Аккаунты»'));
   check('рабочий адаптер читает колонки темы и не падает без миграции',
     /accountOffer: row\.account_offer \|\| null/.test(supaSrc)
       && /accountSoldAt: toDate\(row\.account_sold_at\) \?\? null/.test(supaSrc));
@@ -11299,16 +11310,31 @@ console.log('\nAN. Доска аккаунтов');
   check('отметка закрытия — PATCH одной колонки, как у обменной доски',
     /export async function closeAccountOffer\(id, closed\)[\s\S]{0,240}method: 'PATCH'[\s\S]{0,90}account_sold_at/.test(supaSrc));
 
-  /* ── Форма темы и карточка ── */
-  check('форма спрашивает обе части и держит длины базы',
-    pagesSrc.includes('name="account_offer"') && pagesSrc.includes('name="account_price"')
-      && /renderAccountFields\(needsAccountLines\(tags\)\)/.test(pagesSrc)
-      && /name="account_offer" data-forum-account-offer[\s\S]{0,120}maxlength="\$\{L\.accountOfferMax\}"/.test(pagesSrc)
-      && /name="account_price" data-forum-account-price[\s\S]{0,120}maxlength="\$\{L\.accountPriceMax\}"/.test(pagesSrc));
-  check('поля прячутся вместе с меткой — как у встречи и обмена',
-    mountSrc.includes('accountFields.hidden = !needsAccountLines(chosen)'));
-  check('в запрос не уедет ничего, если метку не ставили',
-    /if \(needsAccountLines\(draft\.tags\)\) \{[\s\S]{0,200}draft\.accountOffer = form\.account_offer\?\.value\?\.trim\(\) \|\| null/.test(mountSrc));
+  /* ── Форма объявления и карточка темы ── */
+  check('форма объявления спрашивает обе части и держит длины базы',
+    boardSrc.includes('name="account_offer"') && boardSrc.includes('name="account_price"')
+      && /name="account_offer"[\s\S]{0,160}maxlength="\$\{L\.accountOfferMax\}"/.test(boardSrc)
+      && /name="account_price"[\s\S]{0,160}maxlength="\$\{L\.accountPriceMax\}"/.test(boardSrc));
+  check('а композер форума их больше не спрашивает: метка не предлагается, полей нет',
+    !pagesSrc.includes('name="account_offer"') && !pagesSrc.includes('renderAccountFields')
+      && /TOPIC_TAGS\.filter\(\(tag\) => !tag\.shopOnly\)/.test(pagesSrc)
+      && rules.TOPIC_TAGS.find((t) => t.id === 'accounts').shopOnly === true
+      && rules.TOPIC_TAGS.filter((t) => !t.shopOnly).length === rules.TOPIC_TAGS.length - 1);
+  check('в запрос темы колонки доски не уезжают ни при каком раскладе: лента объявлений не пишет',
+    !mountSrc.includes('needsAccountLines') && !/draft\.accountOffer/.test(mountSrc)
+      && !pagesSrc.includes('data-forum-account-fields'));
+  check('ящик на вкладке спрашивает объявление целиком: заголовок, состав, цену, срок и комментарий',
+    /<form class="accounts-composer" data-accounts-form>/.test(boardSrc)
+      && ['name="title"', 'name="account_offer"', 'name="account_price"', 'name="expires_in"', 'name="body"']
+        .every((attr) => boardSrc.includes(attr))
+      && boardSrc.includes('renderMdBar()') && boardSrc.includes('data-accounts-submit'));
+  check('правка идёт тем же ящиком: те же поля, другая кнопка и один вызов правки',
+    boardSrc.includes("editing ? 'Сохранить' : 'Выставить на доску'")
+      && behavSrc.includes('await forum.updateAccountAd(editing.id')
+      && behavSrc.includes('state.editing = editSeed(post)'));
+  check('форма доски проверяется той же функцией, что и тема: доска не проводит то, что отвергла бы лента',
+    /validatePost\(\{ title: value\.title, body: value\.body, category: ACCOUNT_CATEGORY \}\)/.test(behavSrc)
+      && /export const ACCOUNT_CATEGORY = 'offtop';/.test(boardSrc));
   check('карточка темы показывает обе части и значок проданного',
     pagesSrc.includes('${accountLines(p)}') && pagesSrc.includes('${accountBadge(p)}')
       && /function accountBadge\(p\)[\s\S]{0,240}Продано/.test(pagesSrc));
@@ -11320,9 +11346,10 @@ console.log('\nAN. Доска аккаунтов');
       && mountSrc.includes('await forum.closeAccountOffer(id, sold)'));
   check('отказ без миграции называет файл, а не «операция не выполнена»',
     mountSrc.includes(sqlPath));
-  check('блок одет своим стилем, и снятое объявление читается приглушённо',
-    cssSrc.includes('.forum-offer-fields') && cssSrc.includes('.forum-offer--sold')
-      && cssSrc.includes('.forum-post__offer-sold'));
+  check('блок в теме одет своим стилем, а снятое объявление читается приглушённо',
+    cssSrc.includes('.forum-offer--sold') && cssSrc.includes('.forum-post__offer-sold'));
+  check('стиля полей доски в композере форума не осталось: разметку убрали вместе с краской',
+    !cssSrc.includes('.forum-offer-fields'));
 
   /* ── Вкладка-витрина подключена, а не лежит рядом ── */
   check('вкладка стоит в меню и живёт по своему адресу',
@@ -11339,8 +11366,13 @@ console.log('\nAN. Доска аккаунтов');
     (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
   check('модуль поведения подключён к сайту той же версией, что и остальные',
     /import \{ mountAccounts, unmountAccounts \} from '\.\/forum\/accounts\.js\?v=\d+'/.test(mainSrc));
-  check('намерение из адреса знает доску: кнопка витрины ведёт в обычный композер',
-    urlSrc.includes("export const COMPOSE_INTENTS = ['event', 'accounts'];"));
+  check('намерение «объявление» ушло из адреса форума: композер больше не знает доски',
+    urlSrc.includes("export const COMPOSE_INTENTS = ['event'];"));
+  check('старая ссылка не ведёт в пустую форму, а переезжает на вкладку до разбора маршрута',
+    /function redirectLegacyAccountHash\(\)[\s\S]{0,400}history\.replaceState\(null, '', '#\/accounts\?new=accounts'\)/.test(mainSrc)
+      && /redirectLegacyAccountHash\(\);\s*const \{ id, param, search \} = parseHash\(\);/.test(mainSrc));
+  check('а на вкладке то же намерение раскрывает ящик и только вошедшему',
+    /if \(intent === 'accounts' && state\.me\) \{/.test(behavSrc));
 
   /*
     Проза формы о сроке перечисляет метки словами. Живой прогон в браузере
@@ -11361,14 +11393,17 @@ console.log('\nAN. Доска аккаунтов');
   check('срок подставляется и при приходе по ссылке, а не только по клику по метке',
     /function autofillExpiry\(form, tagId\)/.test(mountSrc)
       && /autofillExpiry\(form, tagBox\.value\)/.test(mountSrc)
-      && /const intentTag = state\.accountDraft \? ACCOUNT_TAG_ID : state\.eventDraft \? EVENT_TAG_ID : '';/.test(mountSrc)
-      && /if \(intentTag\) autofillExpiry\(host\.querySelector\('\[data-forum-new\]'\), intentTag\)/.test(mountSrc));
+      && /if \(state\.eventDraft\) autofillExpiry\(host\.querySelector\('\[data-forum-new\]'\), EVENT_TAG_ID\);/.test(mountSrc));
+  check('а черновик доски не остался в состоянии форума: объявление рождается только на вкладке',
+    !/accountDraft/.test(mountSrc) && !/state\.accountDraft/.test(pagesSrc));
 
   /* ── Как собрана витрина: фильтр, а не второй ящик ── */
   check('доска читает ленту фильтром по метке и тем же порядком, что выбран на экране',
     behavSrc.includes('tag: ACCOUNT_TAG_ID') && behavSrc.includes('sort: state.sort'));
   check('«ещё» считается по общему числу тем, а не по догадке',
     behavSrc.includes('state.more = state.posts.length < state.total'));
+  check('список не перечитывается ради одного числа: созданное объявление прибавляет себя и к счётчику доски',
+    /state\.posts = \[created, \.\.\.state\.posts\];[\s\S]{0,400}state\.total \+= 1;/.test(behavSrc));
   check('снятые объявления режет экран: запрос к базе про них ничего не знает',
     !/listPosts\(\{[\s\S]{0,220}sold/.test(behavSrc)
       && boardSrc.includes('s.posts.filter((p) => s.showSold || !p.accountSoldAt)'));
@@ -11399,12 +11434,13 @@ console.log('\nAN. Доска аккаунтов');
     ready: true, loading: false, posts: [mk({}), mk({ accountSoldAt: new Date() })],
     total: 2, more: false, error: '', sort: 'fresh', showSold: false, ...over,
   });
-  check('проданное по умолчанию скрыто, но не удалено: число говорит про экран',
+  check('проданное по умолчанию скрыто, но не удалено: база и экран посчитаны раздельно',
     view().includes('Аккаунт 40 лвл') && !view().includes('Продано')
-      && view().includes('1 объявление на экране'));
+      && /<dt>на доске<\/dt>\s*<dd>2 объявления<\/dd>/.test(view())
+      && /<dt>на экране<\/dt>\s*<dd>1 объявление<\/dd>/.test(view()));
   check('галочка возвращает снятые объявления и называет их проданными',
     view({ showSold: true }).includes('accounts-card--sold')
-      && view({ showSold: true }).includes('2 объявления на экране'));
+      && /<dt>на экране<\/dt>\s*<dd>2 объявления<\/dd>/.test(view({ showSold: true })));
   check('просроченное объявление показано со знаком «срок вышел», а не спрятано',
     /accounts-card--expired/.test(renderAccountCard(mk({ expiresAt: new Date(Date.now() - 86400000).toISOString() })))
       && renderAccountCard(mk({ expiresAt: new Date(Date.now() - 86400000).toISOString() })).includes('Срок вышел'));
@@ -11412,11 +11448,16 @@ console.log('\nAN. Доска аккаунтов');
     view().includes('href="#/forum/p1"'));
   check('кнопки покупки, оплаты и реквизитов на витрине нет и быть не может',
     !/купить|оплат|корзин|реквизит/i.test(view()) && view().includes('Сайт денег не берёт'));
-  check('фильтры, галочка и кнопка объявления одеты своими атрибутами',
-    view().includes('name="show_sold"') && view().includes('data-accounts-sort="talked"')
-      && view().includes('href="#/forum?new=accounts"'));
-  equal('адрес кнопки действительно расбирается как намерение',
-    composeIntentFromSearch('new=accounts'), 'accounts');
+  check('фильтры и галочка одеты своими атрибутами',
+    view().includes('name="show_sold"') && view().includes('data-accounts-sort="talked"'));
+  check('объявление выставляют с самой вкладки: кнопка в шапке раскрывает ящик, а не уводит в форум',
+    view({ me: { id: 'u9', nick: 'Свидетель' } }).includes('data-accounts-new')
+      && !view({ me: { id: 'u9', nick: 'Свидетель' } }).includes('new=accounts'));
+  check('без входа ящика не обещаем: шапка предлагает войти ссылкой вместо кнопки',
+    !view().includes('data-accounts-new') && view().includes('Войдите и выставьте аккаунт')
+      && view().includes('href="#/forum"'));
+  equal('адрес форума больше не знает намерения «объявление»: его расбирает только вкладка',
+    composeIntentFromSearch('new=accounts'), '');
   check('число «ещё» даёт кнопку, а не молчание',
     view({ posts: [mk({})], total: 9, more: true, showSold: true }).includes('data-accounts-more'));
   check('пустая доска и пустой превью — разные вещи',
@@ -11429,6 +11470,27 @@ console.log('\nAN. Доска аккаунтов');
     renderAccountCard(mk({ accountPrice: null })).includes('цена не названа'));
   check('витрина одета общим каркасом сайта, а не отдельным макетом',
     view().includes('class="panel accounts-page"') && view().includes('panel__head'));
+
+  /*
+    Облик вкладки: магазин, а не ещё один раздел ленты. Проверка красок здесь
+    нужна потому, что цвета вне токенов `styles-v8.css` светлая тема молча
+    переопределяет, и расхождение было бы видно только человеку.
+  */
+  check('витрина собрана магазином: шапка со статами, ящик объявления сеткой и плитки с ценой-плашкой',
+    ['.accounts-hero', '.accounts-stats', '.accounts-stat--screen', '.accounts-notice',
+      '.accounts-composer', '.accounts-fields', '.accounts-search', '.accounts-grid',
+      '.accounts-card__price', '.accounts-card__acts', '.accounts-act--sold', '.accounts-act--return',
+    ].every((sel) => cssSrc.includes(sel)));
+  check('краска витрина берёт из токенов сайта, а не держит собственные цвета',
+    /\.accounts-card \{[\s\S]{0,420}?background: linear-gradient\(180deg, var\(--raised\), var\(--surface\)\)/.test(cssSrc)
+      && /\.accounts-card__price \{[\s\S]{0,420}?color: var\(--gold\)/.test(cssSrc)
+      && /\.accounts-composer \{[\s\S]{0,320}?background: var\(--surface\)/.test(cssSrc));
+  check('телефон: шапка и сетка складываются в одну колонку, а кнопки становятся во всю ширину',
+    /@media \(max-width: 700px\)[\s\S]{0,1200}?\.accounts-hero \{ grid-template-columns: 1fr;[\s\S]{0,900}?\.accounts-grid \{ grid-template-columns: 1fr;[\s\S]{0,700}?\.accounts-act \{ min-height: 44px/.test(cssSrc));
+  check('главное действие витрины одето общей кнопкой сайта, а не собственным градиентом',
+    /class="forum-btn accounts-hero__cta"/.test(boardSrc)
+      && /class="forum-btn forum-btn--ghost accounts-hero__cta"/.test(boardSrc)
+      && !/\.accounts-hero__cta \{[^}]*background:/.test(cssSrc));
 
   /* ── Правила форума: доска не отменила запрет торговли в ленте ── */
   const adsRule = rules.RULES.find((r) => r.id === 'ads');
@@ -11449,6 +11511,10 @@ console.log('\nAN. Доска аккаунтов');
   check('документ объясняет два решения, которые легко потерять при правке',
     flatDocs.includes('проданные объявления режет экран, а не база')
       && flatDocs.includes('ссылка доски — это адрес вида'));
+  check('документ не врёт про прежний путь: форма на вкладке одна, а миграция прогнана',
+    !docsSrc.includes('Разместить объявление')
+      && flatDocs.includes('Ящик на вкладке — единственный путь')
+      && /Миграция \*\*прогнана\*\*/.test(docsSrc));
 
   /* ── Живой черновой прогон: те же правила, что у базы ── */
   const local = await import('../src/forum/adapters/local.js');
@@ -11516,18 +11582,37 @@ console.log('\nAN. Доска аккаунтов');
   equal('объявление осталось темой со своим заголовком', closed.title, 'Аккаунт 40');
   equal('повторное нажатие возвращает на доску',
     (await local.closeAccountOffer(ad.id, false)).accountSoldAt, null);
+
+  const edited = await local.updateAccountAd(ad.id, {
+    offer: 'уровень 45, собран гарнизон и две крепости', price: '2000 ₽, торг уместен',
+  });
+  equal('правка состава доезжает до строки', edited.accountOffer, 'уровень 45, собран гарнизон и две крепости');
+  equal('и цена: обе части объявления правятся одним вызовом', edited.accountPrice, '2000 ₽, торг уместен');
+  equal('заголовок без правки остаётся авторский', edited.title, 'Аккаунт 40');
+  check('названный срок живёт свой: править цену — не значит передвигать дату',
+    new Date(edited.expiresAt).getTime() === new Date(ad.expiresAt).getTime());
+  equal('названный назад срок не примется и при правке',
+    await says(() => local.updateAccountAd(ad.id, { offer, price: '1500 ₽', expiresAt: inDays(-1) })),
+    'Срок должен быть хотя бы на сутки впереди — вчерашнее объявление актуальным не станет');
+  equal('без одной из частей правка не проходит, как при создании',
+    await says(() => local.updateAccountAd(ad.id, { offer: '', price: '1500 ₽' })), both);
   await local.signOut();
   equal('без входа снимать некому',
     await says(() => local.closeAccountOffer(ad.id, true)), 'Сначала войдите');
   await local.signUp('Посторонний');
   equal('и чужую строку не снять',
     await says(() => local.closeAccountOffer(ad.id, true)), 'Это не ваш пост');
+  equal('чужое объявление не поправить тем же правом',
+    await says(() => local.updateAccountAd(ad.id, { offer, price: '1000 ₽' })), 'Это не ваш пост');
   const ownCalm = await local.createPost({
     title: 'Своё без продажи', body: '<p>обычная тема</p>', category: 'vs', tags: ['vs'],
   });
   equal('у своей темы без метки снимать нечего',
     await says(() => local.closeAccountOffer(ownCalm.id, true)),
     'Снимать с доски можно только объявление с меткой «Аккаунты»');
+  equal('и править на доске без метки нечего',
+    await says(() => local.updateAccountAd(ownCalm.id, { offer, price: '1000 ₽' })),
+    'Править на доске можно только объявление с меткой «Аккаунты»');
 
   await local.signIn('Продавец');
   await local.closeAccountOffer(ad.id, true);

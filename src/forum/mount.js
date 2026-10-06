@@ -25,8 +25,7 @@ import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
   CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines,
-  needsAccountLines, ACCOUNT_TAG_ID, EVENT_TAG_ID,
-  EVENT_RSVP_IDS, validateServerId,
+  EVENT_TAG_ID, EVENT_RSVP_IDS, validateServerId,
 } from './rules.js';
 import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
 import { getProfile, getUserPosts, saveProfile, uploadAvatar, clearAvatar, attachImage } from './profile.js';
@@ -169,12 +168,6 @@ const state = {
     держим: иначе встреча открывалась бы закрытой.
   */
   eventDraft: false,
-  /*
-    То же намерение для доски аккаунтов: `#/forum?new=accounts` с витрины.
-    Флаг отмечает метку «Аккаунты» до первой отрисовки и раскрывает форму,
-    где уже лежат поля «что в аккаунте» и «цена».
-  */
-  accountDraft: false,
   /*
     Отмеченные метки набираемой темы. Держим их состоянием, а не экраном:
     у семи чекбоксов одно имя `tags`, и через снимок ввода под этим ключом
@@ -444,8 +437,8 @@ function restoreInput(snapshot) {
  * отказ вместо подсказки. Поэтому срок подставляется сам. Делается это в двух
  * местах одним кодом: когда метку только что отметили и когда пришли по ссылке
  * с уже отмеченной меткой. Второе место появилось не для красоты — подстановка
- * жила только в слушателе клика, и приход по ссылке «Разместить объявление»
- * давал форму, которая подсказкой обещает автоподстановку и тут же её не делает.
+ * жила только в слушателе клика, и приход по ссылке «Создать встречу» давал
+ * форму, которая подсказкой обещает автоподстановку и тут же её не делает.
  */
 function autofillExpiry(form, tagId) {
   const select = form?.elements.expires_in;
@@ -596,17 +589,6 @@ function paint() {
     }
     state.composerOpen = true;
   }
-  /*
-    Пришли разместить объявление на доске аккаунтов — метка «Аккаунты» должна
-    быть отмечена до первой отрисовки, иначе человек увидит форму без полей
-    «что в аккаунте» и «цена», а без них база тему не примет.
-  */
-  if (state.accountDraft) {
-    if (!state.composerTags.includes(ACCOUNT_TAG_ID)) {
-      state.composerTags = [...state.composerTags, ACCOUNT_TAG_ID];
-    }
-    state.composerOpen = true;
-  }
   host.innerHTML = mode === 'user'
     ? renderUserPage({ ...profileState, me: state.me }) + dialogs
     : renderForum(siteView, state) + dialogs;
@@ -628,10 +610,8 @@ function paint() {
       Пришли по ссылке с уже отмеченной меткой — срок подставляется здесь же:
       получить его из слушателя клика некому, клика не было.
     */
-    const intentTag = state.accountDraft ? ACCOUNT_TAG_ID : state.eventDraft ? EVENT_TAG_ID : '';
-    if (intentTag) autofillExpiry(host.querySelector('[data-forum-new]'), intentTag);
+    if (state.eventDraft) autofillExpiry(host.querySelector('[data-forum-new]'), EVENT_TAG_ID);
     state.eventDraft = false;
-    state.accountDraft = false;
   }
 
   /*
@@ -768,7 +748,6 @@ function readFilters(search) {
     человек остаётся с закрытым композером.
   */
   state.eventDraft = state.eventDraft || composeIntentFromSearch(search) === 'event';
-  state.accountDraft = state.accountDraft || composeIntentFromSearch(search) === 'accounts';
 }
 
 function writeFilters() {
@@ -2785,13 +2764,6 @@ function wire() {
       const barterFields = form?.querySelector('[data-forum-barter-fields]');
       if (barterFields) barterFields.hidden = !needsBarterLines(chosen);
       /*
-        Поля доски аккаунтов — за той же меткой: без «Аккаунтов» база обнулит
-        обе колонки триггером, и оставленные на экране поля обещали бы
-        объявление, которого в ленте не появится.
-      */
-      const accountFields = form?.querySelector('[data-forum-account-fields]');
-      if (accountFields) accountFields.hidden = !needsAccountLines(chosen);
-      /*
         Черновик пересохраняем именно здесь: автосохранение идёт на input,
         который случился до того, как поле заполнилось, и без этого шага
         перерисовка вернула бы пустой срок.
@@ -2956,17 +2928,6 @@ function wire() {
       if (needsBarterLines(draft.tags)) {
         draft.barterGives = gives || null;
         draft.barterWants = wants || null;
-      }
-      /*
-        Доска аккаунтов — те же два правила: строку не режем местной проверкой
-        (длины держат проверка таблицы и триггер), и пустое поле в запрос не
-        уезжает. Без метки «Аккаунты» колонок не касается никто, а до прогона
-        20261006-account-board.sql PostgREST отверг бы всю тему из-за
-        неизвестного столбца.
-      */
-      if (needsAccountLines(draft.tags)) {
-        draft.accountOffer = form.account_offer?.value?.trim() || null;
-        draft.accountPrice = form.account_price?.value?.trim() || null;
       }
 
       await withBusy(submitter, 'Публикуем…', async () => {
@@ -3572,7 +3533,6 @@ export function unmountForum() {
     ставал в прошлый заход.
   */
   state.eventDraft = false;
-  state.accountDraft = false;
   state.composerTags = [];
   state.composerOpen = false;
   state.editingPostId = null;

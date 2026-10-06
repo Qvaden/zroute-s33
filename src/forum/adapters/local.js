@@ -1281,6 +1281,55 @@ export async function closeAccountOffer(id, closed) {
   return postOut(s, post);
 }
 
+/**
+ * ПРАВКА ОБЪЯВЛЕНИЯ С ДОСКИ — состав, цена, заголовок и срок одним шагом.
+ *
+ * Боевой режим делает один PATCH строки (см. supabase.js), и здесь тот же один
+ * шаг: две функции, разошедшиеся в порядке проверок, показали бы черновику
+ * другую причину отказа, чем игрок увидел бы на базе. Тексты держат те же
+ * accountProblem и expiryProblem, что стоят при создании объявления, — те же
+ * слова, что у триггеров forum_posts_accounts и forum_posts_expiry.
+ *
+ * Право — автор или модература ленты, ровно как у отметки «продано».
+ */
+export async function updateAccountAd(id, patch = {}) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const post = s.posts.find((p) => p.id === id);
+  if (!post) throw new Error('Пост не найден');
+  if (!canModeratePost(s, me, post) && post.authorId !== me.id) throw new Error('Это не ваш пост');
+
+  const tags = Array.isArray(post.tags) ? post.tags : [];
+  if (!needsAccountLines(tags)) {
+    throw new Error('Править на доске можно только объявление с меткой «Аккаунты»');
+  }
+
+  const offer = String(patch.offer ?? '').trim();
+  const price = String(patch.price ?? '').trim();
+  const accountError = accountProblem(tags, offer, price);
+  if (accountError) throw new Error(accountError);
+
+  /*
+    Срок не трогается, если его не назвали: человек правит цену, а дата
+    назначена неделю назад и проживёт своё. Названный срок проверяется тем же
+    текстом, что и при создании, — «на вчера» база не примет.
+  */
+  const when = patch.expiresAt === undefined ? post.expiresAt ?? null : patch.expiresAt ?? null;
+  const expiryError = expiryProblem(tags, when);
+  if (expiryError) throw new Error(expiryError);
+
+  const title = String(patch.title ?? '').trim();
+  if (title) post.title = title;
+  post.accountOffer = offer;
+  post.accountPrice = price;
+  post.expiresAt = when;
+  post.editedAt = new Date().toISOString();
+  write(s);
+  return postOut(s, post);
+}
+
 /* ── Комментарии ──────────────────────────────────────────────────────────── */
 
 function commentOut(state, c) {

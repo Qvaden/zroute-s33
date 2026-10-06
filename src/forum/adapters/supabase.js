@@ -881,6 +881,37 @@ export async function closeAccountOffer(id, closed) {
   return full;
 }
 
+/**
+ * ПРАВКА ОБЪЯВЛЕНИЯ С ДОСКИ — состав, цена, заголовок и срок одним шагом.
+ *
+ * Отдельная функция, а не вызов editPost рядом с setExpiry: объявление меняют
+ * целиком («стал дороже», «добавился гарнизон»), и два запроса подряд показали
+ * бы человеку половину новой строки, если второй сорвался бы на отказе
+ * триггера. Один PATCH — одна правка, один ответ базы, один текст отказа.
+ *
+ * Длины строк и требование обеих частей решает база (проверки таблицы и
+ * триггер forum_posts_accounts из supabase/applied/20261006-account-board.sql),
+ * срок — триггер forum_posts_expiry: сюда поля уходят как их набрал человек,
+ * местной проверки нет нарочно, чтобы отказами распоряжалась одна схема.
+ * Право на строку отдаёт RLS: свою правит автор, любую — модература ленты.
+ */
+export async function updateAccountAd(id, patch = {}) {
+  const body = {
+    account_offer: String(patch.offer ?? '').trim(),
+    account_price: String(patch.price ?? '').trim(),
+    edited_at: new Date().toISOString(),
+  };
+  const title = String(patch.title ?? '').trim();
+  if (title) body.title = title;
+  // Срок меняем только когда его назвали: undefined — «трогать нечего».
+  if (patch.expiresAt !== undefined) body.expires_at = patch.expiresAt ?? null;
+
+  await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body });
+  const full = await getPost(id);
+  if (!full) throw new Error('Объявление не найдено после правки');
+  return full;
+}
+
 /* ── Комментарии ──────────────────────────────────────────────────────────── */
 
 function commentOut(row) {

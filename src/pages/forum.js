@@ -21,7 +21,7 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines, needsAccountLines } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
@@ -1565,43 +1565,15 @@ function barterControl(p, s) {
 
 /* ── Доска аккаунтов ────────────────────────────────────────────────────── */
 
-/**
- * Поля объявления на доске аккаунтов.
- *
- * Требование обеих частей держит триггер базы `forum_posts_accounts`
- * (supabase/applied/20261006-account-board.sql), а длины — проверка той же таблицы,
- * поэтому форма просит ровно то, что база примет: числа берутся из config.js,
- * где они стоят рядом с числами миграции, и расхождение сторожит тест.
- *
- * Денег и контактов здесь нет намеренно, и это не забывчивость: сайт не держит
- * платёж, не берёт комиссию и не может вернуть сумму, поэтому цена — только
- * слово автора, а сделка происходит мимо форума. Телефон или дискорд полем не
- * становятся по второй причине: связаться с автором можно по его нику, который
- * и так в теме, а поле под личные данные приглашало бы светить их там, где их
- * читает весь сервер.
- */
-function renderAccountFields(open) {
-  const L = CONFIG.forum.limits;
-  return `
-    <div class="forum-offer-fields" data-forum-account-fields${open ? '' : ' hidden'}>
-      <label class="forum-field">
-        <span>Что в аккаунте</span>
-        <input type="text" name="account_offer" data-forum-account-offer
-               minlength="${L.accountOfferMin}" maxlength="${L.accountOfferMax}"
-               placeholder="уровень, техника, скины, что осталось от сезона">
-      </label>
-      <label class="forum-field">
-        <span>Цена</span>
-        <input type="text" name="account_price" data-forum-account-price
-               minlength="${L.accountPriceMin}" maxlength="${L.accountPriceMax}"
-               placeholder="словами, например: 500 рублей или по договорённости">
-      </label>
-      <small class="muted">Сайт денег не берёт: цена — слово автора, а сделка происходит
-        мимо форума. Обсуждение, торг и вопросы пишут в ответах под темой — она обычная,
-        просто с меткой «Аккаунты». Когда аккаунт продан, отметьте это в карточке: тема
-        останется со своими ответами.</small>
-    </div>`;
-}
+/*
+  Полей объявления в форме новой темы здесь больше нет: метка «Аккаунты»
+  размечена `shopOnly` в rules.js, и объявление пишут на своей вкладке
+  (src/pages/accounts.js). Две формы на те же две колонки расходились бы при
+  каждой правке чисел, а вторая ничего не добавляла — тема-объявление
+  создаётся тем же createPost. В теме объявление по-прежнему видно: строки
+  ниже показывают обе части, а кнопка отметки «продано» остаётся здесь для
+  модературы, которой тема видна в ленте.
+*/
 
 /**
  * Обе части объявления в карточке.
@@ -1763,7 +1735,7 @@ function renderComposer(s) {
 
         <fieldset class="forum-topic-tags">
           <legend>Теги темы <small>до трёх</small></legend>
-          ${TOPIC_TAGS.map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"${tags.includes(tag.id) ? ' checked' : ''}><span>${esc(tag.label)}</span></label>`).join('')}
+          ${TOPIC_TAGS.filter((tag) => !tag.shopOnly).map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"${tags.includes(tag.id) ? ' checked' : ''}><span>${esc(tag.label)}</span></label>`).join('')}
         </fieldset>
 
         ${renderExpiryField(tags)}
@@ -1771,8 +1743,6 @@ function renderComposer(s) {
         ${renderEventFields(needsEventDate(tags))}
 
         ${renderBarterFields(needsBarterLines(tags))}
-
-        ${renderAccountFields(needsAccountLines(tags))}
 
         <label class="forum-field">
           <span>Заголовок</span>

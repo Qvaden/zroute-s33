@@ -378,6 +378,7 @@
  * @property {(id: string, expiresAt: string|null) => Promise<ForumPost>} setExpiry  Продлить срок или снять его; база считает границы, страница показывает отказ как есть.
  * @property {(id: string, closed: boolean) => Promise<ForumPost>} closeBarter  Снять объявление обмена с доски или вернуть его. Право решает RLS темы, как у setExpiry: своей строкой правит автор.
  * @property {(id: string, closed: boolean) => Promise<ForumPost>} closeAccountOffer  Доска аккаунтов — отдельная от обменной: свои колонки и своя метка, поэтому и функция своя. Право то же — RLS темы, свою строку закрывает автор; тема при этом не удаляется, а перестаёт висеть на доске.
+ * @property {(id: string, patch: {offer?: string, price?: string, title?: string, expiresAt?: string|null}) => Promise<ForumPost>} updateAccountAd  Правка объявления с доски: обе строки доски, заголовок и срок одним PATCH. Раздельные вызовы показали бы наполовину исправленное объявление, если второй запрос отверг бы триггер. Срок трогается только когда его назвали.
  * @property {(postId: string) => Promise<ForumComment[]>} listComments
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment
  * @property {(id: string, reason: string) => Promise<void>} deleteComment

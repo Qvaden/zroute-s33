@@ -2950,20 +2950,6 @@
   white-space: nowrap;
 }
 
-/* Поля объявления в форме — по образцу полей обмена и встречи: метка открыла
-   свои поля, и подсветка говорит, какая метка. */
-.forum-offer-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--gold) 7%, var(--raised));
-  border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
-}
-.forum-offer-fields .forum-field { flex: 1 1 220px; }
-.forum-offer-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
-
 /* ══ ПУЛЬС ОБНОВЛЕНИЙ ИГРЫ ══════════════════════════════════════════════════
    Заметки пишет модерация, поэтому карточка обязана называть источник и его
    дату: без них пересказ неотличим от слуха.
@@ -3304,26 +3290,112 @@
   color: var(--mute);
 }
 
-/* ══ ДОСКА АККАУНТОВ ════════════════════════════════════════════════════════
-   Витрину смотрят глазами «почём» и «что внутри», поэтому карточка — плитка
-   с крупной ценой, а не строка ленты: объявление сравнивают с соседним, не
-   переходя в тему.
+/* ══ МАГАЗИН АККАУНТОВ ══════════════════════════════════════════════════════
+   Витрина собрана как магазин, а не как ещё один раздел ленты: сверху — шапка
+   с двумя числами и главным действием, ниже — сетка плиток, у каждой цена
+   крупно. Объявление сравнивают с соседним, не переходя в тему, поэтому
+   плитка читается за две строки: «что внутри» и «почём».
+
+   Все цвета берутся из токенов `styles-v8.css`, и светлая тема обязана
+   выглядеть собранной так же, как тёмная: ни одного цвета, который живёт
+   только в одной из двух.
 */
 
 .accounts-page .panel__head { margin-bottom: 12px; }
-.accounts-page .panel__head h1 { font-size: clamp(20px, 3vw, 26px); margin: 4px 0 0; }
-.accounts-page .panel__head p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+
+/* Шапка: слева — зачем страница, справа — чем она заполнена и что делать. */
+.accounts-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.accounts-hero__text { min-width: 0; }
+.accounts-hero h1 {
+  margin: 5px 0 0;
+  font-size: clamp(22px, 3.4vw, 30px);
+  line-height: 1.12;
+  letter-spacing: -.015em;
+}
+.accounts-hero p { margin: 8px 0 0; max-width: 46ch; font-size: 13px; line-height: 1.55; }
+.accounts-hero__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* Два числа рядом и названы: «на доске» считает база, «на экране» — то,
+   что легло сюда. Разница видна сразу, и кнопка «Показать ещё» не выглядит
+   обещанием, которое страница не выполнила. */
+.accounts-stats { display: flex; gap: 8px; margin: 0; }
+.accounts-stat {
+  min-width: 96px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--raised);
+}
+.accounts-stat dt {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.accounts-stat dd { margin: 2px 0 0; font-size: 13.5px; font-weight: 800; color: var(--text); }
+.accounts-stat--screen {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--raised));
+}
+.accounts-stat--screen dd { color: var(--accent); }
+/*
+  Кнопка в шапке — общая сайтная, поэтому её форма перебивается слоем
+  отделки: у `.forum-btn` свои углы, и правило той же силы, стоящее ниже в
+  списке файлов, побеждает. Плашка здесь написана двумя классами — иначе
+  главное действие витрины выглядело бы прямоугольным рядом с круглыми чипами.
+*/
+.accounts-hero .accounts-hero__cta { border-radius: 999px; padding: 10px 22px; }
 
 .accounts-notice {
   margin: 0 0 14px;
-  padding: 10px 13px;
+  padding: 10px 13px 10px 15px;
   border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
+  border-left: 3px solid var(--gold);
   border-radius: 12px;
   background: color-mix(in srgb, var(--gold) 7%, var(--raised));
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--mute);
 }
+
+/*
+  Ящик объявления — форма прямо на вкладке. Выделена рамкой в цвет акцента,
+  чтобы между «читаю чужое» и «написал своё» был видимый переход: человек не
+  должен гадать, где заканчивается доска и начинается его черновик.
+*/
+.accounts-composer {
+  margin: 0 0 16px;
+  padding: 14px 16px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.accounts-composer__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 12px; }
+.accounts-composer__head b { font-size: 15px; }
+.accounts-composer__head span { font-size: 12px; line-height: 1.45; }
+/* Поля — сеткой: на широком экране состав и цена стоят рядом, и объявление
+   набирают, не скрывая половину формы под прокрутку. */
+.accounts-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0 14px;
+}
+.accounts-fields .forum-field { min-width: 0; }
+.accounts-fields .forum-field textarea { min-height: 92px; }
+.accounts-composer__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 
 .accounts-controls {
   display: flex;
@@ -3342,9 +3414,26 @@
   cursor: pointer;
 }
 .accounts-controls__sold input { width: 16px; height: 16px; accent-color: var(--accent); }
-/* Кнопка «разместить» — на своём месте справа и не превращается в ссылку:
-   это вход в обычный композер форума, а не ещё одна страница. */
-.accounts-controls__new { margin-left: auto; text-decoration: none; }
+/* Поиск — справа в том же ряду и тянется на всё свободное место: доску
+   ищут по уровню и ресурсу, и поле должно быть видно без второго ряда. */
+.accounts-search { flex: 1 1 220px; min-width: 0; }
+.accounts-search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.accounts-search input:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.accounts-search input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
 
 .accounts-chip {
   padding: 8px 14px;
@@ -3367,26 +3456,45 @@
 
 .accounts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
 }
 
 .accounts-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 8px;
+  /* Сетка режет колонку по ширине содержимого, если ячейке не запрещено
+     расширяться: заголовок без пробелов раздвинул бы плитку и весь экран. */
+  min-width: 0;
+  padding: 14px 16px;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--gold);
-  border-radius: 12px;
-  background: var(--raised);
+  border-top: 3px solid var(--gold);
+  border-radius: var(--r);
+  background: linear-gradient(180deg, var(--raised), var(--surface));
+  transition: transform .16s var(--ease), box-shadow .18s var(--ease), border-color .16s var(--ease);
 }
-.accounts-card__title { margin: 0; font-size: 14.5px; line-height: 1.35; font-weight: 600; }
+/* Плитку поднимаем при наведении: объявление выбирают, и отклик должен быть
+   сразу виден, иначе человек тыкает в карточку, думая, что она кликабельна. */
+.accounts-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--gold) 34%, var(--line));
+  border-top-color: var(--gold);
+}
+.accounts-card__title { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .accounts-card__title a { color: var(--text); text-decoration: none; }
 .accounts-card__title a:hover { color: var(--accent); }
+/* Цена — плашкой, а не строкой текста: её сравнивают между карточками,
+   и глаз должен цеплять её, не читая абзац. */
 .accounts-card__price {
+  align-self: flex-start;
   margin: 0;
-  font-size: 15px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--raised));
+  font-size: 14.5px;
   font-weight: 800;
   color: var(--gold);
   overflow-wrap: anywhere;
@@ -3395,8 +3503,14 @@
   margin: 0;
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--text);
+  color: var(--dim);
   overflow-wrap: anywhere;
+  /* Состав режем в четыре строки: карточек на экране должно быть видно
+     несколько сразу, а длинный пересказ сезона читается в теме. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
 }
 .accounts-card__marks { display: flex; flex-wrap: wrap; gap: 6px; }
 .accounts-card__sold,
@@ -3424,7 +3538,8 @@
   align-items: center;
   gap: 8px;
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
   font-size: 11.5px;
   color: var(--dim);
 }
@@ -3432,13 +3547,42 @@
 .accounts-card__nick:hover { text-decoration: underline; }
 .accounts-card__talk { margin-left: auto; color: var(--accent); text-decoration: none; white-space: nowrap; }
 .accounts-card__talk:hover { text-decoration: underline; }
+/* Своё объявление правят отсюда же, откуда смотрят чужие: кнопки одним рядом
+   под футером, чтобы «Продано» и «Править» не прыгали по карточке. */
+.accounts-card__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
+}
+.accounts-act {
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.accounts-act:hover { color: var(--text); border-color: var(--accent); }
+.accounts-act--sold:hover { color: var(--win); border-color: var(--win); }
+.accounts-act--return:hover { color: var(--gold); border-color: var(--gold); }
 /* Проданное и просроченное не прячем, но и не зовём: объявление помнят по
-   цене, и перечёркнутая плитка честнее исчезнувшей. */
+   цене, и снятая плитка честнее исчезнувшей. Наведение такое объявление не
+   получает — оно не ждёт клика. */
 .accounts-card--sold,
 .accounts-card--expired {
-  border-left-color: var(--line);
+  border-top-color: var(--line);
+  background: var(--raised);
   opacity: .62;
 }
+.accounts-card--sold:hover,
+.accounts-card--expired:hover { transform: none; box-shadow: none; border-color: var(--line); border-top-color: var(--line); }
 
 .accounts-error {
   margin: 0 0 12px;
@@ -3462,13 +3606,22 @@
 .accounts-empty p:last-child { margin: 0; font-size: 12px; }
 
 /*
-  Телефон: сетка складывается в один столбец, а кнопка объявления уходит под
-  переключатели — иначе ряд из трёх элементов режет экран пополам.
+  Телефон: шапка складывается в один столбец и кнопка объявления становится
+  во всю ширину — на доске её нажимают пальцем, и мелкий чип рядом с ней
+  означал бы промах. Сетка — в одну колонку, поиск тоже растягивается.
 */
 @media (max-width: 700px) {
+  .accounts-hero { grid-template-columns: 1fr; align-items: start; }
+  .accounts-hero__aside { align-items: stretch; width: 100%; }
+  .accounts-stats { width: 100%; }
+  .accounts-stat { flex: 1 1 0; min-width: 0; }
+  .accounts-hero__cta { width: 100%; }
+  .accounts-fields { grid-template-columns: 1fr; }
+  .accounts-composer__actions .forum-btn { flex: 1 1 160px; }
   .accounts-grid { grid-template-columns: 1fr; }
   .accounts-controls { gap: 8px; }
-  .accounts-controls__new { margin-left: 0; width: 100%; text-align: center; }
+  .accounts-search { flex-basis: 100%; }
   .accounts-chip { min-height: 44px; }
+  .accounts-act { min-height: 44px; flex: 1 1 auto; }
   .accounts-card__talk { margin-left: 0; }
 }
