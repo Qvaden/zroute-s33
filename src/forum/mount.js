@@ -1629,10 +1629,11 @@ function addShots(scope, files, existing = 0) {
 
   const taken = [...files].slice(0, room);
   const skipped = files.length - taken.length;
+  let rejected = '';
 
   for (const file of taken) {
     if (!String(file.type).startsWith('image/')) {
-      showError(`[data-attach-error="${cssEscape(scope)}"]`, `«${file.name}» не картинка`);
+      rejected = `«${file.name}» не картинка`;
       continue;
     }
     current.push({ file, preview: URL.createObjectURL(file) });
@@ -1640,9 +1641,16 @@ function addShots(scope, files, existing = 0) {
 
   pendingShots.set(scope, current);
 
+  /*
+    Отказ про «не картинку» не должен стираться сразу после того, как его
+    показали: раньше ниже шёл безусловный сброс сообщения, и человек видел, как
+    файл выбран, а ни превью, ни объяснения не оставалось.
+  */
   if (skipped > 0) {
     showError(`[data-attach-error="${cssEscape(scope)}"]`,
       `Взято ${taken.length}: к записи можно приложить не больше ${MAX_SHOTS} картинок`);
+  } else if (rejected) {
+    showError(`[data-attach-error="${cssEscape(scope)}"]`, rejected);
   } else {
     clearError(`[data-attach-error="${cssEscape(scope)}"]`);
   }
@@ -2712,7 +2720,15 @@ function wire() {
     }
 
     const attachInput = e.target.closest('[data-attach-input]');
-    if (attachInput) {
+    /*
+      Берём только поле СВОЕГО экрана. Тот же `data-attach-input` стоит в форме
+      гайда и в ящике объявления, а этот слушатель висит на document и живёт,
+      когда форума на экране нет (`host` пуст). Без проверки файл, выбранный на
+      другой вкладке, попадал в нашу карту картинок под именем «new» — и,
+      например, скриншоты гайда молча дорисовывались в композер темы, а потом
+      уезжали к посту при публикации.
+    */
+    if (attachInput && host?.contains(attachInput)) {
       const scope = attachInput.dataset.attachInput;
       let existing = 0;
       // При правке превью прибавляются к уже загруженным картинкам записи:

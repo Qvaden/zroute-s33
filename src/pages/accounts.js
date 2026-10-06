@@ -39,7 +39,7 @@
  */
 import { esc, pluralWord } from '../ui/helpers.js';
 import { serverBadge } from '../forum/roles.js';
-import { renderMdBar } from './forum.js';
+import { renderMdBar, renderAttachRow } from './forum.js';
 import { CONFIG } from '../../config.js';
 
 const SHORT_DATE = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
@@ -91,12 +91,22 @@ function expiryChoices() {
  *
  * `s.editing` — правка существующего объявления: те же поля, другие подписи и
  * другая кнопка, поэтому форма одна, а не две.
+ *
+ * Скриншоты — та же строка прикрепления, что у композера темы
+ * (`renderAttachRow` из `pages/forum.js`): тот же предел из config'а, те же
+ * слова про сжатие и та же область превью по `scope`. У правки свой scope
+ * (`ad:<id>`), чтобы выбранные для одного объявления картинки не переезжали в
+ * форму другого.
  */
 function renderComposer(s) {
   const L = CONFIG.forum.limits;
   const editing = s.editing || null;
   const days = expiryChoices();
   const chosen = Number(editing?.expiresIn ?? 0) || defaultExpiryDays();
+  const shotScope = editing ? `ad:${editing.id}` : 'ad';
+  const already = editing
+    ? (s.posts.find((p) => p.id === editing.id)?.attachments?.length ?? 0)
+    : 0;
   const draft = {
     title: editing?.title ?? '',
     offer: editing?.offer ?? '',
@@ -149,6 +159,11 @@ function renderComposer(s) {
       </label>
 
       ${renderMdBar()}
+
+      ${renderAttachRow(shotScope)}
+      ${already ? `<p class="muted accounts-attach__note">К объявлению уже приложено ${already}
+        ${pluralWord(already, 'картинка', 'картинки', 'картинок')} — новые встанут после них, прежние останутся
+        на месте.</p>` : ''}
 
       <div class="accounts-composer__actions">
         <button type="submit" class="forum-btn forum-btn--primary" data-accounts-submit>${
@@ -248,11 +263,45 @@ function renderControls(s) {
 }
 
 /**
+ * Сколько скриншотов показываем на карточке.
+ *
+ * Предел вложений — 12 картинок к записи, и все двенадцать в плитки витрины
+ * встанут ценой полосы на три экрана: доска — список, её читают глазами по
+ * строкам. Три плитки дают увидеть «аккаунт живой или пустой», а остальное
+ * человек открывает в теме, куда ведёт чип с числом.
+ */
+const SHOTS_ON_CARD = 3;
+
+/**
+ * Превью скриншотов объявления.
+ *
+ * Картинки лежат у темы (та же `forum_attachments`, что у постов и гайдов),
+ * поэтому лента доски приносит их вместе с строкой — отдельного запроса не
+ * нужно. Ссылка каждой плитки ведёт в тему, а не на файл: на витрине решение
+ * «смотреть или нет», а торговля и все остальное — там же, где ответы.
+ */
+function renderCardShots(p, href) {
+  const shots = (Array.isArray(p.attachments) ? p.attachments : []).filter((a) => a?.url);
+  if (!shots.length) return '';
+  const shown = shots.slice(0, SHOTS_ON_CARD);
+  const extra = shots.length - shown.length;
+  return `
+    <div class="accounts-card__shots">
+      ${shown.map((a, i) => `<a class="accounts-card__shot" href="${href}" aria-label="Скриншот ${i + 1} — в теме объявления">
+        <img src="${esc(a.url)}" alt="Скриншот ${i + 1} к объявлению «${esc(p.title)}»" loading="lazy">
+      </a>`).join('')}
+      ${extra ? `<a class="accounts-card__more" href="${href}">+${extra}</a>` : ''}
+    </div>`;
+}
+
+/**
  * Одна карточка объявления.
  *
  * Название, обе колонки доски, срок и автор с его сервером — всё. Текст темы на
  * витрине не показываем: решение о просмотре принимается по «что в аккаунте»
  * и «почём», а остальное человек прочитает в теме, куда ведёт заголовок.
+ * Скриншоты — исключение нарочно: аккаунт покупают глазами, и описать
+ * собранный гарнизон словами так, чтобы он не выглядел пустым, невозможно.
  *
  * Проданное и устаревшее не прячем: тема с ответами остаётся на месте, и
  * честнее показать её с пометкой, чем заставлять человека гадать, куда делось
@@ -274,6 +323,7 @@ export function renderAccountCard(p, canManage = false) {
         ${!expired && p.expiresAt ? `<span class="accounts-card__until" title="Объявление висит до ${esc(shortDate(p.expiresAt))}">до ${esc(shortDate(p.expiresAt))}</span>` : ''}
       </div>
       <h3 class="accounts-card__title"><a href="${href}">${esc(p.title)}</a></h3>
+      ${renderCardShots(p, href)}
       <p class="accounts-card__offer">${esc(p.accountOffer || '—')}</p>
       <p class="accounts-card__price">${esc(p.accountPrice || 'цена не названа')}</p>
       <footer class="accounts-card__foot">

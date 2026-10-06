@@ -26,9 +26,11 @@
 import { forum } from './index.js';
 import { renderAccounts, ACCOUNT_SORTS, ACCOUNT_CATEGORY } from '../pages/accounts.js';
 import { ACCOUNT_TAG_ID, validatePost } from './rules.js';
+import { attachImage } from './profile.js';
 import { textOf } from './format.js';
 import { editorFor, applyFormat, wireRichEditor } from './editor.js';
 import { siteServer } from '../data/server.js';
+import { esc } from '../ui/helpers.js';
 import { CONFIG } from '../../config.js';
 
 const DEFAULT_SORT = 'fresh';
@@ -129,6 +131,7 @@ function paint() {
       }
     }
   }
+  paintShots();
 }
 
 /**
@@ -174,6 +177,188 @@ function showFormError(message) {
   if (box) { box.textContent = message; box.hidden = false; }
 }
 
+/* ── Скриншоты к объявлению ───────────────────────────────────────────────── */
+
+/*
+  Предел один на проект и повторён триггером базы
+  (supabase/applied/profiles.sql): браузер предупреждает заранее, база охраняет
+  от запросов мимо сайта. Второй цифры для доски не заводят — вложения лежат в
+  той же таблице и под тем же `target_type='post'`, что у темы и комментария,
+  потому что объявление и есть тема.
+*/
+const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;
+
+/*
+  Выбранные файлы живут вне состояния и вне разметки: ссылка на Blob есть только
+  в памяти браузера, в строку она не превращается и в черновик не попадёт.
+  Ключ — область формы ('ad' при создании, `ad:<id>` при правке), иначе
+  картинки, выбранные для одного объявления, молча переехали бы в форму другого
+  и уехали не туда.
+*/
+const pendingShots = new Map();
+
+/** Область, которой сейчас принадлежит форма. */
+function shotScope() {
+  return state.editing ? `ad:${state.editing.id}` : 'ad';
+}
+
+/*
+  Узлы ищем перебором по data-атрибуту, а не селектором вида
+  `[data-attach-list="ad:p_1"]`: идентификатор приходит из базы, и собирать из
+  него строку запроса — значит ловить исключение на первом же странном символе
+  (тот же приём, что у страницы гайдов).
+
+  Значение читаем через getAttribute, а не через `dataset[имя]`: ключи dataset —
+  верблюжьи, `dataset['attach-list']` всегда пустой, и поиск молча возвращал бы
+  null. Тогда превью выбранной картинки не появилось бы вообще, без единого
+  сообщения об ошибке.
+*/
+function shotNode(attr, scope) {
+  for (const el of host?.querySelectorAll(`[${attr}]`) ?? []) {
+    if (el.getAttribute(attr) === scope) return el;
+  }
+  return null;
+}
+
+function shotError(message) {
+  const box = shotNode('data-attach-error', shotScope());
+  if (!box) return;
+  box.textContent = message;
+  box.hidden = !message;
+}
+
+/**
+ * Превью выбранных картинок.
+ *
+ * Дорисовываются ПОСЛЕ перерисовки, а не собираются в строку разметки: ссылка
+ * на Blob живёт в памяти, и в `innerHTML` формы её не положить.
+ */
+function paintShots() {
+  if (!host) return;
+  for (const [scope, files] of pendingShots) {
+    const list = shotNode('data-attach-list', scope);
+    if (!list) continue;
+    list.innerHTML = files
+      .map((f, i) => `<div class="forum-attach__item">
+        <img src="${f.preview}" alt="">
+        <button type="button" class="forum-attach__drop"
+                data-attach-drop="${esc(scope)}:${i}" title="Убрать">✕</button>
+      </div>`)
+      .join('');
+  }
+}
+
+/** Сколько картинок уже приложено к объявлению: комнату под новые считаем от общего предела. */
+function existingShots() {
+  const id = state.editing?.id;
+  if (!id) return 0;
+  return state.posts.find((p) => p.id === id)?.attachments?.length ?? 0;
+}
+
+function addShots(files) {
+  const scope = shotScope();
+  const current = pendingShots.get(scope) ?? [];
+  const room = MAX_SHOTS - existingShots() - current.length;
+
+  if (room <= 0) {
+    shotError(`К объявлению можно приложить не больше ${MAX_SHOTS} картинок`);
+    return;
+  }
+
+  const taken = [...files].slice(0, room);
+  let rejected = '';
+  for (const file of taken) {
+    if (!String(file.type).startsWith('image/')) {
+      rejected = `«${file.name}» не картинка`;
+      continue;
+    }
+    current.push({ file, preview: URL.createObjectURL(file) });
+  }
+
+  if (current.length) pendingShots.set(scope, current);
+  /*
+    Сообщения идут по важности: обрезали по пределу — говорим про предел, иначе
+    — про отвергнутый файл, и только когда приняли всё снимаем прошлый отказ.
+    Раньше «не картинка» ставился в цикле и стирался ниже, если в списке уже
+    лежала хоть одна картинка: человек не понимал, почему файл пропал.
+  */
+  if (taken.length < files.length) {
+    shotError(`Взято ${current.length}: к объявлению можно приложить не больше ${MAX_SHOTS} картинок`);
+  } else if (rejected) {
+    shotError(rejected);
+  } else if (current.length) {
+    shotError('');
+  }
+
+  paintShots();
+}
+
+function dropShot(scope, index) {
+  const list = pendingShots.get(scope);
+  if (!list?.[index]) return;
+  // Ссылку на Blob освобождаем сразу: иначе браузер держит файл до перезагрузки.
+  URL.revokeObjectURL(list[index].preview);
+  list.splice(index, 1);
+  if (list.length) pendingShots.set(scope, list);
+  else pendingShots.delete(scope);
+  shotError('');
+  paintShots();
+}
+
+function clearShots(scope) {
+  for (const item of pendingShots.get(scope) ?? []) URL.revokeObjectURL(item.preview);
+  pendingShots.delete(scope);
+}
+
+function clearAllShots() {
+  for (const scope of [...pendingShots.keys()]) clearShots(scope);
+}
+
+/**
+ * Загрузить выбранное к уже созданной теме.
+ *
+ * Картинки уходят ПОСЛЕ объявления, а не до: вложение ссылается на запись,
+ * значит запись должна существовать. Загрузка до публикации оставила бы в
+ * хранилище файлы, на которые никто не ссылается, — брошенную форму чистить
+ * было бы нечем.
+ *
+ * Неудача одной картинки не отменяет публикацию: тема уже написана и видна
+ * другим, и терять её из-за третьего скриншота нельзя. О возвращённых ссылках
+ * просим не ради красоты — карточка обязана показать свой скриншот сразу, без
+ * перечитывания доски.
+ *
+ * @returns {Promise<{error: string, added: {id: string, url: string}[]}>}
+ */
+async function uploadShots(scope, targetId, onProgress) {
+  const list = pendingShots.get(scope) ?? [];
+  if (!list.length) return { error: '', added: [] };
+
+  /*
+    В локальном режиме файла некуда положить: хранилища нет. Отказ должен
+    говорить про режим, а не про вход: `attachImage` в черновом режиме ответил
+    бы «Сначала войдите» человеку, который только что вошёл в черновой профиль,
+    и это была бы ложь вместо объяснения.
+  */
+  if (CONFIG.forum.source !== 'supabase') {
+    clearShots(scope);
+    return { error: 'Картинки не приложены: в локальном режиме хранилища нет. Объявление опубликовано без скриншотов.', added: [] };
+  }
+
+  const failed = [];
+  const added = [];
+  for (let i = 0; i < list.length; i++) {
+    onProgress?.(i + 1, list.length);
+    try {
+      const shot = await attachImage('post', targetId, list[i].file);
+      if (shot?.url) added.push({ id: shot.id, url: shot.url });
+    } catch (err) {
+      failed.push(String(err?.message ?? err));
+    }
+  }
+  clearShots(scope);
+  return { error: failed.length ? `Не загрузились картинки: ${failed[0]}` : '', added };
+}
+
 /**
  * Тело темы из ящика объявления.
  *
@@ -199,7 +384,7 @@ function readForm(form) {
   };
 }
 
-/** Строка объявления в виде, котором её хочет видеть форма правки. */
+/** Строка объявления в том виде, в котором её хочет видеть форма правки. */
 function editSeed(post) {
   return {
     id: post.id,
@@ -230,10 +415,21 @@ async function submitForm(form, submitter) {
         price: value.price,
         expiresAt: value.expiresAt,
       });
+      /*
+        Скриншоты — следом за правкой, в область `ad:<id>`: поле выбора
+        картинок было видно всё это время, и человек ждёт, что его файлы уедут
+        вместе с составом и ценой.
+      */
+      const shots = await uploadShots(`ad:${editing.id}`, editing.id, (i, n) => {
+        if (submitter) submitter.textContent = `Картинка ${i}/${n}…`;
+      });
       const i = state.posts.findIndex((p) => p.id === editing.id);
-      if (i >= 0 && updated) state.posts[i] = updated;
+      if (i >= 0 && updated) {
+        state.posts[i] = { ...updated, attachments: [...(updated.attachments ?? []), ...shots.added] };
+      }
       state.editing = null;
       state.composing = false;
+      state.error = shots.error;
     } else {
       const draft = {
         ...checked.value,
@@ -251,7 +447,10 @@ async function submitForm(form, submitter) {
       if (server != null) draft.serverId = server;
       const created = await forum.createPost(draft);
       if (created) {
-        state.posts = [created, ...state.posts];
+        const shots = await uploadShots('ad', created.id, (i, n) => {
+          if (submitter) submitter.textContent = `Картинка ${i}/${n}…`;
+        });
+        state.posts = [{ ...created, attachments: [...(created.attachments ?? []), ...shots.added] }, ...state.posts];
         /*
           Список не перечитывается — объявление уже в руках, и второй запрос
           ради одного слова был бы платным дважды. Но «на доске» берётся из
@@ -259,10 +458,10 @@ async function submitForm(form, submitter) {
           видимом объявлении: число в шапке стало бы меньше экрана.
         */
         state.total += 1;
+        state.error = shots.error;
       }
       state.composing = false;
     }
-    state.error = '';
     paint();
   } catch (err) {
     showFormError(String(err?.message ?? err));
@@ -291,6 +490,18 @@ function wire() {
     if (colorBtn) {
       const editor = editorFor(colorBtn);
       if (editor) applyFormat(editor, 'color', colorBtn.dataset.editorColor || 'inherit');
+      return;
+    }
+
+    const dropBtn = t.closest?.('[data-attach-drop]');
+    if (dropBtn) {
+      /*
+        Индекс всегда последний сегмент, а область может содержать двоеточие
+        (`ad:p_12`), поэтому режем по ПОСЛЕДНЕМУ двоеточию, а не по первому.
+      */
+      const raw = dropBtn.dataset.attachDrop;
+      const sep = raw.lastIndexOf(':');
+      dropShot(raw.slice(0, sep), Number(raw.slice(sep + 1)));
       return;
     }
 
@@ -369,6 +580,23 @@ function wire() {
     const box = form.querySelector('[data-accounts-error]');
     if (box) { box.textContent = ''; box.hidden = true; }
     submitForm(form, form.querySelector('[data-accounts-submit]'));
+  });
+
+  /*
+    Файлы приходят событием change, а не click: поле выбора картинки отдаёт их
+    только так. Область проверяем на принадлежность доске: тот же атрибут стоит
+    в композере темы и в форме гайда, а слушатель висит на этой вкладке —
+    чужие поля трогать незачем.
+  */
+  host.addEventListener('change', (e) => {
+    const input = e.target?.closest?.('[data-attach-input]');
+    if (!input || !host?.contains(input)) return;
+    addShots(input.files ?? []);
+    /*
+      Поле очищаем: иначе второй выбор тех же файлов не дал бы события, и
+      человек решил бы, что кнопка сломалась.
+    */
+    input.value = '';
   });
 
   /*
@@ -459,6 +687,12 @@ export function unmountAccounts() {
   host = null;
   mountToken++;
   clearTimeout(searchTimer);
+  /*
+    Ссылки на выбранные картинки освобождаем обязательно: иначе браузер держит
+    файлы в памяти до перезагрузки, а на телефоне это несколько мегабайт за
+    каждую брошенную форму.
+  */
+  clearAllShots();
   state.posts = [];
   state.total = 0;
   state.more = false;

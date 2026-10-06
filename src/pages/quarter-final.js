@@ -1,5 +1,5 @@
-import { esc, formDots, plural } from '../ui/helpers.js?v=90';
-import { formatQuarterLeft } from '../ui/quarter-timer.js?v=90';
+import { esc, formDots, plural } from '../ui/helpers.js?v=91';
+import { formatQuarterLeft } from '../ui/quarter-timer.js?v=91';
 
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,

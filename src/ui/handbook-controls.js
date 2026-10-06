@@ -18,7 +18,7 @@
   на каждый нажатый знак назад не ходят, и история из двадцати состояний
   одного слова была бы вредна.
 */
-import { renderResults, renderSections } from '../pages/handbook.js?v=90';
+import { renderResults, renderSections } from '../pages/handbook.js?v=91';
 
 /**
  * Адрес с текущим запросом — ровно то, что кинут в чат.

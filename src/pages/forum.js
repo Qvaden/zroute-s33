@@ -1825,6 +1825,10 @@ function renderComposer(s) {
 /**
  * Строка прикрепления картинок.
  *
+ * Общая: той же функцией пользуется ящик объявления на доске аккаунтов
+ * (см. `pages/accounts.js`). Кнопка, предел и слова о сжатии у всех экранов
+ * одни — вторая версия той же строки разошлась бы текстом при первой правке.
+ *
  * ПОЧЕМУ КАРТИНКИ ГРУЗЯТСЯ ПОСЛЕ ПУБЛИКАЦИИ, А НЕ ДО.
  *
  * Вложение ссылается на запись, значит запись должна существовать. Можно было
@@ -1838,7 +1842,7 @@ function renderComposer(s) {
  *
  * @param {'new'|string} scope 'new' для нового поста, id поста для комментария.
  */
-function renderAttachRow(scope) {
+export function renderAttachRow(scope) {
   return `
     <div class="forum-attach" data-forum-attach="${esc(scope)}">
       <label class="forum-attach__btn">

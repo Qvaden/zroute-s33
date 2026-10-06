@@ -11403,7 +11403,7 @@ console.log('\nAN. Доска аккаунтов');
   check('«ещё» считается по общему числу тем, а не по догадке',
     behavSrc.includes('state.more = state.posts.length < state.total'));
   check('список не перечитывается ради одного числа: созданное объявление прибавляет себя и к счётчику доски',
-    /state\.posts = \[created, \.\.\.state\.posts\];[\s\S]{0,400}state\.total \+= 1;/.test(behavSrc));
+    /state\.posts = \[\{ \.\.\.created,[\s\S]{0,700}state\.total \+= 1;/.test(behavSrc));
   check('снятые объявления режет экран: запрос к базе про них ничего не знает',
     !/listPosts\(\{[\s\S]{0,220}sold/.test(behavSrc)
       && boardSrc.includes('s.posts.filter((p) => s.showSold || !p.accountSoldAt)'));
@@ -11623,6 +11623,171 @@ console.log('\nAN. Доска аккаунтов');
   await local.deletePost(ad.id, null);
   check('удалённое объявление уходит с доски вместе с темой',
     !(await local.listPosts({ tag: 'accounts' })).posts.some((p) => p.id === ad.id));
+
+  /* ── Скриншоты к объявлению: картинки темы, а не новый ящик ── */
+
+  /*
+    Здесь нет ни одной новой колонки и ни одной новой цифры: скриншоты
+    объявления живут в той же `forum_attachments`, под тем же `target_type` и под
+    тем же пределом, что у темы, комментария и гайда. Поэтому проверки сверяют
+    не наличие картинки, а три вещи, которые ломаются молча: общим механизмом
+    (вторая копия строки загрузки разошлась бы текстом и лимитом), порядком
+    (загрузка до публикации оставила бы в хранилище файлы без ссылок) и
+    принадлежностью поля выбора файла экрану, который его показал. Последнее —
+    не теоретическая осторожность: обработчик форума висит на всём `document` и
+    переживал уход со страницы, а атрибут у трёх форм один, из-за чего скриншоты
+    гайда дорисовывались в композер темы.
+  */
+  const guidesSrc = await readFile('src/forum/guides.js', 'utf8');
+  check('строка прикрепления у доски общая с форумом: своей копии поля загрузки нет',
+    /import \{ renderMdBar, renderAttachRow \} from '\.\/forum\.js'/.test(boardSrc)
+      && /export function renderAttachRow/.test(pagesSrc)
+      && boardSrc.includes('${renderAttachRow(shotScope)}')
+      && !/data-attach-input=/.test(boardSrc)
+      && !/attachmentsMax/.test(boardSrc));
+  check('предел картинок один на проект и взят из того же числа, что у форума, гайдов и триггера базы',
+    behavSrc.includes('const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;')
+      && mountSrc.includes('const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;')
+      && guidesSrc.includes('const MAX_SHOTS = CONFIG.forum.limits.attachmentsMax;')
+      && L.attachmentsMax === 12);
+  check('скриншот уходит вложением темы тем же вызовом: отдельной колонки, rpc и миграции для картинок доски нет',
+    behavSrc.includes("await attachImage('post', targetId, list[i].file)")
+      && !/\/rpc\/forum_[a-z_]*account|account_shots|account_attachments/i.test(`${behavSrc}${boardSrc}`)
+      && !/account_shots|account_attachments/i.test(sql));
+
+  /* Область превью: при правке она привязана к теме, иначе файлы одного
+     объявления уехали бы в другое. */
+  check('область выбранных картинок у доски своя: при правке она привязана к теме',
+    /const shotScope = editing \? `ad:\$\{editing\.id\}` : 'ad';/.test(boardSrc)
+      && /function shotScope\(\) \{\s*return state\.editing \? `ad:\$\{state\.editing\.id\}` : 'ad';/.test(behavSrc));
+
+  const shotCard = (n, over) => renderAccountCard(mk({
+    attachments: Array.from({ length: n }, (_, i) => ({ id: `a${i + 1}`, url: `https://cdn.example/s${i + 1}.jpg` })),
+    ...over,
+  }));
+  check('карточка объявления показывает скриншоты, а без них полоска не появляется',
+    shotCard(2).includes('accounts-card__shots') && !shotCard(0).includes('accounts-card__shots')
+      && shotCard(2).includes('s1.jpg') && shotCard(2).includes('s2.jpg'));
+  check('плиток на витрине не больше трёх, а остаток назван числом, а не молчанием',
+    (shotCard(7).match(/class="accounts-card__shot"/g) || []).length === 3
+      && shotCard(7).includes('class="accounts-card__more"') && shotCard(7).includes('+4')
+      && !shotCard(3).includes('accounts-card__more'));
+  check('каждая плитка ведёт в тему объявления, а не на файл: торговля и вопросы живут там',
+    shotCard(2).split('accounts-card__shot" href="#/forum/p1"').length - 1 === 2
+      && shotCard(7).includes('accounts-card__more" href="#/forum/p1"'));
+  check('подпись картинки экранирована и называет объявление, а не остаётся пустой',
+    renderAccountCard(mk({ attachments: [{ url: '/x.jpg' }], title: '<b>акк</b>' }))
+      .includes('alt="Скриншот 1 к объявлению «&lt;b&gt;акк&lt;/b&gt;»'));
+  check('лента доски приносит вложения вместе со строкой: отдельного запроса за картинками нет',
+    /const shots = \(Array\.isArray\(p\.attachments\) \? p\.attachments : \[\]\)\.filter\(\(a\) => a\?\.url\)/.test(boardSrc)
+      && !behavSrc.includes('listAttachments'));
+
+  /* Порядок: сначала запись, потом файл на неё. */
+  check('скриншоты грузятся после того, как тема появилась, — и при создании, и при правке',
+    behavSrc.indexOf('await forum.createPost(draft)') < behavSrc.indexOf("uploadShots('ad', created.id")
+      && behavSrc.indexOf('await forum.updateAccountAd(editing.id')
+        < behavSrc.indexOf('uploadShots(`ad:${editing.id}`, editing.id'));
+  const submitFn = /async function submitForm\(form, submitter\) \{[\s\S]*?\n\}/.exec(behavSrc);
+  check('полученные ссылки подмешиваются в оптимистичную строку: доска не перечитывается ради показанного кадра',
+    /state\.posts = \[\{ \.\.\.created, attachments: \[\.\.\.\(created\.attachments \?\? \[\]\), \.\.\.shots\.added\] \}/.test(behavSrc)
+      && /state\.posts\[i\] = \{ \.\.\.updated, attachments: \[\.\.\.\(updated\.attachments \?\? \[\]\), \.\.\.shots\.added\] \}/.test(behavSrc)
+      && behavSrc.includes('state.total += 1;')
+      && Boolean(submitFn) && !submitFn[0].includes('listPosts'));
+  check('отказ одной картинки не отменяет опубликованную тему, а называется в тексте',
+    /failed\.push\(String\(err\?\.message \?\? err\)\)/.test(behavSrc)
+      && behavSrc.includes('Не загрузились картинки:')
+      && /state\.error = shots\.error;/.test(behavSrc));
+  check('прогресс загрузки назван числом на кнопке: двенадцать файлов идут долго, и молчание читается как зависание',
+    (behavSrc.match(/Картинка \$\{i\}\/\$\{n\}/g) || []).length === 2);
+
+  /* Превью живут вне разметки и обязаны переживать перерисовку формы. */
+  const paintFn = /function paint\(\) \{[\s\S]*?\n\}/.exec(behavSrc);
+  check('превью дорисовываются в конце перерисовки: ссылка на Blob в innerHTML формы не помещается',
+    Boolean(paintFn) && /paintShots\(\);\s*\}$/.test(paintFn[0]));
+  check('уход с вкладки освобождает ссылки на файлы, иначе браузер держит их до перезагрузки',
+    /function unmountAccounts\(\)[\s\S]*?clearAllShots\(\);/.test(behavSrc)
+      && behavSrc.includes('URL.revokeObjectURL(list[index].preview)')
+      && /function clearShots\(scope\) \{[\s\S]*?URL\.revokeObjectURL\(item\.preview\)/.test(behavSrc));
+
+  /* Принадлежность поля выбора файла экрану — тот дефект, который ловили руками. */
+  check('форум берёт выбранный файл, только если поле принадлежит ему: гайд и доска делят тот же атрибут',
+    /const attachInput = e\.target\.closest\('\[data-attach-input\]'\);[\s\S]{0,700}if \(attachInput && host\?\.contains\(attachInput\)\)/.test(mountSrc));
+  check('вкладка объявлений слушает выбор файла на своём корне, а не на всём документе',
+    /host\.addEventListener\('change', \(e\) => \{\s*const input = e\.target\?\.closest\?\.\('\[data-attach-input\]'\);[\s\S]{0,200}!host\?\.contains\(input\)/.test(behavSrc));
+  check('поле после выбора очищается: второй тот же файл иначе не даст события',
+    /attachInput\.value = '';/.test(mountSrc) && /input\.value = '';/.test(behavSrc));
+
+  /*
+    Два дефекта, которые черновая проверка ловит руками, а тест — только если
+    сверяет поведение, а не наличие строк.
+
+    Первый: узлы превью исались через `dataset[имя]`. Ключи `dataset` —
+    верблюжьи, `dataset['attach-list']` всегда пуст, поэтому поиск молча
+    возвращал null: выбранная картинка не появлялась ни превью, ни ошибкой —
+    просто ничего не происходило.
+
+    Второй: отказ «не картинка» ставился в цикле и тут же стирался ниже — в
+    доске, если в списке уже лежала картинка, в форуме — при каждом выборе без
+    обрезки по пределу. Файл исчезал без единого слова.
+  */
+  const shotNodeFn = /function shotNode\(attr, scope\) \{[\s\S]*?\n\}/.exec(behavSrc);
+  const fakeHost = {
+    querySelectorAll: () => [
+      { getAttribute: () => 'other' },
+      { getAttribute: (a) => (a === 'data-attach-list' ? 'ad' : null) },
+    ],
+  };
+  const foundList = shotNodeFn
+    ? new Function('host', `${shotNodeFn[0]} return shotNode('data-attach-list', 'ad');`)(fakeHost)
+    : null;
+  check('узел превью находится по значению атрибута: с дефисом в ключе dataset он не нашёлся бы никогда',
+    foundList !== null && !/dataset\[/.test(shotNodeFn?.[0] ?? ''));
+
+  const addShotsOrder = (fnBody, clearToken) => {
+    if (!fnBody) return false;
+    const a = fnBody.indexOf("let rejected = '';");
+    const b = fnBody.indexOf('} else if (rejected) {');
+    const c = fnBody.indexOf(clearToken);
+    return a >= 0 && b > a && c > b;
+  };
+  const accAddShots = /function addShots\(files\) \{[\s\S]*?\n\}/.exec(behavSrc)?.[0];
+  const mountAddShots = /function addShots\(scope, files, existing = 0\) \{[\s\S]*?\n\}/.exec(mountSrc)?.[0];
+  check('доска: отказ про «не картинку» переживает сброс сообщения ниже',
+    addShotsOrder(accAddShots, "shotError('')")
+      && /rejected = `«\$\{file\.name\}» не картинка`;/.test(accAddShots ?? ''));
+  check('форум: тот же отказ не стирается безусловным сбросом после цикла',
+    addShotsOrder(mountAddShots, 'clearError(')
+      && /rejected = `«\$\{file\.name\}» не картинка`;/.test(mountAddShots ?? ''));
+
+  /* Черновой режим: хранилища нет, и отказ должен говорить про него. */
+  check('в черновом режиме доска говорит про отсутствие хранилища и не теряет объявление',
+    /if \(CONFIG\.forum\.source !== 'supabase'\) \{\s*clearShots\(scope\);/.test(behavSrc)
+      && behavSrc.includes('в локальном режиме хранилища нет')
+      && behavSrc.includes('Объявление опубликовано без скриншотов')
+      && !/throw new Error\('Сначала войдите'\)/.test(behavSrc));
+
+  /* Облик: плитки режутся по формату кадра и красятся токенами. */
+  check('полоска скриншотов одета токенами сайта: плитки 16/9, остаток — чип, плашка заметки живёт под строкой загрузки',
+    ['.accounts-card__shots', '.accounts-card__shot', '.accounts-card__more', '.accounts-attach__note']
+      .every((sel) => cssSrc.includes(sel))
+      && /\.accounts-card__shot \{[\s\S]{0,400}?aspect-ratio: 16 \/ 9/.test(cssSrc)
+      && /\.accounts-card__shot img \{[^}]*object-fit: cover/.test(cssSrc)
+      && /\.accounts-card__shot \{[\s\S]{0,400}?border: 1px solid var\(--line\)/.test(cssSrc));
+
+  /* Документ: решение и его границы должны читаться без кода. */
+  const flatDocs2 = docsSrc.replace(/\s+/g, ' ');
+  check('документ называет скриншоты вложениями темы: та же таблица, тот же лимит, загрузка после публикации',
+    flatDocs2.includes('скриншоты объявления — вложения темы, а не колонка доски')
+      && flatDocs2.includes("target_type='post'")
+      && flatDocs2.includes('Загрузка идёт ПОСЛЕ публикации')
+      && flatDocs2.includes('три плитки'));
+  check('документ объясняет, почему поле картинки собирает только свой экран',
+    flatDocs2.includes('картинки собирает только тот экран, который их показал')
+      && flatDocs2.includes('дорисовывались в форму темы'));
+  check('документ называет два места, где скриншот терялся молча: поиск узла и порядок сообщений',
+    flatDocs2.includes('место превью и место отказа в строке — не мелочь, а видимость работы кнопки')
+      && flatDocs2.includes('сначала про предел, затем про отвергнутый файл')
+      && flatDocs2.includes('ключи `dataset` — верблюжьи'));
 }
 
 /* ── 10. Раздача: сеть не держит белый экран ─────────────────────────────

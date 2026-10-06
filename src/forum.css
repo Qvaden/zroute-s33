@@ -3396,6 +3396,17 @@
 .accounts-fields .forum-field { min-width: 0; }
 .accounts-fields .forum-field textarea { min-height: 92px; }
 .accounts-composer__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+/*
+  Строка прикрепления в ящике объявления — та же `.forum-attach`, что у темы и
+  чата, поэтому своих стилей ей не нужно. Отдельная плашка только у заметки про
+  уже приложенные картинки: её читают один раз при правке, и в общий ряд
+  превью она бы лезла.
+*/
+.accounts-attach__note {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
 
 .accounts-controls {
   display: flex;
@@ -3485,6 +3496,45 @@
 .accounts-card__title { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .accounts-card__title a { color: var(--text); text-decoration: none; }
 .accounts-card__title a:hover { color: var(--accent); }
+/*
+  Полоска скриншотов. Плитки тяжутся по свободной ширине рядом (16/9 — формат
+  игрового кадра), а не в один фиксированный квадрат: на узкой карточке
+  три плитки по 90 px превратили бы объявление в колонку иконок.
+  Чип «+N» — не наложение, а своя плитка в конце ряда: под картинкой живёт
+  подпись и дата, и висящая поверх плашка съела бы их на телефоне.
+*/
+.accounts-card__shots {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.accounts-card__shot {
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--raised);
+  transition: border-color .15s var(--ease);
+}
+.accounts-card__shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.accounts-card__shot:hover { border-color: var(--accent); }
+.accounts-card__more {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  padding: 0 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--mute);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color .15s, border-color .15s;
+}
+.accounts-card__more:hover { color: var(--text); border-color: var(--accent); }
 /* Цена — плашкой, а не строкой текста: её сравнивают между карточками,
    и глаз должен цеплять её, не читая абзац. */
 .accounts-card__price {
