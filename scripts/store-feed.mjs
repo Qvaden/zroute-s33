@@ -74,13 +74,31 @@ const VK = STORE.vk || {};
 const VK_MIRRORS = [
   {
     name: 'ридер r.jina.ai',
-    url: (target) => `https://r.jina.ai/${target}`,
+    /*
+      К адрес всегда приклеивается отметка времени, и вот почему: ридер хранит
+      свой последний ответ по адресу и на повторный запрос того же адреса
+      отвечает из памяти. Замер 06.10.2026: без отметки за 2 секунды прилетает
+      заглушка «Проверяем, что вы не робот» в 375 знаков, с отметкой — 16,6
+      секунды ожидания и 130 тысяч знаков живой стены с двадцатью записями.
+      То есть без отметки автомат читал бы кэш чужой неудачной попытки и
+      считал бы её пустой стеной.
+    */
+    url: (target) => `https://r.jina.ai/${target}${/\?/.test(target) ? '&' : '?'}feed=${Date.now()}`,
     /*
       Чужой заголовок User-Agent ридеру не отдают: под браузер он отвечает
       страницей «Just a moment...» и кодом 403. Просим как есть — автомат,
       читающий одну публичную страницу раз в час.
+
+      Про `X-Return-Format: html` и думать забыли: с ним ридер не открывает
+      страницу браузером, а отдаёт сырой HTML, где стена пуста ровно потому,
+      что ВК не пускает без рук браузера. Без этого заголовка ридер отдаёт
+      разметку перерисованной страницы — тот же набор постов, что видит
+      человек, и `readVkWallMarkdown` разбирает именно её.
     */
-    headers: { 'X-Return-Format': 'html', 'User-Agent': 'zroute-s33-store-feed/1.0' },
+    headers: { 'User-Agent': 'zroute-s33-store-feed/1.0', 'x-timeout': '60' },
+    /* Ждём дольше, чем просим у ридера: пусть его отказ придёт к нам
+       понятной ошибкой, а не оборванным ответом на 60-й секунде. */
+    timeoutMs: 90000,
   },
 ];
 
@@ -123,15 +141,19 @@ async function rest(path, { method = 'GET', body, token } = {}) {
  * `res.text()` читает тело как UTF-8 и превращает русскую букву в две
  * латинские с диакритикой. Байты отдаются как есть, а кодировку знает тот, кто
  * её выбирал (см. `decodeVkBytes`).
+ *
+ * Срок по умолчанию — 20 секунд: магазин за молчанием прятаться не умеет.
+ * Двери он не касается: та сначала открывает страницу настоящим браузером, и
+ * по замеру 06.10.2026 — 17 секунд до готового ответа.
  */
-async function fetchExternal(url, want = 'text', extraHeaders = null) {
+async function fetchExternal(url, want = 'text', extraHeaders = null, timeoutMs = 20000) {
   const res = await fetch(url, {
     headers: {
       'Accept-Language': `${STORE.country || 'ru'},ru;q=0.9,en;q=0.5`,
       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
       ...(extraHeaders || {}),
     },
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
@@ -376,11 +398,44 @@ function vkReadable(vk) {
   return vk.via === 'vk.com' && vk.how === 'no-posts';
 }
 
-function vkNoPageDebug(address, html) {
+/**
+ * Паспорт ответа стены: чем он был на самом деле.
+ *
+ * Нужен не только в журнале прогона: журнал Actions модератор увидит, только
+ * зайдя на GitHub, а строка обхода — всегда на вкладке. Поэтому одно и то же
+ * «стена не разобрана» обязано называть источник, размер ответа и наличие
+ * разметки постов: «ридер принёс 900 знаков без разметки» и «ридер принёс
+ * 1,2 млн знаков, но кириллицы в них нет» чинятся по-разному.
+ */
+function vkPageFacts(html) {
+  /* У ответа читалки заголовка в теге нет — он напечатан первой строкой. */
+  const title = pageTitle(html);
+  return {
+    bytes: html.length,
+    /* Следы записей стены: блоком в HTML или ссылкой на пост в разметке. */
+    markup: /id="post-\d+_\d+"/.test(html) || /\(https:\/\/vk\.com\/wall-\d+_\d+\)/.test(html),
+    cyril: /[а-яёА-ЯЁ]/.test(html),
+    title: title !== '(заголовка нет)' ? title
+      : String(/^Title:\s*(.+)$/m.exec(html)?.[1] || '').trim(),
+  };
+}
+
+/** Одна строка того же паспорта — в `last_run_text`, где на всё про всё 400 знаков. */
+function vkUnreadable(vk) {
+  const f = vk.facts;
+  if (!f) return '';
+  const parts = [vk.via || 'стена', `${f.bytes} знаков`];
+  parts.push(f.markup ? 'разметка постов есть' : 'разметки постов нет');
+  if (!f.cyril) parts.push('кириллицы нет');
+  if (f.title) parts.push(`«${String(f.title).slice(0, 40)}»`);
+  return ` (${parts.join(', ')})`;
+}
+
+function vkNoPageDebug(address, html, facts = vkPageFacts(html)) {
   return `адрес: ${address}\n`
     + `первые 400 знаков ответа: ${html.slice(0, 400)}\n`
-    + `разметка постов: ${/id="post-\d+_\d+"/.test(html) ? 'есть' : 'нет'};`
-    + ` кириллица в ответе: ${/[а-яёА-ЯЁ]/.test(html) ? 'есть' : 'нет — похоже на сбой кодировки'}`;
+    + `разметка постов: ${facts.markup ? 'есть' : 'нет'};`
+    + ` кириллица в ответе: ${facts.cyril ? 'есть' : 'нет — похоже на сбой кодировки'}`;
 }
 
 /** Ответ уже начатого прямого запроса — в той же форме, что и попытка зеркала. */
@@ -394,7 +449,10 @@ function vkFromResponse(res, knownKeys) {
   const html = decodeVkBytes(res.value);
   const picked = pickVkNotes(html, { known: knownKeys, cfg: VK });
   const vk = { ...picked, written: [], bytes: html.length, pageTitle: pageTitle(html), via: 'vk.com' };
-  if (picked.how === 'no-page') vk.debug = vkNoPageDebug(vkWallUrl(VK), html);
+  if (!vkReadable(vk)) {
+    vk.facts = vkPageFacts(html);
+    if (picked.how === 'no-page') vk.debug = vkNoPageDebug(vkWallUrl(VK), html, vk.facts);
+  }
   return vk;
 }
 
@@ -402,7 +460,7 @@ async function vkFromMirror(mirror, knownKeys) {
   const address = mirror.url(vkWallUrl(VK));
   let html = '';
   try {
-    html = decodeVkAuto(await fetchExternal(address, 'bytes', mirror.headers));
+    html = decodeVkAuto(await fetchExternal(address, 'bytes', mirror.headers, mirror.timeoutMs));
   } catch (e) {
     return {
       notes: [], written: [], how: 'no-page', total: 0, skipped: {},
@@ -411,7 +469,10 @@ async function vkFromMirror(mirror, knownKeys) {
   }
   const picked = pickVkNotes(html, { known: knownKeys, cfg: VK });
   const vk = { ...picked, written: [], bytes: html.length, pageTitle: pageTitle(html), via: mirror.name };
-  if (picked.how === 'no-page') vk.debug = vkNoPageDebug(address, html);
+  if (!vkReadable(vk)) {
+    vk.facts = vkPageFacts(html);
+    if (picked.how === 'no-page') vk.debug = vkNoPageDebug(address, html, vk.facts);
+  }
   return vk;
 }
 
@@ -463,7 +524,8 @@ function report({ android, ios, known, marks, note, dated, undated, vk, wrote })
   head('ВК — официальная группа');
   if (vk.bytes) say(`пришло: ${vk.bytes} знаков, заголовок ответа: ${vk.pageTitle}`);
   if (vk.error) say(`⚠ страница не пришла: ${vk.error}`);
-  say(`как нашли: ${vk.how}${vk.via && vk.via !== 'vk.com' ? ` через ${vk.via}` : ''}; постов группы на странице: ${vk.total}`);
+  say(`как нашли: ${vk.how}${vk.via && vk.via !== 'vk.com' ? ` через ${vk.via}` : ''}; постов группы на странице: ${vk.total}`
+    + (vkReadable(vk) ? '' : vkUnreadable(vk)));
   if (vk.drawn) {
     say('страницу перерисовала читалка: у заметок дата — день вместо минуты, эмодзи в заголовке теряются');
   }
@@ -682,13 +744,19 @@ function summarizeRun(note, vk) {
     Группа отвечает тремя разными пустотами, и путать их нельзя: «постов нет»
     значит, что разработчики молчат, а «стена не разобрана» значит, что молчим
     мы. По этой строке за неделю видно, какой из двух ремонтов нужен.
+
+    Пустота обязана называть, чем именно кончился разбор, а не только факт:
+    журнал Actions виден модератору только после входа на GitHub, а эта строка
+    — всегда на вкладке.
   */
+  const vkBad = vkUnreadable(vk);
   const vkWord = vk.written.length
     ? `; из группы «${vk.written[0]}»${vk.written.length > 1 ? ` и ещё ${vk.written.length - 1}` : ''}`
     : vk.how === 'login' ? '; группа закрылась за страницей входа'
-      : vk.error ? '; страница группы не ответила'
-        : vk.how === 'no-page' ? '; стена группы не разобрана'
-          : vk.how === 'no-posts' && !vkReadable(vk) ? '; читалка вернула стену без единой записи группы — это не тишина разработчиков' : '';
+      : vk.error ? `; страница группы не ответила (${String(vk.error).slice(0, 140)})`
+        : vk.how === 'no-page' ? `; стена группы не разобрана${vkBad}`
+          : vk.how === 'no-posts' && !vkReadable(vk)
+            ? `; читалка вернула стену без единой записи группы — это не тишина разработчиков${vkBad}` : '';
   /*
     Чем читалась стена, модератор обязан видеть: если список собран через
     зеркало, а зеркало однажды перестанет отвечать, молчание фида надо

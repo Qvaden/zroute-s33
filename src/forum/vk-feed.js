@@ -259,6 +259,13 @@ export function readVkWall(html, cfg = VK, now = Date.now()) {
     match = POST_START.exec(source);
   }
   if (!starts.length) {
+    /*
+      Разметки ВК в ответе нет вовсе — значит читалка принесла не HTML, а
+      разметку. Это ожидаемая форма ответа двери, и она полнее сырого HTML:
+      там стена бывает пуста ровно потому, что браузер её не открыл.
+    */
+    const drawnMd = readVkWallMarkdown(source, cfg, now);
+    if (drawnMd.posts.length) return drawnMd;
     return { posts: [], how: isVkLoginPage(source) ? 'login' : 'no-page' };
   }
 
@@ -454,8 +461,96 @@ export function readVkWallRendered(html, cfg = VK, now = Date.now()) {
 }
 
 /**
- * запрос из дата-центра, и когда группа закрылась: оба случая — не «постов
- * нет», а «нам сюда нельзя», и назвать это молчанием значит соврать.
+ * Стена, которую читалка отдала разметкой, а не HTML.
+ *
+ * ЗАЧЕМ ВООБЩЕ ЭТОТ РАЗБОР. Просим у читалки сырой HTML — и получаем страницу
+ * «Проверяем, что вы не робот»: без браузера ВК стену не отдаёт, а сырой HTML
+ * этой заглушки ничем не отличается от сырого HTML стены, кроме нулевой
+ * содержательности. Режим разметки же заставляет читалку открыть страницу
+ * настоящим браузером: ВК пропускает её через свой React и возвращает то, что
+ * видит человек. Замер 06.10.2026: в HTML-режиме 27 тысяч знаков заглушки, в
+ * режиме разметки — 130 тысяч знаков живой стены и 20 записей группы.
+ *
+ * КАК ЗДЕСЬ НАЙДЕН ОДИН ПОСТ. Ссылка на саму запись — единственная метка,
+ * которая стоит в конце поста и не ведёт в комментарии: у ссылки комментария
+ * всегда есть `?reply=`, у неё же адрес чистый, а подписью служит дата. Всё,
+ * что лежит между двумя такими ссылками, — хвост предыдущей записи (её
+ * комментарии) и тело следующей, поэтому тело отрезаем от последней шапки
+ * автора внутри куска: шапка есть только у самой группы, комментарии игроков
+ * печатаются без неё.
+ *
+ * Чем платят и здесь: дата — надпись «2 d ago» или «27 Sep», то есть день без
+ * минуты, эмодзи приходят картинками и теряются. На это согласились сознательно.
+ */
+const MD_POST_LINK = /\[([^\]\n]{1,60})\]\(https:\/\/vk\.com\/wall-(\d+)_(\d+)\)/g;
+const MD_AUTHOR_HEAD = /^#{5,6} \[[^\]]*\]\([^)]*\)/gm;
+
+/**
+ * Что в куске разметки не является текстом поста: кнопки интерфейса, счётчик
+ * реакций, длительность видеоролика и «124» прокрутки.
+ *
+ * Длительность отсекаем нарочно: без этой строки «0:10» становится первой
+ * строкой поста, а первая строка — это заголовок карточки.
+ */
+function mdNoise(line) {
+  return /^(Actions|Like|Share|Show shared copies|Show likes|Show more comments|See translation)$/i.test(line)
+    || /people reacted|\d+ people/i.test(line)
+    || /^\d+$/.test(line)
+    || /^\d+:\d{1,2}$/.test(line)
+    || /^\[\d+\]$/.test(line);
+}
+
+/** Кусок разметки → текст той записи, чья ссылка стоит в конце куска. */
+function mdPostText(chunk) {
+  MD_AUTHOR_HEAD.lastIndex = 0;
+  let head = MD_AUTHOR_HEAD.exec(chunk);
+  let cut = 0;
+  while (head) {
+    cut = head.index + head[0].length;
+    head = MD_AUTHOR_HEAD.exec(chunk);
+  }
+  return chunk
+    .slice(cut)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !mdNoise(line))
+    .join('\n');
+}
+
+export function readVkWallMarkdown(md, cfg = VK, now = Date.now()) {
+  const source = String(md ?? '');
+  const owner = String(cfg.group ?? '');
+  const group = bareGroup(cfg);
+  MD_POST_LINK.lastIndex = 0;
+  const dated = [];
+  let match = MD_POST_LINK.exec(source);
+  while (match) {
+    const at = match[2] === group ? drawnDateToMs(match[1], now) : null;
+    if (at) dated.push({ num: match[3], at, start: match.index, end: MD_POST_LINK.lastIndex });
+    match = MD_POST_LINK.exec(source);
+  }
+  if (!dated.length) return { posts: [], how: 'no-page', drawn: false };
+
+  const posts = [];
+  let from = 0;
+  for (const mark of dated) {
+    const lines = vkPostToLines(mdPostText(source.slice(from, mark.start)));
+    from = mark.end;
+    if (!lines.length) continue;
+    const id = `${owner}_${mark.num}`;
+    posts.push({ id, atMs: mark.at.atMs, atExact: mark.at.exact, url: vkPostUrl(id, cfg), lines });
+  }
+  posts.sort((a, b) => b.atMs - a.atMs);
+  return { posts, how: posts.length ? 'ok' : 'no-posts', drawn: true };
+}
+
+/**
+ * Пустой ответ стены бывает двух родов: нам её не отдали (запрос из
+ * дата-центра, заглушка, капча) и нам закрыли в неё вход (страница
+ * авторизации). Оба случая — не «постов нет», а «нам сюда нельзя», и назвать
+ * это молчанием группы значит соврать.
  */
 function isVkLoginPage(html) {
   const s = String(html ?? '');

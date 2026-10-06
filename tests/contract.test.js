@@ -10876,14 +10876,74 @@ console.log('\nAM. Фид магазина: обновление и событи
     check('огрызок читалки не принимается за молчание разработчиков: зеркало пустым не доверяет',
       /function vkReadable\(vk\) \{\s*if \(vk\.how === 'ok'\) return true;\s*return vk\.via === 'vk\.com' && vk\.how === 'no-posts';\s*\}/.test(scriptSrc)
         && scriptSrc.includes('читалка вернула стену без единой записи группы — это не тишина разработчиков'));
+    check('пустота двери называет себя цифрами: источник, размер ответа, следы записей и заголовок читалки',
+      /function vkUnreadable\(vk\)/.test(scriptSrc)
+        && scriptSrc.includes('vk.facts = vkPageFacts(html)')
+        && scriptSrc.includes('Title:\\s*(.+)')
+        && scriptSrc.includes('`; стена группы не разобрана${vkBad}`'));
     check('прямой запрос идёт первым, а зеркало подключается только когда ВК отдал не стену',
       /if \(!ONLY_MIRROR\) attempts\.push\(\(\) => Promise\.resolve\(vkFromResponse\(res, knownKeys\)\)\);/.test(scriptSrc)
         && scriptSrc.includes("process.argv.includes('--только-зеркало')")
         && /for \(const mirror of VK_MIRRORS\)/.test(scriptSrc));
     check('зеркало отличается от группы и заголовком, и кодировкой: ридер отвечает UTF-8',
-      scriptSrc.includes("'X-Return-Format': 'html'")
-        && scriptSrc.includes("'User-Agent': 'zroute-s33-store-feed/1.0'")
+      scriptSrc.includes("'User-Agent': 'zroute-s33-store-feed/1.0'")
         && /new TextDecoder\('utf-8', \{ fatal: true \}\)/.test(scriptSrc));
+    check('сырого HTML ридер больше не просит: с ним стена приходит пустой заглушкой',
+      !scriptSrc.includes("'X-Return-Format': 'html'")
+        && /`https:\/\/r\.jina\.ai\/\$\{target\}/.test(scriptSrc));
+    check('дверь не читает чужой кэш: адрес стены каждый раз с отметкой времени',
+      /feed=\$\{Date\.now\(\)\}/.test(scriptSrc));
+    check('и ждёт её дольше магазина: браузер читалки открывает страницу десятки секунд',
+      /timeoutMs: \d{5,}/.test(scriptSrc) && scriptSrc.includes('mirror.timeoutMs'));
+    /*
+      Разбор ответа читалки. Фикстура — тот же самый ответ ридера, что автомат
+      получит с боевого адреса, только сокращённый до пяти записей: 35 тысяч
+      знаков живой стены против 130 тысяч в ответе целиком.
+    */
+    const mdSrc = await readFile('tests/vk-wall-markdown-fixture.txt', 'utf8');
+    const mdNow = Date.parse('2026-10-06T09:37:00Z');
+    const mdPage = vk.readVkWallMarkdown(mdSrc, VK, mdNow);
+    const mdViaWall = vk.readVkWall(mdSrc, VK, mdNow);
+    const mdPicked = vk.pickVkNotes(mdSrc, { now: mdNow, cfg: VK });
+    check('с размеченной стены читаются все пять записей группы, newest первым и датам дня',
+      mdPage.how === 'ok' && mdPage.drawn === true
+        && mdPage.posts.map((p) => p.id).join(',') === '-236547214_41747,-236547214_41250,'
+          + '-236547214_40597,-236547214_39980,-236547214_39747'
+        && mdPage.posts.every((p) => p.url === `https://vk.com/wall${p.id}`
+          && p.atExact === false && iso(p.atMs).endsWith('T12:00:00Z')));
+    check('размеченная стена называет те же тексты, что живая страница: строка в строку, минус эмодзи',
+      mdPage.posts.filter((p) => liveOf(p.id)).length >= 3
+        && mdPage.posts.filter((p) => liveOf(p.id)).every((p) => {
+          const live = liveOf(p.id);
+          return p.lines.length === live.lines.length
+            && p.lines.every((line, i) => live.lines[i].includes(line));
+        }));
+    check('и не врёт про день: дата надписи «3 d ago» расходится с живой меткой не больше чем на сутки с хвостом',
+      mdPage.posts.filter((p) => liveOf(p.id)).every((p) => Math.abs(p.atMs - liveOf(p.id).atMs) < 2 * 86400000));
+    check('комментарии игроков в текст записи не попадают: кусок отсекается по шапке автора',
+      mdPage.posts.every((p) => {
+        const text = p.lines.join('\n');
+        return !/Конечно же Арнольд|Show more comments|people reacted|Liana/i.test(text);
+      }));
+    check('длительность ролика не становится заголовком карточки',
+      mdPage.posts.find((p) => p.id.endsWith('_41250')).lines[0].startsWith('Лимитированный скин'));
+    check('заглушка «не робот» — «стены нет», а не «постов нет»',
+      (() => {
+        const stub = 'Title: Проверяем, что вы не робот\n\nMarkdown Content:\n## Проверяем,\n\n'
+          + 'что вы не робот\n\nЧто-то пошло не так. Повторите попытку позже.\n';
+        return vk.readVkWallMarkdown(stub, VK, mdNow).how === 'no-page'
+          && vk.readVkWall(stub, VK, mdNow).how === 'no-page';
+      })());
+    check('чужая стена в разметке голосом группы не становится: номер группы в ссылке решает',
+      vk.readVkWallMarkdown('[2 d ago](https://vk.com/wall-99999_1) текст', VK, mdNow).how === 'no-page');
+    check('общий вход один: без HTML-разметки постов readVkWall сам уходит в разметку',
+      mdViaWall.how === 'ok' && mdViaWall.drawn === true
+        && JSON.stringify(mdViaWall.posts) === JSON.stringify(mdPage.posts));
+    check('фильтр публикуемого на разметке тот же: часть записей группа пишет не для фида',
+      mdPicked.drawn === true && mdPicked.notes.map((n) => n.feedKey).join(',')
+        === 'vk:-236547214_41250,vk:-236547214_39980,vk:-236547214_39747'
+        && mdPicked.skipped.silent === 2
+        && mdPicked.notes.every((n) => n.fields.sourceAt.endsWith('T12:00:00Z')));
     check('отчёт обхода называет источник стены и цену точности дня',
       scriptSrc.includes('страницу перерисовала читалка: у заметок дата — день вместо минуты')
         && scriptSrc.includes("`; стена через ${vk.via}${vk.drawn ? ' (дата заметок — с точностью до дня)' : ''}`"));
@@ -10900,6 +10960,16 @@ console.log('\nAM. Фид магазина: обновление и событи
         && docsSrc.includes('tests/vk-wall-rendered-fixture.html')
         && docsSrc.replace(/s+/g, ' ').includes('дата заметок — с точностью до дня')
         && docsSrc.replace(/s+/g, ' ').includes('только когда прямой ответ — не стена вовсе'));
+    check('документ объясняет, почему дверь просит разметку, а не HTML, и не берёт чужой кэш',
+      docsSrc.includes('Просить HTML — бесполезно, просим разметку')
+        && docsSrc.includes('readVkWallMarkdown')
+        && docsSrc.includes('X-Return-Format')
+        && docsSrc.includes('tests/vk-wall-markdown-fixture.txt')
+        && docsSrc.replace(/\s+/g, ' ').includes('адрес каждый обход новый'));
+    check('документ объясняет, чем пустота двери называет себя сама',
+      docsSrc.includes('vkPageFacts')
+        && docsSrc.includes('Проверяем, что вы не робот')
+        && docsSrc.includes('last_run_text'));
   }
 
   /* ── 9. Вход на форум: один монтаж, ранняя лента, память первого экрана ──
