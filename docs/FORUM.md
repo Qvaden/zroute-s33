@@ -2140,7 +2140,7 @@ CASCADE унёс бы представления, которых клиент н
 `forum_posts_accounts_idx`, триггер `forum_posts_accounts`, пересозданные
 `forum_posts_tags_check`, `forum_expiry_required`, `forum_posts_expiry` и
 `forum_post_list` — в
-[`supabase/20261006-account-board.sql`](../supabase/20261006-account-board.sql).
+[`supabase/applied/20261006-account-board.sql`](../supabase/applied/20261006-account-board.sql).
 Миграция **переписывает** правило срока: метки живут в одном списке
 `forum_expiry_required`, а не вторым текстом в триггере, и текст отказа в
 `forum_posts_expiry` называет все четыре метки словами.

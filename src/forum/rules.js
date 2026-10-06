@@ -163,7 +163,7 @@ export const TOPIC_TAG_IDS = TOPIC_TAGS.map((tag) => tag.id);
  * проверить ответ: числа лежат в CONFIG.forum.limits, а те же четыре id стоят
  * в функции forum_expiry_required (supabase/applied/20260925-announcement-expiry.sql,
  * расширена в supabase/applied/20260926-barter-board.sql и
- * supabase/20261006-account-board.sql). Расхождение сторожит тест.
+ * supabase/applied/20261006-account-board.sql). Расхождение сторожит тест.
  */
 export const EXPIRY_TAG_IDS = ['recruiting', 'sos', 'barter', 'accounts'];
 
@@ -216,7 +216,7 @@ export function needsBarterLines(tags) {
 /*
   Доска аккаунтов. Устроена один в один как обменная — объявлением делает тему
   метка, а не отдельная таблица (рассуждение и плата за это — в шаге 1 миграции
-  supabase/20261006-account-board.sql), — но требует другое: названный состав
+  supabase/applied/20261006-account-board.sql), — но требует другое: названный состав
   аккаунта и цену словами. «Продаю аккаунт» без того и другого — это не
   объявление, а вопрос, и отвечать на него приходится в комментариях вечер.
   Тот же id стоит в триггере forum_posts_accounts и в проверке меток темы.

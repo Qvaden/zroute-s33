@@ -5555,7 +5555,7 @@ console.log('\nV. Срок действия темы');
     они разойтись обязаны, и ниже есть проверка на это.
   */
   const later = await readFile('supabase/applied/20260926-barter-board.sql', 'utf8');
-  const newest = await readFile('supabase/20261006-account-board.sql', 'utf8');
+  const newest = await readFile('supabase/applied/20261006-account-board.sql', 'utf8');
   const oldSql = await readFile('supabase/applied/20260916-forum-community.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
@@ -11159,12 +11159,10 @@ console.log('\nAN. Доска аккаунтов');
   */
   const { readFile } = await import('node:fs/promises');
   /*
-     Файл миграции лежит в очереди: на боевой базе его ещё нет. После прогона
-     он переезжает в applied/ — и этот путь, как и в остальных разделах,
-     правится вместе с переездом; проверка папки миграций не даст остаться
-     ссылке на несуществующий файл.
+     Миграция прогнана и переехала в applied/ — путь здесь сверяется с папкой
+     миграций: ссылка на несуществующий файл красит этот тест, а не код.
   */
-  const sqlPath = 'supabase/20261006-account-board.sql';
+  const sqlPath = 'supabase/applied/20261006-account-board.sql';
   const sql = await readFile(sqlPath, 'utf8');
   const flat = sql.replace(/\s+/g, ' ');
   // Текст без комментариев: правила ищет по коду, а не по рассуждениям файла.

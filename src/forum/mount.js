@@ -2559,7 +2559,7 @@ function wire() {
         paint();
       } catch (err) {
         notice(`${String(err?.message ?? err)}
-Если база ещё не обновлена, прогоните supabase/20261006-account-board.sql.`.trim());
+Если база ещё не обновлена, прогоните supabase/applied/20261006-account-board.sql.`.trim());
         accountBtn.disabled = false;
       }
       return;

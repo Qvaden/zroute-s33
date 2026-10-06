@@ -513,7 +513,7 @@ export const CONFIG = {
       barterLineMin: 3,
       barterLineMax: 200,
       /*
-        Доска аккаунтов (supabase/20261006-account-board.sql): длина описания
+        Доска аккаунтов (supabase/applied/20261006-account-board.sql): длина описания
         аккаунта и цены. Границы держит база — проверки char_length на колонках
         account_offer (20–400) и account_price (2–80), — а здесь те же числа
         нужны, чтобы форма отказывала тем же словом до отправки.
