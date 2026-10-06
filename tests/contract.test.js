@@ -10401,8 +10401,9 @@ console.log('\nAM. Фид магазина: обновление и событи
       && !/STORE_FEED_PASSWORD\s*=\s*['"`][^'"`]/.test(flowSrc + scriptSrc));
   check('сухой прогон — поведение по умолчанию, пишет только флаг',
     scriptSrc.includes("process.argv.includes('--писать')"));
-  check('без учётных данных запуск не падает, а остаётся сухим',
-    scriptSrc.includes('Нет STORE_FEED_NICK или STORE_FEED_PASSWORD — в базу не пишем.'));
+  check('без учётных данных запуск не падает: автомат остаётся гостем и в базу не пишет',
+    scriptSrc.includes('нет STORE_FEED_NICK или STORE_FEED_PASSWORD — автомат остаётся гостем')
+      && scriptSrc.includes('— в базу не пишем.'));
   check('планировщик зовётся по расписанию и руками',
     flowSrc.includes('schedule:') && flowSrc.includes("cron: '17 * * * *'")
       && flowSrc.includes('workflow_dispatch'));
@@ -10778,15 +10779,35 @@ console.log('\nAM. Фид магазина: обновление и событи
     check('потолок за один запуск держит разбор: первый прогон не выливает архив',
       vk.pickVkNotes(wall, { now: NOW_VK, cfg: { ...VK, perRun: 1 } }).notes.length === 1
         && vk.pickVkNotes(wall, { now: NOW_VK, cfg: { ...VK, perRun: 1 } }).notes[0].feedKey === 'vk:-236547214_41250');
+    /*
+      Отметки фида читаются не «под ключом, обходящим правила», а под входом
+      бота, и вот почему это не стилистическая деталь: у таблицы стоит политика
+      «смотреть только модерации», а запрос без токена идёт от имени гостя.
+      Гость по такой политике получает не отказ, а пустой список — молчаливую
+      пустоту, которую автомат читает как «я ничего никогда не приносил».
+    */
     check('уже принесённое узнаётся по отметке, а не по живой строке заметки',
       vk.pickVkNotes(wall, {
         now: NOW_VK,
         cfg: VK,
         known: page.posts.map((p) => `vk:${p.id}`),
       }).skipped.published === 4
-        && scriptSrc.includes("rest('/forum_feed_marks?select=feed_key&what=eq.note')"));
+        && /rest\('\/forum_feed_marks\?select=feed_key&what=eq\.note', \{ token \}\)/.test(scriptSrc));
     check('планировщик в отметки только заглядывает: пишет в них база одной операцией',
       (scriptSrc.match(/forum_feed_marks/g) || []).length === 1);
+    check('отметки читает тот, кому политика их показывает: бот входит до запроса',
+      marksSql.includes('create policy forum_feed_marks_read on public.forum_feed_marks for select using (public.forum_is_staff());')
+        && scriptSrc.slice(scriptSrc.indexOf('async function knownNoteKeys()'), scriptSrc.indexOf('/* ── Основной путь'))
+          .includes('const { token, why } = await botSession();'));
+    check('без токена запрос к отметкам не идёт вовсе, а пустой список не выдаётся за ноль отметок',
+      /if \(!token\) \{\s*return \{ keys: \[\], count: 0, visible: false, why: why \|\| 'нет входа бота' \};/.test(scriptSrc)
+        && scriptSrc.includes('отметок фида не прочитано (${marks.why})'));
+    check('вход один на весь запуск: отметки и запись берут один и тот же токен',
+      (scriptSrc.match(/await login\(\)/g) || []).length === 1
+        && scriptSrc.includes('const { token, why } = await botSession();\n  if (!token) {\n    say(`Бот не вошёл (${why}) — в базу не пишем.`);'));
+    check('причина отказа входа называется в отчёте, а не прячется за «в базу не пишем»',
+      /async function botSession\(\) \{[\s\S]{0,400}catch \(e\) \{\s*session = \{ token: '', why: `бот не вошёл: \$\{e\.message\}` \};/
+        .test(scriptSrc));
 
     /* ── Дверь публикации ── */
     const pubSql = finalSrc.slice(finalSrc.indexOf('-- ── Шаг 2.'), finalSrc.indexOf('-- ── Шаг 3.'));
@@ -10886,14 +10907,21 @@ console.log('\nAM. Фид магазина: обновление и событи
         && scriptSrc.includes("process.argv.includes('--только-зеркало')")
         && /for \(const mirror of VK_MIRRORS\)/.test(scriptSrc));
     check('прочитанная стена без единой годной записи — не удача: источник с нулём пробует дверь',
-      /if \(vkReadable\(vk\) && vk\.notes\.length\)/.test(scriptSrc)
+      /if \(vkSettled\(vk, marks\.visible\)\)/.test(scriptSrc)
+        && /function vkSettled\(vk, marksKnown\) \{\s*if \(!vkReadable\(vk\)\) return false;\s*if \(vk\.notes\.length\) return true;\s*if \(vk\.how !== 'ok'\) return true;\s*return marksKnown;\s*\}/.test(scriptSrc)
         && scriptSrc.includes('стены нет или она не дала годных записей')
         && /const chosen = empty \|\| last;/.test(scriptSrc));
+    check('нуль годных перестаёт быть подозрением, только когда автомат видит свои отметки',
+      scriptSrc.includes('return marksKnown;')
+        && /const \[known, marks\] = await Promise\.all\(\[knownVersions\(\), knownNoteKeys\(\)\]\);\s*const vk = await readVk\(vkRes, marks\);/.test(scriptSrc));
     check('чем кончилась каждая попытка, видно числом: источник, записей, годных и почему отсеяны',
       /function vkTally\(vk\)/.test(scriptSrc)
         && scriptSrc.includes('записей ${vk.total}, годных ${vk.notes.length}')
         && scriptSrc.includes('не про перемену ${s.silent}')
         && scriptSrc.includes('vk.tried'));
+    check('расхождение с памятью базы видно числом: сколько заметок она не приняла как уже принесённые',
+      scriptSrc.includes('vk.refused = (vk.refused || 0) + 1;')
+        && scriptSrc.includes('`, база не приняла ${vk.refused}`'));
     check('зелёный прогон с нулём заметок не молчит: те же числа уходят в строку обхода',
       scriptSrc.includes('`; ${vkTally(vk)}`')
         && scriptSrc.includes('новых заметок этот обход не принёс: ${vkTally(vk)}'));
@@ -10975,7 +11003,20 @@ console.log('\nAM. Фид магазина: обновление и событи
     check('документ объясняет, чем зелёный прогон с нулём заметок отвечает модератору',
       docsSrc.includes('Зелёный прогон с нулём заметок обязан быть объяснён числом')
         && docsSrc.includes('vkTally')
-        && docsSrc.includes('нулём *заметок*'));
+        && docsSrc.includes('нулём *постов*'));
+    check('документ рассказывает прогон #32 и не выдаёт слепоту гостя за пустоту таблицы',
+      docsSrc.includes('годных 5 (пропущено: не про перемену 3)')
+        && docsSrc.replace(/\s+/g, ' ').includes('пустой список отметок был не правдой о таблице, а слепотой гостя'));
+    check('документ объясняет, почему отметки читаются под входом бота и чем платит гость',
+      docsSrc.includes('Отметки фида читаются под входом бота')
+        && docsSrc.includes('for select using (public.forum_is_staff())')
+        && docsSrc.includes('botSession')
+        && docsSrc.replace(/\s+/g, ' ').includes('этот источник уже приносил заметку')
+        && docsSrc.replace(/\s+/g, ' ').includes('«отметок фида не прочитано (…)»'));
+    check('и объясняет, что ноль годных значит разное в зависимости от видимости отметок',
+      docsSrc.includes('НОЛЬ годных заметок — удача или поломка')
+        && docsSrc.includes('`vkSettled`')
+        && docsSrc.includes('база не приняла N'));
     check('документ объясняет, почему дверь просит разметку, а не HTML, и не берёт чужой кэш',
       docsSrc.includes('Просить HTML — бесполезно, просим разметку')
         && docsSrc.includes('readVkWallMarkdown')

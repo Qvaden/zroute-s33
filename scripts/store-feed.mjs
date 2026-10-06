@@ -23,6 +23,12 @@
  * не по догадке. Писать начинает только с флагом --писать и только когда есть
  * учётные данные бота.
  *
+ * УЧЁТНЫЕ ДАННЫЕ НУЖНЫ НЕ ТОЛЬКО ЗАПИСИ. Отметки фида — «что я уже приносил» —
+ * по правилу базы читает только модерация, и без входа бота автомат слеп к
+ * собственной памяти; почему это дороже, чем кажется, описано у `knownNoteKeys`.
+ * Сухой прогон с секретами тоже входит — иначе он не повторяет боевой путь, —
+ * но ни одной строки не пишет: флаг на запись остаётся единственным выключателем.
+ *
  * КЕМ ПИШЕТ. Обычным входом по нику и паролю, как любой игрок. Служебный
  * ключ, обходящий правила доступа, в проекте не появляется: права бота ровно
  * те, которые ему выдала модерация, и отзываются тем же списком игроков.
@@ -245,18 +251,57 @@ async function knownVersions() {
   и главное — удалённая заметка уносит с собой свою строку, а отметка остаётся.
   Иначе «убрано насовсем» означало бы «вернётся через час».
 
+  Их читают под входом бота, и вот почему это не мелочь: у таблицы
+  стоит политика «смотреть только модерации» (`for select using
+  (public.forum_is_staff())`), а запрос без токена идёт от имени гостя. Гость
+  видит пустой список — не «отметок нет», а «отметок не видно», — и автомат
+  каждый час заново считает принесённое новым: пять вызовов двери публикации,
+  пять отказов «этот источник уже приносил заметку». Дубликаты база ловит,
+  поэтому прогон остаётся зелёным, но строка обхода врёт про ноль отметок,
+  а журнал Actions наполняется отказами.
+
   Пустой список при отказе — не пустота: без отметок каждый обход заново
-  нёс бы все посты окна. Поэтому отказ называется и попадает в отчёт запуска,
-  а публикации за этот раз не будет.
+  нёс бы все посты окна. Дубликаты тогда ловит дверь публикации, но молча:
+  поэтому отказ называется словами в отчёте, а число отвергнутых им заметок
+  попадает в строку обхода — иначе слепота автомата неотличима от успеха.
 */
 async function knownNoteKeys() {
-  try {
-    const rows = await rest('/forum_feed_marks?select=feed_key&what=eq.note');
-    const keys = (Array.isArray(rows) ? rows : []).map((r) => r.feed_key);
-    return { keys, count: keys.length, why: '' };
-  } catch (e) {
-    return { keys: [], count: 0, why: `отметки фида не прочитаны: ${e.message}` };
+  const { token, why } = await botSession();
+  if (!token) {
+    return { keys: [], count: 0, visible: false, why: why || 'нет входа бота' };
   }
+  try {
+    const rows = await rest('/forum_feed_marks?select=feed_key&what=eq.note', { token });
+    const keys = (Array.isArray(rows) ? rows : []).map((r) => r.feed_key);
+    return { keys, count: keys.length, visible: true, why: '' };
+  } catch (e) {
+    return { keys: [], count: 0, visible: false, why: `отметки фида не прочитаны: ${e.message}` };
+  }
+}
+
+/*
+  Один вход на весь запуск. Отметки фида нужны до первого запроса к базе, а
+  публикация — после, и входить дважды значило бы дважды спрашивать у системы
+  входа одно и то же: токен живёт час, а неудачный вход видно по первой же
+  попытке. Результат запоминается вместе с причиной неудачи, чтобы и отметки,
+  и запись называли отказ одними словами.
+*/
+let session = null;
+
+async function botSession() {
+  if (session) return session;
+  if (!NICK || !PASSWORD) {
+    session = { token: '', why: 'нет STORE_FEED_NICK или STORE_FEED_PASSWORD — автомат остаётся гостем' };
+    return session;
+  }
+  try {
+    const token = (await login())?.access_token || '';
+    if (!token) throw new Error('система входа не вернула токен');
+    session = { token, why: '' };
+  } catch (e) {
+    session = { token: '', why: `бот не вошёл: ${e.message}` };
+  }
+  return session;
 }
 
 /* ── Основной путь ─────────────────────────────────────────────────────────── */
@@ -335,7 +380,7 @@ async function main() {
     разные фразы.
   */
   const [known, marks] = await Promise.all([knownVersions(), knownNoteKeys()]);
-  const vk = await readVk(vkRes, marks.keys);
+  const vk = await readVk(vkRes, marks);
   const note = composeStoreNote({ android, ios, known });
 
   const wrote = APPLY ? await apply({ note, dated, android, ios, vk }) : '';
@@ -476,7 +521,27 @@ async function vkFromMirror(mirror, knownKeys) {
   return vk;
 }
 
-async function readVk(res, knownKeys) {
+/**
+ * Пустой список годных — удача или поломка? Зависит от того, видит ли сам
+ * автомат свои отметки.
+ *
+ * Пока отметки читались гостем (то есть всегда пусто), нуль годных означал
+ * только одно: разбор споткнулся, и пробовать дверь было правильно.
+ * Теперь отметки видны под входом бота, и у нуля появляется законная причина —
+ * всё свежее уже принесено. Звать ради него читалку значило бы каждые сутки
+ * 24 раза тратить её 16 секунд на тот же нуль. Поэтому правило делит случай по
+ * видимости отметок: без них пустой список подозрителен, с ними — честен, если
+ * записи на стене разбор видел.
+ */
+function vkSettled(vk, marksKnown) {
+  if (!vkReadable(vk)) return false;
+  if (vk.notes.length) return true;
+  if (vk.how !== 'ok') return true;
+  return marksKnown;
+}
+
+async function readVk(res, marks) {
+  const knownKeys = marks.keys;
   const attempts = [];
   if (!ONLY_MIRROR) attempts.push(() => Promise.resolve(vkFromResponse(res, knownKeys)));
   for (const mirror of VK_MIRRORS) {
@@ -496,7 +561,7 @@ async function readVk(res, knownKeys) {
   for (const attempt of attempts) {
     const vk = await attempt();
     tried.push(vk);
-    if (vkReadable(vk) && vk.notes.length) {
+    if (vkSettled(vk, marks.visible)) {
       vk.tried = tried;
       if (vk.via !== 'vk.com') {
         say(`Стена получена через ${vk.via}${attempts.length > 1 ? ': напрямую ВК отдал не стену или не дал годной записи' : ' — так задано флагом'}.`);
@@ -527,6 +592,7 @@ function vkTally(vk) {
   ].filter(Boolean).join(', ');
   return `стена ${vk.via || '—'}: записей ${vk.total}, годных ${vk.notes.length}`
     + (skip ? ` (пропущено: ${skip})` : '')
+    + (vk.refused ? `, база не приняла ${vk.refused}` : '')
     + (vk.drawn ? ', дата с точностью до дня' : '')
     + (vkReadable(vk) ? '' : vkUnreadable(vk));
 }
@@ -587,7 +653,14 @@ function report({ android, ios, known, marks, note, dated, undated, vk, wrote })
 
   head('Что уже знает база');
   say(`опубликовано: Android ${known.android || '—'}, iOS ${known.ios || '—'}`);
-  say(`отметок фида: ${marks.count}${marks.why ? ` — ⚠ ${marks.why}` : ''}`);
+  /*
+    Нуль здесь означает два разных факта, и путать их нельзя: «отметок в базе
+    нет» (автомат ничего никогда не приносил) и «отметок гостю не видно»
+    (политика таблицы, а входа бота нет). Второй случай печатается словами, а не
+    числом, иначе ровно он и выглядел как первое.
+  */
+  if (marks.visible) say(`отметок фида: ${marks.count}`);
+  else say(`отметок фида не прочитано (${marks.why}) — уже принесённое этот прогон угадывает не по памяти, а по отказу базы`);
   if (known.lastRunAt) say(`последний обход: ${known.lastRunAt} — ${known.lastText}`);
   else say('последнего обхода ещё не было: состояние заведено миграцией, автомат молчал');
   if (known.why) say(`оговорка: ${known.why}`);
@@ -623,18 +696,14 @@ function report({ android, ios, known, marks, note, dated, undated, vk, wrote })
 /* ── Запись ────────────────────────────────────────────────────────────────── */
 
 async function apply({ note, dated, android, ios, vk }) {
-  if (!NICK || !PASSWORD) {
-    say('Нет STORE_FEED_NICK или STORE_FEED_PASSWORD — в базу не пишем.');
-    return '';
-  }
-
-  let token = '';
-  try {
-    const session = await login();
-    token = session?.access_token || '';
-    if (!token) throw new Error('система входа не вернула токен');
-  } catch (e) {
-    say(`Бот не вошёл: ${e.message}`);
+  /*
+    Вход сделан ещё до чтения отметок, поэтому здесь бот только берёт свой
+    токен: второй запрос к системе входа на один прогон — это вторая возможность
+    услышать «не тот пароль» и назвать в отчёте одним словом две разные причины.
+  */
+  const { token, why } = await botSession();
+  if (!token) {
+    say(`Бот не вошёл (${why}) — в базу не пишем.`);
     return '';
   }
 
@@ -686,6 +755,13 @@ async function apply({ note, dated, android, ios, vk }) {
       });
       vk.written.push(item.fields.title);
     } catch (e) {
+      /*
+        Отказ двери по ключу — это всегда сигнал, что автомат разошёлся со
+        своей памятью: заметку база отвергает как уже принесённую, а сам он её
+        таковой не считал. Число попадает в строку обхода, потому что молча
+        пропущенные пять вызовов выглядят ровно как пять опубликованных карточек.
+      */
+      vk.refused = (vk.refused || 0) + 1;
       say(`База не приняла заметку из группы «${item.fields.title}»: ${e.message}`);
     }
   }
