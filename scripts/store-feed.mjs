@@ -483,16 +483,52 @@ async function readVk(res, knownKeys) {
     attempts.push(() => vkFromMirror(mirror, knownKeys));
   }
 
-  let last = null;
+  /*
+    «Стена прочитана» и «стена дала заметки» — разные вещи, и останавливаться на
+    первой из них нельзя. Прямой ответ ВК разбирается целиком (записей двадцать),
+    но из чужой подсети эти записи могут быть не годны для таблицы публикуемого —
+    и тогда обход был бы зелёным и молчаливым: ни заметок, ни объяснения. Поэтому
+    источник без единой годной записки не считает попытку удачной: пробуем
+    следующий, а числа всех попыток остаются в отчёте и в строке обхода.
+  */
+  let empty = null;
+  const tried = [];
   for (const attempt of attempts) {
-    last = await attempt();
-    if (vkReadable(last)) {
-      if (last.via !== 'vk.com') say(`Стена получена через ${last.via}: напрямую ВК отдал не стену.`);
-      return last;
+    const vk = await attempt();
+    tried.push(vk);
+    if (vkReadable(vk) && vk.notes.length) {
+      vk.tried = tried;
+      if (vk.via !== 'vk.com') {
+        say(`Стена получена через ${vk.via}${attempts.length > 1 ? ': напрямую ВК отдал не стену или не дал годной записи' : ' — так задано флагом'}.`);
+      }
+      return vk;
     }
-    if (attempts.length > 1) say(`Через ${last.via} стены нет (${last.error || last.how}) — пробуем следующий источник.`);
+    if (vkReadable(vk) && !empty) empty = { ...vk, tried: null };
+    if (attempts.length > 1) say(`Через ${vk.via} стены нет или она не дала годных записей (${vk.error || vk.how}) — пробуем следующий источник.`);
   }
-  return last;
+  const last = tried[tried.length - 1];
+  const chosen = empty || last;
+  chosen.tried = tried;
+  return chosen;
+}
+
+/**
+ * Чем кончилась каждая попытка прочитать стену — одной строкой на источник.
+ *
+ * Журнал Actions модератор видит, только зайдя на GitHub, поэтому те же числа
+ * уходят в `last_run_text`, которая всегда на вкладке.
+ */
+function vkTally(vk) {
+  const s = vk.skipped || {};
+  const skip = [
+    s.published ? `уже ${s.published}` : '',
+    s.silent ? `не про перемену ${s.silent}` : '',
+    s.tooOld ? `старше окна ${s.tooOld}` : '',
+  ].filter(Boolean).join(', ');
+  return `стена ${vk.via || '—'}: записей ${vk.total}, годных ${vk.notes.length}`
+    + (skip ? ` (пропущено: ${skip})` : '')
+    + (vk.drawn ? ', дата с точностью до дня' : '')
+    + (vkReadable(vk) ? '' : vkUnreadable(vk));
 }
 
 /* ── Отчёт ─────────────────────────────────────────────────────────────────── */
@@ -535,6 +571,10 @@ function report({ android, ios, known, marks, note, dated, undated, vk, wrote })
   } else if (!vkReadable(vk)) {
     say('⚠ читалка вернула стену без единой подписанной группой записи — это не ответ «разработчики молчат», а пустой её ответ; следующий обход попробует снова');
   }
+  if (vk.tried && vk.tried.length > 1) {
+    say('как читали стену (каждый источник, тем же числом, что попадает в строку обхода):');
+    for (const t of vk.tried) say(`  ${vkTally(t)}${t.error ? `; ошибка: ${String(t.error).slice(0, 120)}` : ''}`);
+  }
   if (vk.skipped && (vk.skipped.published || vk.skipped.silent || vk.skipped.tooOld)) {
     say(`пропущено: уже опубликовано ${vk.skipped.published}, не про перемену ${vk.skipped.silent}, старше окна ${vk.skipped.tooOld}`);
   }
@@ -543,7 +583,7 @@ function report({ android, ios, known, marks, note, dated, undated, vk, wrote })
     say(`  ${n.feedKey} | ${n.fields.sourceAt} | ${n.fields.sourceUrl}`);
     say(`  ${n.fields.summary.slice(0, 240).replace(/\n/g, ' / ')}`);
   }
-  if (!vk.notes.length && vk.how === 'ok') say('новых заметок этот обход не принёс.');
+  if (!vk.notes.length && vk.how === 'ok') say(`новых заметок этот обход не принёс: ${vkTally(vk)}`);
 
   head('Что уже знает база');
   say(`опубликовано: Android ${known.android || '—'}, iOS ${known.ios || '—'}`);
@@ -756,13 +796,20 @@ function summarizeRun(note, vk) {
       : vk.error ? `; страница группы не ответила (${String(vk.error).slice(0, 140)})`
         : vk.how === 'no-page' ? `; стена группы не разобрана${vkBad}`
           : vk.how === 'no-posts' && !vkReadable(vk)
-            ? `; читалка вернула стену без единой записи группы — это не тишина разработчиков${vkBad}` : '';
+            ? `; читалка вернула стену без единой записи группы — это не тишина разработчиков${vkBad}`
+            /*
+              Случай, ради которого эта строка переписана: стена прочитана,
+              прогон зелёный, а заметок ноль. Без цифр он выглядит как
+              «разработчики молчали сутки», хотя на самом деле разбор мог видеть
+              двадцать записей и не пустить ни одной.
+            */
+            : `; ${vkTally(vk)}`;
   /*
     Чем читалась стена, модератор обязан видеть: если список собран через
     зеркало, а зеркало однажды перестанет отвечать, молчание фида надо
     объяснять сменой источника, а не «разработчики пропали».
   */
-  const via = vk.via && vk.via !== 'vk.com' && vkReadable(vk)
+  const via = vk.written.length && vk.via && vk.via !== 'vk.com'
     ? `; стена через ${vk.via}${vk.drawn ? ' (дата заметок — с точностью до дня)' : ''}`
     : '';
   if (note.fields) return `опубликовано обновление ${note.fields.gameVersion}${gone}${lag}${vkWord}${via}`.trim();

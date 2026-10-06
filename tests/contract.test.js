@@ -10881,10 +10881,22 @@ console.log('\nAM. Фид магазина: обновление и событи
         && scriptSrc.includes('vk.facts = vkPageFacts(html)')
         && scriptSrc.includes('Title:\\s*(.+)')
         && scriptSrc.includes('`; стена группы не разобрана${vkBad}`'));
-    check('прямой запрос идёт первым, а зеркало подключается только когда ВК отдал не стену',
+    check('прямой запрос идёт первым, а зеркало подключается, когда ВК отдал не стену',
       /if \(!ONLY_MIRROR\) attempts\.push\(\(\) => Promise\.resolve\(vkFromResponse\(res, knownKeys\)\)\);/.test(scriptSrc)
         && scriptSrc.includes("process.argv.includes('--только-зеркало')")
         && /for \(const mirror of VK_MIRRORS\)/.test(scriptSrc));
+    check('прочитанная стена без единой годной записи — не удача: источник с нулём пробует дверь',
+      /if \(vkReadable\(vk\) && vk\.notes\.length\)/.test(scriptSrc)
+        && scriptSrc.includes('стены нет или она не дала годных записей')
+        && /const chosen = empty \|\| last;/.test(scriptSrc));
+    check('чем кончилась каждая попытка, видно числом: источник, записей, годных и почему отсеяны',
+      /function vkTally\(vk\)/.test(scriptSrc)
+        && scriptSrc.includes('записей ${vk.total}, годных ${vk.notes.length}')
+        && scriptSrc.includes('не про перемену ${s.silent}')
+        && scriptSrc.includes('vk.tried'));
+    check('зелёный прогон с нулём заметок не молчит: те же числа уходят в строку обхода',
+      scriptSrc.includes('`; ${vkTally(vk)}`')
+        && scriptSrc.includes('новых заметок этот обход не принёс: ${vkTally(vk)}'));
     check('зеркало отличается от группы и заголовком, и кодировкой: ридер отвечает UTF-8',
       scriptSrc.includes("'User-Agent': 'zroute-s33-store-feed/1.0'")
         && /new TextDecoder\('utf-8', \{ fatal: true \}\)/.test(scriptSrc));
@@ -10958,8 +10970,12 @@ console.log('\nAM. Фид магазина: обновление и событи
       docsSrc.includes('### Запасная дверь: стену читает браузер читалки')
         && docsSrc.includes('r.jina.ai')
         && docsSrc.includes('tests/vk-wall-rendered-fixture.html')
-        && docsSrc.replace(/s+/g, ' ').includes('дата заметок — с точностью до дня')
-        && docsSrc.replace(/s+/g, ' ').includes('только когда прямой ответ — не стена вовсе'));
+        && docsSrc.replace(/\s+/g, ' ').includes('дата заметок — с точностью до дня')
+        && docsSrc.replace(/\s+/g, ' ').includes('когда прямой ответ не дал ни одной годной заметки'));
+    check('документ объясняет, чем зелёный прогон с нулём заметок отвечает модератору',
+      docsSrc.includes('Зелёный прогон с нулём заметок обязан быть объяснён числом')
+        && docsSrc.includes('vkTally')
+        && docsSrc.includes('нулём *заметок*'));
     check('документ объясняет, почему дверь просит разметку, а не HTML, и не берёт чужой кэш',
       docsSrc.includes('Просить HTML — бесполезно, просим разметку')
         && docsSrc.includes('readVkWallMarkdown')
