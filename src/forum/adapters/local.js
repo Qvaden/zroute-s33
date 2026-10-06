@@ -17,7 +17,7 @@
  * Настоящий вход живёт в supabase-адаптере, где пароли хеширует Postgres.
  */
 import { CONFIG } from '../../../config.js';
-import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsBarterLines, needsEventDate, needsExpiry, reactionMeta, serverChangeProblem, validateServerId } from '../rules.js';
+import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsAccountLines, needsBarterLines, needsEventDate, needsExpiry, reactionMeta, serverChangeProblem, validateServerId } from '../rules.js';
 import { normalizeQuietWindow } from '../quiet.js';
 import { textOf } from '../sanitize.js';
 
@@ -514,6 +514,10 @@ function postOut(state, p) {
     barterGives: p.barterGives || null,
     barterWants: p.barterWants || null,
     barterClosedAt: toDate(p.barterClosedAt) ?? null,
+    // Доска аккаунтов: состав, цена словами и отметка, что автор снял объявление.
+    accountOffer: p.accountOffer || null,
+    accountPrice: p.accountPrice || null,
+    accountSoldAt: toDate(p.accountSoldAt) ?? null,
     pinned: Boolean(p.pinned),
     deleted: Boolean(p.deleted),
     deletedReason: p.deletedReason || '',
@@ -856,10 +860,11 @@ function checkHold(state, kind, me, text) {
 /**
  * СРОК ДЕЙСТВИЯ ТЕМЫ В ЧЕРНОВОМ РЕЖИМЕ.
  *
- * Держит его база (supabase/applied/20260925-announcement-expiry.sql, триггер
- * forum_posts_expiry), здесь проверка нужна по той же причине, что и выдержка:
- * увидеть правило и проверить его, не подключая Supabase. Формулировки отказов
- * совпадают со словами триггера дословно — за этим тоже следит тест.
+ * Держит его база (триггер forum_posts_expiry; список меток и текст отказа
+ * последний раз переписывал supabase/20261006-account-board.sql), здесь проверка
+ * нужна по той же причине, что и выдержка: увидеть правило и проверить его, не
+ * подключая Supabase. Формулировки отказов совпадают со словами триггера
+ * дословно — за этим тоже следит тест.
  *
  * @param {string[]} tags  Метки темы.
  * @param {string|Date|null} when  Назначенный срок или null.
@@ -868,7 +873,7 @@ function checkHold(state, kind, me, text) {
 function expiryProblem(tags, when) {
   const L = CONFIG.forum.limits;
   if (needsExpiry(tags) && !when) {
-    return 'У темы с меткой «Набор», «Срочно» или «Обмен» должен быть срок действия — выберите, сколько дней она висит';
+    return 'У темы с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» должен быть срок действия — выберите, сколько дней она висит';
   }
   if (!when) return '';
   const at = new Date(when).getTime();
@@ -908,6 +913,38 @@ function barterProblem(tags, gives, wants) {
   if (a.length < L.barterLineMin || a.length > L.barterLineMax
     || b.length < L.barterLineMin || b.length > L.barterLineMax) {
     return `Каждая сторона обмена — от ${L.barterLineMin} до ${L.barterLineMax} символов`;
+  }
+  return '';
+}
+
+/**
+ * ЧАСТИ ОБЪЯВЛЕНИЯ О ПРОДАЖЕ В ЧЕРНОВОМ РЕЖИМЕ.
+ *
+ * Требование обеих частей держит триггер forum_posts_accounts
+ * (supabase/20261006-account-board.sql), и его текст здесь повторяется слово в
+ * слово — за этим следит тест. Границы держит проверка таблицы
+ * (`char_length between 20 and 400` на описании и `between 2 and 80` на цене);
+ * она отвергла бы запрос текстом нарушения ограничения, а не словами для
+ * человека, поэтому текст здесь свой, а числа те же, что в проверке.
+ *
+ * @param {string[]} tags  Метки темы.
+ * @param {string|null} offer  Что в аккаунте.
+ * @param {string|null} price  Почём, словами.
+ * @returns {string}  Пусто, всё в порядке; иначе — текст отказа.
+ */
+function accountProblem(tags, offer, price) {
+  const L = CONFIG.forum.limits;
+  if (!needsAccountLines(tags)) return '';
+  const a = String(offer ?? '').trim();
+  const b = String(price ?? '').trim();
+  if (!a || !b) {
+    return 'У темы с меткой «Аккаунты» должны быть названы обе части: что в аккаунте и почём он';
+  }
+  if (a.length < L.accountOfferMin || a.length > L.accountOfferMax) {
+    return `Описание аккаунта — от ${L.accountOfferMin} до ${L.accountOfferMax} символов`;
+  }
+  if (b.length < L.accountPriceMin || b.length > L.accountPriceMax) {
+    return `Цена — от ${L.accountPriceMin} до ${L.accountPriceMax} символов`;
   }
   return '';
 }
@@ -963,10 +1000,13 @@ export async function createPost(draft) {
   const tags = [...new Set((draft.tags || []).filter((tag) => TOPIC_TAG_IDS.includes(tag)))].slice(0, 3);
   /*
     Порядок проверок повторяет алфавит триггеров на forum_posts:
-    forum_posts_barter идёт раньше forum_posts_event_at, а тот — раньше
-    forum_posts_expiry. Тема сразу с тремя метками обязана получить отказ в том
-    же порядке, в каком её отвергла бы база.
+    forum_posts_accounts идёт раньше forum_posts_barter, тот — раньше
+    forum_posts_event_at, а тот — раньше forum_posts_expiry. Тема сразу с
+    четырьмя метками обязана получить отказ в том же порядке, в каком её
+    отвергла бы база.
   */
+  const accountError = accountProblem(tags, draft.accountOffer ?? null, draft.accountPrice ?? null);
+  if (accountError) throw new Error(accountError);
   const barterError = barterProblem(tags, draft.barterGives ?? null, draft.barterWants ?? null);
   if (barterError) throw new Error(barterError);
   const eventError = eventWhenProblem(tags, draft.eventAt ?? null)
@@ -1009,6 +1049,10 @@ export async function createPost(draft) {
     barterGives: needsBarterLines(tags) ? String(draft.barterGives ?? '').trim() : '',
     barterWants: needsBarterLines(tags) ? String(draft.barterWants ?? '').trim() : '',
     barterClosedAt: null,
+    // И без метки «Аккаунты» частей объявления не бывает — триггер обнуляет их.
+    accountOffer: needsAccountLines(tags) ? String(draft.accountOffer ?? '').trim() : '',
+    accountPrice: needsAccountLines(tags) ? String(draft.accountPrice ?? '').trim() : '',
+    accountSoldAt: null,
     pinned: false,
     deleted: false,
     views: 0,
@@ -1203,6 +1247,36 @@ export async function closeBarter(id, closed) {
     предложение, которое человек ещё не роздал.
   */
   post.barterClosedAt = closed ? new Date().toISOString() : null;
+  write(s);
+  return postOut(s, post);
+}
+
+/**
+ * Снять объявление о продаже аккаунта с доски или вернуть его.
+ *
+ * Черновой режим повторяет боевой: право — за автором и модерацией ленты, тема
+ * остаётся, обратимость та же. Отдельная функция, а не общая «снял с доски»:
+ * у обменной и аккаунтной доски разные метки и разные колонки, и одна функция на
+ * две заставила бы страницу гадать, какую доску имеет в виду человек.
+ */
+export async function closeAccountOffer(id, closed) {
+  const s = read();
+  const me = s.users.find((u) => u.id === s.me);
+  if (!me) throw new Error('Сначала войдите');
+
+  const post = s.posts.find((p) => p.id === id);
+  if (!post) throw new Error('Пост не найден');
+  if (!canModeratePost(s, me, post) && post.authorId !== me.id) throw new Error('Это не ваш пост');
+  if (!needsAccountLines(Array.isArray(post.tags) ? post.tags : [])) {
+    throw new Error('Снимать с доски можно только объявление с меткой «Аккаунты»');
+  }
+
+  /*
+    Будущее время база сжимает в «сейчас» (триггер forum_posts_accounts), и
+    здесь часы одни, поэтому просто текущий момент: объявление, закрытое
+    «завтра», висело бы открытым ровно тот день, которого никто не ждал.
+  */
+  post.accountSoldAt = closed ? new Date().toISOString() : null;
   write(s);
   return postOut(s, post);
 }

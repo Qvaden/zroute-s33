@@ -3878,8 +3878,8 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 9);
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
-  check('живые вкладки — форум, чаты, календарь, пульс обновлений, справочник и страница участника',
-    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'\s*\|\|\s*id === 'updates'\s*\|\|\s*id === 'handbook'\s*\|\|\s*\(id === 'user' && param\)/.test(mainJs));
+  check('живые вкладки — форум, чаты, календарь, пульс обновлений, доска аккаунтов, справочник и страница участника',
+    /id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'\s*\|\|\s*id === 'updates'\s*\|\|\s*id === 'accounts'\s*\|\|\s*id === 'handbook'\s*\|\|\s*\(id === 'user' && param\)/.test(mainJs));
 
   /*
     ПРЕВЬЮ — ЭТО АВАРИЙНЫЙ ВЫХОД, А НЕ КАРТИНКА.
@@ -5549,11 +5549,13 @@ console.log('\nV. Срок действия темы');
   const sql = await readFile('supabase/applied/20260925-announcement-expiry.sql', 'utf8');
   /*
     Правило срока переопределено позже: метка «Обмен» добавлена в
-    20260926-barter-board.sql, и он же пересоздаёт и проверку меток, и функцию
-    списка, и триггер. Поэтому список меток и текст отказа сверяются с ПОСЛЕДНИМ
-    файлом — с прежним они разойтись обязаны, и ниже есть проверка на это.
+    20260926-barter-board.sql, метка «Аккаунты» — в 20261006-account-board.sql,
+    и оба этих шага пересоздают и проверку меток, и функцию списка, и триггер.
+    Поэтому список меток и текст отказа сверяются с ПОСЛЕДНИМ файлом — с прежним
+    они разойтись обязаны, и ниже есть проверка на это.
   */
   const later = await readFile('supabase/applied/20260926-barter-board.sql', 'utf8');
+  const newest = await readFile('supabase/20261006-account-board.sql', 'utf8');
   const oldSql = await readFile('supabase/applied/20260916-forum-community.sql', 'utf8');
   const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
   const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
@@ -5564,20 +5566,20 @@ console.log('\nV. Срок действия темы');
   /* Метка «Срочно» должна доехать до списка, который принимает база. */
   const listOf = (s) => (s ?? '').split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean).sort().join('/');
   equal('метки темы: база и правила называют одно и то же',
-    listOf(later.match(/tags <@ array\[([^\]]*)\]::text\[\]/)?.[1]),
+    listOf(newest.match(/tags <@ array\[([^\]]*)\]::text\[\]/)?.[1]),
     listOf(rules.TOPIC_TAG_IDS.join(',')));
   check('метка «Срочно» названа по-русски и есть в списке',
     rules.TOPIC_TAGS.some((tag) => tag.id === 'sos' && tag.label === 'Срочно'));
   check('список меток переписан целиком, а не дописан одним файлом поверх другого',
-    (later.match(/add constraint forum_posts_tags_check/g) || []).length === 1
-      && later.includes("array['vs','recruiting','diplomacy','guide','question','event','sos','barter']::text[]"));
+    (newest.match(/add constraint forum_posts_tags_check/g) || []).length === 1
+      && newest.includes("array['vs','recruiting','diplomacy','guide','question','event','sos','barter','accounts']::text[]"));
 
   /*
     Список меток, требующих срока, живёт в SQL-функции и в rules.js. Совпадать
     они обязаны буквально: база отвергнет тему, которой форма обещала прощение.
   */
   equal('требовать срок база и страница договариваются об одних метках',
-    listOf(later.match(/&& array\[([^\]]*)\]::text\[\];/)?.[1]),
+    listOf(newest.match(/&& array\[([^\]]*)\]::text\[\];/)?.[1]),
     listOf(rules.EXPIRY_TAG_IDS.join(',')));
   check('нужен срок или нет — решает одна функция, а не два списка',
     rules.needsExpiry(['recruiting']) && rules.needsExpiry(['sos', 'vs'])
@@ -5596,11 +5598,12 @@ console.log('\nV. Срок действия темы');
   /* Проверка висит на записи и на правке, иначе её можно перешагнуть PATCH. */
   check('срок проверяется при создании и при продлении',
     /create trigger forum_posts_expiry[\s\S]{0,140}before insert or update on public\.forum_posts/.test(sql));
-  const need = 'У темы с меткой «Набор», «Срочно» или «Обмен» должен быть срок действия — выберите, сколько дней она висит';
+  const need = 'У темы с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» должен быть срок действия — выберите, сколько дней она висит';
   check('отказ про срок назван одинаково в базе и в черновом режиме',
-    (later.match(new RegExp(need, 'g')) || []).length === 1 && localSrc.includes(need));
+    (newest.match(new RegExp(need, 'g')) || []).length === 1 && localSrc.includes(need));
   check('прежний файл остаётся со своим текстом: читают последний, и он один',
-    !sql.includes(need) && (later.match(/create or replace function public\.forum_posts_expiry\(\)/g) || []).length === 1);
+    !sql.includes(need) && !later.includes(need)
+      && (newest.match(/create or replace function public\.forum_posts_expiry\(\)/g) || []).length === 1);
   check('требование срока не мешает правкам, которые его не касаются',
     sql.includes('new.tags is distinct from old.tags or new.expires_at is distinct from old.expires_at'));
   check('функцию списка меток нельзя позвать из браузера',
@@ -5632,7 +5635,9 @@ console.log('\nV. Срок действия темы');
   check('срок, который подставляет форма, помечен в списке как обязательный',
     /required\.includes\(d\)/.test(pageSrc) && pageSrc.includes('нужен для набора'));
   check('при выборе метки срок подставляется сам',
-    /expiryDefaultDays\?\.\[tagBox\.value\]/.test(mountSrc) && mountSrc.includes('needsExpiry(chosen)'));
+    /expiryDefaultDays\?\.\[tagId\]/.test(mountSrc)
+      && /function autofillExpiry\(form, tagId\)/.test(mountSrc)
+      && mountSrc.includes('needsExpiry(chosen)'));
 
   /* ── Черновой режим: те же отказы, что у базы ── */
   const local = await import('../src/forum/adapters/local.js');
@@ -6528,14 +6533,14 @@ console.log('\nY. Календарь встреч');
       && mountSrc.includes('draft.tags = tags;'));
   check('отмеченные метки возвращаются из черновика до первой отрисовки',
     /if \(!state\.composerTags\.length\) state\.composerTags = composerTagsFromDraft\(\);/.test(mountSrc));
-  check('намерение из адреса не перетирается пустым адресом и гаснет, только когда форма показалась',
-    /state\.eventDraft = state\.eventDraft \|\| composeIntentFromSearch\(search\) === 'event';/.test(mountSrc)
-      && /if \(host\.querySelector\('\[data-forum-composer\]'\)\) state\.eventDraft = false;/.test(mountSrc));
+  check('намерение из адреса — и встречи, и объявления: не перетирается пустым адресом и гаснет, только когда форма показалась',
+    /state\.eventDraft = state\.eventDraft \|\| composeIntentFromSearch\(search\) === 'event';\s*state\.accountDraft = state\.accountDraft \|\| composeIntentFromSearch\(search\) === 'accounts';/.test(mountSrc)
+      && /if \(host\.querySelector\('\[data-forum-composer\]'\)\) \{[\s\S]{0,400}?state\.eventDraft = false;\s*state\.accountDraft = false;\s*\}/.test(mountSrc));
   check('раскрытие формы — тоже состояние, и его снимает только сам человек',
     mountSrc.includes('composerOpen: false') && mountSrc.includes('state.composerOpen = true;')
       && /addEventListener\('toggle',[\s\S]{0,240}data-forum-composer[\s\S]{0,200}\}, true\)/.test(mountSrc));
   check('уход с форума сбрасывает и намерение, и метки, и раскрытую форму',
-    /state\.eventDraft = false;\s*state\.composerTags = \[\];\s*state\.composerOpen = false;/.test(mountSrc));
+    /state\.eventDraft = false;\s*state\.accountDraft = false;\s*state\.composerTags = \[\];\s*state\.composerOpen = false;/.test(mountSrc));
   check('поля встречи не требуют заполнения молча: required у них нет',
     !/name="event_[^"]*"[^>]*required/.test(pagesSrc) && /data-forum-event-fields/.test(pagesSrc));
   check('и дата, и места уходят в черновик поста отдельными полями',
@@ -6635,7 +6640,7 @@ console.log('\nY. Календарь встреч');
       && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js\?v=\d+'/.test(mainSrc)
       && /mountCalendar\(app, search\)/.test(mainSrc));
   check('между вкладками календарь не наследует состояние: его закрывают на каждом уходе',
-    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 9
+    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 10
       && (mainSrc.match(/unmountCalendar\(\);/g) || []).length === (mainSrc.match(/unmountChats\(\);/g) || []).length);
   check('календарь стартует живым кадром, а не надписью «загружаем данные»',
     /const liveFirst = id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'/.test(mainSrc));
@@ -7453,10 +7458,15 @@ console.log('\nAB. Бартер-доска');
     Имя метки знает из трёх мест: список правил, проверка базы и функция
     списка требующих срока. Расхождение выглядит как «галочку поставил, а
     база не поняла», поэтому сверяем все три сразу.
+
+    Полный список здесь не цитируется: он вырос до четырёх меток шагом с
+    доской аккаунтов, и целиком сверяется с самым новым файлом — в разделе
+    про срок действия. Тут важнее, что trio эпохи обмена никуда из правил не
+    делось.
   */
   check('имя метки одно: правила, проверка таблицы и функция срока',
     rulesSrc.includes("export const BARTER_TAG_ID = 'barter';")
-      && rulesSrc.includes("EXPIRY_TAG_IDS = ['recruiting', 'sos', 'barter']")
+      && /EXPIRY_TAG_IDS = \[[^\]]*'recruiting'[^\]]*'sos'[^\]]*'barter'/.test(rulesSrc)
       && sql.includes("array['recruiting','sos','barter']::text[]"));
   check('решает одна функция, а не два списка: обмен в требующих срок',
     (await import('../src/forum/rules.js')).needsExpiry(['barter'])
@@ -7585,7 +7595,7 @@ console.log('\nAB. Бартер-доска');
     await says(() => local.createPost({
       title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
       tags: ['barter'], barterGives: '200 патронов 7.62', barterWants: 'банки',
-    })), 'У темы с меткой «Набор», «Срочно» или «Обмен» должен быть срок действия — выберите, сколько дней она висит');
+    })), 'У темы с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» должен быть срок действия — выберите, сколько дней она висит');
   equal('короткая строка не проходит, как и в проверке таблицы',
     await says(() => local.createPost({
       title: 'Отдам патроны', body: '<p>есть лишние</p>', category: 'ally',
@@ -8765,7 +8775,7 @@ console.log('\nAF. Пульс обновлений игры');
     mainSrc.includes("{ id: 'updates', label: 'Обновления игры', live: true }")
       && mainSrc.includes('mountUpdates(app)'));
   check('она ждёт ответа хранилища, как живой раздел',
-    mainSrc.includes("id === 'updates' || id === 'handbook' || (id === 'user' && param)"));
+    mainSrc.includes("id === 'updates' || id === 'accounts' || id === 'handbook' || (id === 'user' && param)"));
   equal('страница закрывается там же, где закрывается календарь',
     (mainSrc.match(/unmountUpdates\(\);/g) || []).length,
     (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
@@ -9520,10 +9530,10 @@ console.log('\nAJ. Справочник официальных гайдов иг
     /const navId = \(r\) => r\.navAs \|\| r\.id;/.test(mainSrc)
       && /renderNav\(route\.navAs \|\| route\.id\)/.test(mainSrc));
   check('справочник открывается до ответа хранилища',
-    /id === 'updates' \|\| id === 'handbook' \|\| \(id === 'user' && param\)/.test(mainSrc));
+    /id === 'updates' \|\| id === 'accounts' \|\| id === 'handbook' \|\| \(id === 'user' && param\)/.test(mainSrc));
   const branch = /\} else if \(route\.id === 'handbook'\) \{([\s\S]*?)path = '\/handbook\/node'/.exec(mainSrc);
   check('ветка маршрута выгружает все живые разделы перед отрисовкой',
-    branch && (branch[1].match(/unmount\w+\(\);/g) || []).length === 6);
+    branch && (branch[1].match(/unmount\w+\(\);/g) || []).length === 7);
   /*
     Старая ссылка из меню или из чата (#/handbook, в том числе с запросом) не
     должна вести на половину страницы: узел по своему адресу открывается целиком,
@@ -11126,6 +11136,410 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('при отказе базы прошлые темы остаются на экране',
     brokenFrame.includes('Тема из памяти') && brokenFrame.includes('Ленту обновить не удалось')
       && !brokenFrame.includes('Форум не отвечает'));
+}
+
+console.log(`\n${'─'.repeat(52)}`);
+// ── AN. Доска аккаунтов ─────────────────────────────────────────────────────
+console.log('\nAN. Доска аккаунтов');
+{
+  /*
+    Доска устроена как обменная — и опасна по-своему дороже: правило живёт
+    сразу в четырёх местах (текст миграции, числа в config.js, два адаптера,
+    витрина), а расходится молча. Форма, принимающая цену в восемь символов там,
+    где база отвергает, даёт человеку отказ, которого он не понимает. Карточка,
+    у которой однажды появилась кнопка «купить», обещает расчёт и возврат, которых
+    у сайта нет и быть не может, — и по просроченному объявлению о продаже
+    аккаунта люди передают друг другу доступы. Поэтому проверки ниже сверяют
+    места между собой, а не наличие слов.
+
+    Витрина — не второй ящик с объявлениями: она читает ту же ленту фильтром по
+    метке. Значит, здесь же стоит сверить точки подключения вкладки (адрес,
+    живость, размонтирование соседними страницами) и то, что снятые объявления
+    режет экран, а не запрос.
+  */
+  const { readFile } = await import('node:fs/promises');
+  /*
+     Файл миграции лежит в очереди: на боевой базе его ещё нет. После прогона
+     он переезжает в applied/ — и этот путь, как и в остальных разделах,
+     правится вместе с переездом; проверка папки миграций не даст остаться
+     ссылке на несуществующий файл.
+  */
+  const sqlPath = 'supabase/20261006-account-board.sql';
+  const sql = await readFile(sqlPath, 'utf8');
+  const flat = sql.replace(/\s+/g, ' ');
+  // Текст без комментариев: правила ищет по коду, а не по рассуждениям файла.
+  const code = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '');
+  /* Прежние определения ленты: её пересоздают копией, и копия проверяется на верность. */
+  const prevSql = await readFile('supabase/applied/20261005-player-server.sql', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const contractSrc = await readFile('src/forum/contract.js', 'utf8');
+  const mountSrc = await readFile('src/forum/mount.js', 'utf8');
+  const pagesSrc = await readFile('src/pages/forum.js', 'utf8');
+  const boardSrc = await readFile('src/pages/accounts.js', 'utf8');
+  const behavSrc = await readFile('src/forum/accounts.js', 'utf8');
+  const rulesSrc = await readFile('src/forum/rules.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const urlSrc = await readFile('src/forum/feed-url.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  /* Проза документов переносится по словам: длинную фразу сверять по исходной
+     строке нельзя — она рассыпается на переносе и проверка краснеет без причины. */
+  const flatDocs = docsSrc.replace(/\s+/g, ' ');
+  const readmeSrc = await readFile('supabase/README.md', 'utf8');
+  const rules = await import('../src/forum/rules.js');
+  const L = CONFIG.forum.limits;
+
+  const both = 'У темы с меткой «Аккаунты» должны быть названы обе части: что в аккаунте и почём он';
+  const need = 'У темы с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» должен быть срок действия — выберите, сколько дней она висит';
+  const backdate = 'Нельзя снять объявление раньше, чем оно появилось';
+
+  /* ── Форма правила: объявление живёт у темы ── */
+  check('объявление — метка темы, а не отдельный ящик: ни таблицы, ни своей страницы у объявлений нет',
+    !/create table[^;]*account/i.test(sql)
+      && flat.includes('add column if not exists account_offer')
+      && flat.includes('add column if not exists account_price')
+      && flat.includes('add column if not exists account_sold_at'));
+  check('метку принимает список базы, и карточка темы по-прежнему держит три',
+    sql.includes("tags <@ array['vs','recruiting','diplomacy','guide','question','event','sos','barter','accounts']::text[]")
+      && sql.includes('cardinality(tags) <= 3'));
+  check('имя метки одно: правила, список базы и метка витрины',
+    rulesSrc.includes("export const ACCOUNT_TAG_ID = 'accounts';")
+      && rules.ACCOUNT_TAG_ID === 'accounts'
+      && rules.TOPIC_TAGS.some((t) => t.id === 'accounts' && t.label === 'Аккаунты'));
+  check('решают две функции, а не два списка: «Аккаунты» требуют срок и обе части',
+    rules.needsAccountLines(['vs', 'accounts']) && !rules.needsAccountLines(['vs'])
+      && rules.needsExpiry(['accounts']) && !rules.needsBarterLines(['accounts']));
+  check('того же требует база: срок для объявления стоит в функции списка',
+    sql.includes("array['recruiting','sos','barter','accounts']::text[]"));
+
+  /* ── Числа: форма и база говорят одними словами ── */
+  check('длины обеих частей держит проверка таблицы, и числа те же, что в конфиге',
+    sql.includes(`char_length(account_offer) between ${L.accountOfferMin} and ${L.accountOfferMax}`)
+      && sql.includes(`char_length(account_price) between ${L.accountPriceMin} and ${L.accountPriceMax}`));
+  check('черновик называет те же границы своими словами',
+    localSrc.includes('`Описание аккаунта — от ${L.accountOfferMin} до ${L.accountOfferMax} символов`')
+      && localSrc.includes('`Цена — от ${L.accountPriceMin} до ${L.accountPriceMax} символов`'));
+  check('сроку объявления отдельного числа не заводят: он общий',
+    L.expiryDefaultDays.accounts === L.expiryChoices.find((d) => d >= 7)
+      && !Object.keys(L).some((k) => /account/i.test(k) && /(days|expir)/i.test(k)));
+
+  /* ── Что триггер делает сам ── */
+  check('метку сняли — обе части и отметка уходят вместе с ней',
+    /if not \('accounts' = any\(new\.tags\)\) then\s*new\.account_offer := null;\s*new\.account_price := null;\s*new\.account_sold_at := null;/.test(sql));
+  check('требование частей мешает только тем, кто трогает метки или строки',
+    sql.includes('new.tags is distinct from old.tags')
+      && sql.includes('new.account_offer is distinct from old.account_offer')
+      && sql.includes('new.account_price is distinct from old.account_price')
+      && sql.includes('new.account_sold_at is distinct from old.account_sold_at'));
+  check('будущая отметка закрытия сжимается в «сейчас»: часы браузера не указ',
+    /if new\.account_sold_at > now\(\) then\s*new\.account_sold_at := now\(\);/.test(sql));
+  check('закрыть объявление задним числом нельзя — а черновику это не грозит: часы одни',
+    sql.includes(backdate)
+      && localSrc.includes('post.accountSoldAt = closed ? new Date().toISOString() : null'));
+
+  /* ── Двери, права и частота ── */
+  check('файл создаёт ровно три функции и один триггер: своей двери у доски нет',
+    [...new Set([...sql.matchAll(/create or replace function public\.([a-z_]+)/g)].map((m) => m[1]))].sort().join(',')
+      === 'forum_expiry_required,forum_posts_accounts,forum_posts_expiry'
+      && (sql.match(/create trigger /g) || []).length === 1
+      && sql.includes('create trigger forum_posts_accounts'));
+  check('ни политик, ни прав на новые колонки не выдано: живут уже выданная таблица и политика темы',
+    !/create policy/.test(sql)
+      && [...code.matchAll(/grant[^;]*;/gi)].every((m) => !/account_(offer|price|sold_at)/.test(m[0])));
+  check('двери нет ни в базе, ни в адаптере: закрытие — PATCH колонки темы',
+    !supaSrc.includes('/rpc/forum_account') && !/\/rpc\/forum_posts_accounts/.test(supaSrc));
+  check('частоту объявлений держит выдержка тем, а не второй счётчик',
+    !/\b(hold|limit)\b/i.test(code) && !sql.includes('account_hold'));
+  check('ни денег, ни контактов, ни способа связаться в колонках нет',
+    !/account_(contact|discord|telegram|phone|card|requisite|money)/.test(sql));
+
+  /* ── Лента: новые колонки должны быть видны ── */
+  /*
+     Сравнение идёт по ТЕЛУ select, а не по строке CREATE: файл миграции
+     роняет представление и создаёт его заново (иначе `select p.*` никогда не
+     забрал бы новые столбцы), а прежний файл обновлял его через
+     `create or replace view`. Один и тот же запрос — разные первые строки.
+  */
+  const viewOf = (src) => (src.match(/forum_post_list with \(security_invoker = on\) as\s*select[\s\S]*?author_id;/)?.[0] ?? '')
+    .replace(/\s+/g, ' ').trim();
+  check('лента пересоздана копией прежнего определения: select p.* увидит колонки',
+    viewOf(sql).length > 200 && viewOf(sql) === viewOf(prevSql)
+      && sql.includes('drop view if exists public.forum_post_list'));
+  check('кэш схемы API перезапущен: иначе отдавались бы колонки, которых больше нет',
+    sql.includes("notify pgrst, 'reload schema';"));
+  check('доска смотрит на свежие открытые объявления, и указатель частичный',
+    /create index if not exists forum_posts_accounts_idx[\s\S]{0,140}where 'accounts' = any \(tags\) and not deleted/.test(sql));
+
+  /* ── Слова отказа: база и черновой режим ── */
+  check('отказ про обе части назван один раз в базе и дословно повторяется в черновике',
+    (sql.match(new RegExp(both, 'g')) || []).length === 1 && localSrc.includes(both));
+  check('тот же порядок у срока: четыре метки названы одним текстом в двух местах',
+    (sql.match(new RegExp(need, 'g')) || []).length === 1 && localSrc.includes(need));
+
+  /* ── Контракт и оба адаптера ── */
+  check('контракт знает три свойства темы, две части в запросе и дверь закрытия',
+    /@property \{string\|null\} \[accountOffer\]/.test(contractSrc)
+      && /@property \{string\|null\} \[accountPrice\]/.test(contractSrc)
+      && /@property \{Date\|null\} \[accountSoldAt\]/.test(contractSrc)
+      && contractSrc.includes('accountOffer?: string|null, accountPrice?: string|null')
+      && contractSrc.includes('(id: string, closed: boolean) => Promise<ForumPost>} closeAccountOffer'));
+  check('черновик отдаёт те же три поля и своим null, и своей датой',
+    /accountOffer: p\.accountOffer \|\| null/.test(localSrc)
+      && /accountPrice: p\.accountPrice \|\| null/.test(localSrc)
+      && /accountSoldAt: toDate\(p\.accountSoldAt\) \?\? null/.test(localSrc));
+  check('черновик проверяет части по порядку триггеров базы и обнуляет их без метки',
+    localSrc.includes('const accountError = accountProblem(tags, draft.accountOffer ?? null, draft.accountPrice ?? null);')
+      && /accountOffer: needsAccountLines\(tags\) \? String\(draft\.accountOffer \?\? ''\)\.trim\(\) : ''/.test(localSrc));
+  check('черновик повторяет отказ про метку своим словом',
+    localSrc.includes('Снимать с доски можно только объявление с меткой «Аккаунты»'));
+  check('рабочий адаптер читает колонки темы и не падает без миграции',
+    /accountOffer: row\.account_offer \|\| null/.test(supaSrc)
+      && /accountSoldAt: toDate\(row\.account_sold_at\) \?\? null/.test(supaSrc));
+  check('колонки уезжают в запрос только когда их попросили',
+    /if \(draft\.accountOffer != null \|\| draft\.accountPrice != null\) \{[\s\S]{0,160}payload\.account_offer = draft\.accountOffer \?\? null/.test(supaSrc));
+  check('отметка закрытия — PATCH одной колонки, как у обменной доски',
+    /export async function closeAccountOffer\(id, closed\)[\s\S]{0,240}method: 'PATCH'[\s\S]{0,90}account_sold_at/.test(supaSrc));
+
+  /* ── Форма темы и карточка ── */
+  check('форма спрашивает обе части и держит длины базы',
+    pagesSrc.includes('name="account_offer"') && pagesSrc.includes('name="account_price"')
+      && /renderAccountFields\(needsAccountLines\(tags\)\)/.test(pagesSrc)
+      && /name="account_offer" data-forum-account-offer[\s\S]{0,120}maxlength="\$\{L\.accountOfferMax\}"/.test(pagesSrc)
+      && /name="account_price" data-forum-account-price[\s\S]{0,120}maxlength="\$\{L\.accountPriceMax\}"/.test(pagesSrc));
+  check('поля прячутся вместе с меткой — как у встречи и обмена',
+    mountSrc.includes('accountFields.hidden = !needsAccountLines(chosen)'));
+  check('в запрос не уедет ничего, если метку не ставили',
+    /if \(needsAccountLines\(draft\.tags\)\) \{[\s\S]{0,200}draft\.accountOffer = form\.account_offer\?\.value\?\.trim\(\) \|\| null/.test(mountSrc));
+  check('карточка темы показывает обе части и значок проданного',
+    pagesSrc.includes('${accountLines(p)}') && pagesSrc.includes('${accountBadge(p)}')
+      && /function accountBadge\(p\)[\s\S]{0,240}Продано/.test(pagesSrc));
+  check('кнопка снятия есть только у автора и модерации и знает своё состояние',
+    /function accountControl\(p, s\)[\s\S]{0,400}s\.me\.id !== p\.authorId/.test(pagesSrc)
+      && pagesSrc.includes('data-forum-account-close=') && pagesSrc.includes('data-forum-account-sold='));
+  check('страница слушает кнопку и правит карточку ответом адаптера',
+    mountSrc.includes("t.closest('[data-forum-account-close]')")
+      && mountSrc.includes('await forum.closeAccountOffer(id, sold)'));
+  check('отказ без миграции называет файл, а не «операция не выполнена»',
+    mountSrc.includes(sqlPath));
+  check('блок одет своим стилем, и снятое объявление читается приглушённо',
+    cssSrc.includes('.forum-offer-fields') && cssSrc.includes('.forum-offer--sold')
+      && cssSrc.includes('.forum-post__offer-sold'));
+
+  /* ── Вкладка-витрина подключена, а не лежит рядом ── */
+  check('вкладка стоит в меню и живёт по своему адресу',
+    /\{ id: 'accounts', label: 'Аккаунты', live: true \}/.test(mainSrc)
+      && mainSrc.includes('if (id === \'accounts\') return `accounts:${search}`;'));
+  check('она ждёт ответа хранилища, как живой раздел',
+    /const liveFirst = [^;]*id === 'accounts'[^;]*;/.test(mainSrc));
+  const boardBranch = /\} else if \(route\.id === 'accounts'\) \{([\s\S]*?)path = '\/accounts';/.exec(mainSrc);
+  check('ветка монтирует доску и выгружает перед этим все остальные живые разделы',
+    Boolean(boardBranch) && boardBranch[1].includes('mountAccounts(app, search)')
+      && (boardBranch[1].match(/unmount\w+\(\);/g) || []).length === 6);
+  equal('доску закрывают там же, где календарь и обновления',
+    (mainSrc.match(/unmountAccounts\(\);/g) || []).length,
+    (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
+  check('модуль поведения подключён к сайту той же версией, что и остальные',
+    /import \{ mountAccounts, unmountAccounts \} from '\.\/forum\/accounts\.js\?v=\d+'/.test(mainSrc));
+  check('намерение из адреса знает доску: кнопка витрины ведёт в обычный композер',
+    urlSrc.includes("export const COMPOSE_INTENTS = ['event', 'accounts'];"));
+
+  /*
+    Проза формы о сроке перечисляет метки словами. Живой прогон в браузере
+    поймал, что с приходом четвёртой метки текст остался трёхметочным, а
+    обещанная автоподстановка не работала при приходе по ссылке: прежние
+    проверки сверяли отказы базы и наличие полей, а не эти два места.
+  */
+  const expiryLabels = rules.EXPIRY_TAG_IDS.map(
+    (id) => rules.TOPIC_TAGS.find((t) => t.id === id).label
+  );
+  const expiryHint = /data-forum-expiry-hint[^>]*>([\s\S]{0,240}?)<\/small>/.exec(pagesSrc);
+  check('подсказка срока называет все метки, которым база требует срок',
+    Boolean(expiryHint) && expiryLabels.every((label) => expiryHint[1].includes(`«${label}»`)));
+  const expiryOption = /required\.includes\(d\) \? ' \(нужен для([^']*)\)' : ''/.exec(pagesSrc);
+  check('пометка у нужного срока в списке вариантов называет те же метки',
+    Boolean(expiryOption)
+      && (expiryOption[1].match(/,| и /g) || []).length === expiryLabels.length - 1);
+  check('срок подставляется и при приходе по ссылке, а не только по клику по метке',
+    /function autofillExpiry\(form, tagId\)/.test(mountSrc)
+      && /autofillExpiry\(form, tagBox\.value\)/.test(mountSrc)
+      && /const intentTag = state\.accountDraft \? ACCOUNT_TAG_ID : state\.eventDraft \? EVENT_TAG_ID : '';/.test(mountSrc)
+      && /if \(intentTag\) autofillExpiry\(host\.querySelector\('\[data-forum-new\]'\), intentTag\)/.test(mountSrc));
+
+  /* ── Как собрана витрина: фильтр, а не второй ящик ── */
+  check('доска читает ленту фильтром по метке и тем же порядком, что выбран на экране',
+    behavSrc.includes('tag: ACCOUNT_TAG_ID') && behavSrc.includes('sort: state.sort'));
+  check('«ещё» считается по общему числу тем, а не по догадке',
+    behavSrc.includes('state.more = state.posts.length < state.total'));
+  check('снятые объявления режет экран: запрос к базе про них ничего не знает',
+    !/listPosts\(\{[\s\S]{0,220}sold/.test(behavSrc)
+      && boardSrc.includes('s.posts.filter((p) => s.showSold || !p.accountSoldAt)'));
+  check('галочка не перезапрашивает доску: это вид, а не данные',
+    behavSrc.includes('state.showSold = box.checked')
+      && !/await loadPage\(false\)/.test(behavSrc.split("host.addEventListener('change'")[1] ?? ''));
+  check('адрес страницы переживает возврат «назад» и ссылку из чата',
+    behavSrc.includes('history.replaceState') && behavSrc.includes("params.get('sold') === '1'"));
+  check('поздний ответ базы не нарисует доску поверх другой страницы',
+    behavSrc.includes('mountToken'));
+  check('без подключённого форума доска говорит про себя, а не про пустоту',
+    behavSrc.includes("state.error = 'Форум ещё не подключён — доски с объявлениями нет.'"));
+
+  /* ── Разметка витрины: что человек видит и чего не должно быть ── */
+  const { renderAccounts, renderAccountCard, ACCOUNT_SORTS } = await import('../src/pages/accounts.js');
+  const { composeIntentFromSearch } = await import('../src/forum/feed-url.js');
+  check('порядка два, и оба взяты из порядков ленты: третьего вида доске не нужно',
+    ACCOUNT_SORTS.map((s) => s.id).join(',') === 'fresh,talked'
+      && ACCOUNT_SORTS.every((s) => rules.SORT_IDS.includes(s.id)));
+  const offer = 'уровень 40, собрана техника сезона, 3 млн на складе';
+  const mk = (over) => ({
+    id: 'p1', authorId: 'u1', authorNick: 'Продавец', authorServer: 33, title: 'Аккаунт 40 лвл',
+    body: '<p>текст</p>', category: 'ally', tags: ['accounts'], createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 5 * 86400000).toISOString(), commentCount: 2,
+    accountOffer: offer, accountPrice: '1500 ₽', accountSoldAt: null, ...over,
+  });
+  const view = (over) => renderAccounts({
+    ready: true, loading: false, posts: [mk({}), mk({ accountSoldAt: new Date() })],
+    total: 2, more: false, error: '', sort: 'fresh', showSold: false, ...over,
+  });
+  check('проданное по умолчанию скрыто, но не удалено: число говорит про экран',
+    view().includes('Аккаунт 40 лвл') && !view().includes('Продано')
+      && view().includes('1 объявление на экране'));
+  check('галочка возвращает снятые объявления и называет их проданными',
+    view({ showSold: true }).includes('accounts-card--sold')
+      && view({ showSold: true }).includes('2 объявления на экране'));
+  check('просроченное объявление показано со знаком «срок вышел», а не спрятано',
+    /accounts-card--expired/.test(renderAccountCard(mk({ expiresAt: new Date(Date.now() - 86400000).toISOString() })))
+      && renderAccountCard(mk({ expiresAt: new Date(Date.now() - 86400000).toISOString() })).includes('Срок вышел'));
+  check('единственный путь к договорённости — тема: карточка ссылается на неё',
+    view().includes('href="#/forum/p1"'));
+  check('кнопки покупки, оплаты и реквизитов на витрине нет и быть не может',
+    !/купить|оплат|корзин|реквизит/i.test(view()) && view().includes('Сайт денег не берёт'));
+  check('фильтры, галочка и кнопка объявления одеты своими атрибутами',
+    view().includes('name="show_sold"') && view().includes('data-accounts-sort="talked"')
+      && view().includes('href="#/forum?new=accounts"'));
+  equal('адрес кнопки действительно расбирается как намерение',
+    composeIntentFromSearch('new=accounts'), 'accounts');
+  check('число «ещё» даёт кнопку, а не молчание',
+    view({ posts: [mk({})], total: 9, more: true, showSold: true }).includes('data-accounts-more'));
+  check('пустая доска и пустой превью — разные вещи',
+    view({ posts: [], total: 0 }).includes('Объявлений на доске нет.')
+      && view({ ready: false, posts: [], total: 0 }).includes('Доска появится вместе с форумом.'));
+  check('отказ адаптера и текст темы экранируются',
+    view({ error: '<b>база</b> молчит', posts: [], total: 0 }).includes('&lt;b&gt;база')
+      && !renderAccountCard(mk({ title: '<script>x</script>' })).includes('<script>x'));
+  check('не названная цена названа словами, а не пустой строкой',
+    renderAccountCard(mk({ accountPrice: null })).includes('цена не названа'));
+  check('витрина одета общим каркасом сайта, а не отдельным макетом',
+    view().includes('class="panel accounts-page"') && view().includes('panel__head'));
+
+  /* ── Правила форума: доска не отменила запрет торговли в ленте ── */
+  const adsRule = rules.RULES.find((r) => r.id === 'ads');
+  check('правило про рекламу переписано, а не снято: аккаунты — на доске, сбор денег по-прежнему под запретом',
+    adsRule.title.includes('аккаунты — на доске')
+      && adsRule.body.includes('сбор денег') && adsRule.body.includes('меткой «Аккаунты»')
+      && adsRule.body.includes('Денег сайт не берёт'));
+  check('правило называет ограничение доски и запрет светить контакты',
+    adsRule.body.includes('Телефон, почту и дискорд в текст объявления не пишите'));
+
+  /* ── Документы ── */
+  check('правило описано и в базе, и в документах, и в списке миграций',
+    sql.includes('── ПРАВИЛО ──') && docsSrc.includes('## Доска аккаунтов')
+      && docsSrc.includes(sqlPath) && readmeSrc.includes('20261006-account-board.sql'));
+  check('документ называет ограничение доски: денег нет, и сделку форум не ведёт',
+    /Денег\.|не обещает сделку|сделку не ведёт/.test(docsSrc)
+      && flatDocs.includes('передают друг другу доступы'));
+  check('документ объясняет два решения, которые легко потерять при правке',
+    flatDocs.includes('проданные объявления режет экран, а не база')
+      && flatDocs.includes('ссылка доски — это адрес вида'));
+
+  /* ── Живой черновой прогон: те же правила, что у базы ── */
+  const local = await import('../src/forum/adapters/local.js');
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const rawAc = () => JSON.parse(store.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const DAY = 86400000;
+  const inDays = (n) => new Date(Date.now() + n * DAY).toISOString();
+
+  await local.signUp('Продавец');
+  equal('объявлению без цены база отказывает тем же словом',
+    await says(() => local.createPost({
+      title: 'Аккаунт 40', body: '<p>есть что продать</p>', category: 'ally',
+      tags: ['accounts'], accountOffer: offer, expiresAt: inDays(5),
+    })), both);
+  equal('и срок для объявления обязателен',
+    await says(() => local.createPost({
+      title: 'Аккаунт 40', body: '<p>есть что продать</p>', category: 'ally',
+      tags: ['accounts'], accountOffer: offer, accountPrice: '1500 ₽',
+    })), need);
+  equal('короткое описание не проходит, как и в проверке таблицы',
+    await says(() => local.createPost({
+      title: 'Аккаунт 40', body: '<p>есть что продать</p>', category: 'ally',
+      tags: ['accounts'], accountOffer: 'аккаунт норм', accountPrice: '1500 ₽', expiresAt: inDays(5),
+    })), `Описание аккаунта — от ${L.accountOfferMin} до ${L.accountOfferMax} символов`);
+  equal('длинное описание — тоже',
+    await says(() => local.createPost({
+      title: 'Аккаунт 40', body: '<p>есть что продать</p>', category: 'ally',
+      tags: ['accounts'], accountOffer: 'я'.repeat(L.accountOfferMax + 1),
+      accountPrice: '1500 ₽', expiresAt: inDays(5),
+    })), `Описание аккаунта — от ${L.accountOfferMin} до ${L.accountOfferMax} символов`);
+  equal('цена длиннее восьмидесяти символов не пройдёт',
+    await says(() => local.createPost({
+      title: 'Аккаунт 40', body: '<p>есть что продать</p>', category: 'ally',
+      tags: ['accounts'], accountOffer: offer, accountPrice: '₽'.repeat(L.accountPriceMax + 1),
+      expiresAt: inDays(5),
+    })), `Цена — от ${L.accountPriceMin} до ${L.accountPriceMax} символов`);
+
+  const ad = await local.createPost({
+    title: 'Аккаунт 40', body: '<p>есть что продать</p>', category: 'ally',
+    tags: ['accounts'], accountOffer: offer, accountPrice: 'торг', expiresAt: inDays(5),
+  });
+  equal('объявление принято и названо обеими частями', ad.accountOffer, offer);
+  equal('цена доехала словами автора', ad.accountPrice, 'торг');
+  equal('свежее объявление открыто', ad.accountSoldAt, null);
+
+  const calm = await local.createPost({
+    title: 'Разбор флангов', body: '<p>обычная тема</p>', category: 'vs',
+    tags: ['vs'], accountOffer: offer, accountPrice: '1500 ₽',
+  });
+  check('без метки частей объявления не бывает, даже если их прислали',
+    calm.accountOffer === null && calm.accountPrice === null && calm.accountSoldAt === null);
+
+  const byTag = await local.listPosts({ tag: 'accounts' });
+  equal('витрина — обычный фильтр по метке, отдельного хранилища объявлений нет',
+    byTag.posts.map((p) => p.id), [ad.id]);
+
+  const closed = await local.closeAccountOffer(ad.id, true);
+  check('закрытие ставит момент, а не флаг', closed.accountSoldAt instanceof Date);
+  equal('объявление осталось темой со своим заголовком', closed.title, 'Аккаунт 40');
+  equal('повторное нажатие возвращает на доску',
+    (await local.closeAccountOffer(ad.id, false)).accountSoldAt, null);
+  await local.signOut();
+  equal('без входа снимать некому',
+    await says(() => local.closeAccountOffer(ad.id, true)), 'Сначала войдите');
+  await local.signUp('Посторонний');
+  equal('и чужую строку не снять',
+    await says(() => local.closeAccountOffer(ad.id, true)), 'Это не ваш пост');
+  const ownCalm = await local.createPost({
+    title: 'Своё без продажи', body: '<p>обычная тема</p>', category: 'vs', tags: ['vs'],
+  });
+  equal('у своей темы без метки снимать нечего',
+    await says(() => local.closeAccountOffer(ownCalm.id, true)),
+    'Снимать с доски можно только объявление с меткой «Аккаунты»');
+
+  await local.signIn('Продавец');
+  await local.closeAccountOffer(ad.id, true);
+  check('в хранилище у темы — обе части, момент закрытия и ничего лишнего',
+    rawAc().posts.some((p) => p.id === ad.id && p.accountOffer && p.accountPrice && p.accountSoldAt));
+  check('закрытая тема не пропадает из ленты: ответы людей остаются',
+    (await local.listPosts({})).posts.some((p) => p.id === ad.id));
+  await local.deletePost(ad.id, null);
+  check('удалённое объявление уходит с доски вместе с темой',
+    !(await local.listPosts({ tag: 'accounts' })).posts.some((p) => p.id === ad.id));
 }
 
 /* ── 10. Раздача: сеть не держит белый экран ─────────────────────────────
@@ -13215,7 +13629,7 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('реестр числит шаг прогнанным и не зовёт в базу вторично',
     queueSrc.includes('supabase/applied/20261005-player-server.sql')
       && /20261005-player-server\.sql` — \*\*прогнан 05\.10\.2026/.test(queueSrc)
-      && !queueSrc.includes('ещё не прогнан'));
+      && !/20261005-player-server\.sql[^\n]{0,60}не прогнан/i.test(queueSrc));
 
   /* ── Слова и числа клиента ── */
   check('форма собирает свои отказные фразы из чисел config.js, а не из памяти',

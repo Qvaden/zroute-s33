@@ -34,6 +34,7 @@ import { renderTournaments } from '../src/pages/tournaments.js';
 import { renderGuides } from '../src/pages/guides.js';
 import { renderCalendar } from '../src/pages/calendar.js';
 import { renderUpdates } from '../src/pages/updates.js';
+import { renderAccounts } from '../src/pages/accounts.js';
 import { renderHandbook } from '../src/pages/handbook.js';
 import { computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 
@@ -84,6 +85,9 @@ const NAV = [
   { id: 'guides', label: 'Гайды', html: renderGuides({ me: null, guides: [], category: 'all' }) },
   { id: 'calendar', label: 'Календарь', html: renderCalendar({ ready: false, shared: false, sourceName: 'без базы', me: null, events: [], loading: false, error: '', view: 'next' }) },
   { id: 'updates', label: 'Обновления игры', html: renderUpdates({ ready: false, shared: false, sourceName: 'без базы', me: null, canManage: false, notes: [], loading: false, error: '', composing: false }) },
+  // Доска аккаунтов — те же темы, что и форум: в статичном файле их быть не
+  // может, поэтому страница собирается без объявлений, но с правилами доски.
+  { id: 'accounts', label: 'Аккаунты', html: renderAccounts({ ready: false, sort: 'fresh', showSold: false, posts: [], total: 0, loading: false, more: false, error: '' }) },
   { id: 'home', label: 'Итоги недели', html: renderHome(view) },
   { id: 'quarter', label: 'Кварт', html: renderQuarter({ standings: quarterStandings, quarter }) },
   { id: 'ladder', label: 'Рейтинг', html: renderLadder(view) },

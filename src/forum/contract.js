@@ -97,6 +97,17 @@
  * @property {Date|null} [barterClosedAt]  Когда автор снял объявление с доски;
  *                                    null — объявление открыто. Тема при этом
  *                                    остаётся: под ней могли договориться другие.
+ * @property {string|null} [accountOffer]  Что в аккаунте: уровень, ресурсы,
+ *                                    альянс, что внутри. Обязательна вместе с
+ *                                    ценой при метке «Аккаунты» — это держит
+ *                                    триггер forum_posts_accounts, длину —
+ *                                    проверка таблицы (20261006-account-board.sql).
+ * @property {string|null} [accountPrice]  Почём, словами: сумма, «торг» или
+ *                                    «по договорённости». Денег на сайте нет
+ *                                    нарочно: ни суммы на счету, ни шлюза, ни
+ *                                    способа вернуть перевод у форума нет.
+ * @property {Date|null} [accountSoldAt]  Когда автор снял объявление о продаже;
+ *                                    null — висит. Тема остаётся с ответами.
  * @property {boolean} [pinned]       Держать сверху ленты.
  * @property {boolean} [deleted]
  * @property {string}  [deletedReason]
@@ -356,16 +367,17 @@
  * @property {() => Promise<ForumServer[]>} [listServers]  Пустой список — это «миграции 20261001-server-scope.sql нет», а не «серверов нет»: по пустому ответу строка про закрытый приём тем не показывается, а лента читается фильтром из `config.js`.
  * @property {() => Promise<Record<string, string>|null>} [myServerRoles]  Моя роль в каждом сервере одним запросом: ключ — номер строкой, значение — 'moderator' | 'member' | 'none'. `null` означает «миграции 20261001-server-rights.sql нет, прав не проверяем» — и ничего не прячет; пустая карта — это «тебя нет ни в одной ленте», и путать их нельзя.
  * @property {(userId: string, serverId: number, role: string|null) => Promise<void>} [setServerMember]  Членство в сервере: 'member', 'moderator' или снятие при null. Право и все слова отказа — из базы (`forum_set_server_member`), черновой адаптер повторяет их дословно.
- * @property {(opts?: {category?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}) => Promise<{posts: ForumPost[], total: number}>} listPosts  serverId — фильтр ленты; пусто значит «не фильтровать» (так читается база до миграции).
+ * @property {(opts?: {category?: string, tag?: string, sort?: string, limit?: number, offset?: number, q?: string, saved?: boolean, serverId?: number|null}) => Promise<{posts: ForumPost[], total: number}>} listPosts  serverId — фильтр ленты; пусто значит «не фильтровать» (так читается база до миграции). tag — одна метка темы: витрина доска аккаунтов читает этим же запросом, что и лента.
  * @property {(id: string) => Promise<ForumPost|null>} getPost
  * @property {(postId: string) => Promise<void>} registerView  Один просмотр темы.
  * @property {(postId: string) => Promise<void>} markRead  Отметка «я здесь был»: по ней лента считает, сколько ответов в теме новое.
- * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, barterGives?: string|null, barterWants?: string|null, serverId?: number|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока. serverId прикладывается к запросу только когда сервер известен (см. listServers): до миграции база отвергла бы всю тему из-за неизвестного столбца.
+ * @property {(draft: {title: string, body: string, category: string, tags?: string[], expiresAt?: string|null, eventAt?: string|null, eventCapacity?: number|null, barterGives?: string|null, barterWants?: string|null, accountOffer?: string|null, accountPrice?: string|null, serverId?: number|null, poll?: {question: string, multiple: boolean, options: string[]}}) => Promise<ForumPost>} createPost  Отказ из-за выдержки приходит текстом ошибки — страница показывает его как есть, объяснять человеку нечего кроме срока. serverId прикладывается к запросу только когда сервер известен (см. listServers): до миграции база отвергла бы всю тему из-за неизвестного столбца.
  * @property {(id: string, patch: {title?: string, body?: string, category?: string}) => Promise<ForumPost>} editPost
  * @property {(id: string, reason: string) => Promise<void>} deletePost
  * @property {(id: string, pinned: boolean) => Promise<ForumPost>} setPinned
  * @property {(id: string, expiresAt: string|null) => Promise<ForumPost>} setExpiry  Продлить срок или снять его; база считает границы, страница показывает отказ как есть.
  * @property {(id: string, closed: boolean) => Promise<ForumPost>} closeBarter  Снять объявление обмена с доски или вернуть его. Право решает RLS темы, как у setExpiry: своей строкой правит автор.
+ * @property {(id: string, closed: boolean) => Promise<ForumPost>} closeAccountOffer  Доска аккаунтов — отдельная от обменной: свои колонки и своя метка, поэтому и функция своя. Право то же — RLS темы, свою строку закрывает автор; тема при этом не удаляется, а перестаёт висеть на доске.
  * @property {(postId: string) => Promise<ForumComment[]>} listComments
  * @property {(postId: string, body: string) => Promise<ForumComment>} addComment
  * @property {(id: string, reason: string) => Promise<void>} deleteComment

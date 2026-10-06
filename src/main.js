@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=87';
-import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=87';
-import { validateDataset } from './data/contract.js?v=87';
+import { CONFIG } from '../config.js?v=88';
+import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=88';
+import { validateDataset } from './data/contract.js?v=88';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,31 +9,32 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=87';
-import { renderHome } from './pages/home.js?v=87';
-import { renderLadder } from './pages/ladder.js?v=87';
-import { renderQuarter } from './pages/quarter-final.js?v=87';
-import { renderTimeline } from './pages/timeline.js?v=87';
-import { renderGuide } from './pages/guide.js?v=87';
-import { renderBot } from './pages/bot.js?v=87';
-import { renderHandbook } from './pages/handbook.js?v=87';
-import { renderAbout } from './pages/about.js?v=87';
-import { renderAlliance } from './pages/alliance.js?v=87';
-import { computeAchievements } from './logic/achievements.js?v=87';
-import { esc } from './ui/helpers.js?v=87';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=87';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=87';
+} from './logic/standings.js?v=88';
+import { renderHome } from './pages/home.js?v=88';
+import { renderLadder } from './pages/ladder.js?v=88';
+import { renderQuarter } from './pages/quarter-final.js?v=88';
+import { renderTimeline } from './pages/timeline.js?v=88';
+import { renderGuide } from './pages/guide.js?v=88';
+import { renderBot } from './pages/bot.js?v=88';
+import { renderHandbook } from './pages/handbook.js?v=88';
+import { renderAbout } from './pages/about.js?v=88';
+import { renderAlliance } from './pages/alliance.js?v=88';
+import { computeAchievements } from './logic/achievements.js?v=88';
+import { esc } from './ui/helpers.js?v=88';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=88';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=88';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=87';
-import './ui/timeline-controls.js?v=87';
+import './ui/ladder-controls.js?v=88';
+import './ui/timeline-controls.js?v=88';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=87';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=87';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=87';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=87';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=87';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=87';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=87';
+import './ui/handbook-controls.js?v=88';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=88';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=88';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=88';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=88';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=88';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=88';
+import { mountAccounts, unmountAccounts } from './forum/accounts.js?v=88';
 
 /*
   РАЗДЕЛЫ.
@@ -69,6 +70,14 @@ const ROUTES = [
     «Сервер», рядом с хроникой, а не в меню рядом с форумом.
   */
   { id: 'updates', label: 'Обновления игры', live: true },
+  /*
+    Доска аккаунтов — витрина тем с меткой «Аккаунты». В основной строке меню
+    её нет по той же причине, что и пульс обновлений: ряд и так держит пять
+    живых вкладок, а шестая на телефоне съедает его целиком. Внутри доски
+    ничего не продаётся: объявление — обычная тема, и договоренность рождается
+    в её ответах, а не на этой странице.
+  */
+  { id: 'accounts', label: 'Аккаунты', live: true },
   /*
     Справочник — текст самой игры, перенесённый из Telegram-бота один в один.
     Своей вкладки у него больше нет: он живёт внутри «Гайдов», под списком
@@ -376,6 +385,7 @@ function liveKeyOf(id, param, search) {
   if (id === 'calendar') return `calendar:${search}`;
   if (id === 'guides') return `guides:${param || ''}:${search}`;
   if (id === 'updates') return 'updates';
+  if (id === 'accounts') return `accounts:${search}`;
   if (id === 'chats') return `chats:${location.hash.replace(/^#\/?chats\/?/, '')}`;
   return '';
 }
@@ -473,6 +483,7 @@ function render() {
     unmountChats();
     unmountCalendar();
     unmountUpdates();
+    unmountAccounts();
     renderNav('ladder');
     app.innerHTML = renderAlliance(view, param);
     path = `/alliance/${param}`;
@@ -490,6 +501,7 @@ function render() {
     unmountGuides();
     unmountCalendar();
     unmountUpdates();
+    unmountAccounts();
     renderNav('forum');
     app.innerHTML = '';
     mountUser(app, decodeURIComponent(param));
@@ -504,6 +516,7 @@ function render() {
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
+      unmountAccounts();
       app.innerHTML = '';
       // Второй сегмент — id чата; ссылка-приглашение: #/chats/join/<код>.
       const rest = location.hash.replace(/^#\/?chats\/?/, '');
@@ -515,6 +528,7 @@ function render() {
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
+      unmountAccounts();
       app.innerHTML = '';
       mountTournaments(app, view.alliances);
       path = '/tournaments';
@@ -524,6 +538,7 @@ function render() {
       unmountTournaments();
       unmountCalendar();
       unmountUpdates();
+      unmountAccounts();
       app.innerHTML = '';
       /*
         Второй сегмент — slug гайда: #/guides/na-sklad. Берём его из разобранного
@@ -539,6 +554,7 @@ function render() {
       unmountTournaments();
       unmountGuides();
       unmountUpdates();
+      unmountAccounts();
       app.innerHTML = '';
       /*
         Хвост адреса хранит вид календаря (#/calendar?view=mine): ссылка на
@@ -558,9 +574,30 @@ function render() {
       unmountTournaments();
       unmountGuides();
       unmountCalendar();
+      unmountAccounts();
       app.innerHTML = '';
       mountUpdates(app);
       path = '/updates';
+    } else if (route.id === 'accounts') {
+      /*
+        Доска аккаунтов читает ту же ленту, что и форум, только фильтром по
+        метке «Аккаунты», поэтому у неё своя живая страница, а не ещё один
+        режим форума: два монтирования на один экран с общим состоянием
+        композера спорили бы друг с другом.
+
+        Хвост адреса хранит порядок и флаг снятых объявлений (#/accounts?sort=
+        talked&sold=1): ссылка из чата обязана открыть ровно тот вид доски,
+        который человек в неё скопировал.
+      */
+      unmountForum();
+      unmountChats();
+      unmountTournaments();
+      unmountGuides();
+      unmountCalendar();
+      unmountUpdates();
+      app.innerHTML = '';
+      mountAccounts(app, search);
+      path = '/accounts';
     } else if (route.id === 'handbook') {
       /*
         Справочник больше не отдельная вкладка: он живёт внутри «Гайдов»
@@ -584,6 +621,7 @@ function render() {
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
+      unmountAccounts();
       app.innerHTML = renderHandbook({ guideId: param });
       path = '/handbook/node';
     } else if (route.live) {
@@ -592,6 +630,7 @@ function render() {
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
+      unmountAccounts();
       /*
         Живому разделу нельзя просто подставить строку: он сам решает, что
         показать, потому что ждёт ответа хранилища. Второй сегмент адреса —
@@ -607,6 +646,7 @@ function render() {
       path = param ? `/forum/${param}` : '/forum';
     } else {
       unmountForum();
+      unmountAccounts();
       unmountChats();
       unmountTournaments();
       unmountGuides();
@@ -765,10 +805,13 @@ async function boot() {
     база, ни данные сайта — всё дерево лежит рядом с ним в репозитории. Ждать
     пробуждения базы, чтобы открыть правило про засаду, значит платить десятью
     секундами за чужую сонливость.
+
+    Доска аккаунтов — та же лента, фильтрованная по метке, поэтому она ждёт
+    ответ базы, а не данные сайта: плашка хроники ей не рисуется вовсе.
   */
   const { id, param } = parseHash();
   const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar'
-    || id === 'updates' || id === 'handbook' || (id === 'user' && param);
+    || id === 'updates' || id === 'accounts' || id === 'handbook' || (id === 'user' && param);
 
   app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
   if (liveFirst) {

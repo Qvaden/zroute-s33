@@ -24,7 +24,8 @@ import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY }
 import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
-  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines, EVENT_TAG_ID,
+  CATEGORY_IDS, TOPIC_TAG_IDS, SORT_IDS, needsExpiry, needsEventDate, needsBarterLines,
+  needsAccountLines, ACCOUNT_TAG_ID, EVENT_TAG_ID,
   EVENT_RSVP_IDS, validateServerId,
 } from './rules.js';
 import { filtersFromSearch, searchFromFilters, composeIntentFromSearch } from './feed-url.js';
@@ -168,6 +169,12 @@ const state = {
     держим: иначе встреча открывалась бы закрытой.
   */
   eventDraft: false,
+  /*
+    То же намерение для доски аккаунтов: `#/forum?new=accounts` с витрины.
+    Флаг отмечает метку «Аккаунты» до первой отрисовки и раскрывает форму,
+    где уже лежат поля «что в аккаунте» и «цена».
+  */
+  accountDraft: false,
   /*
     Отмеченные метки набираемой темы. Держим их состоянием, а не экраном:
     у семи чекбоксов одно имя `tags`, и через снимок ввода под этим ключом
@@ -430,6 +437,26 @@ function restoreInput(snapshot) {
 }
 
 /**
+ * Подставить срок, который требует база.
+ *
+ * Метки «Набор», «Срочно», «Обмен» и «Аккаунты» без срока база не примет, а
+ * узнавать об этом после того, как человек написал текст, — значит выдать ему
+ * отказ вместо подсказки. Поэтому срок подставляется сам. Делается это в двух
+ * местах одним кодом: когда метку только что отметили и когда пришли по ссылке
+ * с уже отмеченной меткой. Второе место появилось не для красоты — подстановка
+ * жила только в слушателе клика, и приход по ссылке «Разместить объявление»
+ * давал форму, которая подсказкой обещает автоподстановку и тут же её не делает.
+ */
+function autofillExpiry(form, tagId) {
+  const select = form?.elements.expires_in;
+  if (!select || select.value) return;
+  const chosen = [...form.querySelectorAll('input[name="tags"]:checked')].map((i) => i.value);
+  if (!needsExpiry(chosen)) return;
+  const days = CONFIG.forum.limits.expiryDefaultDays?.[tagId];
+  if (days && [...select.options].some((o) => o.value === String(days))) select.value = String(days);
+}
+
+/**
  * Имя поля, устойчивое к перерисовке: имя внутри формы плюс адрес записи,
  * к которой форма относится. Порядок элементов для этого не годится —
  * разметка между перерисовками меняется.
@@ -569,6 +596,17 @@ function paint() {
     }
     state.composerOpen = true;
   }
+  /*
+    Пришли разместить объявление на доске аккаунтов — метка «Аккаунты» должна
+    быть отмечена до первой отрисовки, иначе человек увидит форму без полей
+    «что в аккаунте» и «цена», а без них база тему не примет.
+  */
+  if (state.accountDraft) {
+    if (!state.composerTags.includes(ACCOUNT_TAG_ID)) {
+      state.composerTags = [...state.composerTags, ACCOUNT_TAG_ID];
+    }
+    state.composerOpen = true;
+  }
   host.innerHTML = mode === 'user'
     ? renderUserPage({ ...profileState, me: state.me }) + dialogs
     : renderForum(siteView, state) + dialogs;
@@ -585,7 +623,16 @@ function paint() {
     кто её уже закрыл. Отмеченные метки при этом остаются в
     state.composerTags — их меняет только сам человек.
   */
-  if (host.querySelector('[data-forum-composer]')) state.eventDraft = false;
+  if (host.querySelector('[data-forum-composer]')) {
+    /*
+      Пришли по ссылке с уже отмеченной меткой — срок подставляется здесь же:
+      получить его из слушателя клика некому, клика не было.
+    */
+    const intentTag = state.accountDraft ? ACCOUNT_TAG_ID : state.eventDraft ? EVENT_TAG_ID : '';
+    if (intentTag) autofillExpiry(host.querySelector('[data-forum-new]'), intentTag);
+    state.eventDraft = false;
+    state.accountDraft = false;
+  }
 
   /*
     Таймер Кварта в боковой колонке форума — свой интервал. При каждой
@@ -721,6 +768,7 @@ function readFilters(search) {
     человек остаётся с закрытым композером.
   */
   state.eventDraft = state.eventDraft || composeIntentFromSearch(search) === 'event';
+  state.accountDraft = state.accountDraft || composeIntentFromSearch(search) === 'accounts';
 }
 
 function writeFilters() {
@@ -2492,6 +2540,32 @@ function wire() {
     }
 
     /*
+      Аккаунт продан — или объявление вернули на доску. Отметка живёт у темы,
+      поэтому право на неё решает та же политика, что у обменной доски и срока,
+      а тема остаётся с ответами: под объявлением могли торговаться другие.
+    */
+    const accountBtn = t.closest('[data-forum-account-close]');
+    if (accountBtn && host.contains(accountBtn)) {
+      const id = accountBtn.dataset.forumAccountClose;
+      const sold = accountBtn.dataset.forumAccountSold !== '1';
+      accountBtn.disabled = true;
+      try {
+        const updated = await forum.closeAccountOffer(id, sold);
+        if (updated) {
+          const i = state.posts.findIndex((p) => p.id === id);
+          if (i >= 0) state.posts[i] = updated;
+          else state.posts = [updated, ...state.posts];
+        }
+        paint();
+      } catch (err) {
+        notice(`${String(err?.message ?? err)}
+Если база ещё не обновлена, прогоните supabase/20261006-account-board.sql.`.trim());
+        accountBtn.disabled = false;
+      }
+      return;
+    }
+
+    /*
       Ответ на приглашение прямо в теме. На странице календаря те же кнопки
       обслуживает forum/calendar.js; здесь они нужны потому, что человек
       читает анонс и хочет ответить, не уходя с темы. Двойной обработки не
@@ -2678,22 +2752,17 @@ function wire() {
     }
 
     /*
-      Метки «Набор» и «Срочно» без срока база не примет, а узнавать об этом
-      после того, как человек написал текст, — значит выдать ему отказ вместо
-      подсказки. Поэтому срок подставляется сам в момент выбора метки: поле
-      остаётся на виду, и его можно переставить на другой.
+      Метки, требующие срока, без него базой не принимаются — поэтому срок
+      подставляется в момент выбора метки (см. autofillExpiry). Поле остаётся на
+      виду, и его можно переставить на другой.
     */
     const tagBox = e.target.closest('[data-forum-new] input[name="tags"]');
     if (tagBox) {
       const form = tagBox.closest('form');
-      const select = form?.elements.expires_in;
       const chosen = [...form.querySelectorAll('input[name="tags"]:checked')].map((i) => i.value);
       // Список меток — состояние: только так он переживает перерисовку формы.
       state.composerTags = chosen;
-      if (select && !select.value && needsExpiry(chosen)) {
-        const days = CONFIG.forum.limits.expiryDefaultDays?.[tagBox.value];
-        if (days && [...select.options].some((o) => o.value === String(days))) select.value = String(days);
-      }
+      autofillExpiry(form, tagBox.value);
       /*
         Подсказка живёт рядом с полем и молчит, пока срок не требуется:
         вечная заметка «обязательно» рядом с необязательным полем — это шум.
@@ -2715,6 +2784,13 @@ function wire() {
       */
       const barterFields = form?.querySelector('[data-forum-barter-fields]');
       if (barterFields) barterFields.hidden = !needsBarterLines(chosen);
+      /*
+        Поля доски аккаунтов — за той же меткой: без «Аккаунтов» база обнулит
+        обе колонки триггером, и оставленные на экране поля обещали бы
+        объявление, которого в ленте не появится.
+      */
+      const accountFields = form?.querySelector('[data-forum-account-fields]');
+      if (accountFields) accountFields.hidden = !needsAccountLines(chosen);
       /*
         Черновик пересохраняем именно здесь: автосохранение идёт на input,
         который случился до того, как поле заполнилось, и без этого шага
@@ -2880,6 +2956,17 @@ function wire() {
       if (needsBarterLines(draft.tags)) {
         draft.barterGives = gives || null;
         draft.barterWants = wants || null;
+      }
+      /*
+        Доска аккаунтов — те же два правила: строку не режем местной проверкой
+        (длины держат проверка таблицы и триггер), и пустое поле в запрос не
+        уезжает. Без метки «Аккаунты» колонок не касается никто, а до прогона
+        20261006-account-board.sql PostgREST отверг бы всю тему из-за
+        неизвестного столбца.
+      */
+      if (needsAccountLines(draft.tags)) {
+        draft.accountOffer = form.account_offer?.value?.trim() || null;
+        draft.accountPrice = form.account_price?.value?.trim() || null;
       }
 
       await withBusy(submitter, 'Публикуем…', async () => {
@@ -3485,6 +3572,7 @@ export function unmountForum() {
     ставал в прошлый заход.
   */
   state.eventDraft = false;
+  state.accountDraft = false;
   state.composerTags = [];
   state.composerOpen = false;
   state.editingPostId = null;

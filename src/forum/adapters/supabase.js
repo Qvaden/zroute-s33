@@ -338,6 +338,16 @@ function postOut(row) {
     barterGives: row.barter_gives || null,
     barterWants: row.barter_wants || null,
     barterClosedAt: toDate(row.barter_closed_at) ?? null,
+    /*
+      Доска аккаунтов: что в аккаунте, почём и отметка, что снял. Устроена одним
+      способом с обменной — объявлением делает тему метка, а не отдельная
+      таблица (шаг 1 supabase/20261006-account-board.sql). Денег и контактов у
+      объявления нет нарочно: цена — это слова, а не реквизиты. До прогона
+      миграции колонок в строке нет вовсе — отсюда null, а не ошибка.
+    */
+    accountOffer: row.account_offer || null,
+    accountPrice: row.account_price || null,
+    accountSoldAt: toDate(row.account_sold_at) ?? null,
     pinned: Boolean(row.pinned),
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
@@ -675,6 +685,20 @@ export async function createPost(draft) {
   }
 
   /*
+    Доска аккаунтов: описание и цена. Тот же порядок, что у обмена, — колонки
+    темы, обязывает их метка, а не страница: обе части требует триггер
+    forum_posts_accounts, длину — проверка таблицы.
+
+    Поля прикладываются только когда их попросили: до прогона
+    20261006-account-board.sql PostgREST отверг бы весь запрос из-за неизвестного
+    столбца, и встал бы не доска, а весь форум.
+  */
+  if (draft.accountOffer != null || draft.accountPrice != null) {
+    payload.account_offer = draft.accountOffer ?? null;
+    payload.account_price = draft.accountPrice ?? null;
+  }
+
+  /*
     Момент встречи и места — те же колонки темы, что и срок действия: событие
     у нас и есть тема с меткой «Событие». Границы (не меньше десяти минут
     вперёд, не дальше 90 дней, места от 2 до 200) держит триггер
@@ -836,6 +860,24 @@ export async function closeBarter(id, closed) {
   });
   const full = await getPost(id);
   if (!full) throw new Error('Пост не найден после снятия объявления');
+  return full;
+}
+
+/**
+ * Снять объявление о продаже с доски или вернуть его.
+ *
+ * Право на это решает та же RLS темы, что у обмена: строку правит автор,
+ * модерация — любую. Дверь не заводилась нарочно: «это моя тема» — единственное
+ * правило, а политика отвечает его сама. Тема при этом остаётся: под объявлением
+ * могли спросить и договориться, и ответы исчезли бы вместе с ним.
+ */
+export async function closeAccountOffer(id, closed) {
+  await rest(`/forum_posts?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: { account_sold_at: closed ? new Date().toISOString() : null },
+  });
+  const full = await getPost(id);
+  if (!full) throw new Error('Пост не найден после снятия объявления аккаунта');
   return full;
 }
 

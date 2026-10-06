@@ -2895,6 +2895,75 @@
 .forum-barter-fields .forum-field { flex: 1 1 220px; }
 .forum-barter-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
 
+/*
+  Объявление в теме. Те же две строки, что у бартерной доски, но цвет
+  золотой, а не зелёный: обмен — про «отдам и возьму», продажа — про цену, и
+  глаз должен различать доски, не читая подписей.
+*/
+.forum-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+}
+.forum-offer > div {
+  flex: 1 1 200px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gold) 7%, var(--raised));
+}
+.forum-offer dt {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.forum-offer dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+/* Снятое объявление читается, но не зовёт — тот же смысл, что у бартерной доски. */
+.forum-offer--sold > div {
+  border-color: var(--line);
+  background: transparent;
+  opacity: .62;
+}
+.forum-offer__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.forum-offer__foot .muted { font-size: 11.5px; }
+.forum-post__offer-sold {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mute);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Поля объявления в форме — по образцу полей обмена и встречи: метка открыла
+   свои поля, и подсветка говорит, какая метка. */
+.forum-offer-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gold) 7%, var(--raised));
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
+}
+.forum-offer-fields .forum-field { flex: 1 1 220px; }
+.forum-offer-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
+
 /* ══ ПУЛЬС ОБНОВЛЕНИЙ ИГРЫ ══════════════════════════════════════════════════
    Заметки пишет модерация, поэтому карточка обязана называть источник и его
    дату: без них пересказ неотличим от слуха.
@@ -3233,4 +3302,173 @@
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--mute);
+}
+
+/* ══ ДОСКА АККАУНТОВ ════════════════════════════════════════════════════════
+   Витрину смотрят глазами «почём» и «что внутри», поэтому карточка — плитка
+   с крупной ценой, а не строка ленты: объявление сравнивают с соседним, не
+   переходя в тему.
+*/
+
+.accounts-page .panel__head { margin-bottom: 12px; }
+.accounts-page .panel__head h1 { font-size: clamp(20px, 3vw, 26px); margin: 4px 0 0; }
+.accounts-page .panel__head p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+
+.accounts-notice {
+  margin: 0 0 14px;
+  padding: 10px 13px;
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--gold) 7%, var(--raised));
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--mute);
+}
+
+.accounts-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.accounts-controls__sorts { display: flex; flex-wrap: wrap; gap: 6px; }
+.accounts-controls__sold {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--mute);
+  cursor: pointer;
+}
+.accounts-controls__sold input { width: 16px; height: 16px; accent-color: var(--accent); }
+/* Кнопка «разместить» — на своём месте справа и не превращается в ссылку:
+   это вход в обычный композер форума, а не ещё одна страница. */
+.accounts-controls__new { margin-left: auto; text-decoration: none; }
+
+.accounts-chip {
+  padding: 8px 14px;
+  min-height: 40px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mute);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.accounts-chip:hover { color: var(--text); border-color: var(--accent); }
+.accounts-chip.is-on {
+  color: #14100c;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.accounts-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 12px;
+  background: var(--raised);
+}
+.accounts-card__title { margin: 0; font-size: 14.5px; line-height: 1.35; font-weight: 600; }
+.accounts-card__title a { color: var(--text); text-decoration: none; }
+.accounts-card__title a:hover { color: var(--accent); }
+.accounts-card__price {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+.accounts-card__offer {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.accounts-card__marks { display: flex; flex-wrap: wrap; gap: 6px; }
+.accounts-card__sold,
+.accounts-card__over,
+.accounts-card__until {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mute);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.accounts-card__sold {
+  border-color: color-mix(in srgb, var(--win) 40%, var(--line));
+  color: var(--win);
+}
+.accounts-card__over {
+  border-color: color-mix(in srgb, var(--loss) 40%, var(--line));
+  color: var(--loss);
+}
+.accounts-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.accounts-card__nick { color: var(--link); font-weight: 600; text-decoration: none; }
+.accounts-card__nick:hover { text-decoration: underline; }
+.accounts-card__talk { margin-left: auto; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.accounts-card__talk:hover { text-decoration: underline; }
+/* Проданное и просроченное не прячем, но и не зовём: объявление помнят по
+   цене, и перечёркнутая плитка честнее исчезнувшей. */
+.accounts-card--sold,
+.accounts-card--expired {
+  border-left-color: var(--line);
+  opacity: .62;
+}
+
+.accounts-error {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,71,87,.3);
+  border-radius: 10px;
+  background: rgba(255,71,87,.07);
+  color: var(--soft-bad);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.accounts-empty {
+  padding: 18px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.accounts-empty p { margin: 0 0 6px; }
+.accounts-empty p:last-child { margin: 0; font-size: 12px; }
+
+/*
+  Телефон: сетка складывается в один столбец, а кнопка объявления уходит под
+  переключатели — иначе ряд из трёх элементов режет экран пополам.
+*/
+@media (max-width: 700px) {
+  .accounts-grid { grid-template-columns: 1fr; }
+  .accounts-controls { gap: 8px; }
+  .accounts-controls__new { margin-left: 0; width: 100%; text-align: center; }
+  .accounts-chip { min-height: 44px; }
+  .accounts-card__talk { margin-left: 0; }
 }

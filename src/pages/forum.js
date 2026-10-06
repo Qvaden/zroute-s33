@@ -21,7 +21,7 @@
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines, needsAccountLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
@@ -1423,8 +1423,8 @@ function renderExpiryField(tags) {
   const now = Date.now();
   /*
     Метка «нужен» стоит у тех вариантов, которые база примет при метке «Набор»,
-    «Срочно» или «Обмен»: автоподстановка подставляет ровно такой вариант, и
-    человеку видно, что выбор честный, а не случайный.
+    «Срочно», «Обмен» или «Аккаунты»: автоподстановка подставляет ровно такой
+    вариант, и человеку видно, что выбор честный, а не случайный.
   */
   const required = [...new Set(Object.values(defaults).map(Number))]
     .filter((d) => days.includes(d));
@@ -1435,11 +1435,11 @@ function renderExpiryField(tags) {
         <option value="">Бессрочно</option>
         ${days
           .map(
-            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора, срочных тем и обмена)' : ''}</option>`
+            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора, срочных тем, обмена и аккаунтов)' : ''}</option>`
           )
           .join('')}
       </select>
-      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор», «Срочно» или «Обмен» срок нужен
+      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» срок нужен
         обязательно: он подставится сам, но его можно выбрать другой.</small>
     </label>`;
 }
@@ -1563,6 +1563,97 @@ function barterControl(p, s) {
     </div>`;
 }
 
+/* ── Доска аккаунтов ────────────────────────────────────────────────────── */
+
+/**
+ * Поля объявления на доске аккаунтов.
+ *
+ * Требование обеих частей держит триггер базы `forum_posts_accounts`
+ * (supabase/20261006-account-board.sql), а длины — проверка той же таблицы,
+ * поэтому форма просит ровно то, что база примет: числа берутся из config.js,
+ * где они стоят рядом с числами миграции, и расхождение сторожит тест.
+ *
+ * Денег и контактов здесь нет намеренно, и это не забывчивость: сайт не держит
+ * платёж, не берёт комиссию и не может вернуть сумму, поэтому цена — только
+ * слово автора, а сделка происходит мимо форума. Телефон или дискорд полем не
+ * становятся по второй причине: связаться с автором можно по его нику, который
+ * и так в теме, а поле под личные данные приглашало бы светить их там, где их
+ * читает весь сервер.
+ */
+function renderAccountFields(open) {
+  const L = CONFIG.forum.limits;
+  return `
+    <div class="forum-offer-fields" data-forum-account-fields${open ? '' : ' hidden'}>
+      <label class="forum-field">
+        <span>Что в аккаунте</span>
+        <input type="text" name="account_offer" data-forum-account-offer
+               minlength="${L.accountOfferMin}" maxlength="${L.accountOfferMax}"
+               placeholder="уровень, техника, скины, что осталось от сезона">
+      </label>
+      <label class="forum-field">
+        <span>Цена</span>
+        <input type="text" name="account_price" data-forum-account-price
+               minlength="${L.accountPriceMin}" maxlength="${L.accountPriceMax}"
+               placeholder="словами, например: 500 рублей или по договорённости">
+      </label>
+      <small class="muted">Сайт денег не берёт: цена — слово автора, а сделка происходит
+        мимо форума. Обсуждение, торг и вопросы пишут в ответах под темой — она обычная,
+        просто с меткой «Аккаунты». Когда аккаунт продан, отметьте это в карточке: тема
+        останется со своими ответами.</small>
+    </div>`;
+}
+
+/**
+ * Обе части объявления в карточке.
+ *
+ * Витрина читается именно по этим двум строкам: «что в аккаунте» и «почём».
+ * Прятать их за «читать целиком» — значит заставить человека открывать каждую
+ * тему, чтобы понять, продают ли ему то, что нужно.
+ *
+ * Строк без метки не бывает: триггер обнуляет колонки вместе с меткой.
+ */
+function accountLines(p) {
+  if (!p.accountOffer && !p.accountPrice) return '';
+  return `
+    <dl class="forum-offer${p.accountSoldAt ? ' forum-offer--sold' : ''}">
+      <div><dt>В аккаунте</dt><dd>${esc(p.accountOffer || '—')}</dd></div>
+      <div><dt>Цена</dt><dd>${esc(p.accountPrice || '—')}</dd></div>
+    </dl>`;
+}
+
+/**
+ * Значок проданного объявления.
+ *
+ * Проданное не удаляется: под темой могли торговаться другие, и их ответы
+ * исчезли бы вместе с объявлением. Тот же порядок, что у обменной доски и у
+ * знака «срок вышел».
+ */
+function accountBadge(p) {
+  if (!p.accountSoldAt) return '';
+  return `<span class="forum-post__offer-sold" title="Автор снял это объявление с доски ${esc(shortDate(p.accountSoldAt))}">Продано</span>`;
+}
+
+/**
+ * Кнопка «продано / вернуть на доску» для автора и модерации.
+ *
+ * Отметка обратима: нажатие мимо кнопки не должно навсегда прятать
+ * объявление, по которому ещё не сошлись. Право решает та же RLS темы.
+ */
+function accountControl(p, s) {
+  const sold = Boolean(p.accountSoldAt);
+  if (!s.me) return '';
+  if (s.me.id !== p.authorId && !canModerateServer(s, p.serverId)) return '';
+  return `
+    <div class="forum-offer__foot">
+      <button type="button" class="forum-act" data-forum-account-close="${esc(p.id)}"
+              data-forum-account-sold="${sold ? '1' : ''}"
+              title="${sold ? 'Вернуть объявление на доску' : 'Снять объявление с доски — тема останется со своими ответами'}">${
+        sold ? 'Вернуть на доску' : 'Аккаунт продан'
+      }</button>
+      ${sold ? '<span class="muted">объявление больше не действует</span>' : ''}
+    </div>`;
+}
+
 /**
  * Значок срока в шапке карточки.
  *
@@ -1680,6 +1771,8 @@ function renderComposer(s) {
         ${renderEventFields(needsEventDate(tags))}
 
         ${renderBarterFields(needsBarterLines(tags))}
+
+        ${renderAccountFields(needsAccountLines(tags))}
 
         <label class="forum-field">
           <span>Заголовок</span>
@@ -2144,6 +2237,7 @@ export function renderPostCard(p, s) {
         ${expiryBadge(p)}
         ${eventBadge(p)}
         ${barterBadge(p)}
+        ${accountBadge(p)}
       </header>
 
       ${
@@ -2158,6 +2252,8 @@ export function renderPostCard(p, s) {
 
       ${barterLines(p)}
 
+      ${accountLines(p)}
+
       <div class="forum-post__body">
         ${isOpen ? postBody(p.body) : `<p>${esc(excerpt(p.body))}</p>`}
       </div>
@@ -2169,6 +2265,8 @@ export function renderPostCard(p, s) {
       ${isOpen ? expiryControl(p, s) : ''}
 
       ${isOpen && barterLines(p) ? barterControl(p, s) : ''}
+
+      ${isOpen && accountLines(p) ? accountControl(p, s) : ''}
 
       ${isOpen && needsEventDate(p.tags) ? eventActions(p, s) : ''}
 
