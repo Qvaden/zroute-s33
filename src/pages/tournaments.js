@@ -49,19 +49,34 @@ export function renderTournaments(s) {
             : ''}
         </li>`;
     }).join('')
-    : '<p class="muted">Турниров пока нет — сгенерируйте первый ниже.</p>';
+    : '';
+
+  /*
+    Указатель направления имеет смысл только тогда, когда блок по этому
+    направлению действительно есть: форма жребия рисуется над списком и только
+    вошедшему, и только при двух альянсах. Гость, прочитавший «соберите первый
+    выше» там, где ничего нет, получает обещание, которое страница не выполняет.
+  */
+  const canCreate = Boolean(s.me) && alliances.length >= 2;
+  const emptyText = list
+    ? ''
+    : canCreate
+      ? '<p class="muted">Турниров пока нет — соберите пару в форме выше.</p>'
+      : s.me
+        ? '<p class="muted">Турниров пока нет. Для жребия нужны как минимум два альянса.</p>'
+        : '<p class="muted">Турниров пока нет. Собрать первый можно, войдя на форум.</p>';
 
   const opts = alliances
     .map((a) => `<option value="${esc(a.id)}">${esc(a.tag)} — ${esc(a.name)}</option>`)
     .join('');
 
-  const genForm = s.me && alliances.length >= 2
+  const genForm = canCreate
     ? `
       <form class="tour-gen" data-tour-create>
         <span class="eyebrow">Новый матч · жребий</span>
         <div class="tour-gen__row">
           <select name="allyA" aria-label="Первый альянс" disabled>${opts}</select>
-          <button type="button" class="forum-btn forum-btn--sm" data-tour-random title="Перебросить пару">🎲</button>
+          <button type="button" class="forum-btn forum-btn--sm" data-tour-random title="Перебросить пару" aria-label="Перебросить пару">🎲</button>
           <select name="allyB" aria-label="Второй альянс" disabled>${opts}</select>
         </div>
         <p class="muted tour-gen__hint">Пара выпадает сама и закрепляется: selectable поля закрыты. Киньте 🎲 ещё раз, если жребий не нравится.</p>
@@ -79,6 +94,6 @@ export function renderTournaments(s) {
         <p class="muted">Два альянса, счёт по победам в VS. Засчитывайте раунды — победитель определится автоматически.</p>
       </header>
       ${genForm}
-      <ul class="tour-list">${list}</ul>
+      ${list ? `<ul class="tour-list">${list}</ul>` : emptyText}
     </section>`;
 }

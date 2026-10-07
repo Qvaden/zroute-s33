@@ -73,7 +73,7 @@ export function renderChats(s) {
     return `
       <section class="panel chat-empty">
         <span class="eyebrow">Чаты</span>
-        <h2>Чаты ещё не подключены</h2>
+        <h1>Чаты ещё не подключены</h1>
         <p class="muted">${esc(s.error || 'База форума не настроена — см. docs/FORUM.md.')}</p>
       </section>`;
   }
@@ -82,7 +82,7 @@ export function renderChats(s) {
     return `
       <section class="panel chat-empty">
         <span class="eyebrow">Закрытые чаты</span>
-        <h2>Чат альянса — здесь, а не в трёх мессенджерах</h2>
+        <h1>Чат альянса — здесь, а не в трёх мессенджерах</h1>
         <p class="muted">
           Войдите на форум под своим ником, и лидер альянса даст вам код приглашения.
           Чаты закрытые: их видят только участники и модерация сайта.
@@ -115,7 +115,7 @@ export function renderChatListHead(s) {
     <header class="chat-list__head">
       <div>
         <span class="eyebrow">Закрытые чаты</span>
-        <h2 class="chat-list__title">Чаты</h2>
+        <h1 class="chat-list__title">Чаты</h1>
       </div>
       <div class="chat-list__head-actions">
         ${canCreate

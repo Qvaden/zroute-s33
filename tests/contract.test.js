@@ -3841,12 +3841,18 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /overflow-x: clip/.test(mobileCss));
 
   const mainJs = await readFile('src/main.js', 'utf8');
+  /*
+    Порядок разделов важен не меньше самого списка: форум — входная дверь,
+    и его нельзя случайно опустить вниз. Читается именно порядок id в массиве,
+    а не запись на одной строке — у раздела их теперь несколько.
+  */
+  const routesStart = mainJs.indexOf('const ROUTES = [');
+  const routesBlock = mainJs.slice(routesStart, mainJs.indexOf('\n];', routesStart));
+  const menuOrder = [...routesBlock.matchAll(/^\s*id: '([a-z]+)',/gm)].map((m) => m[1]);
   check('форум — первый раздел в меню',
-    /const ROUTES = \[[\s\S]{0,600}?\{ id: 'forum'/.test(mainJs) &&
-    mainJs.indexOf("{ id: 'forum'") < mainJs.indexOf("{ id: 'home'"));
+    menuOrder[0] === 'forum' && menuOrder.indexOf('home') > 0, menuOrder.join(', '));
   check('чаты — второй раздел, сразу за форумом',
-    /\{ id: 'chats', label: 'Чаты', live: true/.test(mainJs) &&
-    mainJs.indexOf("{ id: 'chats'") < mainJs.indexOf("{ id: 'home'"));
+    menuOrder[1] === 'chats' && menuOrder.indexOf('home') > 1, menuOrder.join(', '));
   check('пустой адрес открывает форум', /id \|\| 'forum'/.test(mainJs));
   check('итоги VS остались отдельным разделом', /id: 'home'/.test(mainJs));
   check('хронология осталась отдельным разделом', /id: 'timeline'/.test(mainJs));
@@ -8772,7 +8778,7 @@ console.log('\nAF. Пульс обновлений игры');
 
   /* ── Маршрут ── */
   check('страница стоит в меню и живёт по своему адресу',
-    mainSrc.includes("{ id: 'updates', label: 'Обновления игры', live: true }")
+    /\{\s*id: 'updates',\s*label: 'Обновления игры',\s*live: true,/.test(mainSrc)
       && mainSrc.includes('mountUpdates(app)'));
   check('она ждёт ответа хранилища, как живой раздел',
     mainSrc.includes("id === 'updates' || id === 'accounts' || id === 'handbook' || (id === 'user' && param)"));
@@ -9524,7 +9530,7 @@ console.log('\nAJ. Справочник официальных гайдов иг
     меню и блок на странице гайдов.
   */
   check('маршрут остался, а пункт меню — нет: вкладка одна',
-    /\{ id: 'handbook', label: 'Справочник игры', hidden: true, navAs: 'guides' \}/.test(mainSrc)
+    /\{\s*id: 'handbook',\s*label: 'Справочник игры',\s*hidden: true,\s*navAs: 'guides',/.test(mainSrc)
       && /const shown = ROUTES\.filter\(\(r\) => !r\.hidden\);/.test(mainSrc));
   check('открытый справочник подсвечивает вкладку «Гайды»',
     /const navId = \(r\) => r\.navAs \|\| r\.id;/.test(mainSrc)
@@ -11353,7 +11359,7 @@ console.log('\nAN. Доска аккаунтов');
 
   /* ── Вкладка-витрина подключена, а не лежит рядом ── */
   check('вкладка стоит в меню и живёт по своему адресу',
-    /\{ id: 'accounts', label: 'Аккаунты', live: true \}/.test(mainSrc)
+    /\{\s*id: 'accounts',\s*label: 'Аккаунты',\s*live: true,/.test(mainSrc)
       && mainSrc.includes('if (id === \'accounts\') return `accounts:${search}`;'));
   check('она ждёт ответа хранилища, как живой раздел',
     /const liveFirst = [^;]*id === 'accounts'[^;]*;/.test(mainSrc));
@@ -12239,11 +12245,11 @@ console.log('\nAN. Доска аккаунтов');
         { source: 'supabase', snapshotAt: null, primaryError: '' }, 'supabase'
       );
       return clean.box.hidden === true && clean.box.innerHTML === ''
-        && clean.badge.textContent === 'supabase';
+        && clean.badge.textContent === 'живая база';
     })());
   check('полоску зовут и в успехе, и в падении — молчаливой пустоты не остаётся',
     (mainSrc.match(/\bdataNotice\(\);/g) || []).length === 2
-      && mainSrc.includes("import { loadAll, capabilities, db, lastLoad }"));
+      && /function sourceBadge\(\)[\s\S]{0,400}'живая база'/.test(mainSrc));
 
   check('отметка читается из формата базы и молчит, если даты нет',
     (() => {
@@ -14164,6 +14170,157 @@ console.log('\nAN. Доска аккаунтов');
     (await fail(() => local.saveProfile({ serverId: '' }))) === null
       && (await local.currentUser()).serverId === null
       && who().serverSetAt !== null);
+}
+
+/* ── AO. Раздел — страница: своя вкладка, свой H1 и адрес для робота ─────────
+
+   Сайт живёт одним документом: разделы открываются фрагментом адреса. Пока
+   это незаметно человеку, но не роботу и не истории браузера — без правок
+   ниже четырнадцать страниц оставались одной страницей с одним заголовком
+   вкладки, без H1 и без возможности быть найденными.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAO. Раздел — страница');
+{
+  const { readFile } = await import('node:fs/promises');
+  const mainJs = await readFile('src/main.js', 'utf8');
+
+  /*
+    У каждого раздела — свои текст вкладки и описание.
+
+    Проверяем по самому массиву ROUTES, а не по факту вызова функции:
+    добавить раздел и забыть его название — тот же промах, что и не писать
+    вовсе, и поймать его можно только перебором всех строк списка.
+  */
+  const routesStart = mainJs.indexOf('const ROUTES = [');
+  const routesBlock = mainJs.slice(routesStart, mainJs.indexOf('\n];', routesStart));
+  const routeChunks = routesBlock.split('\n  {').slice(1);
+  const noTitle = routeChunks
+    .filter((chunk) => !/title: '/.test(chunk) || !/desc: '/.test(chunk))
+    .map((chunk) => (chunk.match(/id: '([a-z]+)'/) || [, '?'])[1]);
+  check(`у всех разделов свой title и description (${routeChunks.length} шт.)`,
+    routeChunks.length >= 14 && noTitle.length === 0,
+    noTitle.length ? 'без описания: ' + noTitle.join(', ') : '');
+
+  /*
+    Функция мало что меняет, пока её не вызывают при смене раздела.
+    Порядок вызовов тоже не случайность: счётчик визитов читает document.title,
+    поэтому-meta надо успеть обновить до отправки.
+  */
+  check('смена раздела обновляет вкладку', /setPageMeta\(id, param\);/.test(mainJs));
+  check('заголовок ставится до учёта визита',
+    mainJs.indexOf('setPageMeta(id, param);') < mainJs.indexOf('trackPageview(path);'));
+  const indexHtml = await readFile('index.html', 'utf8');
+  check('в документе есть meta description, которую обновлять',
+    /<meta name="description" content="[^"]+"/.test(indexHtml));
+
+  /*
+    Ровно один H1 на разделе.
+
+    Рендереры вызываются с пустыми данными — так же, как при недоступной базе:
+    пустое состояние тоже обязано быть страницей с заголовком, а не полосой
+    текста без начала.
+  */
+  const pages = [
+    ['форум', '../src/pages/forum.js', 'renderForum', {}],
+    ['итоги недели', '../src/pages/home.js', 'renderHome', {}],
+    ['кварт', '../src/pages/quarter-final.js', 'renderQuarter', {}],
+    ['рейтинг', '../src/pages/ladder.js', 'renderLadder', {}],
+    ['хронология', '../src/pages/timeline.js', 'renderTimeline', {}],
+    ['малым альянсам', '../src/pages/guide.js', 'renderGuide', {}],
+    ['чаты', '../src/pages/chats.js', 'renderChats', {}],
+    ['турниры', '../src/pages/tournaments.js', 'renderTournaments', {}],
+    ['календарь', '../src/pages/calendar.js', 'renderCalendar', {}],
+    ['гайды', '../src/pages/guides.js', 'renderGuides', {}],
+    ['обновления', '../src/pages/updates.js', 'renderUpdates', {}],
+    ['аккаунты', '../src/pages/accounts.js', 'renderAccounts', { accounts: [], posts: [] }],
+    ['о проекте', '../src/pages/about.js', 'renderAbout', {}],
+    ['бот', '../src/pages/bot.js', 'renderBot', {}],
+  ];
+  for (const [name, file, fn, state] of pages) {
+    const mod = await import(file);
+    const html = String(mod[fn](state));
+    const levels = [...html.matchAll(/<h([1-6])/g)].map((m) => Number(m[1]));
+    const skips = levels.filter((lv, i) => i > 0 && lv > levels[i - 1] + 1);
+    check(`«${name}»: один H1 и заголовки идут по порядку`,
+      levels.filter((lv) => lv === 1).length === 1 && skips.length === 0,
+      `уровни: ${levels.join(' → ') || 'нет заголовков'}`);
+  }
+
+  /*
+    Робот обходит не фрагмент адреса, а файлы. Поэтому:
+    — robots.txt обязан открыто разрешать src/: без модулей робот получит
+      пустой документ и решит, что страниц нет;
+    — закрыто только то, что в выдаче быть не должно (панель, данные, тесты);
+    — sitemap и canonical ссылаются на один и тот же адрес: расхождение между
+      ними робот читает как два разных сайта с одинаковым содержимым.
+  */
+  const robots = await readFile('robots.txt', 'utf8');
+  check('robots.txt не закрывает код сайта', !/^Disallow: \/src$/m.test(robots));
+  for (const closed of ['/admin.html', '/data/', '/tests/', '/docs/', '/scripts/']) {
+    check(`robots.txt закрывает ${closed}`, new RegExp(`^Disallow: ${closed}$`, 'm').test(robots));
+  }
+
+  const canonical = indexHtml.match(/rel="canonical" href="([^"]+)"/);
+  const sitemap = await readFile('sitemap.xml', 'utf8');
+  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  check('canonical — абсолютный адрес с https',
+    Boolean(canonical) && /^https:\/\/[^/]+\/$/.test(canonical[1]),
+    canonical ? canonical[1] : 'тег не найден');
+  check('в sitemap тот же адрес, что и в canonical',
+    locs.length === 1 && locs[0] === canonical?.[1], locs.join(', '));
+  check('в sitemap и robots.txt нет относительных адресов',
+    locs.every((l) => l.startsWith('https://')) && /Sitemap: https:\/\//.test(robots));
+
+  /*
+    Machine-readable описание сайта. Разбор падает на любой лишней запятой,
+    и Google просто проигнорирует блок — поэтому проверяем как JSON, а не
+    как текст, и сверяем адрес с canonical.
+  */
+  const ld = indexHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  let siteLd = null;
+  let ldError = '';
+  try {
+    siteLd = JSON.parse(ld[1]);
+  } catch (e) {
+    ldError = e.message;
+  }
+  check('JSON-LD разбирается и описывает сайт',
+    siteLd?.['@type'] === 'WebSite' && Boolean(siteLd.name) && Boolean(siteLd.inLanguage),
+    ldError || JSON.stringify(siteLd ?? {}));
+  check('адрес в JSON-LD совпадает с canonical',
+    siteLd?.url === canonical?.[1], `${siteLd?.url} vs ${canonical?.[1]}`);
+
+  /*
+    Кегль и зона нажатия.
+
+    10px — фирменная плотность подписей, и массово поднимать её не стали,
+    но служебные надписи, по которым читают смысл (подписи плиток, заголовок
+    столбцов рейтинга, метки статистики), подняты до 11–12px: на телефоне
+    это разница между «разобрал» и «пропустил».
+
+    Кнопки-ссылки «Вся таблица» и «Страница Кварта» и карточки раздела
+    «О проекте» на touch-экране стали не ниже 44px — роста строки списка,
+    в который палец попадает без промаха.
+  */
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+  const refine = await readFile('src/refine.css', 'utf8');
+  const mobile = await readFile('src/mobile.css', 'utf8');
+  check('подписи плиток статистики читаются (не 10px)',
+    /\.stat__label \{ font-size: 11px/.test(v8) && /\.server-stat span \{[^}]*font-size: 12px/.test(v8));
+  check('шапка разделов читается (не 10px)', /\.eyebrow \{ font-size: 11px/.test(refine));
+  check('на телефоне ссылки-переходы не ниже 44px',
+    /@media \(hover: none\) and \(pointer: coarse\)[\s\S]{0,400}\.who__more[\s\S]{0,200}min-height: 44px/.test(mobile)
+      && /body \.about-card h3 a \{[^}]*min-height: 44px/.test(mobile));
+
+  /*
+    Второстепенный текст обязан дотягивать до порога AA (4.5:1) в обеих темах.
+    Значения подобраны по самой светлой панели своей темы, а не по фону «в
+    среднем»: именно на панельных карточках контраст был хуже всего.
+  */
+  check('тёмная тема: --mute не ниже AA', /--mute:\s*#808a9a/.test(v8));
+  check('светлая тема: --mute не ниже AA', /--mute:\s*#696357/.test(v8));
+  check('тёмные острова в светлой теме используют тот же --mute',
+    /--mute:\s*#808a9a/.test(refine));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

@@ -20,7 +20,12 @@
 
   --text:      #f4f6f9;
   --dim:       #99a1ad;
-  --mute:      #666e7b;
+  /*
+    Второстепенный текст (подписи плиток, даты, строки про автомат).
+    Прежний #666e7b давал 3.07:1 на самой светлой панели — ниже порога AA для
+    обычного текста. #808a9a держит 4.5:1 и на --surface, и на --raised-2.
+  */
+  --mute:      #808a9a;
 
   --accent:    #ff6a2b;
   --accent-dk: #d4501a;
@@ -60,7 +65,8 @@
 
 --text:      #2b2822;
   --dim:       #625d53;
-  --mute:      #756e61;
+  /* Тот же порог AA, что и в тёмной теме: #756e61 на --raised был 3.84:1. */
+  --mute:      #696357;
 
   --accent:    #c05a24;
   --accent-dk: #943e19;
@@ -131,7 +137,7 @@
   text-align: center;
 }
 .server-stat b { display: block; font-size: 17px; font-weight: 700; }
-.server-stat span { display: block; margin-top: 2px; color: var(--dim); font-size: 10.5px; }
+.server-stat span { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; }
 
 .server-stats__chart {
   display: grid;
@@ -402,17 +408,23 @@ h1,h2,h3,h4 {
   color: var(--gold);
 }
 
-/* Победа в VS / поражение в VS */
+/*
+  Победа в VS / поражение в VS.
+
+  Заголовки колонок — H2, а не H3: на странице «Итоги недели» они идут сразу
+  после H1 («Неделя 12»), и через уровень вверх получался разрыв в порядке
+  заголовков. Раз селектор привязан к классу, тег можно менять без стилей.
+*/
 .split { display: grid; gap: 14px; margin-top: 20px; position: relative; z-index: 1; }
 @media (min-width: 720px) { .split { grid-template-columns: 1fr 1fr; gap: 20px; } }
 
-.split__col h3 {
+.split__col .split__title {
   font-family: Inter, sans-serif;
   font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
   display: flex; align-items: center; gap: 9px; margin-bottom: 11px;
 }
-.split__col--win h3 { color: var(--win); }
-.split__col--loss h3 { color: var(--loss); }
+.split__col--win .split__title { color: var(--win); }
+.split__col--loss .split__title { color: var(--loss); }
 .split__count {
   font-family: Unbounded, sans-serif; font-size: 12px; letter-spacing: 0;
   padding: 2px 9px; border-radius: 999px;
@@ -637,7 +649,7 @@ h1,h2,h3,h4 {
 /* ── Рейтинг: строки ────────────────────────────────────────────────────── */
 .lad__head {
   display: none;
-  font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+  font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
   color: var(--mute);
   padding: 0 8px 10px; border-bottom: 1px solid var(--line);
 }
@@ -781,7 +793,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 @media (min-width: 900px) { .ally__stats { grid-template-columns: repeat(6, 1fr); } }
 
 .stat { background: var(--surface); padding: 13px 14px; display: flex; flex-direction: column; gap: 3px; }
-.stat__label { font-size: 10px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--mute); }
+.stat__label { font-size: 11px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--mute); }
 .stat__value {
   font-family: Unbounded, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -1235,7 +1247,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   background: var(--quart-acid);
   box-shadow: 0 0 0 4px rgba(211,166,255,.11), 0 0 14px var(--quart-acid);
 }
-.quart-hero h2 {
+.quart-hero h1, .quart-hero h2 {
   margin-top: 13px;
   color: #f5f9ee;
   font-size: clamp(38px, 9vw, 76px);
@@ -1311,7 +1323,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   gap: 15px;
   margin: 0 4px 18px;
 }
-.quart-board__head h3 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
+.quart-board__head h2 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
 .quart-board__head p { margin: 0; color: #768878; font-size: 12px; }
 .quart-section-label { color: var(--quart-cyan); font-size: 9px; }
 .quart-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 13px; }
@@ -1361,7 +1373,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   background: linear-gradient(90deg, transparent 0 32%, rgba(211,166,255,.25) 32.1% 32.2%, transparent 32.3% 66%, color-mix(in srgb, var(--electric) 20%, transparent) 66.1% 66.2%, transparent 66.3%);
 }
 .quart-podium__heading { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: end; gap: 14px; margin: 0 4px 16px; }
-.quart-podium__heading h3 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
+.quart-podium__heading h2 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
 .quart-podium__note { color: #849a82; font-size: 11px; }
 .quart-podium__grid { position: relative; z-index: 1; display: grid; gap: 8px; }
 .quart-podium-card {

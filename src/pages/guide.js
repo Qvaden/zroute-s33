@@ -79,7 +79,7 @@ function renderProof(standings, weeks, results = [], page = {}) {
     return `
       <section class="hero hero--guide">
         <span class="eyebrow">Наглядно</span>
-        <h2 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h2>
+        <h1 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h1>
         <p class="guide__sub">
 ${esc(page.proofSubtitle || 'Здесь появится сравнение верхней и нижней трети таблицы по реальным цифрам этого сервера.')}
         </p>
@@ -179,7 +179,7 @@ ${esc(page.proofSubtitle || 'Здесь появится сравнение ве
   return `
     <section class="hero hero--guide">
       <span class="eyebrow">Наглядно</span>
-      <h2 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h2>
+      <h1 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h1>
       <p class="guide__sub">
         ${esc(page.proofSubtitle || 'Не общие слова, а цифры этого сервера:')}
         ${plural(third, 'альянс', 'альянса', 'альянсов')} из верхней трети таблицы

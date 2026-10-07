@@ -157,7 +157,18 @@
 
 .panel__head { margin-bottom: 12px; }
 .panel__head h2 { font-size: clamp(16px, 2.2vw, 19px); }
-.eyebrow { font-size: 10px; letter-spacing: .14em; }
+/*
+  Название раздела, поднятое с H2 на H1 (рейтинг, Кварт без данных).
+  Без этого правила H1 получил бы кегль браузера по умолчанию — 2em, и
+  страница заметно перестроилась бы из-за одного только смысла заголовка.
+  Светлая тема снимает свечение так же, как с H2 ниже по файлу.
+*/
+.panel__head h1.panel__title {
+  font-size: clamp(16px, 2.2vw, 19px);
+  letter-spacing: -.045em;
+  text-shadow: 0 0 22px rgba(255, 106, 43, .13);
+}
+.eyebrow { font-size: 11px; letter-spacing: .14em; }
 .grid-2 { gap: var(--gap); }
 .muted { font-size: .86em; }
 
@@ -1607,6 +1618,11 @@ body:has(.chat-layout) .site-foot { display: none; }
   text-align: center;
 }
 .chat-empty .forum-btn { margin-top: 14px; }
+/*
+  Заголовок этого состояния — H1 страницы, а не H2 блока. Кегль оставляем тот,
+  что был у H2 по умолчанию (1.5em), чтобы вид не менялся из-за тега.
+*/
+.chat-empty h1 { font-size: 1.5em; }
 
 /* ── Закреплённое сообщение ──────────────────────────────────────────────── */
 
@@ -2025,7 +2041,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   opacity: .85;
 }
 :root[data-theme="light"] .panel::after { opacity: 0; }
-:root[data-theme="light"] .panel__head h2 { text-shadow: none; }
+:root[data-theme="light"] .panel__head h2,
+:root[data-theme="light"] .panel__head h1.panel__title { text-shadow: none; }
 
 /* На телефоне стекло дорого: blur выключаем, карточки не поднимаем —
    жестом листают список, а не наводят на карточки. */
@@ -2115,7 +2132,9 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .quart-page {
   --text: #f4f6f9;
   --dim:  #99a1ad;
-  --mute:  #666e7b;
+  /* Тот же порог AA, что и в основной тёмной теме: #666e7b на тёмном острове
+     был 3.61:1. Остров остаётся островом — меняется только подпись. */
+  --mute:  #808a9a;
   --electric: #a7a3c2;
   --accent: #ff6a2b;
   --accent-dk: #d4501a;

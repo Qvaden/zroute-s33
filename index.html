@@ -37,10 +37,10 @@
     в браузере, но сборщики превью в мессенджерах его не разворачивают —
     ссылка в чате осталась бы без картинки.
 
-    Это единственное место во всём проекте с зашитым адресом сайта.
-    При переезде на другой хостинг строку ниже нужно поправить, всё остальное
-    относительное и переедет само. За абсолютностью следит тест
-    «I. Готовность к публикации».
+    Домен зашит в трёх файлах: здесь (og:url, og:image, canonical и машинное
+    описание ниже), в robots.txt и в sitemap.xml. При переезде на другой адрес
+    правятся эти строки, всё остальное относительное и переедет само.
+    За абсолютностью следит тест «I. Готовность к публикации».
   -->
   <meta property="og:url" content="https://zroutehub.bond/">
   <meta property="og:image" content="https://zroutehub.bond/public/og.png">
@@ -49,6 +49,29 @@
   <meta property="og:image:alt" content="Сервер 33 — рейтинг альянсов по итогам VS">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
+
+  <!--
+    Страница, которую поисковику надо помнить. Зеркало на GitHub Pages отдаёт
+    ровно этот же документ: без этой ссылки робот считал бы их двумя страницами
+    с одинаковым текстом и делил бы вес между ними.
+  -->
+  <link rel="canonical" href="https://zroutehub.bond/">
+
+  <!--
+    Описание сайта для робота, а не для человека: что это, как называется и на
+    каком языке. Повторяет строки, которые уже стоят в meta и манифесте, —
+    ничего нового здесь не придумано.
+  -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Сервер 33 · Z Route: Redemption",
+    "url": "https://zroutehub.bond/",
+    "inLanguage": "ru",
+    "description": "Рейтинг альянсов 33 сервера по итогам VS, хронология захвата серверов, форум сообщества и гайды для малых альянсов."
+  }
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,7 +86,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=93">
+  <link rel="modulepreload" href="./src/main.js?v=94">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -85,7 +108,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=23">
+  <link rel="stylesheet" href="./src/mobile.css?v=24">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -103,7 +126,7 @@
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=23">
+  <link rel="stylesheet" href="./src/refine.css?v=24">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -218,7 +241,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=93"></script>
+  <script type="module" src="./src/main.js?v=94"></script>
 
   <script>
     /*

@@ -1,4 +1,4 @@
-import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v=93';
+import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js?v=94';
 
 /**
  * Общий рейтинг — главная ценность сайта.
@@ -37,7 +37,7 @@ export function renderLadder({
     <section class="panel${variant === 'quarter' ? ' panel--quarter' : ''}">
       <header class="panel__head">
         <span class="eyebrow">${eyebrow}</span>
-        <h2>${title}</h2>
+        <h1 class="panel__title">${title}</h1>
         <p class="muted">${description}</p>
         ${period ? `<p class="lad__period">Недели ${period.startNumber}–${period.endNumber} · период ${period.number}</p>` : ''}
       </header>
@@ -90,7 +90,7 @@ function renderEmpty(eyebrow, title) {
     <section class="panel">
       <header class="panel__head">
         <span class="eyebrow">${esc(eyebrow)}</span>
-        <h2>${esc(title)}</h2>
+        <h1 class="panel__title">${esc(title)}</h1>
       </header>
       <p class="muted">
         Результатов пока нет. Рейтинг появится, как только внесут первые итоги VS.

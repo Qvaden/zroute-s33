@@ -1,0 +1,19 @@
+# Правила обхода для поисковиков.
+#
+# Сам сайт — одна страница с разделами в адресе (#/forum, #/ladder), поэтому
+# роботу нужно свободно читать код в src/: без него он не сможет отрисовать
+# разделы и увидит пустой документ. Закрыто только то, чего в выдаче быть
+# не должно: панель управления, сырые данные, служебные скрипты, тесты и
+# внутренние документы разработки.
+
+User-agent: *
+Disallow: /admin.html
+Disallow: /data/
+Disallow: /docs/
+Disallow: /scripts/
+Disallow: /supabase/
+Disallow: /tests/
+Disallow: /package.json
+Disallow: /render.yaml
+
+Sitemap: https://zroutehub.bond/sitemap.xml

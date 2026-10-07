@@ -216,13 +216,13 @@ function renderChronicleBand(events) {
 
       <div class="forum-chron__stats">
         <div class="forum-chron__stat">
-          <b class="num">${captures}</b><span>${esc(plural(captures, 'Столица взята', 'Столицы взято', 'Столиц взято').replace(/^\d+\s/, ''))}</span>
+          <b class="num">${captures}</b><span>${esc(pluralWord(captures, 'Столица взята', 'Столицы взято', 'Столиц взято'))}</span>
         </div>
         <div class="forum-chron__stat">
           <b class="num">${defended}</b><span>${defended === 1 ? 'защита своей' : 'защит своей'}</span>
         </div>
         <div class="forum-chron__stat">
-          <b class="num">${all.length}</b><span>${esc(plural(all.length, 'запись в летописи', 'записи в летописи', 'записей в летописи').replace(/^\d+\s/, ''))}</span>
+          <b class="num">${all.length}</b><span>${esc(pluralWord(all.length, 'запись в летописи', 'записи в летописи', 'записей в летописи'))}</span>
         </div>
       </div>
 
@@ -449,17 +449,17 @@ function renderServerActivity(view, s) {
         ${today ? `
         <div class="server-stat">
           <b class="num">${today.forumPosts}</b>
-          <span>${esc(plural(today.forumPosts, 'пост', 'поста', 'постов'))} сегодня</span>
+          <span>${esc(pluralWord(today.forumPosts, 'пост', 'поста', 'постов'))} сегодня</span>
         </div>
         <div class="server-stat">
           <b class="num">${today.chatMessages}</b>
-          <span>${esc(plural(today.chatMessages, 'сообщение', 'сообщения', 'сообщений'))} в чатах</span>
+          <span>${esc(pluralWord(today.chatMessages, 'сообщение', 'сообщения', 'сообщений'))} в чатах</span>
         </div>` : ''}
         ${alliances.length ? `
-        <div class="server-stat"><b class="num">${active}</b><span>${esc(plural(active, 'активный альянс', 'активных альянса', 'активных альянсов'))}</span></div>` : ''}
+        <div class="server-stat"><b class="num">${active}</b><span>${esc(pluralWord(active, 'активный альянс', 'активных альянса', 'активных альянсов'))}</span></div>` : ''}
         ${events.length ? `
-        <div class="server-stat"><b class="num">${thisWeek}</b><span>${esc(plural(thisWeek, 'событие', 'события', 'событий'))} за неделю</span></div>
-        <div class="server-stat"><b class="num">${events.length}</b><span>${esc(plural(events.length, 'запись', 'записи', 'записей'))} в летописи</span></div>` : ''}
+        <div class="server-stat"><b class="num">${thisWeek}</b><span>${esc(pluralWord(thisWeek, 'событие', 'события', 'событий'))} за неделю</span></div>
+        <div class="server-stat"><b class="num">${events.length}</b><span>${esc(pluralWord(events.length, 'запись', 'записи', 'записей'))} в летописи</span></div>` : ''}
       </div>
       ${chart ? `
       <div class="server-stats__chart">

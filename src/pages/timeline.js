@@ -23,7 +23,7 @@ export function renderTimeline({ events } = {}) {
     return `
       <section class="hero hero--tl">
         <span class="eyebrow">Хроника завоеваний</span>
-        <h2 class="tl__title">Ещё ни одной записи</h2>
+        <h1 class="tl__title">Ещё ни одной записи</h1>
         <p class="guide__sub">
           Здесь будет летопись сервера: чьи Столицы забрали и как отбивали свою,
           взятые Столицы крупными плитками и события по датам — войны, слияния
@@ -47,7 +47,7 @@ export function renderTimeline({ events } = {}) {
     return `
       <section class="hero hero--tl">
         <span class="eyebrow">Хроника завоеваний</span>
-        <h2 class="tl__title">Записи есть, но без дат</h2>
+        <h1 class="tl__title">Записи есть, но без дат</h1>
         <p class="guide__sub">
           Летопись строится по датам, и записи без даты показать негде.
           Проверьте столбец с датой в таблице.
@@ -237,7 +237,7 @@ function renderTrophies(captures, all) {
   return `
     <section class="hero hero--tl">
       <span class="eyebrow">Хроника завоеваний</span>
-      <h2 class="tl__title">Чьи Столицы забрали</h2>
+      <h1 class="tl__title">Чьи Столицы забрали</h1>
 
       <div class="tl__stats">
         ${stats

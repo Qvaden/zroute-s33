@@ -231,7 +231,7 @@ function eventCard(e, s, now) {
       </div>
       <div class="evt-card__side">
         <a class="evt-link" href="${esc(icsHref(e))}" download="${esc(e.id)}.ics"
-           title="Файл откроется в календаре телефона, почты или планаера">В мой календарь</a>
+           title="Файл откроется в календаре телефона, почты или планировщика">В мой календарь</a>
         <a class="evt-link" href="#/forum/${esc(e.id)}">Обсуждение</a>
       </div>
     </article>`;

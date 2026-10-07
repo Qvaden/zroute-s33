@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=93';
-import { loadAll, capabilities, db, lastLoad } from './data/index.js?v=93';
-import { validateDataset } from './data/contract.js?v=93';
+import { CONFIG } from '../config.js?v=94';
+import { loadAll, capabilities, lastLoad } from './data/index.js?v=94';
+import { validateDataset } from './data/contract.js?v=94';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,32 +9,32 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=93';
-import { renderHome } from './pages/home.js?v=93';
-import { renderLadder } from './pages/ladder.js?v=93';
-import { renderQuarter } from './pages/quarter-final.js?v=93';
-import { renderTimeline } from './pages/timeline.js?v=93';
-import { renderGuide } from './pages/guide.js?v=93';
-import { renderBot } from './pages/bot.js?v=93';
-import { renderHandbook } from './pages/handbook.js?v=93';
-import { renderAbout } from './pages/about.js?v=93';
-import { renderAlliance } from './pages/alliance.js?v=93';
-import { computeAchievements } from './logic/achievements.js?v=93';
-import { esc } from './ui/helpers.js?v=93';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=93';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=93';
+} from './logic/standings.js?v=94';
+import { renderHome } from './pages/home.js?v=94';
+import { renderLadder } from './pages/ladder.js?v=94';
+import { renderQuarter } from './pages/quarter-final.js?v=94';
+import { renderTimeline } from './pages/timeline.js?v=94';
+import { renderGuide } from './pages/guide.js?v=94';
+import { renderBot } from './pages/bot.js?v=94';
+import { renderHandbook } from './pages/handbook.js?v=94';
+import { renderAbout } from './pages/about.js?v=94';
+import { renderAlliance } from './pages/alliance.js?v=94';
+import { computeAchievements } from './logic/achievements.js?v=94';
+import { esc } from './ui/helpers.js?v=94';
+import { presidentBoardFromTexts } from './logic/president-board.js?v=94';
+import { startQuarterTimer } from './ui/quarter-timer.js?v=94';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=93';
-import './ui/timeline-controls.js?v=93';
+import './ui/ladder-controls.js?v=94';
+import './ui/timeline-controls.js?v=94';
 // Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=93';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=93';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=93';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=93';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=93';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=93';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=93';
-import { mountAccounts, unmountAccounts } from './forum/accounts.js?v=93';
+import './ui/handbook-controls.js?v=94';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=94';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=94';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=94';
+import { mountGuides, unmountGuides } from './forum/guides.js?v=94';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=94';
+import { mountUpdates, unmountUpdates } from './forum/updates.js?v=94';
+import { mountAccounts, unmountAccounts } from './forum/accounts.js?v=94';
 
 /*
   РАЗДЕЛЫ.
@@ -58,18 +58,46 @@ const ROUTES = [
     Форум — первый и главный: сайт из «таблицы итогов» стал местом, где
     сервер разговаривает. Таблицы никуда не делись, они ниже, но входная
     дверь — обсуждение. Чаты — второй пункт: закрытые комнаты альянсов.
+
+    `title` и `desc` у каждого раздела свои: маршрут меняется без
+    перезагрузки документа, и без этих строк браузер, история и поисковик
+    видели бы одну и ту же вкладку на всех четырнадцати страницах.
   */
-  { id: 'forum', label: 'Форум', live: true, primary: true },
-  { id: 'chats', label: 'Чаты', live: true, primary: true },
-  { id: 'tournaments', label: 'Турниры', live: true, primary: true },
-  { id: 'guides', label: 'Гайды', live: true, primary: true },
-  { id: 'calendar', label: 'Календарь', live: true, primary: true },
+  {
+    id: 'forum', label: 'Форум', live: true, primary: true,
+    title: 'Форум сервера 33 · Z Route: Redemption',
+    desc: 'Обсуждения 33 сервера: новости, разбор VS, летопись захватов, альянсы, вопросы по игре и свободные темы.',
+  },
+  {
+    id: 'chats', label: 'Чаты', live: true, primary: true,
+    title: 'Чаты альянсов · Сервер 33',
+    desc: 'Комнаты альянсов на самом сайте: договорённости перед боем и разбор итогов — без внешних мессенджеров.',
+  },
+  {
+    id: 'tournaments', label: 'Турниры', live: true, primary: true,
+    title: 'Турниры альянсов · Сервер 33',
+    desc: 'VS-матчапы двух альянсов со счётом по победам. Раунды засчитываются прямо на странице, победитель определяется сам.',
+  },
+  {
+    id: 'guides', label: 'Гайды', live: true, primary: true,
+    title: 'Гайды · Сервер 33',
+    desc: 'Разборы от участников сервера 33 и официальный справочник игры: тактика, исследования, роли в альянсе.',
+  },
+  {
+    id: 'calendar', label: 'Календарь', live: true, primary: true,
+    title: 'Календарь сборов · Сервер 33',
+    desc: 'Когда сервер собирается на бои: ближайшие события, ответы «иду / не иду» и моё расписание одной строкой.',
+  },
   /*
     Пульс обновлений — живой, но не «общение»: здесь не спорят, здесь читают
     то, что изменилось в игре за последние недели. Поэтому он в группе
     «Сервер», рядом с хроникой, а не в меню рядом с форумом.
   */
-  { id: 'updates', label: 'Обновления игры', live: true },
+  {
+    id: 'updates', label: 'Обновления игры', live: true,
+    title: 'Обновления игры · Z Route: Redemption',
+    desc: 'Что изменилось в игре: сообщения магазина и стены сообщества, собранные автоматом, и заметки участников.',
+  },
   /*
     Доска аккаунтов — витрина тем с меткой «Аккаунты». В основной строке меню
     её нет по той же причине, что и пульс обновлений: ряд и так держит пять
@@ -77,7 +105,11 @@ const ROUTES = [
     ничего не продаётся: объявление — обычная тема, и договоренность рождается
     в её ответах, а не на этой странице.
   */
-  { id: 'accounts', label: 'Аккаунты', live: true },
+  {
+    id: 'accounts', label: 'Аккаунты', live: true,
+    title: 'Доска аккаунтов · Сервер 33',
+    desc: 'Кто отдаёт аккаунт и почём: объявления с описанием, ценой, скриншотами и отметкой «продано».',
+  },
   /*
     Справочник — текст самой игры, перенесённый из Telegram-бота один в один.
     Своей вкладки у него больше нет: он живёт внутри «Гайдов», под списком
@@ -85,14 +117,46 @@ const ROUTES = [
     адреса узлов (#/handbook/<узел>) остаются — по ним ведут ссылки, уже
     лежащие в чатах и закладках.
   */
-  { id: 'handbook', label: 'Справочник игры', hidden: true, navAs: 'guides' },
-  { id: 'home', label: 'Итоги недели', render: renderHome },
-  { id: 'quarter', label: 'Кварт', render: renderQuarter },
-  { id: 'ladder', label: 'Рейтинг', render: renderLadder },
-  { id: 'timeline', label: 'Хронология', render: renderTimeline },
-  { id: 'guide', label: 'Малым алам', render: renderGuide },
-  { id: 'bot', label: 'Бот в ТГ', render: renderBot },
-  { id: 'about', label: 'О проекте', render: renderAbout },
+  {
+    id: 'handbook', label: 'Справочник игры', hidden: true, navAs: 'guides',
+    title: 'Справочник игры · Сервер 33',
+    desc: 'Официальные гайды Z Route: Redemption — текст игры с картинками, поиск по разделам и узлам.',
+  },
+  {
+    id: 'home', label: 'Итоги недели', render: renderHome,
+    title: 'Итоги недели · Сервер 33',
+    desc: 'Как прошла неделя VS на 33 сервере: победа +1, поражение −1, лидеры и движение мест.',
+  },
+  {
+    id: 'quarter', label: 'Кварт', render: renderQuarter,
+    title: 'Итоги Кварта · Сервер 33',
+    desc: 'Расстановка сил по итогам Кварта: пьедестал, очки и трофеи 33 сервера.',
+  },
+  {
+    id: 'ladder', label: 'Рейтинг', render: renderLadder,
+    title: 'Рейтинг альянсов · Сервер 33',
+    desc: 'Таблица 33 сервера: альянсы по победам в VS, форма последних боёв и изменение мест.',
+  },
+  {
+    id: 'timeline', label: 'Хронология', render: renderTimeline,
+    title: 'Хроника сервера 33',
+    desc: 'Летопись 33 сервера: захваты Столицы, защиты, войны и решения модерации — свежие сверху.',
+  },
+  {
+    id: 'guide', label: 'Малым алам', render: renderGuide,
+    title: 'Малым альянсам · Сервер 33',
+    desc: 'Разбор для небольших альянсов: принципы, обязанности руководства и типичные ошибки.',
+  },
+  {
+    id: 'bot', label: 'Бот в ТГ', render: renderBot,
+    title: 'Бот в Telegram · Z Route',
+    desc: 'Telegram-бот со справочником по игре: те же разделы и тексты, что на сайте, только прямо в чате.',
+  },
+  {
+    id: 'about', label: 'О проекте', render: renderAbout,
+    title: 'О проекте · Сервер 33',
+    desc: 'Неофициальный сайт сообщества 33 сервера: что здесь есть, как устроены регистрация и приватность чатов.',
+  },
 ];
 
 const app = document.getElementById('app');
@@ -442,6 +506,39 @@ function setupMobileScrollReveal() {
   });
 }
 
+/**
+ * ЗАГОЛОВОК ВКЛАДКИ И ОПИСАНИЕ СТРАНИЦЫ.
+ *
+ * Раздел открывается без перезагрузки документа, поэтому без этой функции
+ * и вкладка браузера, и закладка, и история, и сниппет в поисковике остаются
+ * одной и той же строкой «Сервер 33 · Z Route» на всех четырнадцати страницах:
+ * человек, пришедший по ссылке на рейтинг, читает во вкладке «Форум».
+ *
+ * Адрес при этом не меняется: правятся только текст вкладки и meta
+ * description того же документа.
+ */
+function setPageMeta(id, param) {
+  const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
+  let title = route.title ?? route.label;
+  let desc = route.desc ?? '';
+
+  if (id === 'alliance' && param) {
+    const a = (view.alliances || []).find((x) => x.id === param);
+    if (a) {
+      title = `${a.name} — альянс сервера 33`;
+      desc = `Страница альянса ${a.tag}: состав, результаты и победы в VS на 33 сервере.`;
+    }
+  } else if (id === 'user' && param) {
+    const nick = decodeURIComponent(param);
+    title = `${nick} — участник сервера 33`;
+    desc = `Профиль ${nick}: достижения, репутация и история сообщений на сервере 33.`;
+  }
+
+  document.title = title;
+  const meta = document.querySelector('meta[name="description"]');
+  if (meta && desc) meta.setAttribute('content', desc);
+}
+
 function trackPageview(path) {
   if (!countedFirstView) {
     countedFirstView = true;
@@ -698,6 +795,7 @@ function render() {
   const keepScroll = (id === 'forum' && param) || id === 'chats';
   if (!keepScroll) window.scrollTo(0, 0);
 
+  setPageMeta(id, param);
   trackPageview(path);
 }
 
@@ -795,13 +893,19 @@ function snapshotStamp(value) {
   });
 }
 
-/** Надпись в подвале про источник данных: база, снимок или никого. */
+/**
+ * Надпись в подвале про источник данных: база, снимок или никого.
+ *
+ * Имя бэкенда («supabase») читателю ничего не говорит, а важно ровно другое:
+ * живые перед ним цифры или копия, снятая пару часов назад. Поэтому здесь
+ * состояние, а не технология.
+ */
 function sourceBadge() {
   const badge = document.getElementById('source-badge');
   if (!badge) return;
   badge.textContent = lastLoad.source === 'снимок' ? 'снимок'
     : lastLoad.source === '' ? 'недоступен'
-      : db.name;
+      : 'живая база';
 }
 
 async function boot() {

@@ -1,5 +1,5 @@
-import { esc, formDots, plural } from '../ui/helpers.js?v=93';
-import { formatQuarterLeft } from '../ui/quarter-timer.js?v=93';
+import { esc, formDots, plural } from '../ui/helpers.js?v=94';
+import { formatQuarterLeft } from '../ui/quarter-timer.js?v=94';
 
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,
@@ -17,7 +17,7 @@ export function renderQuarter({ standings, quarter } = {}) {
       <section class="panel">
         <header class="panel__head">
           <span class="eyebrow">Кварт</span>
-          <h2>Период ещё не начат</h2>
+          <h1 class="panel__title">Период ещё не начат</h1>
         </header>
         <p class="muted">
           Кварт считается по последним четырём неделям. Он появится,
@@ -59,7 +59,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         <div class="quart-hero__top">
           <div class="quart-hero__copy">
             <span class="quart-kicker"><i></i> ЦИКЛ ВОЗВРАЩЕНИЯ</span>
-            <h2>Кварт</h2>
+            <h1>Кварт</h1>
             <p>Новый шанс каждые четыре недели. Текущие результаты альянса независимо от старых неудач.</p>
           </div>
           <div class="quart-dial" aria-label="Текущий период">
@@ -79,7 +79,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         <div class="quart-podium__heading">
           <div>
             <span class="quart-section-label">ДЕЙСТВУЮЩИЕ ЧЕМПИОНЫ</span>
-            <h3 id="quart-podium-title">Кто лидирует в этом Кварте?</h3>
+            <h2 id="quart-podium-title">Кто лидирует в этом Кварте?</h2>
           </div>
           <span class="quart-podium__note">Победители по очкам</span>
         </div>
@@ -90,7 +90,7 @@ export function renderQuarter({ standings, quarter } = {}) {
         <header class="quart-board__head">
           <div>
             <span class="quart-section-label">ДОСКА ВОЗВРАЩЕНИЯ</span>
-            <h3>Все альянсы в гонке</h3>
+            <h2>Все альянсы в гонке</h2>
           </div>
           <p>Очки и форма текущего периода</p>
         </header>

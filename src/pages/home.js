@@ -38,10 +38,10 @@ function renderPreSeason(standings, allWeeks) {
     <section class="hero">
       <div class="hero__top">
         <span class="eyebrow">Отсчёт начинается</span>
-        <div class="hero__week">
+        <h1 class="hero__week">
           <span class="hero__word">Неделя</span>
           <span class="hero__num num">${upcoming ? upcoming.number : '—'}</span>
-        </div>
+        </h1>
         <div class="hero__dates">
           ${
             upcoming
@@ -64,11 +64,11 @@ function renderPreSeason(standings, allWeeks) {
 
       <div class="split">
         <div class="split__col">
-          <h3 class="preseason__title">
+          <h2 class="preseason__title">
             На старте
             <span class="split__count num">${alliances.length}</span>
             <i class="split__bar"></i>
-          </h3>
+          </h2>
           <div class="tiles">
             ${alliances
               .map(
@@ -311,10 +311,10 @@ export function renderHome(view = {}) {
       <div class="hero__top">
         <div>
           <span class="eyebrow">Итоги недели</span>
-          <div class="hero__week">
+          <h1 class="hero__week">
             <span class="hero__word">Неделя</span>
             <span class="hero__num num">${week.number}</span>
-          </div>
+          </h1>
           <div class="hero__dates">
             ${fmtDate(week.startDate)} — ${fmtDate(week.endDate)}
             <span class="hero__sep">·</span>
@@ -357,11 +357,11 @@ export function renderHome(view = {}) {
         </summary>
         <div class="split">
           <div class="split__col split__col--win">
-            <h3>Победа в VS <span class="split__count num">${winners.length}</span><i class="split__bar"></i></h3>
+            <h2 class="split__title">Победа в VS <span class="split__count num">${winners.length}</span><i class="split__bar"></i></h2>
             <div class="tiles">${tiles(winners)}</div>
           </div>
           <div class="split__col split__col--loss">
-            <h3>Поражение в VS <span class="split__count num">${losers.length}</span><i class="split__bar"></i></h3>
+            <h2 class="split__title">Поражение в VS <span class="split__count num">${losers.length}</span><i class="split__bar"></i></h2>
             <div class="tiles">${tiles(losers)}</div>
           </div>
         </div>
@@ -387,13 +387,13 @@ export function renderHome(view = {}) {
       </header>
       <div class="movers">
         <div>
-          <h4 class="movers__title movers__title--up">Рейтинг поднялся</h4>
+          <h3 class="movers__title movers__title--up">Рейтинг поднялся</h3>
           <ul class="movers__list">${
             moved.up.length ? moved.up.map(moverRow).join('') : '<li class="muted">без изменений</li>'
           }</ul>
         </div>
         <div>
-          <h4 class="movers__title movers__title--down">Рейтинг снизился</h4>
+          <h3 class="movers__title movers__title--down">Рейтинг снизился</h3>
           <ul class="movers__list">${
             moved.down.length ? moved.down.map(moverRow).join('') : '<li class="muted">без изменений</li>'
           }</ul>
