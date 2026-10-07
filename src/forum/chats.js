@@ -85,6 +85,13 @@ function fitFullscreen() {
   if (!host) return;
   const head = document.querySelector('.site-head');
   const vv = window.visualViewport;
+  const scroll = host.querySelector('[data-chat-scroll]');
+  /*
+    До записи новой высоты ленты замеряем, стоял ли человек на дне: клавиатура
+    сжимает ленту, и дно уезжает из-под края композера ровно в тот момент,
+    когда человек смотрит на последнее сообщение.
+  */
+  const wasAtBottom = isAtBottom(scroll);
   /*
     Телефонная клавиатура сжимает visualViewport, но не всегда пересчитывает
     100dvh: ввод оказывался под клавиатурой. Берём реальную видимую высоту —
@@ -93,6 +100,9 @@ function fitFullscreen() {
   const visible = Math.round(vv ? vv.height : window.innerHeight);
   host.style.setProperty('--chat-head-h', `${head ? head.offsetHeight : 0}px`);
   host.style.setProperty('--chat-vh', `${visible}px`);
+  /* Чтение scrollHeight принудительно пересчитывает layout уже с новой
+     высотой, поэтому прижатие ниже работает по актуальным числам. */
+  if (wasAtBottom && scroll) stickToBottom();
 }
 
 /** Base64url → Uint8Array (для VAPID-ключа). */
@@ -264,6 +274,19 @@ function toMs(d) {
 /** Пользователь в самой нижней части ленты. */
 function isAtBottom(scroll) {
   return scroll ? scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80 : true;
+}
+
+/**
+ * Прижать ленту к последнему сообщению. Скачком, а не плавно: своё сообщение
+ * человек обязан увидеть сразу, а плавная прокрутка идёт по кадрам и не
+ * успевает за разрастанием поля ввода.
+ */
+function stickToBottom() {
+  const scroll = host?.querySelector('[data-chat-scroll]');
+  if (!scroll) return;
+  scroll.scrollTop = scroll.scrollHeight;
+  state.scrolledUp = false;
+  paintGoBottom();
 }
 
 /**
@@ -756,7 +779,13 @@ async function send(form) {
     if (input) {
       input.innerHTML = '';
       syncEditorEmpty(input);
-      requestAnimationFrame(() => autosize(input));
+      /*
+        Поле съеживается сразу, а не на следующем кадре: колбэк rAF исполняется
+        до отрисовки, поэтому картинка та же, зато порядок жёсткий — лента
+        прибавляет себе высоту ДО того, как мы прижмём её к дну. С отложенным
+        вызовом в скрытой вкладке, где кадров ноль, поле оставалось раздутым.
+      */
+      autosize(input);
     }
     /*
       В рабочем режиме файл уже в хранилище, локальный preview больше не нужен.
@@ -773,14 +802,20 @@ async function send(form) {
       КЛЮЧЕВОЙ ФИКС «ТАНЦУЮЩЕЙ КЛАВИАТУРЫ».
 
       После отправки НЕ вызываем paintMessages (не заменяем весь innerHTML
-      ленты) и НЕ трогаем autosize. Вместо этого дописываем ОДИН <li> в
-      конец существующего <ol class="chat-msgs"> — браузер делает один
-      layout, а не полный пересбор. Клавиатура не прыгает.
+      ленты). Вместо этого дописываем ОДИН <li> в конец существующего
+      <ol class="chat-msgs"> — браузер делает один layout, а не полный
+      пересбор. Клавиатура не прыгает.
 
-      Прокрутку вниз тоже не делаем: пользователь уже внизу (он только
-      что написал), новое сообщение появляется прямо над вводом.
+      А вот прижать ленту после вставки ОБЯЗАТЕЛЬНО. Раньше считалось, что
+      человек и так внизу и прокрутка не нужна, но браузер держит за край
+      видимости то сообщение, на которое был повешен якорь прокрутки
+      (scroll anchoring): вставленный ниже <li> уезжал за нижний край, и
+      отправленное «тонуло» — приходилось крутить руками. Символы набирались
+      в раздвинутом поле, лента под ним короче экрана, и дно оказывалось
+      ровно под краем композера.
     */
     appendMessageToDOM(m);
+    stickToBottom();
 
     paintList();
     paintComposerMeta();

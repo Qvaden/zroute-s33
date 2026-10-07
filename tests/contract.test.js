@@ -12759,6 +12759,37 @@ console.log('\nAN. Доска аккаунтов');
   check('выросшее поле не утаскивает ленту: если смотрели на последнее — возвращаем на дно',
     /const wasStuck = scroll \? isAtBottom\(scroll\) : true;/.test(chatLogicSrc)
       && /if \(scroll && wasStuck\) scroll\.scrollTop = scroll\.scrollHeight;/.test(chatLogicSrc));
+
+  /*
+    ── Отправленное сообщение не должно тонуть ──
+    Браузер держит за край видимости то, на чём висит якорь прокрутки
+    (scroll anchoring), поэтому вставленный ниже <li> уезжал за нижний край:
+    человек видел старый конец ленты и крутил колесо руками. Замер в живом
+    контроллере (iframe 390x700, локальный адаптер): без прижатия вставка
+    строки давала зазор 82px и обрезку последнего сообщения на 69px.
+  */
+  check('прижатие ленты к дну — отдельный помощник, который гасит и якорь',
+    /function stickToBottom\(\) \{[\s\S]{0,240}?scroll\.scrollTop = scroll\.scrollHeight;[\s\S]{0,120}?state\.scrolledUp = false;[\s\S]{0,120}?paintGoBottom\(\);/.test(chatLogicSrc));
+  check('своё сообщение прижимают сразу после вставки в ленту',
+    /appendMessageToDOM\(m\);\s*\n\s*stickToBottom\(\);/.test(chatLogicSrc));
+  check('старый вывод «прокрутку не делаем, пользователь и так внизу» убран',
+    !/Прокрутку вниз тоже не делаем/.test(chatLogicSrc));
+  check('поле съеживается до прижатия и без кадра: в скрытой вкладке rAF не доходит',
+    /input\.innerHTML = '';\s*\n\s*syncEditorEmpty\(input\);\s*\n[\s\S]{0,400}?autosize\(input\);/.test(chatLogicSrc)
+      && !/requestAnimationFrame\(\(\) => autosize/.test(chatLogicSrc));
+  /*
+    Клавиатура сжимает ленту тем же механизмом: fitFullscreen пишет новую
+    высоту, и дно уезжает из-под края композера. Проверено харнессом: сжатие
+    ленты с 551px до 254px обрезало последнее сообщение на 285px, а через
+    обработчик resize зазор остаётся нулевым.
+  */
+  check('сжатие ленты клавиатурой возвращает на дно того, кто на дне стоял',
+    /const wasAtBottom = isAtBottom\(scroll\);/.test(chatLogicSrc)
+      && /if \(wasAtBottom && scroll\) stickToBottom\(\);/.test(chatLogicSrc));
+  const fitFn = chatLogicSrc.match(/function fitFullscreen\(\) \{[\s\S]*?\n\}/)?.[0] ?? '';
+  check('прижатие внутри fitFullscreen условное: уехавшего вверх клавиатура за собой не тянет',
+    /if \(wasAtBottom && scroll\) stickToBottom\(\);/.test(fitFn)
+      && !/\n {2}stickToBottom\(\);/.test(fitFn));
   check('раскрытый переключатель помечен цветом, чтобы было видно, что панель живая',
     /\.chat-compose__btn\[aria-pressed='true'\]/.test(cssSrc));
 
