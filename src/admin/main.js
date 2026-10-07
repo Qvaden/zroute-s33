@@ -4,20 +4,23 @@
  * Отдельная точка входа, а не раздел сайта. Причины две: посетитель не должен
  * грузить код панели, и попасть в неё случайно из меню тоже не должен.
  *
- * ПОЧЕМУ У КАЖДОГО ИМПОРТА СТОИТ ?v=N.
+ * ПОЧЕМУ ВЕРСИЯ СТОИТ ТОЛЬКО НАД ЭТИМ ФАЙЛОМ, А У ИМПОРТОВ НИЖЕ ЕЁ НЕТ.
  *
- * GitHub Pages отдаёт файлы с указанием «хранить десять минут», и браузер
- * слушается: обновление страницы, даже с Ctrl+Shift+R, перезапрашивает
- * саму страницу и main.js, но вложенные модули берёт из кэша.
+ * Раньше номер носила каждая связь панели: страница обновляется, а браузер
+ * берёт вложенный модуль из кэша и вызывает функцию, которой в старом файле
+ * нет. Однажды это стоило поломки обзора: код на диске правильный, а в
+ * браузере «Cannot read properties of undefined (reading fullName)».
  *
- * Это уже стоило одной поломки. Обзор переписали под базу, main.js обновился,
- * а screens/overview.js остался прежним — тот, что читал поля репозитория.
- * Панель падала с «Cannot read properties of undefined (reading fullName)»
- * на исправленном коде, и понять это было нельзя: файл на диске правильный.
+ * Номер в адресе лечит, но ставили его только первым связям. Дальше граф шёл
+ * без версий, и один файл начинали просить двумя адресами — а для браузера
+ * это два разных файла. У панели дублировались `draft.js` и `store.js`, то
+ * есть черновик, записанный одной копией, вторая не видела.
  *
- * Номер в адресе делает файл другим файлом для кэша. Поднимать его надо
- * ВМЕСТЕ с версией в admin.html — иначе смысл теряется: страница придёт
- * свежая, а модули старые.
+ * Сейчас свежесть держит не адрес, а заголовок хостинга: модули отдаются с
+ * `max-age=0`, и браузер обязан перепроверить файл, а не брать его молча.
+ * Версия остаётся над входом — только чтобы документ и входной модуль не
+ * разминулись в кэше CDN. Правило сторожит обход графа в тестах: у каждого
+ * файла на страницу ровно один адрес.
  *
  * ТРИ ПРАВИЛА ПУБЛИКАЦИИ, которые здесь соблюдаются буквально:
  *
@@ -29,18 +32,18 @@
  *    затирать работу второго редактора, который в это же время вносит
  *    другую неделю.
  */
-import { CONFIG } from '../../config.js?v=50';
-import { esc, plural } from '../ui/helpers.js?v=50';
-import { mapDataset } from '../data/adapters/_map.js?v=50';
-import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js?v=50';
-import { validateDataset } from '../data/contract.js?v=50';
+import { CONFIG } from '../../config.js';
+import { esc, plural } from '../ui/helpers.js';
+import { mapDataset } from '../data/adapters/_map.js';
+import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js';
+import { validateDataset } from '../data/contract.js';
 import {
   computeStandings,
   computeWeekSummary,
   computeMovers,
   weeksUpToLastData,
-} from '../logic/standings.js?v=50';
-import { renderHome } from '../pages/home.js?v=50';
+} from '../logic/standings.js';
+import { renderHome } from '../pages/home.js';
 /*
   ВХОД И ХРАНИЛИЩЕ ПАНЕЛИ ПОСЛЕ ПЕРЕЕЗДА С GITHUB.
 
@@ -57,10 +60,10 @@ import { renderHome } from '../pages/home.js?v=50';
 */
 import {
   currentAccount, signIn, signOut, canModerate, canManagePeople, isConfigured,
-} from '../db/account.js?v=50';
+} from '../db/account.js';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator, nextAllianceNumber,
-} from './store.js?v=50';
+} from './store.js';
 /*
   ЦЕЛЬ ПАНЕЛИ — КАКОЙ СЕРВЕР ОНА ПРАВИТ.
 
@@ -72,10 +75,10 @@ import {
 */
 import {
   adoptRights, canEditSite, forgetRights, panelServer, rightsRead,
-} from './target.js?v=50';
-import { diffDataset, applyChanges, describeChanges } from './publish.js?v=50';
-import { roleLabel } from '../forum/roles.js?v=50';
-import { prepareImage, uploadPath } from './image.js?v=50';
+} from './target.js';
+import { diffDataset, applyChanges, describeChanges } from './publish.js';
+import { roleLabel } from '../forum/roles.js';
+import { prepareImage, uploadPath } from './image.js';
 import {
   applyMarks,
   applyEvents,
@@ -96,7 +99,7 @@ import {
   nextAllianceId,
   textsFromRaw,
   applyTexts,
-} from './edit.js?v=50';
+} from './edit.js';
 import {
   getDraft,
   saveDraft,
@@ -113,23 +116,23 @@ import {
   getTextsDraft,
   saveTextsDraft,
   dropTextsDraft,
-} from './draft.js?v=50';
-import { renderShell } from './shell.js?v=50';
-import { renderLogin } from './login.js?v=50';
-import { renderOverview } from './screens/overview.js?v=50';
-import { renderWeek, describe } from './screens/week.js?v=50';
-import { renderAlliances } from './screens/alliances.js?v=50';
-import { renderEvents } from './screens/events.js?v=50';
-import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js?v=50';
-import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js?v=50';
-import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js?v=50';
-import { renderQuarter } from './screens/quarter.js?v=50';
-import { renderPresident } from './screens/president.js?v=50';
-import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js?v=50';
-import { renderModeration } from './screens/moderation.js?v=50';
-import { renderChatsAdmin } from './screens/chats.js?v=50';
-import { forum } from '../forum/index.js?v=50';
-import { deletionReason, categoryLabel } from '../forum/rules.js?v=50';
+} from './draft.js';
+import { renderShell } from './shell.js';
+import { renderLogin } from './login.js';
+import { renderOverview } from './screens/overview.js';
+import { renderWeek, describe } from './screens/week.js';
+import { renderAlliances } from './screens/alliances.js';
+import { renderEvents } from './screens/events.js';
+import { renderGuideRoles, guideFromTexts } from './screens/guide-roles.js';
+import { serializeGuidePage, blankGuideRole } from '../logic/guide-roles.js';
+import { PRESIDENT_BOARD_KEY, presidentBoardFromTexts, serializePresidentBoard } from '../logic/president-board.js';
+import { renderQuarter } from './screens/quarter.js';
+import { renderPresident } from './screens/president.js';
+import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js';
+import { renderModeration } from './screens/moderation.js';
+import { renderChatsAdmin } from './screens/chats.js';
+import { forum, forumReady } from '../forum/index.js';
+import { deletionReason, categoryLabel } from '../forum/rules.js';
 
 const SCREENS = [
   { id: 'overview', label: 'Обзор', render: renderOverview },
@@ -470,6 +473,9 @@ async function readRights() {
 }
 
 async function boot() {
+  // Адаптер наполнен до первого экрана: в бою await не ждёт ничего.
+  await forumReady();
+
   if (!isConfigured()) {
     showLogin();
     return;

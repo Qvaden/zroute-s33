@@ -1,6 +1,6 @@
-import { CONFIG } from '../config.js?v=94';
-import { loadAll, capabilities, lastLoad } from './data/index.js?v=94';
-import { validateDataset } from './data/contract.js?v=94';
+import { CONFIG } from '../config.js';
+import { loadAll, capabilities, lastLoad } from './data/index.js';
+import { validateDataset } from './data/contract.js';
 import {
   computeStandings,
   computeWeekSummary,
@@ -9,32 +9,79 @@ import {
   weeksUpToLastData,
   computeQuarterWindow,
   computeWindowForm,
-} from './logic/standings.js?v=94';
-import { renderHome } from './pages/home.js?v=94';
-import { renderLadder } from './pages/ladder.js?v=94';
-import { renderQuarter } from './pages/quarter-final.js?v=94';
-import { renderTimeline } from './pages/timeline.js?v=94';
-import { renderGuide } from './pages/guide.js?v=94';
-import { renderBot } from './pages/bot.js?v=94';
-import { renderHandbook } from './pages/handbook.js?v=94';
-import { renderAbout } from './pages/about.js?v=94';
-import { renderAlliance } from './pages/alliance.js?v=94';
-import { computeAchievements } from './logic/achievements.js?v=94';
-import { esc } from './ui/helpers.js?v=94';
-import { presidentBoardFromTexts } from './logic/president-board.js?v=94';
-import { startQuarterTimer } from './ui/quarter-timer.js?v=94';
+} from './logic/standings.js';
+import { renderHome } from './pages/home.js';
+import { renderLadder } from './pages/ladder.js';
+import { renderQuarter } from './pages/quarter-final.js';
+import { renderTimeline } from './pages/timeline.js';
+import { renderGuide } from './pages/guide.js';
+import { renderBot } from './pages/bot.js';
+import { renderAbout } from './pages/about.js';
+import { renderAlliance } from './pages/alliance.js';
+import { computeAchievements } from './logic/achievements.js';
+import { esc } from './ui/helpers.js';
+import { presidentBoardFromTexts } from './logic/president-board.js';
+import { startQuarterTimer } from './ui/quarter-timer.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
-import './ui/ladder-controls.js?v=94';
-import './ui/timeline-controls.js?v=94';
-// Поиск по справочнику: поле перерисовывает только список результатов.
-import './ui/handbook-controls.js?v=94';
-import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js?v=94';
-import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js?v=94';
-import { mountTournaments, unmountTournaments } from './forum/tournaments.js?v=94';
-import { mountGuides, unmountGuides } from './forum/guides.js?v=94';
-import { mountCalendar, unmountCalendar } from './forum/calendar.js?v=94';
-import { mountUpdates, unmountUpdates } from './forum/updates.js?v=94';
-import { mountAccounts, unmountAccounts } from './forum/accounts.js?v=94';
+import './ui/ladder-controls.js';
+import './ui/timeline-controls.js';
+import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js';
+import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js';
+import { mountTournaments, unmountTournaments } from './forum/tournaments.js';
+import { mountCalendar, unmountCalendar } from './forum/calendar.js';
+import { mountUpdates, unmountUpdates } from './forum/updates.js';
+import { mountAccounts, unmountAccounts } from './forum/accounts.js';
+import { forumReady } from './forum/index.js';
+
+/*
+  ДЕРЕВО СПРАВОЧНИКА ПРИХОДИТ НА МАРШРУТЕ, А НЕ НА ВХОДЕ.
+
+  «Гайды» и страница узла справочника тянут за собой 167 КБ самих правил,
+  разбор ленты гайдов, поле поиска и обработчики — пять модулей, 62 КБ по сети
+  и пять запросов. Хостинг отвечает по HTTP/1.1 шестью соединениями сразу,
+  и лишний запрос в стартовом графе — это очередь, а не мелочь: главная
+  вкладка форума ждёт своих модулей дольше ровно на то время, что ушло бы на
+  чужой раздел.
+
+  Поэтому под дерево отведён один гейт: render() на маршрутах guides и
+  handbook показывает «загружаем», догружает модули одним Promise.all и
+  перерисовывает себя, когда те приходят. render() от этого не стал
+  асинхронным — его зовут из входа, из прихода данных и из смены адреса,
+  и в каждом из этих мест порядок теперь проверяется здесь, на входе.
+
+  Снятые ветки (forum/, chats, календарь) вызывают unmountGuides() все до
+  одной, включая те, что ещё не загружались: уход с несуществующей страницы
+  ничего не должен ломать, поэтому обёртка ниже терпит пустой модуль.
+*/
+const guidesTree = { mods: null, loading: null };
+
+function loadGuidesTree() {
+  if (!guidesTree.loading) {
+    guidesTree.loading = Promise.all([
+      import('./forum/guides.js'),
+      import('./pages/handbook.js'),
+      // Поиск по справочнику: поле перерисовывает только список результатов.
+      import('./ui/handbook-controls.js'),
+    ]).then(([live, book]) => {
+      guidesTree.mods = {
+        mountGuides: live.mountGuides,
+        unmountGuides: live.unmountGuides,
+        renderHandbook: book.renderHandbook,
+      };
+      return guidesTree.mods;
+    }, (err) => {
+      guidesTree.loading = null;
+      throw err;
+    });
+  }
+  return guidesTree.loading;
+}
+
+const needsGuidesTree = new Set(['guides', 'handbook']);
+
+const mountGuides = (...args) => guidesTree.mods.mountGuides(...args);
+const unmountGuides = () => guidesTree.mods?.unmountGuides();
+const renderHandbook = (...args) => guidesTree.mods.renderHandbook(...args);
 
 /*
   РАЗДЕЛЫ.
@@ -571,6 +618,45 @@ function render() {
   if (!view) return;
   redirectLegacyAccountHash();
   const { id, param, search } = parseHash();
+
+  /*
+    ГЕЙТ ДЕРЕВА СПРАВОЧНИКА: на «Гайдах» и на странице узла модули могут ещё
+    не прийти. Первым делом отдаём строку ожидания и догружаем их, а потом
+    этим же render() — уже с содержимым.
+
+    Ошибка здесь не прощается молча: оборванная связь на одном файле
+    выглядит как «раздел сломался», поэтому повтор идёт по той же кнопке,
+    что слушается на странице (data-boot-retry).
+  */
+  if (needsGuidesTree.has(id) && !guidesTree.mods) {
+    /*
+      Живую вкладку закрываем до строки ожидания. Иначе человек идёт с форума
+      на «Гайды», DOM ленты уже заменён надписью, а форум всё ещё смонтирован:
+      у него остаются часы, опрос ленты и слушатели на документе. Каждый
+      отдельный слушатель под guard по узлу, но вместе они ещё несколько
+      сотен миллисекунд работают над экраном, которого нет.
+    */
+    unmountForum();
+    unmountChats();
+    unmountTournaments();
+    unmountCalendar();
+    unmountUpdates();
+    unmountAccounts();
+    unmountGuides();
+    liveMountKey = null;
+    app.innerHTML = '<div class="loading">Загружаем справочник…</div>';
+    loadGuidesTree()
+      .then(render)
+      .catch((err) => {
+        console.error(err);
+        guidesTree.mods = null;
+        app.innerHTML = '<div class="loading is-honest">Справочник не догрузился: '
+          + 'связь оборвалась на середине.'
+          + '<button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button></div>';
+      });
+    return;
+  }
+
   renderPresidentBoard(view.texts);
 
   /*
@@ -592,10 +678,19 @@ function render() {
 
   let path;
   if (id === 'alliance' && param) {
-    // Карточка альянса не своя вкладка, поэтому в меню подсвечиваем рейтинг,
-    // откуда сюда и приходят.
+    /*
+      Карточка альянса не своя вкладка, поэтому в меню подсвечиваем рейтинг,
+      откуда сюда и приходят.
+
+      Живые разделы закрываем все семь, как и на других уходах: сюда приходят
+      и с «Турниров», и со страницы гайда, а у обоих на документе висят свои
+      слушатели. Без этого под карточкой продолжает жить раздел, которого на
+      экране уже нет: он опрашивает базу и держит свои таймеры.
+    */
     unmountForum();
     unmountChats();
+    unmountTournaments();
+    unmountGuides();
     unmountCalendar();
     unmountUpdates();
     unmountAccounts();
@@ -909,6 +1004,14 @@ function sourceBadge() {
 }
 
 async function boot() {
+  /*
+    Адаптер форума наполнен до первого render(): в бою этот await не ждёт
+    ничего, потому что боевой файл лежит рядом с точкой переключения, а в
+    черновом режиме он приносит отдельный модуль. Без него первая же строка
+    ленты обратилась бы к пустому объекту.
+  */
+  await forumReady();
+
   /*
     ФОРУМ НЕ ЖДЁТ ДАННЫХ САЙТА — ОН ИХ И НЕ ИСПОЛЬЗУЕТ.
 

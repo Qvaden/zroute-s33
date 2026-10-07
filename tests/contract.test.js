@@ -543,9 +543,22 @@ console.log('\nI. Готовность к публикации');
   const broken = [];
   let edges = 0;
 
+  /*
+    ЗАХВАТЫВАЮТСЯ ВСЕ ТРИ ФОРМЫ СВЯЗИ, А НЕ ТОЛЬКО `from`.
+
+    раньше здесь стоял разбор `import|export ... from`, и он не видел двух
+    родов связей: побочных (`import './ui/x.js';` — ради инициализации) и
+    отложенных (`import('./pages/handbook.js')`). Опечатка в первой ведёт
+    ровно к тому же 404, а во второй — ещё и к тому, что экран не откроется
+    никогда: отложенный модуль браузер просит только по делу, и проверить
+    его существование можно только заранее, то есть здесь.
+  */
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const SPEC = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.[^'"]+)['"]/g;
+
   for (const file of files) {
-    const code = await readFile(file, 'utf8');
-    for (const m of code.matchAll(/(?:^|\n)\s*(?:import|export)[^'"\n]*from\s*['"](\.[^'"]+)['"]/g)) {
+    const code = strip(await readFile(file, 'utf8'));
+    for (const m of code.matchAll(SPEC)) {
       edges++;
       const target = path.resolve(path.dirname(file), m[1].split(/[?#]/, 1)[0]);
       try {
@@ -962,95 +975,116 @@ console.log('\nJ. Админ-панель');
   equal('экраны панели не читают поля эпохи GitHub', stale.join(', '), '');
 
   /*
-    ВЕРСИЯ У ИМПОРТОВ ПАНЕЛИ И В admin.html ОБЯЗАНА СОВПАДАТЬ.
+    ВЕРСИЯ ЕСТЬ ТОЛЬКО У ВХОДА ДОКУМЕНТА. У СВЯЗЕЙ МЕЖДУ МОДУЛЯМИ ЕЁ НЕТ.
 
-    GitHub Pages велит браузеру хранить файлы десять минут, и тот слушается:
-    обновление страницы перезапрашивает саму страницу и main.js, но вложенные
-    модули берёт из кэша.
+    Так было не всегда, и прежде всего здесь стоит сказать, что версия на
+    вложенном импорте должна была лечить.
 
-    Это уже стоило поломки. Обзор переписали под базу, main.js обновился,
-    а screens/overview.js остался прежним — тот, что читал поля репозитория.
-    Панель падала «Cannot read properties of undefined (reading fullName)»
-    на исправленном коде, и понять это было нельзя: файл на диске правильный.
+    Лечение: страница обновляется, а браузер берёт вложенный модуль из кэша и
+    вызывает функцию, которой в старом файле нет. Номер в адресе делает файл
+    другим файлом для кэша.
 
-    Номер в адресе делает файл другим файлом для кэша, но работает это только
-    если номер поднят и там, и там: иначе страница придёт свежая, а модули
-    старые — то есть ровно та беда, от которой номер и ставили.
+    Беда в том, что номер ставили только первым связям — тем, что перечислены
+    в main.js и admin/main.js. Дальше граф шёл без версий, и при одной-то
+    конвенции это значило ровно следующее: один и тот же файл запрашивался
+    двумя адресами. Для браузера это два разных файла.
+
+    Замер перед тем, как это писать:
+      - сайт: 72 файла, 5 из них качались дважды (77 запросов вместо 72);
+      - панель: 48 файлов, 12 дважды (60 вместо 48).
+
+    Хуже повторных байт то, что у модуля с состоянием тогда две копии.
+    В панели это были `admin/draft.js` и `admin/store.js`: черновик, записанный
+    одной копией, второй не виден. На сайте дублировались `config.js` (два
+    разных CONFIG) и `pages/handbook.js` (дерево правил разбиралось дважды).
+
+    Почему версии на вложенных связях можно не носить:
+      - service worker перехватывает каждый запрос сайта и идёт в сеть с
+        `cache: 'no-store'` (см. sw.js), то есть кэш документа в стороне;
+      - хостинг отдаёт модули с `Cache-Control: max-age=0`, и браузер без
+        работника обязан перепроверить файл, а не брать его молча.
+
+    Свежесть обеспечивается ниже графа — работником и заголовками хостинга,
+    — а номер внутри графа только множил адреса. Правило теперь одно, и оно
+    проверяется обходом: у каждого файла на страницу ровно один URL.
   */
   const adminMain = await readFile('src/admin/main.js', 'utf8');
   const htmlVersion = adminHtml.match(/admin\/main\.js\?v=(\d+)/)?.[1];
-  const importVersions = [...adminMain.matchAll(/from '\.[^']+\.js\?v=(\d+)'/g)].map((m) => m[1]);
-
-  check('в admin.html указана версия панели', Boolean(htmlVersion), `нашлось: ${htmlVersion}`);
-  check('версия у всех импортов панели одна и та же',
-    new Set(importVersions).size <= 1, `версии: ${[...new Set(importVersions)].join(', ')}`);
-  equal('версия импортов совпадает с версией в admin.html',
-    importVersions[0] ?? '', htmlVersion ?? '');
-
-  /*
-    Все относительные импорты панели должны быть с версией. Один забытый —
-    один файл, который останется старым, и поломка вернётся ровно в том же
-    виде: правильный код на диске, ошибка в браузере.
-  */
-  const bareImports = [...adminMain.matchAll(/from '(\.[^']+\.js)'/g)].map((m) => m[1]);
-  equal('у каждого импорта панели есть версия', bareImports.join(', '), '');
-
-  /*
-    ТО ЖЕ ПРАВИЛО ДЛЯ САЙТА.
-
-    Беда одна на оба входа: страница обновляется, main.js обновляется,
-    а вложенные модули браузер берёт из кэша. У сайта это проявляется мягче
-    (страница просто выглядит по-старому), но однажды проявится так же
-    жёстко: свежий main.js вызовет функцию, которой в старом модуле нет.
-
-    Версия обязана совпадать с той, что стоит в index.html.
-  */
-  const siteMain = await readFile('src/main.js', 'utf8');
   const siteHtml = await readFile('index.html', 'utf8');
   const indexVersion = siteHtml.match(/src\/main\.js\?v=(\d+)/)?.[1];
-  const siteImportVersions = [...siteMain.matchAll(/from '\.[^']+\.js\?v=(\d+)'/g)].map((m) => m[1]);
 
-  check('версия у всех импортов сайта одна и та же',
-    new Set(siteImportVersions).size <= 1,
-    `версии: ${[...new Set(siteImportVersions)].join(', ')}`);
-  equal('версия импортов сайта совпадает с версией в index.html',
-    siteImportVersions[0] ?? '', indexVersion ?? '');
+  check('в index.html указана версия сайта', Boolean(indexVersion), `нашлось: ${indexVersion}`);
+  check('в admin.html указана версия панели', Boolean(htmlVersion), `нашлось: ${htmlVersion}`);
 
-  const bareSiteImports = [...siteMain.matchAll(/from '(\.[^']+\.js)'/g)].map((m) => m[1]);
-  equal('у каждого импорта сайта есть версия', bareSiteImports.join(', '), '');
-
-  /*
-    ВЕРСИЯ ОДНА НА ВЕСЬ ГРАФ САЙТА, А НЕ ТОЛЬКО У ПЕРВОГО ЭШЕЛОНА.
-
-    Три модуля сайта носят версии и у своих импортов: страницы вызывают
-    контролы, контролы — помощников. Число обязано идти рядом с остальными:
-    одна забытая восьмидесятая пара превращает обновление в половину
-    обновления — свежий main.js вызовет функцию, которой в закешированном
-    модуле третьего звена нет.
-  */
   {
     const path = await import('node:path');
-    async function walkSite(dir, out = []) {
-      for (const e of await readdir(dir, { withFileTypes: true })) {
-        if (dir === 'src' && e.name === 'admin') continue;
-        const full = path.join(dir, e.name);
-        if (e.isDirectory()) await walkSite(full, out);
-        else if (e.name.endsWith('.js')) out.push(full);
-      }
-      return out;
-    }
-    const drift = [];
-    let versionedEdges = 0;
-    for (const file of await walkSite('src')) {
-      const code = await readFile(file, 'utf8');
-      for (const m of code.matchAll(/from\s*['"]\.[^'"]*\?v=(\d+)['"]/g)) {
-        versionedEdges++;
-        if (m[1] !== indexVersion) drift.push(`${file} → ?v=${m[1]}`);
+    /*
+      Регулярка ловит все три формы связи: `from '...'`, `import '...'`
+      (побочный импорт) и `import('...')` (отложенный). Все они стоят
+      браузеру одного запроса, поэтому и проверяются вместе.
+    */
+    const SPEC = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.[^'"]+)['"]/g;
+
+    const versioned = [];
+    for (const f of [...await walkJs('src'), 'config.js']) {
+      const code = stripComments(await readFile(f, 'utf8'));
+      for (const m of code.matchAll(SPEC)) {
+        if (/[?#]/.test(m[1])) versioned.push(`${f} → ${m[1]}`);
       }
     }
-    check(`у сайта есть что проверять в графе версий`, versionedEdges > 0,
-      `найдено связей с версией: ${versionedEdges}`);
-    equal(`весь граф сайта на версии ${indexVersion}`, [...new Set(drift)].sort().join('\n       '), '');
+    equal('ни одна связь между модулями не несёт версии',
+      [...new Set(versioned)].sort().join('\n       '), '');
+
+    /*
+      ОБХОД ГРАФА ОТ ВХОДА: ОДИН ФАЙЛ — ОДИН АДРЕС.
+
+      Проверяется не текст импортов, а то, что реально попросит браузер:
+      обход по тем же правилам, что и у движка модулей, с нормализацией
+      относительных путей. Дубль здесь — это повторная загрузка и вторая
+      копия состояния, поэтому проверка идёт для обоих входов сразу.
+    */
+    for (const [page, entryRe] of [
+      ['index.html', /\.\/src\/main\.js\?v=\d+/],
+      ['admin.html', /\.\/src\/admin\/main\.js\?v=\d+/],
+    ]) {
+      const html = await readFile(page, 'utf8');
+      const entries = [...new Set(
+        [...html.matchAll(/(?:src|href)="(\.\/src\/[^"]+\.js[^"]*)"/g)]
+          .map((m) => m[1])
+          .filter((u) => entryRe.test(u))
+      )];
+      check(`${page}: у входа есть адрес с версией`, entries.length > 0, entries.join(', '));
+
+      const urls = new Map();
+      const edges = new Set();
+      async function visit(spec) {
+        const file = path.resolve(spec.split(/[?#]/, 1)[0]).replace(/\\/g, '/');
+        const list = urls.get(file) ?? [];
+        urls.set(file, list);
+        if (!list.includes(spec)) list.push(spec);
+        const code = stripComments(await readFile(file, 'utf8'));
+        for (const m of code.matchAll(SPEC)) {
+          const next = path.posix
+            .normalize(path.posix.join(path.dirname(spec).replace(/\\/g, '/'), m[1]));
+          const key = `${spec}|${next}`;
+          if (edges.has(key)) continue;
+          edges.add(key);
+          const abs = path.resolve(next.split(/[?#]/, 1)[0]);
+          try {
+            await readFile(abs);
+          } catch {
+            continue; // разрыв графа сторожит отдельная проверка
+          }
+          await visit(next);
+        }
+      }
+      for (const e of entries) await visit(e.startsWith('./') ? e : `./${e}`);
+
+      const doubled = [...urls].filter(([, list]) => list.length > 1)
+        .map(([f, list]) => `${path.relative(process.cwd(), f).replace(/\\/g, '/')} ← ${list.join(', ')}`);
+      equal(`${page}: каждый модуль грузится одним адресом`, doubled.join('\n       '), '');
+      check(`${page}: есть что проверять (${urls.size} модулей)`, urls.size > 30, `${urls.size}`);
+    }
   }
 
   check('панель вешает удаление аккаунта и окно подтверждения никем',
@@ -3911,28 +3945,41 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /id="side"/.test(preview) && /side-toggle/.test(preview));
 
   /*
-    Список офлайн-копии уже один раз разъехался: в нём лежал src/styles.css,
-    которого сайт не грузит, и icon-192.png, которого в репозитории нет вовсе.
-    Теперь он сверяется с тем, что действительно подключено.
+    СПИСОК ОФЛАЙН-КОПИИ БОЛЬШЕ НЕ ПЕРЕЧИСЛЯЕТСЯ ВРУЧНУЮ.
+
+    Он уже разъезжался дважды. Первый раз — по составу: в нём лежал
+    `src/styles.css`, которого сайт не грузит, и `icon-192.png`, которого в
+    репозитории нет. Второй раз — по адресам: имена писались без номера, а
+    страница просит `forum.css?v=39`; для кэша это разные файлы, поэтому
+    запас собирался из адресов, которые никто не запрашивает. Проверка ниже
+    тогда сверяла имена без номеров и молчала.
+
+    Теперь install сам вытаскивает адреса из документа, поэтому здесь
+    проверяются две вещи: что ручного списка файлов в sw.js больше нет и что
+    все ссылки страницы ведут в существующие файлы.
   */
   const swJs = await readFile('sw.js', 'utf8');
-  const shell = [...swJs.matchAll(/'(\.\/[^']+)'/g)].map((m) => m[1]);
-  const cssInHtml = [...indexHtml.matchAll(/href="\.\/(src\/[^"?]+\.css)/g)].map((m) => `./${m[1]}`);
-  const missingInShell = cssInHtml.filter((f) => !shell.includes(f));
-  equal('офлайн-копия кэширует те же стили, что грузит страница',
-    missingInShell.join(', '), '');
+  const handListed = [...swJs.matchAll(/'(\.\/src\/[^']*)'/g)].map((m) => m[1]);
+  equal('в sw.js больше нет ручного списка файлов оболочки', handListed.join(', '), '');
+
+  check('оболочка читает список из index.html',
+    /html\.matchAll\(\/\(\?:href\|src\)=/.test(swJs));
 
   const { stat } = await import('node:fs/promises');
+  const refs = [...new Set(
+    [...indexHtml.matchAll(/(?:href|src)="(\.\/[^"]+)"/g)].map((m) => m[1])
+  )];
   const brokenShell = [];
-  for (const url of shell) {
-    if (url === './') continue;
+  for (const url of refs) {
+    const file = url.replace(/[?#].*$/, '').replace(/^\.\//, '');
     try {
-      await stat(url.replace(/^\.\//, ''));
+      await stat(file);
     } catch {
       brokenShell.push(url);
     }
   }
-  equal('все файлы офлайн-копии существуют', brokenShell.join(', '), '');
+  equal(`все ${refs.length} ссылок страницы ведут в существующие файлы`,
+    brokenShell.join(', '), '');
 }
 
 // ── S. Чистые функции без DOM: помощники, роли, страницы, графики ──────────
@@ -6643,11 +6690,24 @@ console.log('\nY. Календарь встреч');
   const previewSrc = await readFile('scripts/build-preview.mjs', 'utf8');
   check('календарь — живая вкладка с собственным монтированием',
     /id: 'calendar', label: 'Календарь', live: true/.test(mainSrc)
-      && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js\?v=\d+'/.test(mainSrc)
+      && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js'/.test(mainSrc)
       && /mountCalendar\(app, search\)/.test(mainSrc));
-  check('между вкладками календарь не наследует состояние: его закрывают на каждом уходе',
-    (mainSrc.match(/unmountCalendar\(\);/g) || []).length === 10
-      && (mainSrc.match(/unmountCalendar\(\);/g) || []).length === (mainSrc.match(/unmountChats\(\);/g) || []).length);
+  /*
+    Живой раздел переживает уход со своей вкладки, если хоть одна ветка
+    маршрута забывает его закрыть: слушатели на документе остаются, а экрана
+    уже нет. Число в проверке было бы полезнее менять каждый раз, когда
+    добавляешь ветку, — поэтому сверяем не цифру, а одинаковость: все семь
+    закрывателей вызываются поровну, т.е. каждая ветка честна к каждому.
+  */
+  {
+    const liveTabs = ['Forum', 'Chats', 'Tournaments', 'Guides', 'Calendar', 'Updates', 'Accounts'];
+    // Только вызовы с собственной строки: строка с определением обёртки
+    // (unmountGuides) тоже содержит «unmountGuides();», но закрывать никто не закрывает.
+    const counts = liveTabs.map((n) => (mainSrc.match(new RegExp(`\\n\\s*unmount${n}\\(\\);`, 'g')) || []).length);
+    check('все живые разделы закрывают на каждом уходе одинаково',
+      new Set(counts).size === 1 && counts[0] >= 10,
+      liveTabs.map((n, i) => `${n}=${counts[i]}`).join(' '));
+  }
   check('календарь стартует живым кадром, а не надписью «загружаем данные»',
     /const liveFirst = id === 'forum' \|\| id === 'chats' \|\| id === 'calendar'/.test(mainSrc));
   check('вкладка есть и в адресной карте меню, и в сборке для проверки без базы',
@@ -8785,8 +8845,15 @@ console.log('\nAF. Пульс обновлений игры');
   equal('страница закрывается там же, где закрывается календарь',
     (mainSrc.match(/unmountUpdates\(\);/g) || []).length,
     (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
-  equal('новая страница одета в ту же версию, что и остальные импорты',
-    new Set(mainSrc.match(/\?v=\d+/g) || []).size, 1);
+  /*
+    Проверка была построена на номерах версий: «у всех импортов одно число». Теперь
+    чисел в графе нет вовсе — их место заняла проверка «один файл — один
+    адрес» (см. раздел про версии). Здесь остаётся ровно то, что раньше
+    ловила подмена: импорт новой страницы не должен притащить в граф
+    посторонний адрес с запросом.
+  */
+  equal('у импортов сайта больше нет версий',
+    [...new Set(mainSrc.match(/\?v=\d+/g) || [])].join(', '), '');
   check('ошибка списка не глохнет, а форма переживает перерисовку',
     updSrc.includes('state.error = String(err?.message ?? err)')
       && updSrc.includes('state.composing ? readForm() : null'));
@@ -9537,6 +9604,56 @@ console.log('\nAJ. Справочник официальных гайдов иг
       && /renderNav\(route\.navAs \|\| route\.id\)/.test(mainSrc));
   check('справочник открывается до ответа хранилища',
     /id === 'updates' \|\| id === 'accounts' \|\| id === 'handbook' \|\| \(id === 'user' && param\)/.test(mainSrc));
+
+  /*
+    ДЕРЕВО ПРАВИЛ ПРИХОДИТ ПОСЛЕ ВХОДА НА ВКЛАДКУ, А НЕ СО ВСЕМ САЙТОМ.
+
+    163 КБ правил и четыре модуля к ним: снятое дерево весит 238 КБ
+    исходника, а вместе с черновым адаптером форума из входа уходит 430 КБ —
+    ровно четверть того, что браузер разбирал до первого кадра (1,7 МБ). На
+    HTTP/1.1 у браузера шесть соединений, поэтому здесь важны не байты, а
+    число запросов: шесть модулей перестают ехать на входе.
+
+    Проверки ниже сторожат три вещи, без которых отложенность превращается в
+    тихую поломку:
+      - на входе ожидания живые разделы закрыты (иначе форум продолжает
+        опрашивать базу, пока человек смотрит на надпись «загружаем»);
+      - адрес дерева не закеширован под другим именем — иначе модуль
+        догрузится вторым экземпляром и состояние справочника развалится;
+      - черновой адаптер форума тоже не едет зря: в бою его никто не читает.
+  */
+  /*
+    Тело гейта вырезаем целиком, от условия до его закрывающей скобки:
+    проверки ниже читают и начало (снятие живых вкладок), и конец
+    (перерисовка и кнопка повтора). Заبراли только начало — не увидите,
+    что случилось с экраном после догрузки.
+  */
+  const treeGate = /if \(needsGuidesTree\.has\(id\)[\s\S]*?\r?\n {2}\}/.exec(mainSrc);
+  const gate = treeGate ? treeGate[0] : '';
+  check('гейт дерева закрывает живые разделы до строки ожидания',
+    ['unmountForum();', 'unmountChats();', 'unmountTournaments();', 'unmountCalendar();',
+      'unmountUpdates();', 'unmountAccounts();', 'unmountGuides();']
+      .every((call) => gate.indexOf(call) < gate.indexOf('Загружаем справочник')));
+  check('гейт гасит прежний адрес, чтобы догруженное дерево не назвали чужим',
+    gate.includes('liveMountKey = null'));
+  check('после догрузки экран перерисовывает тот же render',
+    /\bloadGuidesTree\(\)[\s\S]*?\.then\(render\)/.test(gate));
+  check('сорвавшуюся догрузку человек может повторить кнопкой',
+    gate.includes('data-boot-retry')
+      // Кнопка без слушателя — украшение: слушает её страница, а не гейт.
+      && /addEventListener\([\s\S]*?\[data-boot-retry\][\s\S]*?boot\(\)/.test(mainSrc)
+      // Без сброса обещания повтор упрётся в тот же оборванный Promise.
+      && /guidesTree\.loading = null/.test(mainSrc));
+
+  const forumIndexSrc = await readFile('src/forum/index.js', 'utf8');
+  check('боевой адаптер форума лежит рядом с переключателем и приходит без запроса',
+    /import \* as supabase from '\.\/adapters\/supabase\.js'/.test(forumIndexSrc));
+  check('черновой адаптер форума приходит только по запросу',
+    /import\('\.\/adapters\/local\.js'\)/.test(forumIndexSrc)
+      && !/from '\.\/adapters\/local\.js'/.test(forumIndexSrc));
+  check('вход сайта и панель ждут наполнения `forum`',
+    /await forumReady\(\);/.test(mainSrc)
+      && /await forumReady\(\);/.test(await readFile('src/admin/main.js', 'utf8')));
   const branch = /\} else if \(route\.id === 'handbook'\) \{([\s\S]*?)path = '\/handbook\/node'/.exec(mainSrc);
   check('ветка маршрута выгружает все живые разделы перед отрисовкой',
     branch && (branch[1].match(/unmount\w+\(\);/g) || []).length === 7);
@@ -9550,8 +9667,16 @@ console.log('\nAJ. Справочник официальных гайдов иг
       && branch[1].includes('#/guides${search'));
   check('стили справочника подключены к странице',
     /<link rel="stylesheet" href="\.\/src\/handbook\.css/.test(indexSrc));
-  check('стили справочника попали в офлайн-копию',
-    swSrc.includes("'./src/handbook.css'"));
+  /*
+    Раньше здесь проверялась строка `'./src/handbook.css'` внутри sw.js, и эта
+    проверка была частью беды: список сверялся по имени, а страница просила
+    файл с номером, то есть по другому адресу. Теперь install читает сам
+    документ, поэтому проверяется связка — ссылка в странице и разбор её
+    работником.
+  */
+  check('стили справочника попадут в офлайн-копию: их берёт install',
+    /<link rel="stylesheet" href="\.\/src\/handbook\.css[^"]*"/.test(indexSrc)
+      && /html\.matchAll\(\/\(\?:href\|src\)=/.test(swSrc));
   check('классы, которые рисует страница, описаны в её stylesheet',
     ['hb-page', 'hb-tile', 'hb-fig', 'hb-crumbs', 'hb-search', 'hb-hits', 'guide-handbook']
       .every((cls) => cssSrc.includes(`.${cls}`)));
@@ -9569,8 +9694,13 @@ console.log('\nAJ. Справочник официальных гайдов иг
       && /\?q=\$\{encodeURIComponent\(q\)\}/.test(controlsSrc)
       && !/#\/handbook\?q=/.test(controlsSrc));
   check('Escape очищает поле', /Escape/.test(controlsSrc));
+  /*
+    Поиск подключён отложенно: дерево справочника весят 167 КБ, и платить их
+    запросом за каждую вкладку нельзя. Поэтому здесь проверяется не
+    статический импорт, а связь — модуль обязан приходить из main.js.
+  */
   check('модуль поиска подключён в main.js',
-    /import '\.\/ui\/handbook-controls\.js/.test(mainSrc));
+    /import\(['"]\.\/ui\/handbook-controls\.js['"]\)/.test(mainSrc));
 
   /* Разметка: поле с разделами — часть вкладки «Гайды», а не отдельная страница. */
   const sections = hb.renderSections();
@@ -11370,8 +11500,8 @@ console.log('\nAN. Доска аккаунтов');
   equal('доску закрывают там же, где календарь и обновления',
     (mainSrc.match(/unmountAccounts\(\);/g) || []).length,
     (mainSrc.match(/unmountCalendar\(\);/g) || []).length);
-  check('модуль поведения подключён к сайту той же версией, что и остальные',
-    /import \{ mountAccounts, unmountAccounts \} from '\.\/forum\/accounts\.js\?v=\d+'/.test(mainSrc));
+  check('модуль поведения подключён к сайту',
+    /import \{ mountAccounts, unmountAccounts \} from '\.\/forum\/accounts\.js'/.test(mainSrc));
   check('намерение «объявление» ушло из адреса форума: композер больше не знает доски',
     urlSrc.includes("export const COMPOSE_INTENTS = ['event'];"));
   check('старая ссылка не ведёт в пустую форму, а переезжает на вкладку до разбора маршрута',
