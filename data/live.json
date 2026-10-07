@@ -503,6 +503,16 @@
     },
     {
       "weekId": "W10",
+      "outcome": "loss",
+      "allianceId": "a17"
+    },
+    {
+      "weekId": "W10",
+      "outcome": "loss",
+      "allianceId": "a18"
+    },
+    {
+      "weekId": "W10",
       "outcome": "win",
       "allianceId": "a19"
     },
@@ -1602,7 +1612,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-10-07T08:33:02+00",
+  "pulledAt": "2026-10-07T17:23:29+00",
   "alliances": [
     {
       "id": "a01",
