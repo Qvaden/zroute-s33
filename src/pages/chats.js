@@ -321,6 +321,14 @@ function renderRoom(s) {
       : '',
   ].filter(Boolean).join('');
 
+  /*
+    Лента и плавающие якоря («вниз», «к новым») сидят в одном контейнере
+    .chat-feed. Кнопка «вниз» обязана стоять ровно над полем ввода, а его
+    высота меняется от одной строки до пяти — человек печатает абзац. Если
+    держать якорь абсолютным от всей комнаты, при разрастании ввода он
+    утонет в нём; здесь дно контейнера — это край ленты, и отсчёт идёт от
+    него, поэтому якорь всегда остаётся видимым.
+  */
   return `
     <header class="chat-room__head">
       <a class="chat-room__back" href="#/chats" aria-label="К списку чатов">
@@ -366,30 +374,32 @@ function renderRoom(s) {
                data-chat-search-input value="${esc(s.searchQuery || '')}">
       </div>` : ''}
 
-    <div class="chat-room__scroll" data-chat-scroll>
-      ${renderScrollArea(s)}
+    <div class="chat-feed">
+      <div class="chat-room__scroll" data-chat-scroll>
+        ${renderScrollArea(s)}
+      </div>
+
+      <button type="button" class="chat-go-bottom${s.scrolledUp || s.newMessages > 0 ? ' is-visible' : ''}"
+              data-chat-go-bottom aria-label="Вниз, к последнему сообщению">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+        <span data-chat-go-count${s.newMessages > 0 ? '' : ' hidden'}>${s.newMessages > 99 ? '99+' : s.newMessages}</span>
+      </button>
+
+      <button type="button" class="chat-go-new${s.readAt && s.unread > 0 ? ' is-visible' : ''}"
+              data-chat-go-new title="К новым сообщениям" aria-label="К новым сообщениям (${
+                s.unread > 99 ? '99+' : s.unread
+              } непрочитанных)">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 17l5-5 5 5"/>
+          <path d="M7 9l5-5 5 5"/>
+        </svg>
+        <span data-chat-go-new-count>${s.unread > 99 ? '99+' : s.unread}</span>
+      </button>
     </div>
-
-    <button type="button" class="chat-go-bottom${s.newMessages > 0 ? ' is-visible' : ''}"
-            data-chat-go-bottom aria-label="К последнему сообщению">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M6 9l6 6 6-6"/>
-      </svg>
-      <span data-chat-go-count>${s.newMessages > 99 ? '99+' : s.newMessages}</span>
-    </button>
-
-    <button type="button" class="chat-go-new${s.readAt && s.unread > 0 ? ' is-visible' : ''}"
-            data-chat-go-new title="К новым сообщениям" aria-label="К новым сообщениям (${
-              s.unread > 99 ? '99+' : s.unread
-            } непрочитанных)">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M7 17l5-5 5 5"/>
-        <path d="M7 9l5-5 5 5"/>
-      </svg>
-      <span data-chat-go-new-count>${s.unread > 99 ? '99+' : s.unread}</span>
-    </button>
 
     ${renderComposer(s, c)}`;
 }
@@ -702,7 +712,8 @@ export function renderComposer(s, c) {
 
         <div class="chat-compose__input is-empty" contenteditable="true" role="textbox"
              aria-multiline="true" data-chat-input data-editor data-limit="${CONFIG.forum.limits.commentMax}"
-             data-placeholder="Сообщение или вставьте скриншот (Ctrl+V)…" aria-label="Сообщение"></div>
+             data-placeholder="Сообщение или вставьте скриншот (Ctrl+V)…"
+             data-placeholder-touch="Сообщение…" aria-label="Сообщение"></div>
 
         <button type="submit" class="chat-compose__send" aria-label="Отправить" ${s.sending ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>

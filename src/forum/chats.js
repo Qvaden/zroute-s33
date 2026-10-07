@@ -49,6 +49,8 @@ const state = {
   formatOpen: false,
   hasMore: false,
   newMessages: 0,
+  /** Человек уехал вверх от дна ленты: по этому флагу живёт якорь «вниз». */
+  scrolledUp: false,
   unread: 0,
   readAt: null,
   sending: false,
@@ -182,6 +184,7 @@ function paintFull({ stick = false } = {}) {
   if (nextScroll) {
     if (stick || atBottom) nextScroll.scrollTop = nextScroll.scrollHeight;
     else nextScroll.scrollTop = prevTop + (nextScroll.scrollHeight - prevHeight);
+    state.scrolledUp = !(stick || atBottom);
   }
   paintGoBottom();
   paintGoNew();
@@ -209,6 +212,7 @@ function paintMessages({ stick = false } = {}) {
   } else {
     scroll.scrollTop = prevTop + (scroll.scrollHeight - prevHeight);
   }
+  state.scrolledUp = !(stick || atBottom);
   paintGoBottom();
   paintGoNew();
 
@@ -225,19 +229,29 @@ function paintList() {
 }
 
 /**
- * Обновить кнопку «вниз» и счётчик новых сообщений.
+ * Обновить якорь «вниз» и счётчик новых сообщений.
  *
- * Кнопка живёт как сиблинг .chat-room__scroll и позиционируется
- * абсолютно над лентой — не зависит от перерисовки ленты.
+ * Кнопка живёт внутри .chat-feed — тот же контейнер, что и лента, — и
+ * позиционируется абсолютно от его дна, поэтому не зависит от перерисовки
+ * ленты и не тонет в выросшем поле ввода.
+ *
+ * Показываем её всякий раз, когда человек смотрит не на последний экран,
+ * а не только когда прилетели новые: якорь нужен, чтобы вернуться, а не
+ * только чтобы увидеть счётчик. Цифра при этом остаётся про новые — без
+ * них это просто стрелка вниз.
  */
 function paintGoBottom() {
   if (!host) return;
   const btn = host.querySelector('[data-chat-go-bottom]');
   if (!btn) return;
-  const has = state.newMessages > 0;
-  btn.classList.toggle('is-visible', has);
+  const scroll = host.querySelector('[data-chat-scroll]');
+  const up = state.scrolledUp || state.newMessages > 0;
+  btn.classList.toggle('is-visible', Boolean(up) && !isAtBottom(scroll));
   const count = btn.querySelector('[data-chat-go-count]');
-  if (count) count.textContent = state.newMessages > 99 ? '99+' : String(state.newMessages);
+  if (count) {
+    count.textContent = state.newMessages > 99 ? '99+' : String(state.newMessages);
+    count.hidden = state.newMessages <= 0;
+  }
 }
 
 /* ── Непрочитанные: граница, кнопка «К новым», отметка прочтения ─────────── */
@@ -352,9 +366,15 @@ async function ensureUnreadBoundary() {
 
 function autosize(el) {
   if (!el) return;
-  // contenteditable не имеет rows, но scrollHeight работает так же.
+  /*
+    contenteditable не имеет rows, но scrollHeight работает так же.
+    Потолок берём из CSS (--chat-input-max), а не держим вторую цифру здесь:
+    на телефоне он ниже десктопного, и зашитые 160 заставляли бы поле
+    раздуваться сверх того, что ему разрешили стили.
+  */
+  const cap = parseFloat(getComputedStyle(el).maxHeight) || 160;
   el.style.height = 'auto';
-  el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  el.style.height = `${Math.min(el.scrollHeight, cap)}px`;
 }
 
 function notice(text) {
@@ -1474,10 +1494,15 @@ function wire() {
   document.addEventListener('input', (e) => {
     if (!host || !host.contains(e.target)) return;
     if (e.target.matches?.('[data-chat-input]')) {
+      const scroll = host.querySelector('[data-chat-scroll]');
+      // Замеряем «стоит ли на дне» ДО autosize: поле раздвинется и лента уедет
+      // вверх, а человек в этот момент смотрит на последнее сообщение.
+      const wasStuck = scroll ? isAtBottom(scroll) : true;
       autosize(e.target);
       // Плейсхолдер держится на классе is-empty: браузер оставляет в поле
       // служебный <br>, и «пусто» глазами не совпадает с «пусто в DOM».
       syncEditorEmpty(e.target);
+      if (scroll && wasStuck) scroll.scrollTop = scroll.scrollHeight;
       // Индикатор набора: отправляем не на каждое нажатие, а с задержкой.
       if (state.openId) {
         clearTimeout(state._typingTimer);
@@ -1516,21 +1541,32 @@ function wire() {
     if (!document.hidden && host) tick();
   });
 
-  /* Слушатель скролла: у низа — сбрасываем newMessages и ставим прочтение;
-     на достижении границы непрочитанных — тоже ставим прочтение;
-     на любом положении — переслеживаем видимость кнопки «К новым». */
+  /*
+    Слушатель скролла. У низа — сбрасываем newMessages и ставим прочтение;
+    на достижении границы непрочитанных — тоже ставим прочтение. Якоря
+    переслеживаем на любом положении и оба сразу: «вниз» смотрит, есть ли
+    под человеком дно ленты, «К новым» — дошёл ли он до границы. Раньше
+    каждый обновлялся в своей ветке, и кнопка «вниз» переживала не все
+    перемещения.
+
+    capture обязателен: scroll не всплывает от прокручиваемого элемента к
+    предкам, поэтому на host без захвата событие не приходило никогда —
+    флаг «уехал вверх» при настоящей прокрутке не выставлялся и якорь не
+    появлялся. Делегирование при этом сохраняем: paintFull пересобирает
+    ленту целиком, и слушатель, висеть который был бы на самом элементе,
+    терялся бы при каждом перемонтаже.
+  */
   host?.addEventListener('scroll', (e) => {
-    const target = e.target.closest('[data-chat-scroll]');
+    const target = e.target?.closest?.('[data-chat-scroll]');
     if (!target) return;
-    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
-    if (atBottom || boundaryReached()) {
+    state.scrolledUp = !isAtBottom(target);
+    if (!state.scrolledUp || boundaryReached()) {
       state.newMessages = 0;
-      paintGoBottom();
       markReadNow();
-    } else {
-      paintGoNew();
     }
-  }, { passive: true });
+    paintGoBottom();
+    paintGoNew();
+  }, { passive: true, capture: true });
 
   /* Бесконечный скролл: IntersectionObserver следит за сентинелем
      в верху ленты и подгружает порцию, когда он появляется в зоне

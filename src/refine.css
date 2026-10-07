@@ -767,6 +767,21 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* ── Лента ───────────────────────────────────────────────────────────────── */
 
+/*
+  Дно ленты вместе с плавающими якорями. .chat-feed забирает всё свободное
+  место комнаты, прокрутка живёт внутри него, а кнопки «вниз» и «к новым»
+  привязаны к этому же контейнеру. Раньше они считали отступ от всей комнаты
+  («bottom: 72px»), и это работало, пока ввод был одной строкой: стоило полю
+  разрастись до пяти строк, как якорь тонул в композере ровно там, где
+  человек смотрел на текст.
+*/
+.chat-feed {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .chat-room__scroll {
   flex: 1;
   min-height: 0;
@@ -969,15 +984,25 @@ body:has(.chat-layout) .site-foot { display: none; }
   flex: 1;
   min-width: 0;
   /*
-    Поле растёт до 160px и дальше прокручивается: цитата, список или код-блок
-    делают набранный текст выше, чем был обычный однострочный, — без прокрутки
-    он полез бы за пределы композера.
+    Поле растёт до --chat-input-max и дальше прокручивается: цитата, список
+    или код-блок делают набранный текст выше, чем был обычный однострочный,
+    — без прокрутки он полез бы за пределы композера. Потолок держит CSS, а не
+    скрипт: на телефоне с открытой клавиатурой те же 160 пикселов отъедали
+    половину ленты, поэтому там он меньше — см. медиа-запрос «Телефон».
   */
-  max-height: 160px;
+  max-height: var(--chat-input-max, 160px);
   overflow-y: auto;
   padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  /*
+    Не 999px. Скругление «таблетки» полю в одну строку идёт, но как только
+    поле выросло до четырёх-пяти строк, использованный радиус становится
+    половиной высоты (при 158px — 79px), и верхняя строка упирается в дугу:
+    на телефоне начало и конец первой и последней строк просто исчезали.
+    Угол в 20px сохраняет мягкий силуэт и не трогает ни одну строку, какой
+    бы высоты поле ни стало.
+  */
+  border-radius: 20px;
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font: inherit;
@@ -1002,12 +1027,31 @@ body:has(.chat-layout) .site-foot { display: none; }
   Плейсхолдер для contenteditable — как в редакторе форума. Держится и на
   :empty, и на классе is-empty: браузер оставляет в поле служебный <br>,
   после чего «пусто» глазами не совпадает с «пусто в DOM».
+
+  Строка ровно одна, со многоточием на конце: без nowrap подсказка в
+  узком поле телефона переносилась на четыре строки, и пустой ввод выглядел
+  как заполненный абзац высотой 89 пикселов — половина экрана до того, как
+  человек напечатал букву.
 */
 .chat-compose__input:empty::before,
 .chat-compose__input.is-empty::before {
   content: attr(data-placeholder);
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--mute);
   pointer-events: none;
+}
+/*
+  На телефоне — короткий вариант: «вставьте скриншот (Ctrl+V)» описывает
+  клавиатуру, которой у сенсорного устройства нет, а место в строке есть.
+*/
+@media (hover: none) and (pointer: coarse) {
+  .chat-compose__input:empty::before,
+  .chat-compose__input.is-empty::before {
+    content: attr(data-placeholder-touch);
+  }
 }
 
 /*
@@ -1415,8 +1459,8 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 .chat-go-bottom {
   position: absolute;
-  bottom: 72px;
-  right: 14px;
+  bottom: 12px;
+  right: 12px;
   display: none;
   align-items: center;
   gap: 5px;
@@ -1435,6 +1479,8 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-go-bottom:hover { color: var(--text); border-color: var(--accent); }
 .chat-go-bottom.is-visible { display: inline-flex; }
 .chat-go-bottom span { min-width: 18px; text-align: center; }
+/* Счётчика нет (человек просто уехал вверх по истории) — стрелка одна. */
+.chat-go-bottom [hidden] { display: none; }
 
 /* ── Кнопка «К новым» ──────────────────────────────────────────────────────
    Плавающая кнопка к границе непрочитанных. Живёт над кнопкой «вниз» на
@@ -1443,8 +1489,8 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 .chat-go-new {
   position: absolute;
-  bottom: 128px;
-  right: 14px;
+  bottom: 58px;
+  right: 12px;
   display: none;
   align-items: center;
   gap: 5px;
@@ -1725,9 +1771,37 @@ body:has(.chat-layout) .site-foot { display: none; }
   .chat-msg__bubble { max-width: 84%; }
   .chat-msg__body { font-size: 13px; }
 
-  .chat-compose { padding: 6px; gap: 6px; }
-  .chat-compose__input { padding: 9px 13px; font-size: 16px; }
-  .chat-compose__send { width: 44px; height: 44px; }
+  /*
+    Ввод в две строки: поле и отправка — первой строкой на всю ширину, три
+    служебные кнопки своей строкой ниже. В один ряд на 390px они съедали
+    115 пикселов, и на текст оставалось 202 из 384 — половина ширины, из-за
+    чего даже короткий ответ вставал в столбик. align-items: end держит
+    круглую отправку размером 44×44, а не растянутой на всё выросшее поле.
+  */
+  .chat-compose {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "input send"
+      "acts acts";
+    align-items: end;
+    padding: 6px;
+    gap: 4px 6px;
+  }
+  .chat-compose__input {
+    grid-area: input;
+    padding: 9px 13px;
+    font-size: 16px;
+    /*
+      Потолок высоты ниже десктопного: с открытой клавиатурой на телефоне
+      в запасе около 300 пикселов ленты, и поле в 160 съедало половину.
+      Пяти строк хватает, чтобы видеть, где абзац, остальное — прокруткой.
+    */
+    --chat-input-max: 112px;
+  }
+  .chat-compose__send { grid-area: send; width: 44px; height: 44px; }
+  .chat-compose__acts-left { grid-area: acts; gap: 2px; padding-bottom: 0; }
+  .chat-compose__btn { width: 34px; height: 30px; font-size: 15px; }
   /*
     Safari на телефоне масштабирует страницу при фокусе, если шрифт поля
     меньше 16px. Все поля чата — не исключение: форма создания чата и форма

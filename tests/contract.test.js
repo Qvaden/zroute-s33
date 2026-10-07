@@ -12711,7 +12711,54 @@ console.log('\nAN. Доска аккаунтов');
   check('панель получила свой слой: .forum-md рассчитан стоять под полем, а не над ним',
     cssSrc.includes('.chat-format .forum-md'));
   check('поле ввода растёт и прокручивается, а не распирает композер',
-    /\.chat-compose__input \{[\s\S]{0,300}?max-height: 160px;\s*\n\s*overflow-y: auto;/.test(cssSrc));
+    /\.chat-compose__input \{[^}]*max-height: var\(--chat-input-max, 160px\);\s*\n\s*overflow-y: auto;/.test(cssSrc));
+  check('потолок высоты поля задаёт CSS: autosize читает его, а не держит свою цифру',
+    /getComputedStyle\(el\)\.maxHeight/.test(chatLogicSrc)
+      && !/Math\.min\(el\.scrollHeight, 160\)/.test(chatLogicSrc));
+  check('угол поля — скругление, а не таблетка: радиус 999px резал первую и последнюю строки',
+    /\.chat-compose__input \{[^}]*border-radius: 20px;/.test(cssSrc)
+      && !/\.chat-compose__input \{[^}]*border-radius: 999px/.test(cssSrc));
+  check('плейсхолдер живёт в одну строку и упирается в многоточие, а не в столбик',
+    /\.chat-compose__input\.is-empty::before \{[\s\S]{0,400}?white-space: nowrap;[\s\S]{0,120}?text-overflow: ellipsis;/.test(cssSrc));
+  check('на сенсоре плейсхолдер короче: длинный текст про скриншот там не нужен',
+    /data-placeholder-touch="Сообщение/.test(openBar)
+      && /@media \(hover: none\) and \(pointer: coarse\)/.test(cssSrc)
+      && /content: attr\(data-placeholder-touch\)/.test(cssSrc));
+  check('на телефоне служебные кнопки уходят своей строкой: 115px в ряд съедали половину ширины поля',
+    /\.chat-compose \{[\s\S]{0,300}?grid-template-areas:\s*\n\s*"input send"\s*\n\s*"acts acts";/.test(cssSrc));
+  check('на телефоне поле не распускают выше пяти строк: с клавиатурой ленты остаётся ~300px',
+    /\.chat-compose__input \{[\s\S]{0,400}?--chat-input-max: 112px;/.test(cssSrc));
+
+  /* ── Якорь «вниз»: держит дно ленты, а не только считает новые ── */
+  check('лента и якоря сидят в одном контейнере: дно .chat-feed — это край ленты',
+    /<div class="chat-feed">/.test(chatPageSrc)
+      && /\.chat-feed \{[\s\S]{0,200}?position: relative;[\s\S]{0,200}?flex: 1;/.test(cssSrc));
+  const anchorsInFeed = chatPageSrc.indexOf('<div class="chat-feed">');
+  check('якорь «вниз» и «к новым» стоят внутри ленты, а не прижаты к шапке комнаты',
+    anchorsInFeed > 0
+      && chatPageSrc.indexOf('data-chat-go-bottom') > anchorsInFeed
+      && chatPageSrc.indexOf('data-chat-go-new') > anchorsInFeed
+      && chatPageSrc.indexOf('data-chat-go-new') < chatPageSrc.indexOf('${renderComposer'));
+  check('якорь виден, когда человек уехал от дна, а не только когда прилетели новые',
+    chatLogicSrc.includes('const up = state.scrolledUp || state.newMessages > 0;')
+      && /is-visible.*!isAtBottom\(scroll\)|!isAtBottom\(scroll\)/.test(chatLogicSrc));
+  check('число новых прячется, когда новых нет: остаётся стрелка, а не «0»',
+    /count\.hidden = state\.newMessages <= 0;/.test(chatLogicSrc)
+      && /<span data-chat-go-count\$\{s\.newMessages > 0 \? '' : ' hidden'\}>/.test(chatPageSrc));
+  check('отъезд от дна отмечает слушатель скролла, а не догадка при отрисовке',
+    /state\.scrolledUp = !isAtBottom\(target\);/.test(chatLogicSrc)
+      && chatLogicSrc.includes('state.scrolledUp = !(stick || atBottom);'));
+  /*
+    scroll не всплывает: без capture событие от ленты до host не доходит, и якорь
+    «вниз» не появлялся при настоящей прокрутке — проверка в браузере это и поймала.
+  */
+  check('слушатель скролла висит на host с захватом и переживает перемонтаж ленты',
+    /host\?\.addEventListener\('scroll', \(e\) => \{[\s\S]{0,400}\{ passive: true, capture: true \}\)/.test(chatLogicSrc));
+  check('мишень слушателя берётся с осмотрительностью: у scroll-события может не быть closest',
+    /const target = e\.target\?\.closest\?\.\('\[data-chat-scroll\]'\);/.test(chatLogicSrc));
+  check('выросшее поле не утаскивает ленту: если смотрели на последнее — возвращаем на дно',
+    /const wasStuck = scroll \? isAtBottom\(scroll\) : true;/.test(chatLogicSrc)
+      && /if \(scroll && wasStuck\) scroll\.scrollTop = scroll\.scrollHeight;/.test(chatLogicSrc));
   check('раскрытый переключатель помечен цветом, чтобы было видно, что панель живая',
     /\.chat-compose__btn\[aria-pressed='true'\]/.test(cssSrc));
 
