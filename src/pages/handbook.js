@@ -46,6 +46,15 @@ export const isHandbookGuide = (node) => Boolean(node) && node.children.length =
 
 export const handbookNode = (id) => byId.get(id) || null;
 
+/**
+ * Узел, внутри которого лежит этот: `null` у корня.
+ *
+ * Наружу отдаётся потому, что собранной странице нужна ссылка «наверх»
+ * (`<link rel="prev">`), а второе дерево родителей в скрипте сборки означало
+ * бы два списка, которые разъезжаются при первой же перестановке гайда.
+ */
+export const handbookParent = (id) => (parentId.has(id) ? byId.get(parentId.get(id)) : null);
+
 /*
   Адрес человек мог и напечатать: «%D0» в середине ломает decodeURIComponent
   исключением, а падать из-за него должна не страница и не весь сайт. Для
@@ -228,8 +237,15 @@ function childTiles(node) {
     .join('')}</ul>`;
 }
 
-/** Первая строка текста без разметки — подпись под плиткой. */
-function leadOf(node) {
+/**
+ * Первая строка текста без разметки — подпись под плиткой.
+ *
+ * Наружу отдаётся потому, что той же строкой собирается `meta description`
+ * статической страницы (scripts/build-handbook-pages.mjs): подпись под
+ * ссылкой и то, что человек читает в выдаче, обязаны быть одним текстом, а
+ * не двумя пересказами одного гайда.
+ */
+export function handbookLead(node) {
   const first = node.blocks.find((b) => b.text) || node.blocks.find((b) => b.caption);
   if (!first) return '';
   let flat = flatten(first.text || first.caption || '');
@@ -246,6 +262,8 @@ function leadOf(node) {
   }
   return flat.length > 120 ? `${flat.slice(0, 120).trimEnd()}…` : flat;
 }
+
+const leadOf = handbookLead;
 
 function blockHtml(block) {
   if (block.image) {

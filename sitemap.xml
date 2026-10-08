@@ -3,13 +3,208 @@
   Список страниц для поисковиков.
 
   Разделы сайта живут во фрагменте адреса (#/forum, #/ladder), а фрагмент
-  робот не передаёт серверу и считает частью одного и того же адреса.
-  Поэтому настоящая здесь одна: документ, который их все отдаёт.
+  робот не передаёт серверу и считает частью одного и того же документа.
+  Поэтому настоящей страницей раздела он видит один документ-оболочку.
+
+  Справочник — исключение: каждый его гайд собирается отдельным файлом
+  (scripts/build-handbook-pages.mjs), и эти адреса перечислены ниже. Пока
+  правила жили только во фрагменте, в выдаче существовал один адрес на все
+  тексты игры.
+
   Зеркало на GitHub Pages в списке нет намеренно — это копия того же
   содержимого, в выдаче ему делать нечего.
+
+  Дат обновления здесь тоже нет: у перенесённых правил игры даты публикации
+  нет, а дата сборки была бы выдана поисковиком за свежесть текста.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://zroutehub.bond/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_events/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_events/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_ambush/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_siege/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_events_train/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_events_excavation/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_events_vs/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_general_explanation/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_monday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_tuesday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_wednesday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_thursday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_friday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_saturday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/vs_sunday/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/event_mission_readiness/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/event_season_guide/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/event_volcano/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/event_pandora/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_heroes/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/heroes_classes_types/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/classes_submenu/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/class_warriors/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/class_tacticians/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/class_assault/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/types_submenu/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/type_tanks/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/type_damagers/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/type_support/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/squads_formation_menu/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/formation_info/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/squad_1_info/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/squad_2_3_info/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/squad_tower_info/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/mythic_gear_menu/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/mythic_gear_create/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/mythic_gear_upgrade/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/stars_levels_menu/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_build/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_soldiers/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_alliance/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_general_explanation/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_sections_explanation/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_novice/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_movement/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_teleports/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_vip/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_radar/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_ops/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_special_ops/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_doomsday_treasures/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_escort_menu/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_my_escort/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/novice_other_escort/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/alliance_heal/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/menu_research/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/minister_roles/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/research_develop/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/research_economy/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/research_hero/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/handbook/research_soldiers/</loc>
   </url>
 </urlset>

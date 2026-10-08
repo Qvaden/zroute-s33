@@ -14382,8 +14382,8 @@ console.log('\nAO. Раздел — страница');
     — robots.txt обязан открыто разрешать src/: без модулей робот получит
       пустой документ и решит, что страниц нет;
     — закрыто только то, что в выдаче быть не должно (панель, данные, тесты);
-    — sitemap и canonical ссылаются на один и тот же адрес: расхождение между
-      ними робот читает как два разных сайта с одинаковым содержимым.
+    — в sitemap стоит адрес из canonical: расхождение между ними робот читает
+      как два разных сайта с одинаковым содержимым.
   */
   const robots = await readFile('robots.txt', 'utf8');
   check('robots.txt не закрывает код сайта', !/^Disallow: \/src$/m.test(robots));
@@ -14397,8 +14397,16 @@ console.log('\nAO. Раздел — страница');
   check('canonical — абсолютный адрес с https',
     Boolean(canonical) && /^https:\/\/[^/]+\/$/.test(canonical[1]),
     canonical ? canonical[1] : 'тег не найден');
+  /*
+    Первым адресом обязан стоять canonical: список читают сверху вниз, и
+    документ-оболочка — главный. Адресов стало больше ровно на статьи
+    справочника (см. секцию AT), и в этом списке они законны.
+  */
   check('в sitemap тот же адрес, что и в canonical',
-    locs.length === 1 && locs[0] === canonical?.[1], locs.join(', '));
+    locs.length > 1 && locs[0] === canonical?.[1], locs.slice(0, 3).join(', '));
+  check('зеркало в sitemap не делит выдачу с основным адресом',
+    !locs.some((l) => /github\.io/.test(l)),
+    locs.filter((l) => /github\.io/.test(l)).join(', '));
   check('в sitemap и robots.txt нет относительных адресов',
     locs.every((l) => l.startsWith('https://')) && /Sitemap: https:\/\//.test(robots));
 
@@ -15187,6 +15195,281 @@ console.log('\nAS. Управление чужими объявлениями');
     (await local.closeAccountOffer(ad.id, true)).accountSoldAt instanceof Date);
   check('и тема остаётся со своими ответами: снятие — не удаление',
     (await local.listPosts({})).posts.some((p) => p.id === ad.id));
+}
+
+/* ── AT. Статьи справочника — отдельными файлами под индексацию ────────────
+
+   До этого захода робот видел один документ на весь сайт: разделы открываются
+   фрагментом адреса, а фрагмент серверу не передаётся. Справочник — единственное
+   место сайта, где тексты можно отдать настоящими файлами: данных у них нет,
+   поэтому страница гайда собирается тем же renderHandbook, которым вкладка
+   рисуется в приложении, и лежит в репозитории
+   (scripts/build-handbook-pages.mjs).
+
+   Отсюда три конкретных риска, и все три проверяются ниже.
+
+   Разъезд. Опубликованная страница сама не пересобирается: правил дерево или
+   рендерер и не запустил сборку — в выдаче остался прошлый текст, и человек
+   придёт читать правило, которого в игре уже нет. Поэтому проверку не интересует
+   «похоже ли»: документы пересобираются в памяти и сверяются строка со строкой,
+   включая ?v= у стилей.
+
+   Битый путь. Такие файлы отдаются как есть — ни сборки, ни серверных правил,
+   никто непроверенный адрес не перехватит. Ссылка, оставшаяся во фрагменте, на
+   документе без маршрутизатора не ведёт никуда, и человек увидит молчание.
+
+   Зеркало. GitHub Pages раздаёт сайт из подпапки, поэтому корне-абсолютный путь
+   («href="/src/..."») ломает только зеркало: на основном адресе он выглядит
+   здоровым, и глазом расхождение не поймать.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAT. Статьи отдельными страницами');
+{
+  const { readFile, readdir } = await import('node:fs/promises');
+  const ppath = await import('node:path');
+  const gen = await import('../scripts/build-handbook-pages.mjs');
+  const { HANDBOOK } = await import('../src/handbook/guides.js');
+  const indexHtml = await readFile('index.html', 'utf8');
+  const origin = new URL(indexHtml.match(/rel="canonical" href="([^"]+)"/)[1]).origin;
+  const { pages } = await gen.buildAll();
+
+  check(`документов ровно по одному на узел дерева плюс оглавление (${pages.length})`,
+    pages.length === HANDBOOK.length + 1,
+    `узлов в дереве ${HANDBOOK.length}, документов ${pages.length}`);
+
+  const oddIds = HANDBOOK.filter((g) => !/^[a-z0-9_]+$/.test(g.id)).map((g) => g.id);
+  check('каждый узел адресуется без кодировки пути',
+    oddIds.length === 0, oddIds.join(', '));
+  const dupIds = HANDBOOK.map((g) => g.id).filter((id, i, all) => all.indexOf(id) !== i);
+  check('два узла не спорят за один адрес', dupIds.length === 0, dupIds.join(', '));
+
+  /*
+    Побайтная сверка — единственная проверка, которая ловит «забыли собрать».
+    Сравнение строк, а не длины: разъехаться может один знак в правиле, и он
+    ровно тот знак, ради которого человек шёл по ссылке из поиска.
+
+    Кроме переводов строки. Их в этом репозитории никто не контролирует (файлов
+    с настройками переноса нет), и редактор, сохраняющий документ, меняет
+    \r\n на \n или наоборот, не тронув ни одного слова правила. Проверка обязана
+    падать на устаревшем тексте, а не на форме переноса.
+  */
+  const eol = (s) => s.replace(/\r\n/g, '\n');
+  const stale = [];
+  for (const p of pages) {
+    let published = null;
+    try {
+      published = await readFile(p.file, 'utf8');
+    } catch (_) {
+      stale.push(`${p.file} — файла нет на диске`);
+      continue;
+    }
+    if (eol(published) !== eol(p.html)) {
+      stale.push(`${p.file} — расходится с тем, что рисует код`);
+    }
+  }
+  check('опубликованные страницы совпадают с кодом с точностью до переноса строки',
+    stale.length === 0, `${stale.length} шт.: ${stale.slice(0, 4).join(', ')}`);
+
+  /*
+    Обратная сторона: убрал раздел из дерева — а файл остался лежать и
+    выдаваться по старому адресу. Он не сломан, он мёртв, и именно такие
+    страницы потом конкурируют в выдаче с живыми.
+  */
+  const published = (await readdir(gen.DIR, { recursive: true }))
+    .map((f) => `${gen.DIR}/${String(f).split(ppath.sep).join('/')}`)
+    .filter((f) => f.endsWith('index.html'));
+  const expectedFiles = new Set(pages.map((p) => p.file));
+  const ghosts = published.filter((f) => !expectedFiles.has(f));
+  check('в каталоге нет страниц, которых больше нет в дереве',
+    ghosts.length === 0, ghosts.slice(0, 5).join(', '));
+
+  const sitemap = await readFile('sitemap.xml', 'utf8');
+  check('sitemap.xml собран из текущего списка страниц', eol(sitemap) === eol(gen.sitemapXml(pages, origin)));
+  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  check(`в sitemap адресов столько же, сколько документов (${locs.length})`,
+    locs.length === pages.length + 1, `страниц ${pages.length}, адресов ${locs.length}`);
+  check('каждый адрес sitemap кончается слешем — как каталог со страницей',
+    locs.every((u) => u.endsWith('/')),
+    locs.filter((u) => !u.endsWith('/')).slice(0, 3).join(', '));
+
+  /*
+    Адрес из sitemap робот читает как обещание: «здесь есть страница». Пустой
+    ответ по этому адресу стоит сайту доверия ко всему списку, поэтому
+    проверяется файл на диске, а не строка в XML.
+  */
+  const deadLocs = [];
+  for (const u of locs) {
+    const rel = u.slice(origin.length).replace(/^\//, '');
+    const target = rel === '' ? 'index.html' : `${rel}index.html`;
+    try {
+      await readFile(target);
+    } catch (_) {
+      deadLocs.push(u);
+    }
+  }
+  check('каждый адрес из sitemap — существующий файл',
+    deadLocs.length === 0, deadLocs.slice(0, 5).join(', '));
+
+  /*
+    Обход всех документов одним проходом: ниже десять инвариантов, и каждый
+    должен быть выполнен на всех страницах сразу. Отдельная проверка на каждую
+    страницу дала бы шестьсот строк вывода, а ловить надо не «упала одна из
+    шестидесяти», а «сломалось правило, и вот где именно».
+  */
+  const broken = {
+    h1: [], url: [], desc: [], ld: [], frag: [], abs: [],
+    module: [], app: [], links: [], date: [],
+  };
+  const seenTitles = new Set();
+  const dupTitles = [];
+
+  for (const p of pages) {
+    const dir = ppath.posix.dirname(p.file);
+    const id = dir === gen.DIR ? '' : dir.slice(gen.DIR.length + 1);
+    const html = p.html;
+
+    if ((html.match(/<h1(\s|>)/g) || []).length !== 1) broken.h1.push(dir);
+
+    const canon = (html.match(/rel="canonical" href="([^"]+)"/) || [])[1];
+    const ogUrl = (html.match(/property="og:url" content="([^"]+)"/) || [])[1];
+    if (canon !== p.url || ogUrl !== p.url) broken.url.push(`${dir}: ${canon}`);
+
+    const desc = (html.match(/name="description" content="([^"]*)"/) || [])[1] || '';
+    if (!desc.trim() || desc.length > 158) broken.desc.push(`${dir}: длина ${desc.length}`);
+
+    try {
+      const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+      if (ld.url !== canon) broken.ld.push(`${dir}: url не совпал с canonical`);
+    } catch (err) {
+      broken.ld.push(`${dir}: ${err.message}`);
+    }
+
+    /*
+      Fragment-ссылка на собранной странице — это обещание маршрутизатора,
+      которого в документе нет: клик никуда не денет человека с места.
+    */
+    if (/href="#\//.test(html)) broken.frag.push(dir);
+    if (/(?:href|src)="\/[^/]/.test(html)) broken.abs.push(dir);
+    if (/<script[^>]+type="module"/.test(html)) broken.module.push(dir);
+
+    /*
+      Даты публикации у перенесённых правил игры нет, и выдуманная читалась бы
+      поисковиком как свежесть текста.
+    */
+    if (/datePublished/.test(html)) broken.date.push(dir);
+
+    /* Дорога из статьи в живое приложение: без неё страница-сирота. */
+    if (!html.includes(id ? `#/handbook/${id}` : '#/guides')) broken.app.push(dir);
+
+    for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
+      const raw = m[1];
+      if (/^(?:https?:|mailto:|data:|#)/.test(raw)) continue;
+      const bare = raw.split('#')[0].split('?')[0];
+      if (!bare) continue;
+      const target = ppath.posix.normalize(ppath.posix.join(dir, bare));
+      if (target.startsWith('..')) {
+        broken.links.push(`${dir}: ${raw} — за краем сайта`);
+        continue;
+      }
+      const file = bare.endsWith('/') ? `${target}/index.html` : target;
+      try {
+        await readFile(file);
+      } catch (_) {
+        broken.links.push(`${dir}: ${raw}`);
+      }
+    }
+
+    const title = (html.match(/<title>([^<]*)<\/title>/) || [])[1] || '';
+    if (seenTitles.has(title)) dupTitles.push(`${dir}: ${title}`);
+    else seenTitles.add(title);
+  }
+
+  const report = (list) => `${list.length} шт.: ${list.slice(0, 4).join(' | ')}`;
+  check('на каждой статье ровно один H1', broken.h1.length === 0, report(broken.h1));
+  check('canonical и og:url каждой страницы — её собственный адрес',
+    broken.url.length === 0, report(broken.url));
+  check('у каждой страницы непустое описание не длиннее 158 знаков',
+    broken.desc.length === 0, report(broken.desc));
+  check('машинное описание каждой страницы читается и согласно адресу',
+    broken.ld.length === 0, report(broken.ld));
+  check('ни одной ссылки, оставшейся во фрагменте адреса',
+    broken.frag.length === 0, report(broken.frag));
+  check('ни одного корне-абсолютного пути — зеркало в подпапке',
+    broken.abs.length === 0, report(broken.abs));
+  check('в статьях нет модулей приложения',
+    broken.module.length === 0, report(broken.module));
+  check('выдуманной даты публикации нигде нет',
+    broken.date.length === 0, report(broken.date));
+  check('каждая статья ведёт обратно в приложение',
+    broken.app.length === 0, report(broken.app));
+  check('каждая относительная ссылка и картинка ведёт в существующий файл',
+    broken.links.length === 0, report(broken.links));
+  check('заголовки вкладок не повторяются', dupTitles.length === 0, report(dupTitles));
+
+  /*
+    Оглавление — единственная страница, по которой робот обходит дерево. Гайд,
+    на который снаружи нет ссылки, существует, но остаётся недостижимым:
+    адрес-то рабочий, просто его никто не знает.
+  */
+  const bookPage = pages.find((p) => p.file === `${gen.DIR}/index.html`).html;
+  const orphans = HANDBOOK.map((g) => g.id).filter((nodeId) => !bookPage.includes(`href="${nodeId}/"`));
+  check('оглавление ведёт на каждый узел дерева',
+    orphans.length === 0, report(orphans));
+
+  /*
+    Шапка статьи ссылается на разделы приложения — и обязана ссылаться только на
+    те, что в маршрутах: адрес несуществующего раздела открывает пустоту, а
+    проверить это по одному файлу невозможно, только сверившись с ROUTES.
+  */
+  const mainJs = await readFile('src/main.js', 'utf8');
+  const routesStart = mainJs.indexOf('const ROUTES = [');
+  const routesBlock = mainJs.slice(routesStart, mainJs.indexOf('\n];', routesStart));
+  const navHtml = /<nav class="hb-sitenav"[^>]*>([\s\S]*?)<\/nav>/.exec(bookPage)[1];
+  const navIds = [...navHtml.matchAll(/#\/([a-z]+)/g)].map((m) => m[1]);
+  const lostNav = navIds.filter((navId) => !routesBlock.includes(`id: '${navId}'`));
+  check('ссылки шапки статей ведут на существующие разделы',
+    navIds.length >= 5 && lostNav.length === 0,
+    lostNav.length ? `нет таких маршрутов: ${lostNav.join(', ')}` : `ссылок: ${navIds.length}`);
+
+  /*
+    Стили статья берёт у страницы приложения, а не у себя: отдельный список
+    файлов разъехался бы с настоящим в ту же неделю, когда появился первый.
+  */
+  const hbCss = await readFile('src/handbook.css', 'utf8');
+  const cssTags = [...indexHtml.matchAll(/<link rel="stylesheet" href="\.\/(src\/[^"]+\.css(?:\?v=\d+)?)"/g)].map((m) => m[1]);
+  const bareCss = cssTags.map((href) => href.split('?')[0]);
+  const dress = pages.filter((p) => !bareCss.every((href) => p.html.includes(href)));
+  check('каждая статья одета во все слои стилей сайта',
+    dress.length === 0, report(dress.map((p) => p.file)));
+  const dressVersion = pages.filter((p) => !cssTags.every((href) => p.html.includes(href)));
+  check('статьи ссылаются на стили теми же версиями, что и страница',
+    dressVersion.length === 0,
+    report(dressVersion.slice(0, 2).map((p) => p.file)));
+  check('классы сборных страниц описаны в стилях справочника',
+    ['hb-sitenav', 'hb-catalog', 'hb-crumbs', 'hb-tile'].every((cls) => hbCss.includes(`.${cls}`)),
+    ['hb-sitenav', 'hb-catalog', 'hb-crumbs', 'hb-tile'].filter((cls) => !hbCss.includes(`.${cls}`)).join(', '));
+
+  /*
+    Домен зашит ровно в трёх файлах страницы (см. docs/HOSTING.md), и генератор
+    не должен становиться четвёртым: при переезде адреса он обязан прочитать его
+    из index.html, иначе шестьдесят статей останутся на старом домене в
+    canonical, og:url и sitemap — а это не опечатка, это две копии сайта.
+  */
+  const genSrc = await readFile('scripts/build-handbook-pages.mjs', 'utf8');
+  check('генератор не знает домена: берёт его из index.html',
+    !/zroutehub/.test(genSrc) && /rel="canonical" href=/.test(genSrc));
+
+  /*
+    Кода, который переписывал бы путь статьи на маршрут приложения, здесь нет
+    нарочно, и это не забытая деталь, а проверенный отказ. Такой мост казался
+    нужным по одной причине: без связи воркер отдаёт оболочку на любой переход.
+    Но по адресу статьи оболочка всё равно не запустилась бы — её относительный
+    путь до main.js ведёт в /handbook/src/, которого нет, — и до кода моста дело
+    не доходит. Мёртвая страховка дороже отсутствия страховки: она читается как
+    решённая задача.
+
+    Связь между документом и приложением при этом есть, и она одна: ссылка
+    «открыть в приложении» под текстом. Проверяется она выше.
+  */
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────
