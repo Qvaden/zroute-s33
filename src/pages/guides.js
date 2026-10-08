@@ -4,6 +4,7 @@
  * Чистый рендер от состояния. Поведение — в src/forum/guides.js.
  */
 import { esc } from '../ui/helpers.js';
+import { skWithCaption } from '../ui/skeleton.js';
 import { postBody } from '../forum/format.js';
 import { slaLevel, SLA_LABELS } from '../forum/sla.js';
 import { renderMdBar } from './forum.js';
@@ -142,7 +143,13 @@ function renderList(s) {
           </li>`
         )
         .join('')}</ul>`
-    : `<p class="muted">${emptyHint(s)}</p>`;
+    /*
+      Пока список не прочитан, «Гайдов пока нет» соврёт и через секунду
+      смениется полным списком: вместо сказки — контур карточек.
+    */
+    : s.loading
+      ? skWithCaption('Читаем гайды…', 'row', 6)
+      : `<p class="muted">${emptyHint(s)}</p>`;
 
   return `
     <section class="panel guides-page">

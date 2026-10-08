@@ -231,11 +231,23 @@ function paintMessages({ stick = false } = {}) {
   if (sentinel && state._scrollObserver) state._scrollObserver.observe(sentinel);
 }
 
-/** Точечная перерисовка списка чатов (счётчики непрочитанного). */
+/**
+ * Точечная перерисовка списка чатов (счётчики непрочитанного).
+ *
+ * Опрос списка идёт каждые 15 секунд, а ответ почти всегда прежний: строки
+ * перестилались на пустом месте, и человек, который уже выбирал чат, видел
+ * подмигивание. Совпала строка — значит экран и так правильный.
+ */
+let lastListPainted = '';
+
 function paintList() {
-  if (!host) return;
+  if (!host) { lastListPainted = ''; return; }
   const area = host.querySelector('[data-chat-list-area]');
-  if (area) area.innerHTML = renderChatList(state);
+  if (!area) return;
+  const html = renderChatList(state);
+  if (html === lastListPainted) return;
+  lastListPainted = html;
+  area.innerHTML = html;
 }
 
 /**
@@ -1650,6 +1662,8 @@ function wire() {
 
 export async function mountChats(container, param = null) {
   host = container;
+  /* Новый монтаж: контейнер свежий, прошлая строка ничего не доказывает. */
+  lastListPainted = '';
   token++;
   wire();
   watchHead();

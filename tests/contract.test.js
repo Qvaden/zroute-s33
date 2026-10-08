@@ -14645,6 +14645,164 @@ console.log('\nAP. Доступность');
     /screen !== lastAnnouncedRoute/.test(mainJs) && /const screen = `\$\{id\}\/\$\{param \|\| ''\}`/.test(mainJs));
 }
 
+/* ── AQ. Стабильность кадра: пока грузится, страница не дёргается ───────────
+
+   Заход 5 собран про движение, а движение глазами не проверяется: «сайт
+   дёргается, когда что-то грузится» человек видит, а код — нет. Механизмов
+   было три, и все три живут в разных файлах, поэтому проверка здесь одна на
+   каждый механизм, а не по одной на вкладку.
+
+   Первый — пустое место. Живая вкладка красит страницу до ответа базы: пока
+   ответа нет — одна строчка, с ответом — список в двести строк. Подвал
+   подскакивает, шапка пересчитывается. Лекарство: контур (.sk) теми же
+   рамками, что настоящие карточки, плюс минимальная высота #app.
+
+   Второй — полоса прокрутки в 10 px, которая появляется ровно в момент,
+   когда документ пересекает высоту окна: центрование шапки сбивается.
+
+   Третий — перерисовка без перемены: минутный тик календаря и опрос списка
+   чатов писали в DOM тот же самый HTML, сбрасывая прокрутку, фокус с кнопки
+   и заставляя картинки вставать заново.
+
+   Порядок условий в первом пункте — самое хрупкое место: стоит переставить
+   `s.loading` ниже `!s.ready`, и контур перестанет существовать, а тесты
+   этого не заметят, если проверять только «в разметке есть .sk». Поэтому
+   ниже проверяется и то, что контур показан, и то, что старая строчка про
+   «ещё не подключён» в этот момент молчит.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAQ. Стабильность кадра');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { skeleton, skWithCaption } = await import('../src/ui/skeleton.js');
+  const { renderForum } = await import('../src/pages/forum.js');
+  const { renderUpdates } = await import('../src/pages/updates.js');
+  const { renderCalendar } = await import('../src/pages/calendar.js');
+  const { renderGuides } = await import('../src/pages/guides.js');
+  const { renderAccounts } = await import('../src/pages/accounts.js');
+  const { renderUserPage } = await import('../src/pages/user.js');
+  const refineCss = await readFile('src/refine.css', 'utf8');
+  const mainJs = await readFile('src/main.js', 'utf8');
+  const forumCalendar = await readFile('src/forum/calendar.js', 'utf8');
+  const forumChats = await readFile('src/forum/chats.js', 'utf8');
+
+  const cards = (html) => (html.match(/sk__card/g) || []).length;
+
+  /*
+    Контур обязан предшествовать ответу о подключении.
+
+    state.ready становится true только когда адаптер ответил, а первая
+    перерисовка случается в пути: если строка «форум ещё не подключён» стоит
+    раньше, человек видит её секунду, а потом страницу разворачивает на два
+    экрана — ровно то подмигивание, с которого начался заход.
+  */
+  const feedLoading = renderForum({ events: [], texts: [], alliances: [] },
+    { ready: false, loading: true, posts: [], total: 0 });
+  check('лента ждёт контуром постов, а не пустотой',
+    feedLoading.includes('sk sk--post') && cards(feedLoading) === 4
+      && feedLoading.includes('Загружаем ленту…'));
+  const updatesLoading = renderUpdates({
+    ready: false, shared: true, me: null, canManage: false, notes: [],
+    loading: true, error: '', composing: false,
+  });
+  const updatesIdle = renderUpdates({ ...updatesLoading, loading: false });
+  check('заметки обновлений: контур вместо сказки про подключение',
+    updatesLoading.includes('sk sk--card') && cards(updatesLoading) === 7
+      && !updatesLoading.includes('Форум ещё не подключён')
+      && updatesIdle.includes('Форум ещё не подключён'));
+  const calendarLoading = renderCalendar({
+    ready: false, shared: true, sourceName: 'supabase', me: null,
+    loading: true, error: '', view: 'next', events: [],
+  });
+  check('календарь: контур двух дней, а не полоска на две строки',
+    calendarLoading.includes('sk sk--card') && cards(calendarLoading) === 2
+      && !calendarLoading.includes('Форум ещё не подключён')
+      && renderCalendar({ ...calendarLoading, loading: false })
+        .includes('Форум ещё не подключён'));
+  const guidesLoading = renderGuides({
+    guides: [], category: 'all', query: '', composing: false,
+    loading: true, me: null, selected: null,
+  });
+  check('гайды во время чтения не врут про пустоту',
+    guidesLoading.includes('sk sk--row') && !guidesLoading.includes('Гайдов пока нет')
+      && renderGuides({ ...guidesLoading, loading: false }).includes('Гайдов пока нет'));
+  const accountsLoading = renderAccounts({
+    ready: false, loading: true, posts: [], me: null, canManage: false,
+    query: '', sort: 'new', showSold: false, composing: false, editing: null, error: '',
+  });
+  check('доска аккаунтов резервирует шесть плиток',
+    accountsLoading.includes('sk sk--tile') && cards(accountsLoading) === 6);
+  check('страница участника ждёт контуром профиля',
+    renderUserPage({ loading: true }).includes('sk sk--post'));
+
+  /*
+    Контур — декорация, а не содержимое.
+
+    Рамки читаются программой экрана как набор пустых блоков, и читатель
+    начал бы пересчитывать их вслух перед каждой подписью. Поэтому
+    aria-hidden на контейнере, а подпись живёт снаружи: её человек слышит.
+  */
+  check('контур спрятан от программы экрана, подпись — нет',
+    skeleton('post', 2).includes('aria-hidden="true"') && cards(skeleton('post', 2)) === 2
+      && skWithCaption('Тест…', 'row', 1).indexOf('<p class="sk__caption">Тест…</p>') === 0);
+
+  /*
+    Рамка картинки обязана существовать до пикселей.
+
+    Одиночный скриншот в ленте без заданной высоты вырастает из нуля в 320 px
+    в тот момент, когда файл доехал, и пост под ним раздвигается. Пока heights
+    не было, это давало самый крупный сдвиг на живой странице.
+  */
+  check('рамка одиночного скриншота задана до загрузки',
+    /\.forum-shots:not\(\.forum-shots--multi\) img \{ aspect-ratio: 16 \/ 9; \}/.test(refineCss));
+
+  /*
+    Высота окна и полоса прокрутки.
+
+    10 px, которые отнимает появившаяся полоса, пересчитывают центрование
+    шапки; min-height #app держит подвал на месте, пока данных нет. У чата
+    резерв убирается: у него собственный мессенджерский рост, и минимальная
+    высота расколола бы окно пополам.
+  */
+  check('полоса прокрутки зарезервирована, а не появляется',
+    /html \{ scrollbar-gutter: stable; \}/.test(refineCss));
+  check('страница с первого кадра занимает окно целиком',
+    /--page-chrome: 110px/.test(refineCss)
+      && /#app \{\s*min-height: calc\(100vh - var\(--page-chrome\)\);\s*min-height: calc\(100dvh - var\(--page-chrome\)\);/.test(refineCss));
+  check('чат остаётся со своей высотой',
+    /body:has\(\.chat-layout\) #app \{ min-height: 0; \}/.test(refineCss));
+  check('контур не удваивает ожидание бегущими точками',
+    /\.loading:has\(\.sk\) \{ padding: 0; text-align: left; \}/.test(refineCss)
+      && /\.loading:has\(\.sk\)::after \{ content: none; animation: none; \}/.test(refineCss));
+  check('мерцание уходит при сниженном движении',
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.sk__ava, \.sk__line \{ animation: none; \}/.test(refineCss));
+
+  /*
+    Перерисовка без перемены обязана молчать.
+
+    Календарь тикает раз в минуту, чтобы строчка «через 40 мин» не врлась, а
+    список чатов опрашивается каждые 15 секунд. Оба писали в DOM тот же HTML:
+    прокрутка сбрасывалась, фокус с кнопки, на которую человек уже целится,
+    снимался, а картинки вставали заново. Страж сравнивает строку; главное —
+    не забыть его обнулить при новом монтаже, иначе первая отрисовка
+    свежего контейнера молча пропустится.
+  */
+  check('календарь не перерисовывает то же самое',
+    /if \(html === lastPainted\) return;/.test(forumCalendar)
+      && /lastPainted = '';/.test(forumCalendar.match(/function mountCalendar[\s\S]*?\n\}/)?.[0] || ''));
+  check('список чатов не перерисовывает то же самое',
+    /if \(html === lastListPainted\) return;/.test(forumChats)
+      && /lastListPainted = '';/.test(forumChats.match(/function mountChats[\s\S]*?\n\}/)?.[0] || ''));
+  check('плашка президента молчит, пока строчка та же',
+    /if \(line === presidentBoardLine\) return;/.test(mainJs));
+  /*
+     Стартовый экран живого раздела остаётся пустым намеренно: форум красит
+     себя сам, и контур над ним был бы вторым ожиданием. Контур нужен
+     статическим разделам, которые ждут данные рейтинга.
+  */
+  check('первый кадр сайта — контур для статики, пустота для живого',
+    /app\.innerHTML = liveFirst \? '' : `/.test(mainJs));
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

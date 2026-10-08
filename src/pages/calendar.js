@@ -20,6 +20,7 @@
  * смотрит.
  */
 import { esc, plural } from '../ui/helpers.js';
+import { skWithCaption } from '../ui/skeleton.js';
 import { categoryLabel, EVENT_RSVP, EVENT_TAG_ID } from '../forum/rules.js';
 import { canModerateServer } from '../forum/server-rights.js';
 import {
@@ -323,10 +324,14 @@ export function renderCalendar(s) {
 
       <nav class="cal-tabs" aria-label="Виды календаря">${tabs}</nav>
 
-      ${!s.ready
-        ? '<p class="cal-none">Форум ещё не подключён — календарь появится вместе с ним.</p>'
-        : s.loading
-          ? '<p class="cal-none">Загружаем встречи…</p>'
+      ${/*
+        Ожидание идёт раньше строки про подключение: на первой перерисовке
+        ответ о подключении ещё не пришёл, а полоска «календарь появится
+        вместе с ним» через секунду разрасталась до нескольких экранов.
+      */ s.loading
+        ? skWithCaption('Загружаем встречи…', 'card', 2)
+        : !s.ready
+          ? '<p class="cal-none">Форум ещё не подключён — календарь появится вместе с ним.</p>'
           : s.error
             ? `<p class="cal-none">Календарь не открылся: ${esc(s.error)}</p>
                ${migrationHint(s.error) ? `<p class="cal-none cal-none--sql">${esc(migrationHint(s.error))}</p>` : ''}`

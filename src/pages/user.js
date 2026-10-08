@@ -13,6 +13,7 @@
  * в forum/mount.js, как и у ленты.
  */
 import { esc, pluralWord, plural } from '../ui/helpers.js';
+import { skWithCaption } from '../ui/skeleton.js';
 import { excerpt, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { roleBadge, roleLabel, verifiedBadge, serverBadge } from '../forum/roles.js';
 import { serverChangeHint } from '../forum/rules.js';
@@ -41,7 +42,7 @@ import { levelOf, progressOf, achievementsOf, doneCount, reputationOf, reputatio
 export function renderUserPage(state = {}) {
   const { profile, posts = [], activity = null, me, editing = false, loading = false, error = '', nick = '', history = null } = state;
 
-  if (loading) return '<div class="loading">Открываем профиль…</div>';
+  if (loading) return `<div class="loading">${skWithCaption('Открываем профиль…', 'post', 3)}</div>`;
 
   if (error) {
     return `<section class="panel error">

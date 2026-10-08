@@ -31,6 +31,7 @@
  * фида, и обход видит «это уже решено убрать».
  */
 import { esc, pluralWord } from '../ui/helpers.js';
+import { skWithCaption } from '../ui/skeleton.js';
 import { UPDATE_KINDS, updateKindLabel } from '../forum/rules.js';
 import { pickStoreEvents } from '../forum/feed.js';
 import { localInputValue } from '../forum/event-format.js';
@@ -314,10 +315,16 @@ export function renderUpdates(s) {
   const notes = Array.isArray(s.notes) ? s.notes : [];
   const lim = CONFIG.forum.limits;
 
-  const body = !s.ready
-    ? '<p class="upd-none">Форум ещё не подключён — список появится вместе с ним.</p>'
-    : s.loading
-      ? '<p class="upd-none">Загружаем заметки…</p>'
+  /*
+    Ожидание идёт раньше сказки про подключение: первая перерисовка случается
+    до ответа на вопрос, подключён ли форум вовсе, и честнее показать контур
+    списка, чем строку «форум ещё не подключён», которая через секунду
+    сменилась бы двумя экранами заметок.
+  */
+  const body = s.loading
+    ? skWithCaption('Загружаем заметки…', 'card', 7)
+    : !s.ready
+      ? '<p class="upd-none">Форум ещё не подключён — список появится вместе с ним.</p>'
       : s.error
         ? `<p class="upd-none">Список не открылся: ${esc(s.error)}</p>
            ${migrationHint(s.error) ? `<p class="upd-none">${esc(migrationHint(s.error))}</p>` : ''}`

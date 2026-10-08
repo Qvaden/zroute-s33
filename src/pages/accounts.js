@@ -38,6 +38,7 @@
  * история ответов, и второй вход в ту же политику витрине не нужен.
  */
 import { esc, pluralWord } from '../ui/helpers.js';
+import { skWithCaption } from '../ui/skeleton.js';
 import { serverBadge } from '../forum/roles.js';
 import { renderMdBar, renderAttachRow } from './forum.js';
 import { CONFIG } from '../../config.js';
@@ -371,7 +372,7 @@ export function renderAccounts(s) {
       ${s.error ? `<p class="accounts-error">${esc(s.error)}</p>` : ''}
 
       ${s.loading && !s.posts.length
-        ? '<p class="muted">Читаем доску…</p>'
+        ? skWithCaption('Читаем доску…', 'tile', 6)
         : shown.length
           ? `<div class="accounts-grid">${shown.map((p) => renderAccountCard(p, mine(p))).join('')}</div>`
           : `<div class="accounts-empty">

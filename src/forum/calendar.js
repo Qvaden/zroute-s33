@@ -64,9 +64,21 @@ function writeView() {
   if (location.hash !== hash) history.replaceState(null, '', hash);
 }
 
+/*
+  Последняя отрисованная строка: минутный тик обязан молчать, пока цифры на
+  экране честные. Полная перерисовка без перемены слов сбрасывала прокрутку,
+  снимала фокус с кнопки, на которую человек уже целится, и заставляла
+  картинки вставать заново — подмигивание там, где за минуту не поменялась
+  ни одна буква.
+*/
+let lastPainted = '';
+
 function paint() {
   if (!host) return;
-  host.innerHTML = renderCalendar(state);
+  const html = renderCalendar(state);
+  if (html === lastPainted) return;
+  lastPainted = html;
+  host.innerHTML = html;
 }
 
 /**
@@ -265,6 +277,8 @@ export async function mountCalendar(container, search = '') {
   mountToken++;
   readView(search);
   state.loading = true;
+  /* Рамка нового монтажа пуста, и прошлая строка здесь не аргумент. */
+  lastPainted = '';
   paint();
   wire();
   await load();

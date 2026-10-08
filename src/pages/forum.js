@@ -20,6 +20,7 @@
  * страниц, и по той же причине: чистую разметку можно проверить без браузера.
  */
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
+import { skWithCaption } from '../ui/skeleton.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
@@ -2057,6 +2058,15 @@ function renderShots(item) {
 /* ── Лента ────────────────────────────────────────────────────────────────── */
 
 function renderFeed(s) {
+  /*
+    Контур ленты стоит до ответа на вопрос, подключён ли форум: первая
+    перерисовка случается в пути, а пустое место под шапкой потом разрасталось
+    на два экрана — и подвал, и шапка подскакивали на глазах.
+  */
+  if (s.loading) {
+    return `<div class="loading" data-forum-loading>${skWithCaption('Загружаем ленту…', 'post', 4)}</div>`;
+  }
+
   if (!s.ready) return '';
 
   if (s.error && !s.posts?.length) {
@@ -2065,10 +2075,6 @@ function renderFeed(s) {
       <p>${esc(s.error)}</p>
       <button type="button" class="forum-btn" data-forum-retry>Попробовать снова</button>
     </section>`;
-  }
-
-  if (s.loading) {
-    return '<div class="loading" data-forum-loading>Загружаем ленту…</div>';
   }
 
   if (!s.error && !s.posts.some((p) => !p.deleted)) {

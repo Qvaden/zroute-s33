@@ -20,6 +20,7 @@ import { renderAbout } from './pages/about.js';
 import { renderAlliance } from './pages/alliance.js';
 import { computeAchievements } from './logic/achievements.js';
 import { esc } from './ui/helpers.js';
+import { skWithCaption } from './ui/skeleton.js';
 import { presidentBoardFromTexts } from './logic/president-board.js';
 import { startQuarterTimer } from './ui/quarter-timer.js';
 // Побочные импорты: вешают делегированные обработчики фильтров на страницах.
@@ -503,11 +504,18 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   applyTheme(next);
 });
 
+/*
+  Последняя строка плашки. Нужна ровно для одного: не перерисовывать рамку,
+  пока слова не изменились. Вызов идёт на каждой смене раздела, а с каждой
+  перерисовкой заново запускались бегущая строка и пульс — глаз дёргался без
+  повода, пока человек просто ходил по вкладкам.
+*/
+let presidentBoardLine = null;
+
 function renderPresidentBoard(texts = []) {
   if (!presidentBoard) return;
   const board = presidentBoardFromTexts(texts);
-  presidentBoard.hidden = !board.enabled;
-  presidentBoard.innerHTML = board.enabled ? `
+  const line = board.enabled ? `
     <div class="president-board__head">
       <span class="president-board__signal" aria-hidden="true"></span>
       <span class="president-board__label">${esc(board.label)}</span>
@@ -519,6 +527,10 @@ function renderPresidentBoard(texts = []) {
     </div>
     ${board.note ? `<small class="president-board__note">${esc(board.note)}</small>` : ''}
   ` : '';
+  if (line === presidentBoardLine) return;
+  presidentBoardLine = line;
+  presidentBoard.hidden = !board.enabled;
+  presidentBoard.innerHTML = line;
 }
 
 /*
@@ -709,7 +721,7 @@ function render() {
     unmountAccounts();
     unmountGuides();
     liveMountKey = null;
-    app.innerHTML = '<div class="loading">Загружаем справочник…</div>';
+    app.innerHTML = `<div class="loading">${skWithCaption('Загружаем справочник…', 'row', 6)}</div>`;
     loadGuidesTree()
       .then(render)
       .catch((err) => {
@@ -1141,7 +1153,7 @@ async function boot() {
   const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar'
     || id === 'updates' || id === 'accounts' || id === 'handbook' || (id === 'user' && param);
 
-  app.innerHTML = liveFirst ? '' : '<div class="loading">Загружаем данные…</div>';
+  app.innerHTML = liveFirst ? '' : `<div class="loading">${skWithCaption('Загружаем данные…', 'card', 7)}</div>`;
   if (liveFirst) {
     view = emptyView();
     render();
