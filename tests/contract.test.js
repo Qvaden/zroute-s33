@@ -14931,6 +14931,264 @@ console.log('\nAR. Написать продавцу');
     docsSrc.includes('Кнопки нет на своём объявлении, у гостя, под запретом писать'));
 }
 
+/* ── AS. Управление чужими объявлениями: владелец и модература ──────────
+
+   Доска давала распорядителю доски меньше, чем база. Политика
+   `forum_posts_moderate` и её черновой двойник `canModeratePost` открывают строку
+   автору и модератору ленты с самого первого шага, а кнопку «Аккаунт продан»
+   доска показывала только автору — модература ходила в ленту, где та же кнопка
+   уже была. Та же кнопка в двух местах с разными правилами — не право, а
+   лотерея: снятое «продано» объявление висело открытым, пока о нём не попросят.
+
+   Проверяем то, что легко потерять при правке:
+   - кнопка не создаёт власть и не прячет её от того, у кого она есть: круг
+     ровно тот же, что у ленты (`accountControl`), — автор, модератор этого
+     сервера, модература сайта;
+   - обычный игрок и гость кнопок не видят. Они видят отказ базы текстом, а
+     обещанный кнопкой отказ — ложь;
+   - действие модературы названо чужим: пунктир, подпись на кнопке и заголовок
+     формы правки. Без этого распорядитель сохраняет чужой состав и цену своими
+     словами;
+   - пунктир не двигает сетку (заход 5): рамка вместо второго ряда и вместо
+     подписанной строки под кнопками;
+   - правка чужого объявления не меняет его срок.
+
+   Порядок аргументов в `renderAccountCard(p, canManage, canDm, asModerator)` —
+   часть проверки: переставь местами, и чужая карточка получит кнопки автора без
+   пунктира, а проверка «в разметке есть data-accounts-edit» этого не заметит.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAS. Управление чужими объявлениями');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderAccounts, renderAccountCard } = await import('../src/pages/accounts.js');
+  const pageSrc = await readFile('src/pages/accounts.js', 'utf8');
+  const feedSrc = await readFile('src/pages/forum.js', 'utf8');
+  const behavSrc = await readFile('src/forum/accounts.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const supabaseSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const localSrc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const sqlSrc = await readFile('supabase/applied/20261001-server-rights.sql', 'utf8');
+  const rules = await import('../src/forum/rules.js');
+  const adsRule = rules.RULES.find((r) => r.id === 'ads');
+
+  const mk = (over) => ({
+    id: 'p1', authorId: 'u1', authorNick: 'Продавец', authorServer: 33, serverId: 33,
+    title: 'Аккаунт 40 лвл', body: '<p>текст</p>', category: 'ally', tags: ['accounts'],
+    createdAt: new Date(), expiresAt: new Date(Date.now() + 5 * 86400000).toISOString(),
+    commentCount: 2, accountOffer: 'уровень 40, техника сезона', accountPrice: '1500 ₽',
+    accountSoldAt: null, ...over,
+  });
+  const past = new Date(Date.now() - 86400000).toISOString();
+  const owner = { id: 'u0', nick: 'Владелица', role: 'admin' };
+  const siteMod = { id: 'u7', nick: 'Контролёр', role: 'moderator' };
+  const player = { id: 'u9', nick: 'Свидетель' };
+  const seller = { id: 'u1', nick: 'Продавец' };
+  const board = (me, posts = [mk({})], extra = {}) => renderAccounts({
+    ready: true, loading: false, posts, total: posts.length, more: false, error: '',
+    sort: 'fresh', showSold: true, me, composing: false, editing: null, query: '', ...extra,
+  });
+
+  /* ── Кто видит кнопки распорядителя ── */
+  check('владелец распоряжается чужим объявлением: правка и отметка о продаже',
+    board(owner).includes('data-accounts-edit="p1"') && board(owner).includes('data-accounts-close="p1"'));
+  check('модератор сайта — тем же правом и теми же кнопками',
+    board(siteMod).includes('data-accounts-edit="p1"') && board(siteMod).includes('data-accounts-close="p1"'));
+  check('обычный игрок и гость чужое объявление не снимают и не правят',
+    !board(player).includes('data-accounts-edit') && !board(player).includes('data-accounts-close')
+      && !board(null).includes('data-accounts-edit') && !board(null).includes('data-accounts-close'));
+  check('отказ распорядителя не отнимает право спросить: личная кнопка у игрока остаётся',
+    board(player).includes('data-accounts-dm="p1"'));
+  check('автор правит своё объявление без пунктира чужого действия',
+    board(seller).includes('data-accounts-edit="p1"') && !board(seller).includes('accounts-act--mod'));
+  check('чужое действие одето пунктиром, а своё — нет',
+    board(owner).includes('accounts-act accounts-act--mod') && board(owner).includes('data-accounts-edit'));
+
+  /* ── Модература ленты: роль берётся у того же сервера, что у темы ── */
+  check('модератор сервера распоряжается объявлениями своего сервера',
+    board(player, [mk({ serverId: 44 })], { serverRoles: { 44: 'moderator' } }).includes('data-accounts-close="p1"'));
+  check('участник и «none» кнопки не получают: право на ленту — не право на её строки',
+    !board(player, [mk({ serverId: 44 })], { serverRoles: { 44: 'member' } }).includes('data-accounts-edit')
+      && !board(player, [mk({ serverId: 44 })], { serverRoles: { 44: 'none' } }).includes('data-accounts-close'));
+  check('модератор 44-го не распоряжается объявлением 33-го: граница — сервер темы',
+    !board(player, [mk({ serverId: 33 })], { serverRoles: { 44: 'moderator' } }).includes('data-accounts-edit'));
+  check('без карты прав (миграции ещё нет) решает модерация сайта, а не пустота',
+    board(owner, [mk({ serverId: 44 })], { serverRoles: null }).includes('data-accounts-close')
+      && !board(player, [mk({ serverId: 44 })], { serverRoles: null }).includes('data-accounts-close'));
+
+  /* ── Снятое и просроченное объявление остаётся управляемым ── */
+  check('снятое объявление можно вернуть на доску, не уходя в ленту',
+    board(owner, [mk({ accountSoldAt: new Date() })]).includes('Вернуть на доску')
+      && board(owner, [mk({ accountSoldAt: new Date() })]).includes('data-accounts-sold="0"'));
+  check('просроченное объявление распорядитель правит, хотя ЛС с него уже нет',
+    board(owner, [mk({ expiresAt: past })]).includes('data-accounts-edit="p1"')
+      && !board(owner, [mk({ expiresAt: past })]).includes('data-accounts-dm'));
+
+  /* ── Ряд кнопок и сетка: заход 5 не ломается пунктиром ── */
+  const modRow = (cssSrc.match(/\.accounts-act--mod \{[^}]*\}/) || [''])[0];
+  check('пунктир меняет только рамку: ни высоты, ни полей, ни шрифта',
+    modRow === '.accounts-act--mod { border-style: dashed; }'
+      && !/height|padding|margin|font|min-height|display/.test(modRow));
+  check('второго ряда под карточкой нет: классы рядов общие для автора и модературы',
+    !/\.accounts-card__acts--/.test(cssSrc) && board(owner).includes('class="accounts-card__acts"'));
+  check('кнопки экранируются по id объявления, а не по нику автора',
+    renderAccountCard(mk({ id: 'p"<b>' }), true).includes('data-accounts-edit="p&quot;&lt;b&gt;"')
+      && renderAccountCard(mk({}), true).includes('data-accounts-close="p1"'));
+
+  /* ── Честные подписи: отметку ставит не только автор ── */
+  check('значок «Продано» не приписывает отметку автору: сайт не запоминает, кто её поставил',
+    renderAccountCard(mk({ accountSoldAt: new Date() }), true).includes('отметку ставят автор и модература'));
+  check('то же слово и в ленте: одна отметка — одна подпись на двух экранах',
+    feedSrc.includes('отметку ставят автор и модература'));
+  check('подсказка на чужой кнопке называет чужое объявление и его поля',
+    board(owner).includes('Поправить заголовок, состав, цену и срок чужого объявления')
+      && board(owner).includes('Снять чужое объявление с доски'));
+  check('своё объявление подписано своими словами, а не служебными',
+    board(seller).includes('Поправить своё объявление')
+      && board(seller).includes('Снять своё объявление с доски'));
+
+  /* ── Форма правки: чужая правка называется чужой и не трогает срок ──
+     Дата правки выбрана не круглой — 8 дней и 5 часов. Вариант «N дней от
+     сегодня» такую дату повторить не может, поэтому округление, из-за которого
+     правка и начала двигать чужой дедлайн, здесь видно сразу.
+  */
+  const seed = (over = {}) => ({
+    id: 'p1', title: 'Аккаунт 40 лвл', offer: 'уровень 40, техника сезона', price: '1500 ₽',
+    expiresAt: new Date(Date.now() + 8 * 86400000 + 5 * 3600000).toISOString(), ...over,
+  });
+  const editState = (me, over = {}) => board(me, [mk({})], { editing: seed(), ...over });
+  check('правка чужого объявления названа правкой чужого и помнит автора',
+    editState(owner).includes('Правка чужого объявления')
+      && editState(owner).includes('Автор остаётся Продавец'));
+  check('своя правка не притворяется служебной',
+    editState(seller).includes('Правка объявления') && !editState(seller).includes('чужого объявления'));
+  check('срок правки не сбрасывается: выбран «прежний срок» с настоящей датой, а не дни от сегодня',
+    /<option value="0" selected>Прежний срок — до \d/.test(editState(owner))
+      && !editState(owner).includes('<option value="7" selected>')
+      && editState(owner).includes('Срок остаётся прежний'));
+  check('новый срок остаётся в списке: продлить объявление можно тем же ящиком',
+    (editState(owner).match(/<option value="\d+"/g) || []).length ===
+      CONFIG.forum.limits.expiryChoices.length + 1);
+  check('просроченному объявлению сохранять нечего: форма предлагает новый срок',
+    !editState(owner, { editing: seed({ expiresAt: past }) }).includes('Прежний срок')
+      && editState(owner, { editing: seed({ expiresAt: past }) }).includes('<option value="7" selected>'));
+  check('черновик правки берёт дату темы, а не число дней',
+    /expiresAt: daysLeft\(post\.expiresAt\) > 0 \? post\.expiresAt : null/.test(behavSrc)
+      && !behavSrc.includes('expiresIn: daysLeft'));
+  check('поведение кладёт «прежний срок» в базу как отсутствие поля',
+    /expiresAt: value\.expiresAt === null \? undefined : value\.expiresAt/.test(behavSrc)
+      && /days > 0 \? new Date\(Date\.now\(\) \+ days \* 86400000\)\.toISOString\(\) : null/.test(behavSrc));
+  check('оба адаптера читают «поля нет» как «колонку не трогать»',
+    /patch\.expiresAt === undefined \? post\.expiresAt/.test(localSrc)
+      && supabaseSrc.includes('if (patch.expiresAt !== undefined)'));
+
+  /* ── Одно право на два экрана и ни одного нового правила в базе ── */
+  check('доска спрашивает то же право, что лента: один помощник на два экрана',
+    pageSrc.includes("import { canModerateServer } from '../forum/server-rights.js';")
+      && /const manages = \(p\) => mine\(p\) \|\| canModerateServer\(s, p\.serverId\);/.test(pageSrc)
+      && /function accountControl\(p, s\)[\s\S]{0,400}canModerateServer\(s, p\.serverId\)/.test(feedSrc));
+  check('право не выдумано клиентом: политика базы пускает модератора ленты',
+    /create policy forum_posts_moderate on public\.forum_posts\s*for update using \(public\.forum_can_moderate_server\(server_id\)\)/.test(sqlSrc));
+  check('боевой режим не заводит своей двери: строку правит тот, кого пустит RLS',
+    supabaseSrc.includes('Право на строку отдаёт RLS')
+      && /export async function closeAccountOffer[\s\S]{0,400}account_sold_at/.test(supabaseSrc)
+      && !/closeAccountOffer[\s\S]{0,400}author_id=eq/.test(supabaseSrc));
+  check('черновой режим впускает модературу ленты той же строкой, что и база',
+    (localSrc.match(/if \(!canModeratePost\(s, me, post\) && post\.authorId !== me\.id\) throw new Error\('Это не ваш пост'\);/g) || []).length >= 2
+      && behavSrc.includes('forum.closeAccountOffer(id, sold)'));
+
+  /* ── Тексты и документы ── */
+  check('правило доски называет модература тем, кто может снять и поправить',
+    adsRule.body.includes('модерация, которая может его снять или поправить'));
+  check('шапка модуля объясняет, почему кнопка видна модературе, а не только автору',
+    pageSrc.includes('ПОЧЕМУ ЭТИ ЖЕ ДЕЙСТВИЯ ВИДНЫ МОДЕРАТУРЕ')
+      && pageSrc.includes('это не право, а лотерея'));
+  check('документ называет круг распорядителей и ссылается на те же двери',
+    docsSrc.includes('на чужом объявлении кнопки распорядителя видны владельцу и модературе')
+      && docsSrc.includes('accountControl') && docsSrc.includes('forum_posts_moderate'));
+  check('документ честно пишет про перенос ряда на телефоне, а не прячет его',
+    docsSrc.includes('высота карточки у распорядителя на телефоне больше на 50 px'));
+
+  check('документ называет «прежний срок» и объясняет, почему правка дату не двигает',
+    docsSrc.includes('правка чужого объявления не передвигает его срок')
+      && docsSrc.includes('patch.expiresAt ===')
+      && docsSrc.includes('Снять срок совсем доска не умеет нарочно'));
+
+  /* ── Живой прогон в черновом режиме: права те же, что на базе ── */
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  store.set('zr33.forum.local', JSON.stringify({
+    servers: [
+      { id: 33, title: 'Дом', enabled: true, openWriting: true },
+      { id: 55, title: 'Чужой закрытый', enabled: true, openWriting: false },
+    ],
+  }));
+  const local = await import('../src/forum/adapters/local.js');
+  const rawAs = () => JSON.parse(store.get('zr33.forum.local'));
+  const says = async (fn) => { try { await fn(); return ''; } catch (e) { return String(e.message); } };
+  const offer = 'уровень 40, собрана техника сезона, 3 млн на складе';
+  const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString();
+
+  const ownerU = await local.signUp('Владелица доски');
+  const sellerU = await local.signUp('Продавец доски');
+  await local.signUp('Свидетель доски');
+  const stranger = await local.signUp('Модератор чужой ленты');
+
+  await local.signIn('Продавец доски');
+  const ad = await local.createPost({
+    title: 'Аккаунт 40 лвл', body: '<p>есть что продать</p>', category: 'ally', serverId: 33,
+    tags: ['accounts'], accountOffer: offer, accountPrice: 'торг', expiresAt: inDays(5),
+  });
+
+  await local.signIn('Владелица доски');
+  check('владелец снимает чужое объявление с доски',
+    (await local.closeAccountOffer(ad.id, true)).accountSoldAt instanceof Date);
+  check('и возвращает его тем же нажатием',
+    (await local.closeAccountOffer(ad.id, false)).accountSoldAt === null);
+  equal('правка чужого объявления одним шагом довозит обе части',
+    (await local.updateAccountAd(ad.id, { offer: 'уровень 45, собран гарнизон', price: '2000 ₽' })).accountPrice,
+    '2000 ₽');
+  /*
+    «Прежний срок» из формы доезжает до базы как отсутствие поля, а не как null:
+    null для доски — это «снять срок», чего база не принимает у объявления.
+    Проверка живая, потому что именно этот переход круглой датой не поймать.
+  */
+  equal('null в сроке правки база отвергает — поэтому правка шлёт отсутствие поля',
+    await says(() => local.updateAccountAd(ad.id, { offer, price: '1800 ₽', expiresAt: null })),
+    'У темы с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» должен быть срок действия — выберите, сколько дней она висит');
+  check('после отказа дата объявления осталась той же, что при создании',
+    new Date(rawAs().posts.find((p) => p.id === ad.id).expiresAt).getTime()
+      === new Date(ad.expiresAt).getTime());
+  check('кнопка не создаёт власть: автором строки остаётся продавец',
+    rawAs().posts.find((p) => p.id === ad.id).authorId === sellerU.id
+      && ownerU.nick === 'Владелица доски');
+
+  await local.signIn('Свидетель доски');
+  equal('обычный игрок получает тот же отказ, что и до кнопки',
+    await says(() => local.closeAccountOffer(ad.id, true)), 'Это не ваш пост');
+  equal('и чужой состав не правит',
+    await says(() => local.updateAccountAd(ad.id, { offer, price: '1000 ₽' })), 'Это не ваш пост');
+
+  await local.signIn('Владелица доски');
+  await local.setServerMember(stranger.id, 55, 'moderator');
+  await local.signIn('Модератор чужой ленты');
+  equal('модератор другой ленты не распоряжается этим объявлением',
+    await says(() => local.closeAccountOffer(ad.id, true)), 'Это не ваш пост');
+
+  await local.signIn('Владелица доски');
+  const witness = rawAs().users.find((u) => u.nick === 'Свидетель доски');
+  await local.setServerMember(witness.id, 33, 'moderator');
+  await local.signIn('Свидетель доски');
+  check('модератор этого сервера снимает чужое объявление — право было в базе с начала',
+    (await local.closeAccountOffer(ad.id, true)).accountSoldAt instanceof Date);
+  check('и тема остаётся со своими ответами: снятие — не удаление',
+    (await local.listPosts({})).posts.some((p) => p.id === ad.id));
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

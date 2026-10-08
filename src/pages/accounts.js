@@ -44,10 +44,26 @@
  * это через переход в ленту значило бы гнать человека за кнопку, которую он
  * видит рядом. Удаление и жалоба по-прежнему в теме: там модература, причина и
  * история ответов, и второй вход в ту же политику витрине не нужен.
+ *
+ * ПОЧЕМУ ЭТИ ЖЕ ДЕЙСТВИЯ ВИДНЫ МОДЕРАТУРЕ.
+ *
+ * База разрешает их модерации с самого начала — политика `forum_posts_moderate`
+ * открывает строку автору и модератору ленты, и черновой адаптер повторяет ровно
+ * это (`canModeratePost`). До этого шага право было, а кнопки на доске — нет:
+ * снятое «продано» объявление висело открытым, пока об этом не попросишь, и
+ * модература обходила доску через ленту, где кнопка уже есть (см.
+ * `accountControl` в `pages/forum.js`). Та же кнопка в двух местах с разными
+ * правилами — это не право, а лотерея.
+ *
+ * Кнопка при этом не создавает власть: модератор не становится автором
+ * объявления, ник автора и ссылка на его тему не меняются. Пунктирная рамка и
+ * подпись в форме правки говорят, что человек распоряжается чужим объявлением, —
+ * та же рамка, что отличает служебное действие от личного.
  */
 import { esc, pluralWord } from '../ui/helpers.js';
 import { skWithCaption } from '../ui/skeleton.js';
 import { serverBadge } from '../forum/roles.js';
+import { canModerateServer } from '../forum/server-rights.js';
 import { renderMdBar, renderAttachRow } from './forum.js';
 import { CONFIG } from '../../config.js';
 
@@ -111,11 +127,28 @@ function renderComposer(s) {
   const L = CONFIG.forum.limits;
   const editing = s.editing || null;
   const days = expiryChoices();
-  const chosen = Number(editing?.expiresIn ?? 0) || defaultExpiryDays();
+  /*
+    Срок правка не трогает молча. Объявлению осталось висеть три дня из семи, и
+    вариант «7 дней от сегодня» передвинул бы дату, которую человек не выбирал, —
+    на своём объявлении это досада, а на чужом, которое правит модература, уже
+    подвох автору. Поэтому у правки есть вариант «прежний срок»: он выбран сам,
+    называет настоящую дату, а поведение кладёт в базу «поля нет» — и строка
+    остаётся со своей датой. Просроченному объявлению сохранять нечего, и тогда
+    форма честно предлагает новый срок.
+  */
+  const keepDate = Boolean(editing?.expiresAt) && new Date(editing.expiresAt).getTime() > Date.now()
+    ? editing.expiresAt
+    : '';
+  const chosen = keepDate ? 0 : defaultExpiryDays();
   const shotScope = editing ? `ad:${editing.id}` : 'ad';
-  const already = editing
-    ? (s.posts.find((p) => p.id === editing.id)?.attachments?.length ?? 0)
-    : 0;
+  const edited = editing ? s.posts.find((p) => p.id === editing.id) : null;
+  const already = edited ? (edited.attachments?.length ?? 0) : 0;
+  /*
+    Правка чужого объявления называется правом чужого объявления, а не «ваша
+    правка»: форма та же, и подписать её словами автора нужно ровно затем, чтобы
+    распорядитель доски не сохранил чужой состав и цену как свои.
+  */
+  const foreign = Boolean(edited && s.me && edited.authorId !== s.me.id);
   const draft = {
     title: editing?.title ?? '',
     offer: editing?.offer ?? '',
@@ -124,8 +157,10 @@ function renderComposer(s) {
   return `
     <form class="accounts-composer" data-accounts-form>
       <div class="accounts-composer__head">
-        <b>${editing ? 'Правка объявления' : 'Новое объявление'}</b>
-        <span class="muted">Тема с меткой «Аккаунты» — торг и вопросы пишутся в её ответах.</span>
+        <b>${editing ? (foreign ? 'Правка чужого объявления' : 'Правка объявления') : 'Новое объявление'}</b>
+        <span class="muted">${foreign
+          ? `Автор остаётся ${esc(edited.authorNick)}: состав и цена — его слово, меняйте их только по договорённости с ним. Тема с ответами остаётся на месте.`
+          : 'Тема с меткой «Аккаунты» — торг и вопросы пишутся в её ответах.'}</span>
       </div>
 
       <div class="accounts-fields">
@@ -153,10 +188,13 @@ function renderComposer(s) {
         <label class="forum-field">
           <span>Актуально до</span>
           <select name="expires_in">
-            ${days.map((d) => `<option value="${d}"${d === chosen ? ' selected' : ''}>${d} ${
-              pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(Date.now() + d * 86400000))}</option>`).join('')}
+            ${keepDate ? `<option value="0" selected>Прежний срок — до ${esc(shortDate(keepDate))}</option>` : ''}${
+              days.map((d) => `<option value="${d}"${d === chosen ? ' selected' : ''}>${d} ${
+                pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(Date.now() + d * 86400000))}</option>`).join('')}
           </select>
-          <small class="muted">Срок обязателен: просроченное объявление снимается с витрины само.</small>
+          <small class="muted">${keepDate
+            ? 'Срок остаётся прежний: другой выбирают, только когда объявление нужно продлить. Просроченное снимается с витрины само.'
+            : 'Срок обязателен: просроченное объявление снимается с витрины само.'}</small>
         </label>
       </div>
 
@@ -337,15 +375,17 @@ export function dmOpening(p) {
  * честнее показать её с пометкой, чем заставлять человека гадать, куда делось
  * объявление, которое он помнит.
  *
- * Кнопки автора — снятие с доски и правка — только у владельца: модерируется
- * тема, а не витрина, и удаление с причиной по-прежнему живёт в теме.
+ * Кнопки на карточке распорядителя — снятие с доски и правка — видны автору и
+ * модературе ленты. Удаление с причиной и жалоба по-прежнему в теме: витрина не
+ * второй вход в ту же политику, а то же самое право, положенное тому, кто и так
+ * его имеет в базе.
  *
- * Ряд действий один на оба случая: у чужого объявления в нём «Написать
- * продавцу», у своего — свои кнопки. Второй ряд под тем же объявлением
+ * Ряд действий один на все случаи: у чужого объявления покупателю в нём «Написать
+ * продавцу», автору и модературе — свои кнопки. Второй ряд под тем же объявлением
  * означал бы, что карточка покупателя выше карточки автора, а доска сравнивает
  * цены глазами по строкам.
  */
-export function renderAccountCard(p, canManage = false, canDm = false) {
+export function renderAccountCard(p, canManage = false, canDm = false, asModerator = false) {
   const sold = Boolean(p.accountSoldAt);
   const expired = Boolean(p.expiresAt) && new Date(p.expiresAt).getTime() <= Date.now();
   const href = `#/forum/${esc(p.id)}`;
@@ -359,18 +399,29 @@ export function renderAccountCard(p, canManage = false, canDm = false) {
     ? `<button type="button" class="accounts-act accounts-act--dm" data-accounts-dm="${esc(p.id)}"
             title="Личное сообщение автору. Его видят только вы двое и модерация сайта.">✉ Написать продавцу</button>`
     : '';
+  /*
+    Действие модературы помечено пунктиром: ряд кнопок у автора, покупателя и
+    распорядителя доски один и тот же по высоте, поэтому рамка — единственная
+    метка, которая не двигает сетку и остаётся видна на телефоне, где подсказка
+    курсором недоступна.
+  */
+  const manage = canManage ? `
+          <button type="button" class="accounts-act${asModerator ? ' accounts-act--mod' : ''}"
+                  data-accounts-edit="${esc(p.id)}" title="${
+                    asModerator ? 'Поправить заголовок, состав, цену и срок чужого объявления' : 'Поправить своё объявление'}">Править</button>
+          <button type="button" class="accounts-act accounts-act--${sold ? 'return' : 'sold'}${asModerator ? ' accounts-act--mod' : ''}"
+                  data-accounts-close="${esc(p.id)}" data-accounts-sold="${sold ? '0' : '1'}" title="${
+                    asModerator
+                      ? (sold ? 'Вернуть чужое объявление на доску' : 'Снять чужое объявление с доски — тема останется со своими ответами')
+                      : (sold ? 'Вернуть своё объявление на доску' : 'Снять своё объявление с доски — тема останется со своими ответами')}">${
+            sold ? 'Вернуть на доску' : 'Аккаунт продан'}</button>` : '';
   const acts = dm || canManage ? `
-        <div class="accounts-card__acts">
-          ${dm}${canManage ? `
-          <button type="button" class="accounts-act" data-accounts-edit="${esc(p.id)}">Править</button>
-          <button type="button" class="accounts-act accounts-act--${sold ? 'return' : 'sold'}"
-                  data-accounts-close="${esc(p.id)}" data-accounts-sold="${sold ? '0' : '1'}">${
-            sold ? 'Вернуть на доску' : 'Аккаунт продан'}</button>` : ''}
+        <div class="accounts-card__acts">${dm}${manage}
         </div>` : '';
   return `
     <article class="accounts-card${sold ? ' accounts-card--sold' : ''}${expired ? ' accounts-card--expired' : ''}">
       <div class="accounts-card__marks">
-        ${sold ? `<span class="accounts-card__sold" title="Автор снял это объявление с доски ${esc(shortDate(p.accountSoldAt))}">Продано</span>` : ''}
+        ${sold ? `<span class="accounts-card__sold" title="Снято с доски ${esc(shortDate(p.accountSoldAt))}: отметку ставят автор и модература — кто именно, сайт не запоминает">Продано</span>` : ''}
         ${expired ? '<span class="accounts-card__over" title="Срок действия темы вышел">Срок вышел</span>' : ''}
         ${!expired && p.expiresAt ? `<span class="accounts-card__until" title="Объявление висит до ${esc(shortDate(p.expiresAt))}">до ${esc(shortDate(p.expiresAt))}</span>` : ''}
       </div>
@@ -402,6 +453,14 @@ export function renderAccounts(s) {
     хуже кнопки, которой нет.
   */
   const canDm = (p) => Boolean(s.me) && !s.me.banned && s.me.id !== p.authorId;
+  /*
+    Рядом с продавцом на карточке сидит распорядитель доски: объявление снимают
+    и правят его автор и модература ленты — ровно те, кого пропускает политика
+    `forum_posts_moderate` и её черновой двойник. Гость и обычный игрок кнопки не
+    видят: база отвергла бы обоих текстом отказа, а кнопка, которая всегда
+    отказывает, хуже кнопки, которой нет.
+  */
+  const manages = (p) => mine(p) || canModerateServer(s, p.serverId);
   const empty = s.ready === false
     ? 'Доска появится вместе с форумом.'
     : s.query
@@ -422,7 +481,7 @@ export function renderAccounts(s) {
       ${s.loading && !s.posts.length
         ? skWithCaption('Читаем доску…', 'tile', 6)
         : shown.length
-          ? `<div class="accounts-grid">${shown.map((p) => renderAccountCard(p, mine(p), canDm(p))).join('')}</div>`
+          ? `<div class="accounts-grid">${shown.map((p) => renderAccountCard(p, manages(p), canDm(p), manages(p) && !mine(p))).join('')}</div>`
           : `<div class="accounts-empty">
               <p>${s.loading ? 'Читаем доску…' : empty}</p>
               <p class="muted">${s.showSold

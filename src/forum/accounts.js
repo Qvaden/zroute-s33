@@ -381,8 +381,21 @@ function readForm(form) {
     offer: String(form.account_offer?.value ?? ''),
     price: String(form.account_price?.value ?? ''),
     body: bodyFromForm(form),
+    /*
+      Ноль — это выбранный при правке «прежний срок». Здесь он становится null;
+      правка превращает null в «поля в запросе нет», и строка доживает свою
+      дату. При создании срок обязателен, и пустого варианта ящик создания не
+      показывает вовсе.
+    */
     expiresAt: days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null,
   };
+}
+
+/** Целое число дней, которые остались объявлению: форма правки хранит прежний срок. */
+function daysLeft(expiresAt) {
+  if (!expiresAt) return 0;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  return ms > 0 ? Math.ceil(ms / 86400000) : 0;
 }
 
 /** Строка объявления в том виде, в котором её хочет видеть форма правки. */
@@ -392,6 +405,14 @@ function editSeed(post) {
     title: post.title,
     offer: post.accountOffer || '',
     price: post.accountPrice || '',
+    /*
+      Дата, а не число дней: форма правки показывает «прежний срок — до 13 окт.»
+      и при сохранении передаёт в базу отсутствие поля, чтобы строка прожила своё.
+      Округление до календарных дней передвигало бы дедлайн, которого человек не
+      выбирал, — на чужом объявлении это подвох автору. Просроченной дате в
+      черновике не место: тогда ящик предложит новый срок.
+    */
+    expiresAt: daysLeft(post.expiresAt) > 0 ? post.expiresAt : null,
   };
 }
 
@@ -414,7 +435,14 @@ async function submitForm(form, submitter) {
         title: checked.value.title,
         offer: value.offer,
         price: value.price,
-        expiresAt: value.expiresAt,
+        /*
+          Выбранный «прежний срок» пришёл как null, а для базы null — это
+          «снять срок», чего доска нарочно не умеет: объявление без даты висит
+          вечно. Поэтому null здесь превращается в отсутствие поля — оба
+          адаптера читают `patch.expiresAt === undefined` и не трогают колонку,
+          а строка остаётся с датой, которую выбрал автор.
+        */
+        expiresAt: value.expiresAt === null ? undefined : value.expiresAt,
       });
       /*
         Скриншоты — следом за правкой, в область `ad:<id>`: поле выбора

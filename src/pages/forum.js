@@ -1603,7 +1603,7 @@ function accountLines(p) {
  */
 function accountBadge(p) {
   if (!p.accountSoldAt) return '';
-  return `<span class="forum-post__offer-sold" title="Автор снял это объявление с доски ${esc(shortDate(p.accountSoldAt))}">Продано</span>`;
+  return `<span class="forum-post__offer-sold" title="Снято с доски ${esc(shortDate(p.accountSoldAt))}: отметку ставят автор и модература — кто именно, сайт не запоминает">Продано</span>`;
 }
 
 /**

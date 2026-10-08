@@ -3631,6 +3631,11 @@
 }
 .accounts-act--dm:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .accounts-act--dm:disabled { cursor: default; opacity: .6; }
+/* Пунктир — про то, что действие чужое: объявление по-прежнему принадлежит
+   автору, а кнопка у модературы та же, что у него. Рамка, а не новый ряд:
+   высота карточки не должна зависеть от того, кто на неё смотрит. */
+.accounts-act--mod { border-style: dashed; }
+.accounts-act--mod:hover { color: var(--text); border-color: var(--accent); }
 /* Проданное и просроченное не прячем, но и не зовём: объявление помнят по
    цене, и снятая плитка честнее исчезнувшей. Наведение такое объявление не
    получает — оно не ждёт клика. */
