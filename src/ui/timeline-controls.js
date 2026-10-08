@@ -35,6 +35,18 @@ import { forum } from '../forum/index.js';
     Array.prototype.forEach.call(list, fn);
   }
 
+  /*
+    Переключатель — это два способа сказать одно и то же: класс `is-on` видит
+    глаз, `aria-pressed` слышит программа экрана. Расхождение их — самая
+    противная поломка доступности: кнопка подсвечена, а читатель докладывает
+    «не нажато». Поэтому состояние ставится только здесь, одним вызовом, и ни
+    один ряд (типы, годы, месяцы) не имеет права подсветить без объявления.
+  */
+  function setPressed(btn, on) {
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
   /** Рендер комментариев под событием. */
   function renderEventComments(box, eventId, list) {
     if (!box) return;
@@ -240,7 +252,7 @@ import { forum } from '../forum/index.js';
     currentMonth = null;
     expandedWeeks = false;
     each(document.querySelectorAll('.seg [data-tl-filter]'), function (b) {
-      b.classList.toggle('is-on', b.dataset.tlFilter === 'all');
+      setPressed(b, b.dataset.tlFilter === 'all');
     });
     syncPick();
     apply();
@@ -251,14 +263,14 @@ import { forum } from '../forum/index.js';
     each(document.querySelectorAll('[data-tl-mo]'), function (btn) {
       var year = btn.dataset.tlMo.slice(0, 4);
       btn.hidden = currentYear === 'all' || year !== currentYear;
-      btn.classList.toggle('is-on', btn.dataset.tlMo === currentMonth);
+      setPressed(btn, btn.dataset.tlMo === currentMonth);
     });
 
     var row = document.querySelector('[data-tl-months]');
     if (row) row.hidden = currentYear === 'all';
 
     each(document.querySelectorAll('[data-tl-yr]'), function (btn) {
-      btn.classList.toggle('is-on', btn.dataset.tlYr === currentYear);
+      setPressed(btn, btn.dataset.tlYr === currentYear);
     });
   }
 
@@ -320,7 +332,7 @@ import { forum } from '../forum/index.js';
     if (typeBtn) {
       currentType = typeBtn.dataset.tlFilter;
       each(document.querySelectorAll('.seg [data-tl-filter]'), function (b) {
-        b.classList.toggle('is-on', b === typeBtn);
+        setPressed(b, b === typeBtn);
       });
       // Выбор в списке закрывает его; на сегментах безвредно.
       if (typeBtn.closest('.pick')) closePicks();

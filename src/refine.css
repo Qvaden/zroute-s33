@@ -47,6 +47,27 @@
   overflow: hidden; white-space: nowrap;
 }
 
+/*
+  Ссылка «К содержимому» — первый фокус на каждой странице.
+
+  Она спрятана, пока её не вызвали Tab'ом: зрячему человеку она не нужна, а
+  прыгающая вверху строка только мешает. Как только фокус пришёл — ссылка
+  становится обычной плашкой над шапкой, и одно нажатие уносит читателя мимо
+  кнопки меню, марки и четырнадцати вкладок боковой панели, которые на каждом
+  переходе приходится пробегать заново.
+
+  `top` вместо `margin-top`: ссылка обязана лечь ПОВЕРХ шапки, которая
+  приклеена (`position: sticky`), иначе она утонет под ней.
+*/
+.skip-link {
+  position: absolute; top: 8px; left: 8px; z-index: 200;
+  transform: translateY(-200%);
+  padding: 10px 16px; border-radius: var(--r-sm, 8px);
+  background: var(--accent); color: #14100c; font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus { transform: none; }
+
 /* ── Единая система состояний ─────────────────────────────────────────────── */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);

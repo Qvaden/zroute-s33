@@ -1,4 +1,4 @@
-import { esc, formDots, plural } from '../ui/helpers.js';
+import { esc, formDots, plural, standingsRowLabel } from '../ui/helpers.js';
 import { formatQuarterLeft } from '../ui/quarter-timer.js';
 
 /**
@@ -7,6 +7,12 @@ import { formatQuarterLeft } from '../ui/quarter-timer.js';
  *
  * Про подстановку по умолчанию: недоступная таблица результатов больше
  * не закрывает сайт целиком, поэтому страница может законно получить пустоту.
+ *
+ * Переключатели, счётчик и имена карточек размечены для программы экрана так
+ * же, как в общем рейтинге, и держит их тот же драйвер
+ * ui/ladder-controls.js. Объяснение атрибутов — в src/pages/ladder.js, перед
+ * return: здесь та же договорённость, только в двух словах, чтобы не
+ * раздваивать её на два файла.
  */
 export function renderQuarter({ standings, quarter } = {}) {
   const list = Array.isArray(standings) ? standings : [];
@@ -27,8 +33,9 @@ export function renderQuarter({ standings, quarter } = {}) {
   }
 
   const active = list.filter((r) => r.alliance.active).length;
+  const byId = new Map(list.map((r) => [r.alliance.id, r.alliance]));
   const topThree = list.slice(0, 3);
-  const cards = list.map(quartCard).join('');
+  const cards = list.map((r) => quartCard(r, byId)).join('');
   const periodLabel = period.startNumber == null
     ? 'Период ещё не начат'
     : `Недели ${period.startNumber}–${period.endNumber}`;
@@ -83,7 +90,7 @@ export function renderQuarter({ standings, quarter } = {}) {
           </div>
           <span class="quart-podium__note">Победители по очкам</span>
         </div>
-        <div class="quart-podium__grid">${topThree.map(podiumCard).join('')}</div>
+        <div class="quart-podium__grid">${topThree.map((r) => podiumCard(r, byId)).join('')}</div>
       </section>
 
       <section class="quart-board">
@@ -103,40 +110,43 @@ export function renderQuarter({ standings, quarter } = {}) {
             <input type="search" placeholder="Найти альянс или тег…" data-ladder-search autocomplete="off" spellcheck="false">
           </label>
           <div class="seg" role="group" aria-label="Кого показывать">
-            <button type="button" class="seg__btn is-on" data-ladder-filter="active">Активные</button>
-            <button type="button" class="seg__btn" data-ladder-filter="all">Все</button>
+            <button type="button" class="seg__btn is-on" data-ladder-filter="active" aria-pressed="true">Активные</button>
+            <button type="button" class="seg__btn" data-ladder-filter="all" aria-pressed="false">Все</button>
           </div>
           <div class="seg" role="group" aria-label="Сортировка карточек">
-            <button type="button" class="seg__btn is-on" data-ladder-sort="points">Очки</button>
-            <button type="button" class="seg__btn" data-ladder-sort="wins">Победы</button>
-            <button type="button" class="seg__btn" data-ladder-sort="form">Форма</button>
-            <button type="button" class="seg__btn" data-ladder-sort="name">А–Я</button>
+            <button type="button" class="seg__btn is-on" data-ladder-sort="points" aria-pressed="true">Очки</button>
+            <button type="button" class="seg__btn" data-ladder-sort="wins" aria-pressed="false">Победы</button>
+            <button type="button" class="seg__btn" data-ladder-sort="form" aria-pressed="false">Форма</button>
+            <button type="button" class="seg__btn" data-ladder-sort="name" aria-pressed="false">А–Я</button>
           </div>
         </div>
 
         <div class="quart-grid" data-ladder-list>${cards}</div>
         <p class="quart-empty" data-ladder-empty hidden>Пока никого не нашли. Попробуйте другой тег.</p>
-        <p class="quart-count" data-ladder-count>${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} в гонке</p>
+        <p class="quart-count" data-ladder-count role="status" aria-live="polite">${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} в гонке</p>
       </section>
     </section>`;
 }
 
-function podiumCard(r) {
+function podiumCard(r, byId) {
   const a = r.alliance;
   const score = `${r.points > 0 ? '+' : ''}${r.points}`;
   const medal = ['quart-podium-card--gold', 'quart-podium-card--silver', 'quart-podium-card--bronze'][r.place - 1] || '';
+  const mergedTarget = a.mergedInto ? byId?.get(a.mergedInto) : null;
   return `
-    <a class="quart-podium-card ${medal}" href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}" style="--tag-color:${esc(a.color || '#7a8494')}">
+    <a class="quart-podium-card ${medal}" href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
+       aria-label="${esc(standingsRowLabel(r, { mergedTarget }))}"
+       style="--tag-color:${esc(a.color || '#7a8494')}">
       <span class="quart-podium-card__place">0${r.place}</span>
       <span class="quart-podium-card__medal">${r.place === 1 ? '✦' : r.place === 2 ? '◆' : '◇'}</span>
       <span class="quart-podium-card__tag">${esc(a.tag)}</span>
       <b>${esc(a.name)}</b>
-      <span class="quart-podium-card__meta">${r.wins} побед · ${r.losses} поражений</span>
+      <span class="quart-podium-card__meta">${plural(r.wins, 'победа', 'победы', 'побед')} · ${plural(r.losses, 'поражение', 'поражения', 'поражений')}</span>
       <strong>${score}</strong>
     </a>`;
 }
 
-function quartCard(r) {
+function quartCard(r, byId) {
   const a = r.alliance;
   const formScore = r.form.filter((o) => o === 'win').length;
   const streak = r.streak && r.streak.length > 1
@@ -144,10 +154,20 @@ function quartCard(r) {
     : '';
   const score = `${r.points > 0 ? '+' : ''}${r.points}`;
   const medal = r.place <= 3 ? ` quart-card--m${r.place}` : '';
+  const mergedTarget = a.mergedInto ? byId?.get(a.mergedInto) : null;
 
+  /*
+    Имя карточки — та же фраза, что у строки общего рейтинга (helpers.js:
+    standingsRowLabel). Внутри карточки «02», «КР33», точки формы и «+6 ОЧКИ»,
+    и всё это — знаки: ссылка без имени звучала бы как «ноль два К Р три три».
+    Одной формулировки на оба списка держим специально: строки везде одного
+    состава, и разошедшиеся имена в двух файлах означали бы, что один и тот же
+    альянс читается вслух по-разному на двух вкладках.
+  */
   return `
     <a class="quart-card${medal}${a.active ? '' : ' quart-card--off'}"
        href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
+       aria-label="${esc(standingsRowLabel(r, { mergedTarget }))}"
        style="--tag-color:${esc(a.color || '#7a8494')}"
        data-name="${esc(a.name.toLowerCase())}"
        data-tag="${esc(a.tag.toLowerCase())}"

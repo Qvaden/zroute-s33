@@ -86,7 +86,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=95">
+  <link rel="modulepreload" href="./src/main.js?v=96">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -126,7 +126,7 @@
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=24">
+  <link rel="stylesheet" href="./src/refine.css?v=25">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -145,6 +145,18 @@
 <meta name="vapid-public-key" content="BNs8Y9a3cY8kuJ3A2RnrLjnjWpsWvazVM_QjUW0SyYFQK5Dp3rRwCRCzdASGSOa0ytAyjCE5fyN4DlDqnqMV1xg">
 </head>
 <body>
+  <!--
+    Ссылка «К содержимому» — первый фокус на странице.
+
+    До неё шли шапка, марка и четырнадцать вкладок меню: чтобы добраться до
+    текста, человек с клавиатуры жмёт Таб одно и то же на каждой странице, а
+    читатель программы экрана слушает их подряд, пока не начнётся содержимое.
+
+    В обычном состоянии ссылка спрятана за краем экрана, а не display:none —
+    иначе программа экрана её не видит вовсе (правила в src/refine.css).
+  -->
+  <a class="skip-link" href="#app">К содержимому</a>
+
   <div id="boot-loader" class="boot-loader" role="status" aria-live="polite" aria-label="Загрузка Сервера 33">
     <div class="boot-loader__core">
       <div class="boot-loader__mark"><span>33</span></div>
@@ -232,7 +244,33 @@
   -->
   <div id="data-notice" class="data-notice wrap" role="status" aria-live="polite" hidden></div>
 
-  <main id="app" class="wrap"></main>
+  <!--
+    ГОЛОС СМЕНИВШЕГОСЯ РАЗДЕЛА.
+
+    Живые разделы (форум, чаты, гайды, календарь) дорисовывают себя после
+    ответа хранилища и при этом перекрашивают всю свою разметку. Фокус,
+    поставленный в момент перехода, такая перекраска выбрасывает обратно на
+    <body>: человек нажал «Календарь», экран поменялся, а программа экрана
+    молчит. Строка здесь — единственный сигнал, который от перекраски не
+    зависит: элемент стоит вне содержимого, и его текст читатель слышит всегда.
+
+    Статичные разделы этой строки не получают: там фокус уходит на заголовок,
+    и он же его и объявляет, а два голоса подряд читатель слушал бы как эхо.
+    Разбирается в src/main.js (announceRoute).
+  -->
+  <p id="route-announcer" class="sr-only" role="status" aria-live="polite"></p>
+
+  <!--
+    tabindex="-1" здесь ради одной вещи: фокус можно поставить только на
+    элемент, который его принимает, а блок сам по себе не принимает. Без
+    единицы переход «К содержимому» перенёс бы страницу вниз и оставил фокус
+    на ссылке — программа экрана продолжила бы бормотать меню.
+
+    Ссылка не меняет адрес: hash у сайта и есть маршрут, и слово «app»
+    роутер прочитал бы как раздел, которого нет, вернул бы человека на
+    «Форум». Перехват клика и перестановка фокуса — в src/main.js.
+  -->
+  <main id="app" class="wrap" tabindex="-1"></main>
 
   <footer class="site-foot wrap">
     <p>
@@ -241,7 +279,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=95"></script>
+  <script type="module" src="./src/main.js?v=96"></script>
 
   <script>
     /*

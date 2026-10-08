@@ -128,13 +128,13 @@ function renderServerSection(list) {
   const months = [...new Set(list.map((e) => ymKey(e.date)))].sort().reverse();
 
   const yearChips = years
-    .map((y) => `<button type="button" class="cal__btn" data-tl-yr="${y}">${y}</button>`)
+    .map((y) => `<button type="button" class="cal__btn" data-tl-yr="${y}" aria-pressed="false">${y}</button>`)
     .join('');
 
   const monthChips = months
     .map((ym) => {
       const label = MONTH_NAME[Number(ym.slice(5, 7)) - 1];
-      return `<button type="button" class="cal__btn" data-tl-mo="${ym}" hidden>${esc(label)}</button>`;
+      return `<button type="button" class="cal__btn" data-tl-mo="${ym}" aria-pressed="false" hidden>${esc(label)}</button>`;
     })
     .join('');
 
@@ -176,13 +176,13 @@ function renderServerSection(list) {
 
       <div class="cal">
         <span class="cal__label">Найти запись</span>
-        <div class="cal__row">
-          <button type="button" class="cal__btn is-on" data-tl-yr="all">За всё время</button>
+        <div class="cal__row" role="group" aria-label="Год">
+          <button type="button" class="cal__btn is-on" data-tl-yr="all" aria-pressed="true">За всё время</button>
           ${yearChips}
         </div>
         <!-- Скрыт до выбора года: иначе до первого запуска скрипта здесь
              висела бы пустая строка с отступом. -->
-        <div class="cal__row cal__row--mo" data-tl-months hidden>${monthChips}</div>
+        <div class="cal__row cal__row--mo" role="group" aria-label="Месяц" data-tl-months hidden>${monthChips}</div>
       </div>
 
       <ul class="wks">${pills}</ul>
@@ -256,15 +256,21 @@ function renderTrophies(captures, all) {
 function renderFilters(events) {
   const present = [...new Set(events.map((e) => e.type))];
   const types = EVENT_TYPE_ORDER.filter((t) => present.includes(t));
+  /*
+    Ряд «Тип» — переключатель, а не кнопка действия: он выбирает, что показано
+    в ленте. Поэтому у каждой кнопки есть `aria-pressed` рядом с классом
+    `is-on`; дальше их вместе держит ui/timeline-controls.js. При первой
+    отрисовке нажата только «Все» — ровно то, что человек увидит до клика.
+  */
   const buttons = types
     .map(
-      (t) => `<button type="button" class="seg__btn" data-tl-filter="${t}">${esc(EVENT_TYPE[t].filter)}</button>`
+      (t) => `<button type="button" class="seg__btn" data-tl-filter="${t}" aria-pressed="false">${esc(EVENT_TYPE[t].filter)}</button>`
     )
     .join('');
 
   return `<div class="ctl ctl--tl">
     <div class="seg seg--type" role="group" aria-label="Тип события">
-      <button type="button" class="seg__btn is-on" data-tl-filter="all">Все</button>
+      <button type="button" class="seg__btn is-on" data-tl-filter="all" aria-pressed="true">Все</button>
       ${buttons}
     </div>
     <div class="pick pick--tl">

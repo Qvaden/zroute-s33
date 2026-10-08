@@ -104,9 +104,19 @@ function renderList(s) {
   const canWrite = canPublish(s.me);
   const staff = isStaff(s.me);
 
+  /*
+    Плашки разделов — переключатели (aria-pressed), а не вкладки. Роль
+    `tablist` здесь висела раньше, не имея ни одной вкладки: у списка гайдов
+    нет панели, связанной с кнопкой через aria-controls, а без неё программа
+    экрана обещает поведение вкладок — «переключение по стрелкам», которого
+    нет. Честное описание этого ряда: группа кнопок-переключателей с
+    подписью. Класс `is-on` и `aria-pressed` считаются из одного `s.category`,
+    поэтому после любой перерисовки страницы они не разъезжаются.
+  */
   const chips = cats
     .map((c) => `<button type="button" class="guide-chip${s.category === c.id ? ' is-on' : ''}"
-             data-guide-cat="${esc(c.id)}">${esc(c.label)}</button>`)
+             data-guide-cat="${esc(c.id)}"
+             aria-pressed="${s.category === c.id ? 'true' : 'false'}">${esc(c.label)}</button>`)
     .join('');
 
   /*
@@ -141,7 +151,7 @@ function renderList(s) {
         <h1>Гайды</h1>
         <p class="muted">Стратегии, советы для новичков и разбор боёв — пишут участники.</p>
       </header>
-      <div class="guide-cats" role="tablist">${chips}${mineChip}</div>
+      <div class="guide-cats" role="group" aria-label="Раздел гайда">${chips}${mineChip}</div>
       <label class="guide-search">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>

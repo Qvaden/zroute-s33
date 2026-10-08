@@ -249,7 +249,8 @@ function renderControls(s) {
     <div class="accounts-controls">
       <div class="accounts-controls__sorts" role="group" aria-label="Порядок объявлений">
         ${ACCOUNT_SORTS.map((item) => `<button type="button" class="accounts-chip${s.sort === item.id ? ' is-on' : ''}"
-                data-accounts-sort="${esc(item.id)}">${esc(item.label)}</button>`).join('')}
+                data-accounts-sort="${esc(item.id)}"
+                aria-pressed="${s.sort === item.id ? 'true' : 'false'}">${esc(item.label)}</button>`).join('')}
       </div>
       <label class="accounts-controls__sold">
         <input type="checkbox" name="show_sold"${s.showSold ? ' checked' : ''}>
@@ -257,6 +258,7 @@ function renderControls(s) {
       </label>
       <label class="accounts-search">
         <input type="search" name="q" data-accounts-q autocomplete="off" spellcheck="false"
+               aria-label="Поиск по доске объявлений"
                placeholder="Поиск по доске: уровень, ресурс, цена" value="${esc(s.query ?? '')}">
       </label>
     </div>`;

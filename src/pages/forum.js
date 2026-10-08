@@ -1918,6 +1918,16 @@ function renderFeedControls(s) {
     заведует теперь не кнопка, а строка над формой (serverWriteNotice).
   */
 
+  /*
+    ВСЕ ТРИ ПЕРЕКЛЮЧАТЕЛЯ В ЭТОМ РЯДУ — ОДИН ДОГОВОР. Раздел, порядок и тег
+    дают не действие, а выбор варианта, поэтому несут `aria-pressed` рядом с
+    классом `is-on`: глаз видит подсветку, программа экрана слышит, что именно
+    этот вариант действует. Без `aria-pressed` десять кнопок звучат десятью
+    одинаковыми «нажать», и человек, выбравший «Обсуждение», не может
+    прочитать, что лента уже про обсуждение. Ряд закладок был размечен так с
+    самого начала — заодно и порядок с тегами.
+  */
+
   return `
     <div class="ctl ctl--forum">
       <label class="search forum-search">
@@ -1930,10 +1940,13 @@ function renderFeedControls(s) {
       </label>
       <div class="seg seg--cat" role="group" aria-label="Раздел форума">
         <button type="button" class="seg__btn ${s.category === 'all' ? 'is-on' : ''}"
-                data-forum-cat="all">Все</button>
+                data-forum-cat="all"
+                aria-pressed="${s.category === 'all' ? 'true' : 'false'}">Все</button>
         ${CATEGORIES.map(
           (c) => `<button type="button" class="seg__btn ${s.category === c.id ? 'is-on' : ''}"
-                          data-forum-cat="${esc(c.id)}" title="${esc(c.hint)}">${esc(c.label)}</button>`
+                          data-forum-cat="${esc(c.id)}"
+                          aria-pressed="${s.category === c.id ? 'true' : 'false'}"
+                          title="${esc(c.hint)}">${esc(c.label)}</button>`
         ).join('')}
       </div>
       <div class="pick">
@@ -1968,12 +1981,15 @@ function renderFeedControls(s) {
       <div class="seg seg--sort" role="group" aria-label="Порядок">
         ${SORTS.map(
           (o) => `<button type="button" class="seg__btn ${s.sort === o.id ? 'is-on' : ''}"
-                          data-forum-sort="${esc(o.id)}">${esc(o.label)}</button>`
+                          data-forum-sort="${esc(o.id)}"
+                          aria-pressed="${s.sort === o.id ? 'true' : 'false'}">${esc(o.label)}</button>`
         ).join('')}
       </div>
-      <div class="forum-tag-filter" aria-label="Теги">
-        <button type="button" class="forum-tag${s.tag === 'all' ? ' is-on' : ''}" data-forum-tag="all">Все теги</button>
-        ${TOPIC_TAGS.map((tag) => `<button type="button" class="forum-tag${s.tag === tag.id ? ' is-on' : ''}" data-forum-tag="${esc(tag.id)}">#${esc(tag.label)}</button>`).join('')}
+      <div class="forum-tag-filter" role="group" aria-label="Теги">
+        <button type="button" class="forum-tag${s.tag === 'all' ? ' is-on' : ''}" data-forum-tag="all"
+                aria-pressed="${s.tag === 'all' ? 'true' : 'false'}">Все теги</button>
+        ${TOPIC_TAGS.map((tag) => `<button type="button" class="forum-tag${s.tag === tag.id ? ' is-on' : ''}" data-forum-tag="${esc(tag.id)}"
+                aria-pressed="${s.tag === tag.id ? 'true' : 'false'}">#${esc(tag.label)}</button>`).join('')}
       </div>
     </div>`;
 }
@@ -2365,11 +2381,25 @@ function renderReactions(targetType, item, s) {
   const chosenExtra = extras.find((r) => r.id === mine);
   const extraTotal = extras.reduce((sum, r) => sum + Number(counts[r.id] ?? 0), 0);
 
+  /*
+    ИМЯ КНОПКИ РЕАКЦИИ НЕ МОЖЕТ БРАТЬСЯ ИЗ КАРТИНКИ. Значок закрыт от программы
+    экрана (`aria-hidden`), иначе она произнесла бы «палец вверх» каждый раз,
+    а в некоторых голосах и вовсе «эмодзи». Без `aria-label` у кнопки остаётся
+    одно имя — число: читатель слышал бы «двенадцать, кнопка» и не знал бы, на
+    что нажимает. Поэтому имя = название реакции и её счёт, а `aria-pressed`
+    говорит, стоит ли уже моя метка.
+
+    Счёт дан голым числом, без слова «проголосовало»: с ним пришлось бы
+    склонзовать («1 проголосовавший», «2 проголосовавших»…), а после запятой
+    число и так читается как количество.
+  */
   return `
     <div class="forum-react" ${can ? '' : 'data-forum-react-locked'}>
       <button type="button"
               class="forum-react__btn ${mine === 'like' ? 'is-on' : ''}"
               data-forum-react="${esc(key)}:like"
+              aria-label="${esc(likeMeta.label)}, ${Number(counts.like ?? 0)}"
+              aria-pressed="${mine === 'like' ? 'true' : 'false'}"
               ${can ? '' : 'disabled title="Войдите, чтобы отреагировать"'}>
         <span aria-hidden="true">${likeMeta.glyph}</span>
         <b class="num">${Number(counts.like ?? 0)}</b>
@@ -2378,6 +2408,8 @@ function renderReactions(targetType, item, s) {
       <button type="button"
               class="forum-react__btn forum-react__btn--down ${mine === 'dislike' ? 'is-on' : ''}"
               data-forum-react="${esc(key)}:dislike"
+              aria-label="${esc(dislikeMeta.label)}, ${Number(counts.dislike ?? 0)}"
+              aria-pressed="${mine === 'dislike' ? 'true' : 'false'}"
               ${can ? '' : 'disabled title="Войдите, чтобы отреагировать"'}>
         <span aria-hidden="true">${dislikeMeta.glyph}</span>
         <b class="num">${Number(counts.dislike ?? 0)}</b>
@@ -2386,6 +2418,8 @@ function renderReactions(targetType, item, s) {
       <div class="forum-emoji">
         <button type="button" class="forum-react__btn forum-react__btn--more ${chosenExtra ? 'is-on' : ''}"
                 data-forum-emoji-open="${esc(key)}"
+                aria-label="${chosenExtra ? `ваша реакция: ${chosenExtra.label}, ${extraTotal}` : `выбрать смайл, других реакций ${extraTotal}`}"
+                aria-pressed="${chosenExtra ? 'true' : 'false'}"
                 ${can ? '' : 'disabled title="Войдите, чтобы отреагировать"'}>
           <span aria-hidden="true">${chosenExtra ? chosenExtra.glyph : '🙂'}</span>
           ${extraTotal ? `<b class="num">${extraTotal}</b>` : '<b class="forum-react__plus">+</b>'}
@@ -2395,7 +2429,9 @@ function renderReactions(targetType, item, s) {
           ${extras
             .map(
               (r) => `<button type="button" class="forum-emoji__item ${mine === r.id ? 'is-on' : ''}"
-                              data-forum-react="${esc(key)}:${esc(r.id)}" title="${esc(r.label)}">
+                              data-forum-react="${esc(key)}:${esc(r.id)}" title="${esc(r.label)}"
+                              aria-label="${esc(r.label)}${counts[r.id] ? `, ${Number(counts[r.id])}` : ''}"
+                              aria-pressed="${mine === r.id ? 'true' : 'false'}">
                 <span aria-hidden="true">${r.glyph}</span>
                 ${counts[r.id] ? `<b class="num">${Number(counts[r.id])}</b>` : ''}
               </button>`

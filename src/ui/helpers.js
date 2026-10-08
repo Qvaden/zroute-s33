@@ -156,3 +156,63 @@ export function miniMarkdown(src) {
   if (inList) out.push('</ul>');
   return out.join('\n');
 }
+
+/**
+ * Что строка рейтинга говорит вслух.
+ *
+ * Порядок тот же, что глаз видит слева направо: место и его изменение, кто
+ * это, победы и поражения, очки, свежая форма, затем служебное (серия,
+ * слияние, распад, достижения).
+ *
+ * Нужен и общему рейтингу, и «Кварту», и любому будущему списку альянсов:
+ * строка везде одна и та же по составу, а имя у неё только одно, поэтому и
+ * формулировка не должна расходиться по файлам.
+ *
+ * Очки даны словами «плюс» и «минус» вместе с падежом: «-6» в середине фразы
+ * читатель склеивает с отрицанием следующего значения, а «минус 6 очков» —
+ * однозначно. Падежи считает plural, и для нуля, и для отрицательных.
+ */
+export function standingsRowLabel(r, { mergedTarget = null, achievementCount = 0 } = {}) {
+  const a = r.alliance;
+  const parts = [];
+
+  parts.push(`${r.place}-е место`);
+  if (r.delta !== null && r.delta !== 0) {
+    parts.push(r.delta > 0 ? `подъём на ${r.delta}` : `спуск на ${Math.abs(r.delta)}`);
+  }
+
+  const form = Array.isArray(r.form) ? r.form : [];
+  const formWins = form.filter((o) => o === 'win').length;
+
+  parts.push(`${a.name} (${a.tag})`);
+  parts.push(
+    `${plural(r.wins, 'победа', 'победы', 'побед')}, ` +
+      `${plural(r.losses, 'поражение', 'поражения', 'поражений')}`
+  );
+  parts.push(
+    `${r.points > 0 ? 'плюс ' : r.points < 0 ? 'минус ' : ''}` +
+      `${plural(Math.abs(r.points), 'очко', 'очка', 'очков')}`
+  );
+  if (form.length) {
+    parts.push(`форма: ${plural(formWins, 'победа', 'победы', 'побед')} из ${form.length}`);
+  }
+  if (r.streak && r.streak.length > 1) {
+    parts.push(
+      r.streak.type === 'win'
+        ? `серия: ${plural(r.streak.length, 'победа', 'победы', 'побед')} подряд`
+        : `серия: ${plural(r.streak.length, 'поражение', 'поражения', 'поражений')} подряд`
+    );
+  }
+  if (achievementCount) {
+    parts.push(plural(achievementCount, 'достижение', 'достижения', 'достижений'));
+  }
+  /*
+    Имя партнёра по слиянию стоит в именительном и в кавычках: просклонять
+    выдуманное название программа не может, а «слился с Космическая коалиция»
+    звучало бы как обрывок.
+  */
+  if (mergedTarget) parts.push(`слияние: «${mergedTarget.name}»`);
+  else if (!a.active) parts.push('распался');
+
+  return parts.join(', ');
+}

@@ -14453,6 +14453,198 @@ console.log('\nAO. Раздел — страница');
     /--mute:\s*#808a9a/.test(refine));
 }
 
+/* ── AP. Доступность: что слышит читатель программы экрана ──────────────
+
+   Заход 4 собран не про внешний вид, а про голос, и потому он особенно
+   хрупкий: переключатель светится выбранным, и человеку это видно, а читатель
+   программы экрана слышит просто кнопку. Строка таблицы для глаза — цифры,
+   для читателя — поток чисел без начала. Новый раздел для глаза — другой
+   экран, для читателя — тишина.
+
+   Ни одна проверка ниже не заметит исчезновение атрибуту глазами. Их смысл —
+   держать три договора: состояние переключателя сказано словами, строка
+   называет себя сама, смена экрана объявлена.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAP. Доступность');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { standingsRowLabel } = await import('../src/ui/helpers.js');
+  const { renderLadder } = await import('../src/pages/ladder.js');
+  const { renderQuarter } = await import('../src/pages/quarter-final.js');
+
+  /*
+    Тот же набор, что и на живом экране: лидер с достижениями, альянс после
+    спуска, распавшийся и слившийся. Пустой набор здесь не проверяет ничего —
+    имя строки складывается из подробностей, и именно они ломаются молча.
+  */
+  const row = (place, name, tag, wins, losses, delta, form, streak, active, mergedInto) => ({
+    alliance: { id: 'a' + place, name, tag, color: '#fff', active: Boolean(active), mergedInto },
+    place,
+    wins,
+    losses,
+    points: wins - losses,
+    delta,
+    form,
+    streak,
+    series: [1, 2, 3],
+  });
+  const standings = [
+    row(1, 'Космическая коалиция', 'CCCP', 10, 0, 0, ['win', 'win', 'win', 'win', 'win'], { type: 'win', length: 7 }, 1),
+    row(2, 'Кремлёвцы', 'КР33', 8, 1, -3, ['win', 'loss', 'win'], { type: 'win', length: 2 }, 1),
+    row(3, 'Бароны', 'BARS', 5, 4, 1, ['loss', 'loss'], { type: 'loss', length: 2 }, 0),
+    row(4, 'Сталкеры', 'STG', 0, 1, null, [], null, 1, 'a1'),
+  ];
+
+  const leader = standingsRowLabel(standings[0], { achievementCount: 3 });
+  const merged = standingsRowLabel(standings[3], { mergedTarget: standings[0].alliance });
+
+  check('имя строки начинается с места', /^1-е место/.test(leader), leader);
+  check('имя строки называет альянс и его тег',
+    /Космическая коалиция \(CCCP\)/.test(leader), leader);
+  check('очки сказаны словом, а не знаком', /плюс 10 очков/.test(leader), leader);
+  check('поражение и победа различаются падежом',
+    /0 побед, 1 поражение/.test(standingsRowLabel(standings[3])), standingsRowLabel(standings[3]));
+  check('распавшийся альянс сказан словами', /распался/.test(standingsRowLabel(standings[2])), '');
+  check('слияние названо по имени, а не идентификатором',
+    /слияние: «Космическая коалиция»/.test(merged), merged);
+
+  /*
+    Сборка имени обязана выдерживать пустые поля. Единственная проверка на
+    undefined ловит целое семейство поломок: поле переименовали, данные не
+    пришли, форматтер уехал — и читатель вместо строки слышит «undefined».
+  */
+  check('в собранном имени нет undefined и NaN',
+    ![leader, merged, standingsRowLabel(standings[1]), standingsRowLabel(standings[2])]
+      .some((l) => /undefined|null|NaN/.test(l)));
+
+  const ladderHtml = renderLadder({ standings, achievements: new Map([['a1', [1, 2, 3]]]) });
+  const quartHtml = renderQuarter({
+    standings,
+    quarter: { number: 3, startNumber: 5, endNumber: 8, playedWeeks: 4 },
+  });
+  const namedOf = (html) => [...html.matchAll(/aria-label="(\d+-е? место[^"]*)"/g)].map((m) => m[1]);
+  const ladderNames = namedOf(ladderHtml);
+  const quartNames = namedOf(quartHtml);
+
+  check(`рейтинг: названа каждая строка (${ladderNames.length} из ${standings.length})`,
+    ladderNames.length === standings.length);
+  check(`кварт: названа каждая карточка и подиум (${quartNames.length})`,
+    quartNames.length === standings.length + Math.min(3, standings.length),
+    'подиум повторяет первые три карточки — и каждая из них обязана быть названа');
+  check('ни одно имя не собралось в undefined',
+    ![...ladderNames, ...quartNames].some((l) => /undefined|NaN/.test(l)));
+
+  /*
+    Шапка таблицы остаётся aria-hidden.
+
+    Это не недоделка, а выбор: строка рейтинга — ссылка, и клетки её нельзя
+    associровать с заголовками столбцов, поэтому имя носит сама строка. Если
+    шапку однажды «разблокируют», читатель станет слышать дважды одно и то же,
+    и именно эта проверка поднимет шум.
+  */
+  check('шапка рейтинга осталась декоративной',
+    /class="lad__head" aria-hidden="true"/.test(ladderHtml));
+
+  const forumJs = await readFile('src/pages/forum.js', 'utf8');
+  const timelineJs = await readFile('src/pages/timeline.js', 'utf8');
+  const guidesJs = await readFile('src/pages/guides.js', 'utf8');
+  const accountsJs = await readFile('src/pages/accounts.js', 'utf8');
+
+  /*
+    Переключатель обязан говорить, выбран он или нет.
+
+    Класс `is-on` — это глаз. Читателю нужен aria-pressed (или aria-selected
+    там, где настоящие вкладки), и цифра ниже сверяет их по всем разделам с
+    фильтрами: не «есть ли атрибут вообще», а «не меньше ли их, чем
+    подсвеченных кнопок». Расхождение — самая противная поломка доступности:
+    кнопка горит выбранной, а голос говорит «не нажато».
+  */
+  for (const [name, src] of [['рейтинг', ladderHtml], ['кварт', quartHtml],
+    ['форум', forumJs], ['хронология', timelineJs], ['гайды', guidesJs],
+    ['аккаунты', accountsJs], ['рейтинг (драйвер)', await readFile('src/ui/ladder-controls.js', 'utf8')],
+    ['хронология (драйвер)', await readFile('src/ui/timeline-controls.js', 'utf8')]]) {
+    const eye = (src.match(/is-on/g) || []).length;
+    const voice = (src.match(/aria-pressed/g) || []).length + (src.match(/aria-selected/g) || []).length;
+    check(`переключатели «${name}» говорят своё состояние`, voice >= eye, `is-on ${eye}, состояний ${voice}`);
+  }
+
+  check('группы переключателей названы, а не висят без подписи',
+    /role="group"/.test(ladderHtml) && /role="group"/.test(forumJs)
+      && /role="group"/.test(timelineJs) && /role="group"/.test(guidesJs)
+      && /role="group"/.test(accountsJs));
+
+  /*
+    Роль tablist стоит только там, где за ней настоящие вкладки.
+
+    На «Гайдах» она висела на списке фильтров, не имея ни одной role="tab":
+    читатель получал обещание переключения вкладок и ничего под ним.
+  */
+  check('вкладки обещаны только там, где они есть',
+    !/role="tablist"/.test(guidesJs) && /role="tab"/.test(forumJs));
+
+  /*
+    Кнопка реакции не может брать имя из картинки.
+
+    До правки у неё не было имени вовсе: читатель слышал голое «3». Теперь
+    метка смайла и счёт собраны в одну строку, и проверка следит, чтобы счёт
+    не остался единственным содержимым кнопки.
+  */
+  check('реакция названа словом, а не только числом',
+    /aria-label="\$\{esc\(likeMeta\.label\)\}, /.test(forumJs)
+      && /aria-label="\$\{esc\(dislikeMeta\.label\)\}, /.test(forumJs));
+
+  /*
+    Счётчик найденного объявляется вслух, но не бормочет.
+
+    Роль status читает каждое изменение текста, а таймер и опрос ленты трогают
+    этот узел часто. Драйвер обязан присвоить строку только когда она
+    действительно изменилась — иначе «26 из 28» звучит раз в секунду.
+  */
+  check('счётчик рейтинга объявляется вслух',
+    /data-ladder-count[^>]*role="status"/.test(ladderHtml)
+      && /data-ladder-count[^>]*role="status"/.test(quartHtml));
+  const ladderCtrlJs = await readFile('src/ui/ladder-controls.js', 'utf8');
+  check('счётчик молчит, когда текст не поменялся',
+    /if \(count\.textContent !== next\)/.test(ladderCtrlJs));
+
+  /*
+    Обход блоков и объявление нового экрана.
+
+    Ссылка «К содержимому» обязана быть первым фокусом в документе — если она
+    встанет после шапки, её смысл исчезает. И она не должна менять адрес:
+    hash у сайта и есть маршрут, а «app» роутер прочитал бы как раздел,
+    которого нет, и выбросил бы читателя на форум.
+  */
+  const indexHtml = await readFile('index.html', 'utf8');
+  const mainJs = await readFile('src/main.js', 'utf8');
+  const refineCss = await readFile('src/refine.css', 'utf8');
+
+  check('ссылка «К содержимому» идёт первой в теле страницы',
+    /<a class="skip-link" href="#app">К содержимому<\/a>/.test(indexHtml)
+      && indexHtml.indexOf('class="skip-link"') < indexHtml.indexOf('<header class="site-head">'));
+  check('ссылка спрятана сдвигом, а не display: none',
+    /transform: translateY\(-200%\)/.test(refineCss) && /\.skip-link:focus \{ transform: none; \}/.test(refineCss));
+  check('содержимое принимает фокус', /<main id="app" class="wrap" tabindex="-1">/.test(indexHtml));
+  check('клик по ссылке не трогает адрес',
+    /preventDefault\(\);/.test(mainJs) && /focusAppHeading\(\)/.test(mainJs)
+      && !/location\.hash = '#app'/.test(mainJs));
+  check('смена экрана объявляется вслух',
+    /id="route-announcer"[^>]*role="status"/.test(indexHtml) && /Открыт раздел:/.test(mainJs));
+
+  /*
+    Живой раздел не спорит со своей перекраской.
+
+    Замер на 127.0.0.1: первый кадр гайдов, календаря и форума появляется
+    сразу, фокус встаёт на заголовок — и следующая перекраска выбрасывает его
+    на body вместе с объявлением. Поэтому живой раздел (и форум с открытой
+    темой) получает только голос. Проверка держит именно этот порядок условий.
+  */
+  check('живой раздел получает голос, а не фокус',
+    /!keepScroll && !live && focusAppHeading\(\)/.test(mainJs));
+  check('перекраска того же экрана молчит',
+    /screen !== lastAnnouncedRoute/.test(mainJs) && /const screen = `\$\{id\}\/\$\{param \|\| ''\}`/.test(mainJs));
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

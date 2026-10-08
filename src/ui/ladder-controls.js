@@ -63,16 +63,31 @@
 
     var count = document.querySelector('[data-ladder-count]');
     if (count) {
-      count.textContent = q || state.filter === 'all'
+      var next = q || state.filter === 'all'
         ? 'Показано ' + shown + ' из ' + rows.length
         : plural(shown, 'активный альянс', 'активных альянса', 'активных альянсов') + ' из ' + rows.length;
+      /*
+        Присваивание вслепую — это замена текстового узла, и зона
+        объявлений (`role="status"` на счётчике) реагирует на неё даже тогда,
+        когда строка слов в точности прежняя. Страницу перерисовывают таймеры
+        данных и смена сервера: без этой проверки счётчик бормотал бы одно и то
+        же вслух при каждом таком тике, хотя человек ничего не трогал.
+      */
+      if (count.textContent !== next) count.textContent = next;
     }
   }
 
+  /*
+    Подсветка и состояние — две записи одного факта. Класс видит глаз,
+    `aria-pressed` слышит программа экрана, и они не имеют права разойтись:
+    кнопка с подсветкой и «не нажато» хуже, чем без обоих.
+  */
   function setActive(group, pressed) {
     var buttons = document.querySelectorAll('[data-ladder-' + group + ']');
     Array.prototype.forEach.call(buttons, function (b) {
-      b.classList.toggle('is-on', b === pressed);
+      var on = b === pressed;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   }
 

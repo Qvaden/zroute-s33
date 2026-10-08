@@ -1,4 +1,4 @@
-import { esc, deltaBadge, formDots, sparkline, plural } from '../ui/helpers.js';
+import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel } from '../ui/helpers.js';
 
 /**
  * Общий рейтинг — главная ценность сайта.
@@ -33,6 +33,25 @@ export function renderLadder({
   const rows = list.map((r) => rowHtml(r, byId, variant, achievements)).join('');
   const active = list.filter((r) => r.alliance.active).length;
 
+  /*
+    ДВЕ ВЕЩИ В ЭТОЙ РАЗМЕТКЕ СДЕЛАНЫ ДЛЯ ЧИТАТЕЛЯ С ПРОГРАММОЙ ЭКРАНА, И
+    ОБЕ ДЕРЖАТСЯ В СООТВЕТСТВИИ КОДОМ ДРАЙВЕРА (ui/ladder-controls.js).
+
+    1. Переключатели порядка и состава несут `aria-pressed` наряду с классом
+       `is-on`. Класс — то, что видит глаз; нажатие — то, что слышит человек.
+       Без второго кнопка звучит как обычная кнопка: «Победы» нажал, а что
+       порядок именно этот — нечем прочитать. Размечать нужно при первой
+       отрисовке, а не только в обработчике: вернувшись на страницу, читатель
+       увидел бы «не нажато» под горящей кнопкой.
+
+    2. Счётчик найденного — зона объявлений (`role="status"`). На него смотрит
+       тот, кто только что печатал в поиске: без объявления он не знает,
+       применилась ли фильтрация. Роль поставлена на счёт, а не на строки:
+       объявлять перемену места 65 строк при каждой сортировке — это час
+       бормотания вместо ответа. `aria-live="polite"` ролью status дан неявно и
+       здесь повторён явно, потому что этот файл читают как договорённость о
+       поведении.
+  */
   return `
     <section class="panel${variant === 'quarter' ? ' panel--quarter' : ''}">
       <header class="panel__head">
@@ -52,15 +71,15 @@ export function renderLadder({
         </label>
 
         <div class="seg" role="group" aria-label="Кого показывать">
-          <button type="button" class="seg__btn is-on" data-ladder-filter="active">Активные</button>
-          <button type="button" class="seg__btn" data-ladder-filter="all">Все</button>
+          <button type="button" class="seg__btn is-on" data-ladder-filter="active" aria-pressed="true">Активные</button>
+          <button type="button" class="seg__btn" data-ladder-filter="all" aria-pressed="false">Все</button>
         </div>
 
         <div class="seg" role="group" aria-label="Сортировка">
-          <button type="button" class="seg__btn is-on" data-ladder-sort="points">Очки</button>
-          <button type="button" class="seg__btn" data-ladder-sort="wins">Победы</button>
-          <button type="button" class="seg__btn" data-ladder-sort="form">Форма</button>
-          <button type="button" class="seg__btn" data-ladder-sort="name">А–Я</button>
+          <button type="button" class="seg__btn is-on" data-ladder-sort="points" aria-pressed="true">Очки</button>
+          <button type="button" class="seg__btn" data-ladder-sort="wins" aria-pressed="false">Победы</button>
+          <button type="button" class="seg__btn" data-ladder-sort="form" aria-pressed="false">Форма</button>
+          <button type="button" class="seg__btn" data-ladder-sort="name" aria-pressed="false">А–Я</button>
         </div>
       </div>
 
@@ -72,7 +91,7 @@ export function renderLadder({
       <div class="lad" data-ladder-list>${rows}</div>
 
       <p class="lad__empty" data-ladder-empty hidden>Ничего не нашлось. Проверьте написание.</p>
-      <p class="lad__count muted" data-ladder-count>
+      <p class="lad__count muted" data-ladder-count role="status" aria-live="polite">
         ${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} из ${list.length}
       </p>
     </section>`;
@@ -120,10 +139,21 @@ function rowHtml(r, byId, variant = 'season', achievements) {
     Строка — ссылка на карточку альянса. data-go нужен только собранному
     одним файлом превью: там нет роутера, и клик перехватывается вручную.
     В настоящем сайте отрабатывает обычный href.
+
+    ИМЯ СТРОКИ — ГЛАВНОЕ, ЧЕМ СТРОКА ОТЛИЧАЕТСЯ ОТ КАРТИНКИ.
+
+    Внутри строки шесть колонок, и четыре из них — голые знаки: «2», «—»,
+    «●●○○○», «8/1», «+6». Строка при этом не таблица, а ссылка: ассоциировать
+    её клетки с шапкой столбцов невозможно, даже если подписать шапку. Поэтому
+    читателю с программой экрана имя даёт сама строка — целиком, в нужном
+    порядке, словами. Шапка столбцов остаётся декоративной (aria-hidden): для
+    зрячего она полезна, читатель получил бы по ней второе копирование тех же
+    слов.
   */
   return `
   <a class="lad__row${medal}${isQuarter ? ' lad__row--quarter' : ''}${a.active ? '' : ' lad__row--off'}"
      href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
+     aria-label="${esc(standingsRowLabel(r, { mergedTarget, achievementCount }))}"
      style="--tag-color:${esc(color)}"
      data-name="${esc(a.name.toLowerCase())}"
      data-tag="${esc(a.tag.toLowerCase())}"
