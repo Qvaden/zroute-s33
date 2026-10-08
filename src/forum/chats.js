@@ -1727,6 +1727,15 @@ export async function mountChats(container, param = null) {
 }
 
 export function unmountChats() {
+  /*
+    Черновик переживает уход с вкладки. Без этого шага текст терялся ровно в
+    тот момент, когда человек смотрел не туда: набрал «а почта привязана?»,
+    вспомнил цену, нажал на карточку объявления — и вернулся с пустым полем.
+    Та же причина касается строчки «Написать продавцу», которая кладётся в
+    черновик: она защищена от перезаписи, только если доживает до возврата.
+  */
+  const input = host?.querySelector('[data-chat-input]');
+  if (input && state.openId) chatDrafts.set(state.openId, input.innerHTML);
   host = null;
   token++;
   stopPolling();
@@ -1767,4 +1776,24 @@ export async function unreadChatsTotal() {
   } catch {
     return 0;
   }
+}
+
+/**
+ * Положить в поле открываемого чата первую строчку — так с доски аккаунтов
+ * начинают разговор про конкретное объявление.
+ *
+ * Черновик кладется в тот же `chatDrafts`, что и набранный руками, поэтому
+ * отдельного механизма в перерисовке не появляется: `paintFull` сам достанет
+ * строку при открытии чата и сам сотрёт её после отправки.
+ *
+ * Набранный ранее текст не перезаписывается: человек мог начать фразу в этом
+ * чате и уйти, а кнопка на другом объявлении стёрла бы его слова.
+ *
+ * @returns {boolean} лёг черновик в поле или там уже было написано
+ */
+export function seedChatDraft(chatId, text) {
+  if (!chatId || !text) return false;
+  if (textOf(chatDrafts.get(chatId) || '')) return false;
+  chatDrafts.set(chatId, esc(String(text)));
+  return true;
 }

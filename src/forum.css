@@ -3622,6 +3622,15 @@
 .accounts-act:hover { color: var(--text); border-color: var(--accent); }
 .accounts-act--sold:hover { color: var(--win); border-color: var(--win); }
 .accounts-act--return:hover { color: var(--gold); border-color: var(--gold); }
+/* «Написать продавцу» — единственное действие чужого объявления, поэтому оно
+   подсвечено, а кнопки автора остаются нейтральными: на одном ряду человек не
+   должен выбирать, какая из них его. */
+.accounts-act--dm {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent);
+}
+.accounts-act--dm:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.accounts-act--dm:disabled { cursor: default; opacity: .6; }
 /* Проданное и просроченное не прячем, но и не зовём: объявление помнят по
    цене, и снятая плитка честнее исчезнувшей. Наведение такое объявление не
    получает — оно не ждёт клика. */

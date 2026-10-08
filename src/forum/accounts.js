@@ -24,7 +24,8 @@
  * страница честно показывает «Показать ещё», пока лента не кончилась.
  */
 import { forum } from './index.js';
-import { renderAccounts, ACCOUNT_SORTS, ACCOUNT_CATEGORY } from '../pages/accounts.js';
+import { renderAccounts, ACCOUNT_SORTS, ACCOUNT_CATEGORY, dmOpening } from '../pages/accounts.js';
+import { seedChatDraft } from './chats.js';
 import { ACCOUNT_TAG_ID, validatePost } from './rules.js';
 import { attachImage } from './profile.js';
 import { textOf } from './format.js';
@@ -561,6 +562,33 @@ function wire() {
         paint();
       } catch (err) {
         state.error = `Отметку снять не удалось: ${String(err?.message ?? err)}`;
+        paint();
+      }
+      return;
+    }
+
+    /*
+      Написать продавцу. ЛС с этим человеком, скорее всего, уже есть — база
+      возвращает существующую комнату, поэтому повторное нажатие не плодит
+      двойников. Черновик с названием и ценой кладётся в поле до перехода:
+      у адреса чата нет способа передать первую строчку, а запись в DOM после
+      перехода стёрлась бы первой перерисовкой.
+    */
+    const dmBtn = t.closest?.('[data-accounts-dm]');
+    if (dmBtn) {
+      const post = state.posts.find((p) => p.id === dmBtn.dataset.accountsDm);
+      if (!post) return;
+      dmBtn.disabled = true;
+      dmBtn.textContent = 'Открываем…';
+      try {
+        const chatId = await forum.createDM?.(post.authorNick);
+        if (!chatId) throw new Error('ЛС не открылся');
+        seedChatDraft(chatId, dmOpening(post));
+        location.hash = `#/chats/${chatId}`;
+      } catch (err) {
+        dmBtn.disabled = false;
+        dmBtn.textContent = '✉ Написать продавцу';
+        state.error = `Написать автору не удалось: ${String(err?.message ?? err)}`;
         paint();
       }
       return;

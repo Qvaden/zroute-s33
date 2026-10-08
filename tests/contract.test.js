@@ -11580,7 +11580,7 @@ console.log('\nAN. Доска аккаунтов');
   check('просроченное объявление показано со знаком «срок вышел», а не спрятано',
     /accounts-card--expired/.test(renderAccountCard(mk({ expiresAt: new Date(Date.now() - 86400000).toISOString() })))
       && renderAccountCard(mk({ expiresAt: new Date(Date.now() - 86400000).toISOString() })).includes('Срок вышел'));
-  check('единственный путь к договорённости — тема: карточка ссылается на неё',
+  check('публичный путь остался и он виден: карточка ссылается на тему с ответами',
     view().includes('href="#/forum/p1"'));
   check('кнопки покупки, оплаты и реквизитов на витрине нет и быть не может',
     !/купить|оплат|корзин|реквизит/i.test(view()) && view().includes('Сайт денег не берёт'));
@@ -11616,6 +11616,7 @@ console.log('\nAN. Доска аккаунтов');
     ['.accounts-hero', '.accounts-stats', '.accounts-stat--screen', '.accounts-notice',
       '.accounts-composer', '.accounts-fields', '.accounts-search', '.accounts-grid',
       '.accounts-card__price', '.accounts-card__acts', '.accounts-act--sold', '.accounts-act--return',
+      '.accounts-act--dm',
     ].every((sel) => cssSrc.includes(sel)));
   check('краска витрина берёт из токенов сайта, а не держит собственные цвета',
     /\.accounts-card \{[\s\S]{0,420}?background: linear-gradient\(180deg, var\(--raised\), var\(--surface\)\)/.test(cssSrc)
@@ -14801,6 +14802,133 @@ console.log('\nAQ. Стабильность кадра');
   */
   check('первый кадр сайта — контур для статики, пустота для живого',
     /app\.innerHTML = liveFirst \? '' : `/.test(mainJs));
+}
+
+/* ── AR. «Написать продавцу»: личная связь на доске ──────────────────────
+
+   Витрина объяснила, что в аккаунте и почём он, но не объяснила, как спросить.
+   Написать автору означало уйти во «Чаты», нажать ✉ и вписать ник руками, а
+   ошибаются ником ровно по тому, у кого уже покупали. Кнопка делает один шаг и
+   кладёт в поле первую строчку с названием и ценой объявления.
+
+   Проверяем то, что легко потерять при правке:
+   - кнопка не появляется там, где сообщение всё равно не уйдёт: своё
+     объявление, гость, бан, снятое и просроченное. Отказ базы человек прочитал
+     бы как сломанную кнопку, а кнопки, которая всегда отказывает, лучше не
+     вовсе;
+   - строчка в поле называет объявление: «привет, а ещё продаётся?» без
+     названия продавец встречает встречным вопросом, и вечер уходит у обоих;
+   - уже набранное в комнате не затирается.
+
+   Порядок условий в карточке — часть проверки: canDm && !sold && !expired.
+   Стоит переставить, и кнопка вернётся на снятое объявление, а проверка «в
+   разметке есть .accounts-act--dm» этого не заметит.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAR. Написать продавцу');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderAccounts, renderAccountCard, dmOpening } = await import('../src/pages/accounts.js');
+  const { seedChatDraft } = await import('../src/forum/chats.js');
+  const behavSrc = await readFile('src/forum/accounts.js', 'utf8');
+  const chatsSrc = await readFile('src/forum/chats.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const rules = await import('../src/forum/rules.js');
+  const adsRule = rules.RULES.find((r) => r.id === 'ads');
+
+  const mk = (over) => ({
+    id: 'p1', authorId: 'u1', authorNick: 'Продавец', authorServer: 33, title: 'Аккаунт 40 лвл',
+    body: '<p>текст</p>', category: 'ally', tags: ['accounts'], createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 5 * 86400000).toISOString(), commentCount: 2,
+    accountOffer: 'уровень 40, техника сезона', accountPrice: '1500 ₽', accountSoldAt: null, ...over,
+  });
+  const past = new Date(Date.now() - 86400000).toISOString();
+  const buyer = { id: 'u9', nick: 'Свидетель' };
+  const board = (me, posts = [mk({})]) => renderAccounts({
+    ready: true, loading: false, posts, total: posts.length, more: false, error: '',
+    sort: 'fresh', showSold: true, me, composing: false, editing: null, query: '',
+  });
+
+  check('чужое висящее объявление предлагает личное сообщение автору',
+    board(buyer).includes('data-accounts-dm="p1"'));
+  check('себе не пишут, а гостю не обещают: кнопка требует входа и чужого автора',
+    !board({ id: 'u1', nick: 'Продавец' }).includes('data-accounts-dm')
+      && !board(null).includes('data-accounts-dm'));
+  check('под запретом писать кнопки нет: отказ базы выглядит сломанной кнопкой',
+    !board({ ...buyer, banned: true }).includes('data-accounts-dm'));
+  check('снятое и просроченное объявление в ЛС не зовёт',
+    !board(buyer, [mk({ accountSoldAt: new Date() })]).includes('data-accounts-dm')
+      && !board(buyer, [mk({ expiresAt: past })]).includes('data-accounts-dm'));
+  check('публичный путь остался: та же ссылка на тему с историей и ответами',
+    board(buyer).includes('href="#/forum/p1"'));
+  check('кнопка экранируется и ведёт по id объявления, а не по нику автора',
+    renderAccountCard(mk({ id: 'p"<b>' }), false, true).includes('data-accounts-dm="p&quot;&lt;b&gt;"')
+      && renderAccountCard(mk({}), false, true).includes('data-accounts-dm="p1"'));
+  check('кнопка говорит правду про приватность: модерация названа вслух',
+    renderAccountCard(mk({}), false, true).includes('видят только вы двое и модерация сайта'));
+  check('ряд действий один на оба случая: карточка покупателя не выше карточки автора',
+    renderAccountCard(mk({}), false, true).includes('class="accounts-act accounts-act--dm"')
+      && !/\.accounts-card__acts--/.test(cssSrc));
+  /*
+    Кнопка добавила ряд к чужой карточке: до неё ряда у читателя не было
+    вовсе, и резерв контура в 210 px был равен heights пустой плитки. Живая
+    карточка с рядом — 251 px при колонке 316 px (замер в окне 1280 px),
+    поэтому резерв поднят до 250: иначе заход 5 ломается ровно на той
+    вкладке, ради которой ряд и появился.
+  */
+  const refineSrc = await readFile('src/refine.css', 'utf8');
+  check('контур плитки резервирует место под ряд кнопок',
+    /\.sk--tile \.sk__card \{ --sk-h: 250px; \}/.test(refineSrc));
+
+  equal('первая строчка называет объявление его же заголовком и ценой',
+    dmOpening(mk({})), 'По объявлению «Аккаунт 40 лвл» (1500 ₽) — ещё продаётся?');
+  check('без названия и без цены строчка всё равно про что-то',
+    dmOpening({}).includes('объявление без названия')
+      && dmOpening({ title: 'Акк' }).includes('цена не названа'));
+
+  check('нажатие открывает ЛС автора этого объявления и подставляет строчку',
+    behavSrc.includes('await forum.createDM?.(post.authorNick)')
+      && behavSrc.includes('seedChatDraft(chatId, dmOpening(post))')
+      && /location\.hash = `#\/chats\/\$\{chatId\}`/.test(behavSrc));
+  check('отказ не бросает человека в пустом чате: кнопка цела, причина названа',
+    /dmBtn\.disabled = false;[\s\S]{0,240}Написать автору не удалось/.test(behavSrc));
+
+  check('черновик пустой комнаты принимается, а уже набранное не затирается',
+    seedChatDraft('c-ar-1', 'раз') === true && seedChatDraft('c-ar-1', 'два') === false
+      && /if \(textOf\(chatDrafts\.get\(chatId\) \|\| ''\)\) return false;/.test(chatsSrc));
+  check('без комнаты или без текста черновика не бывает',
+    seedChatDraft('', 'текст') === false && seedChatDraft('c-ar-2', '') === false);
+  /*
+    Защита черновика бессмысленна, если сам черновик не переживает уход с
+    вкладки: человек набрал вопрос, нажал карточку объявления, чтобы сверить
+    цену, — и вернулся с пустым полем. Проверка стоит здесь, а не в разделе
+    про чаты, потому что именно кнопка «Написать продавцу» уводит с чата.
+  */
+  check('уход с вкладки сохраняет ненаправленное сообщение',
+    /export function unmountChats\(\) \{\s*(?:\/\*[\s\S]*?\*\/\s*)?const input = host\?\.querySelector\('\[data-chat-input\]'\);\s*if \(input && state\.openId\) chatDrafts\.set\(state\.openId, input\.innerHTML\);/.test(chatsSrc));
+
+  check('витрина и правило называют оба пути: тему и личное сообщение',
+    board(buyer).includes('кнопка «Написать продавцу»')
+      && adsRule.body.includes('личным сообщением с карточки'));
+  check('предупреждение доски не врёт про тайну: ЛС читает ещё и модерация',
+    /личное сообщение видят только вы двое\s+да модерация сайта/.test(board(null)));
+  check('личная кнопка выделена, а кнопки автора остались нейтральными',
+    /\.accounts-act--dm \{[^}]*border-color: color-mix\(in srgb, var\(--accent\) 45%, var\(--line\)\)/.test(cssSrc)
+      && /\.accounts-act--dm:disabled \{ cursor: default;/.test(cssSrc));
+
+  /*
+    Документ обязан называть приватность так, как её решает база. ЛС кажутся
+    тайными, пока человек не вспомнил про RLS; если документ об этом умолчит,
+    следующий правщик добавит кнопке «секретность» или уберёт модерацию из
+    политики чтения — и то, и другое другое делает сайт местом, где нельзя
+    разобрать спор по переписке.
+  */
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  check('документ называет оба пути связи и кто читает личное сообщение',
+    docsSrc.includes('«Написать продавцу»')
+      && docsSrc.includes('forum_chat_messages_read')
+      && docsSrc.includes('собеседникам и модерации сайта'));
+  check('документ объясняет, где кнопки нет, а не только где она есть',
+    docsSrc.includes('Кнопки нет на своём объявлении, у гостя, под запретом писать'));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

@@ -22,13 +22,21 @@
  * `createPost`, что и любая другая: метку ставит форма, раздел берёт «Разное»,
  * а текстом темы становится описание аккаунта, если комментарий не написан.
  *
- * ПОЧЕМУ НА ВИТРИНЕ НЕТ КНОПКИ «КУПИТЬ».
+ * ПОЧЕМУ НА ВИТРИНЕ НЕТ КНОПКИ «КУПИТЬ», НО ЕСТЬ «НАПИСАТЬ ПРОДАВЦУ».
  *
  * Сайта-продавца у нас нет и быть не может: денег форум не берёт, платёжного
  * шлюза, комиссии и способа вернуть сумму нет. Кнопка «купить» обещала бы то,
- * чего за ней не стоит, — поэтому единственный путь к договорённости это тема:
- * там автор, история и ответы, а сделка происходит мимо форума. Тот же смысл у
- * цены: это слово автора, а не счёт к оплате.
+ * чего за ней не стоит. Тот же смысл у цены: это слово автора, а не счёт к
+ * оплате.
+ *
+ * Личное сообщение ничего не обещает и ничего не берёт — оно убирает лишний
+ * путь. До него написать автору означало уйти во «Чаты», нажать ✉ и вписать ник
+ * руками, а ник на память держится плохо и ошибаются им ровно по тому, у кого
+ * уже покупали. Кнопка делает один шаг и кладёт в поле первую строчку с названием
+ * и ценой объявления, чтобы продавец понял, о чём речь, без переписки «это ещё
+ * продаётся?». Публичный путь остаётся: тема с историей и ответами, и торговаться
+ * там честнее — ЛС видят только вы двое и модерация сайта (политика чтения в
+ * supabase/applied/chats.sql), поэтому итог сделки по-прежнему отметка на доске.
  *
  * ПОЧЕМУ ДЕЙСТВИЯ АВТОРА ВСЁ-ТАКИ ЕСТЬ.
  *
@@ -139,7 +147,7 @@ function renderComposer(s) {
           <span>Почём</span>
           <input type="text" name="account_price" maxlength="${L.accountPriceMax}" autocomplete="off"
                  value="${esc(draft.price)}" placeholder="1500 ₽, торг, по договорённости">
-          <small class="muted">${L.accountPriceMin}–${L.accountPriceMax} символов, словами. Счета и контакты сюда не пишут — для связи есть ник автора.</small>
+          <small class="muted">${L.accountPriceMin}–${L.accountPriceMax} символов, словами. Счета и контакты сюда не пишут: для связи есть ник автора и кнопка «Написать продавцу» на карточке.</small>
         </label>
 
         <label class="forum-field">
@@ -191,7 +199,8 @@ function renderNotice() {
       договорённости пишутся в её ответах. Сайт денег не берёт: цена — слово
       автора, сделка происходит мимо форума, гарантий и возврата у нас нет.
       Телефон, почту и дискорд в объявлении не пишите — для связи есть ник
-      автора. Срок действия обязателен: по умолчанию ${L.expiryDefaultDays?.accounts ?? 7}
+      автора и кнопка «Написать продавцу»: личное сообщение видят только вы двое
+      да модерация сайта. Срок действия обязателен: по умолчанию ${L.expiryDefaultDays?.accounts ?? 7}
       ${pluralWord(L.expiryDefaultDays?.accounts ?? 7, 'день', 'дня', 'дней')}.
     </p>`;
 }
@@ -219,7 +228,8 @@ function renderHero(s, shownCount) {
         <h1>Кто отдаёт аккаунт и почём</h1>
         <p class="muted">
           Здесь только то, что отмечено меткой «Аккаунты»; договор и вопросы — в
-          теме, ссылка на неё в заголовке карточки.
+          теме, ссылка на неё в заголовке карточки. Написать автору лично можно
+          прямо с карточки.
         </p>
       </div>
       <div class="accounts-hero__aside">
@@ -298,6 +308,23 @@ function renderCardShots(p, href) {
 }
 
 /**
+ * Первая строчка личного сообщения продавцу.
+ *
+ * Пустое поле заставило бы покупателя печатать, о чём он, а продавца — спрашивать
+ * и ждать: на доске у одного человека висит несколько объявлений, и «привет,
+ * аккаунт ещё продаётся» не отвечает, о каком. Строка называет объявление его же
+ * заголовком и ценой, поэтому она работает и доказательством: договорённости
+ * начались с конкретного объявления, а не с «я думал, другой цена».
+ *
+ * Чистая функция: сборка текста не требует браузера и проверяется тестом.
+ */
+export function dmOpening(p) {
+  const title = String(p?.title ?? '').trim() || 'объявление без названия';
+  const price = String(p?.accountPrice ?? '').trim() || 'цена не названа';
+  return `По объявлению «${title}» (${price}) — ещё продаётся?`;
+}
+
+/**
  * Одна карточка объявления.
  *
  * Название, обе колонки доски, срок и автор с его сервером — всё. Текст темы на
@@ -312,12 +339,34 @@ function renderCardShots(p, href) {
  *
  * Кнопки автора — снятие с доски и правка — только у владельца: модерируется
  * тема, а не витрина, и удаление с причиной по-прежнему живёт в теме.
+ *
+ * Ряд действий один на оба случая: у чужого объявления в нём «Написать
+ * продавцу», у своего — свои кнопки. Второй ряд под тем же объявлением
+ * означал бы, что карточка покупателя выше карточки автора, а доска сравнивает
+ * цены глазами по строкам.
  */
-export function renderAccountCard(p, canManage = false) {
+export function renderAccountCard(p, canManage = false, canDm = false) {
   const sold = Boolean(p.accountSoldAt);
   const expired = Boolean(p.expiresAt) && new Date(p.expiresAt).getTime() <= Date.now();
   const href = `#/forum/${esc(p.id)}`;
   const answers = p.commentCount ?? 0;
+  /*
+    Кнопка ведёт в ЛС, а не в него же с ником в атрибуте: объявление на доске
+    ищут по id, а ник автора база нормализует по регистру, и два объявления
+    одного человека иначе не различились бы.
+  */
+  const dm = canDm && !sold && !expired
+    ? `<button type="button" class="accounts-act accounts-act--dm" data-accounts-dm="${esc(p.id)}"
+            title="Личное сообщение автору. Его видят только вы двое и модерация сайта.">✉ Написать продавцу</button>`
+    : '';
+  const acts = dm || canManage ? `
+        <div class="accounts-card__acts">
+          ${dm}${canManage ? `
+          <button type="button" class="accounts-act" data-accounts-edit="${esc(p.id)}">Править</button>
+          <button type="button" class="accounts-act accounts-act--${sold ? 'return' : 'sold'}"
+                  data-accounts-close="${esc(p.id)}" data-accounts-sold="${sold ? '0' : '1'}">${
+            sold ? 'Вернуть на доску' : 'Аккаунт продан'}</button>` : ''}
+        </div>` : '';
   return `
     <article class="accounts-card${sold ? ' accounts-card--sold' : ''}${expired ? ' accounts-card--expired' : ''}">
       <div class="accounts-card__marks">
@@ -333,14 +382,7 @@ export function renderAccountCard(p, canManage = false) {
         <a class="accounts-card__nick" href="#/user/${encodeURIComponent(p.authorNick)}">${esc(p.authorNick)}</a>${serverBadge(p.authorServer)}
         <span class="muted">${esc(shortDate(p.createdAt))}</span>
         <a class="accounts-card__talk" href="${href}">${answers} ${pluralWord(answers, 'ответ', 'ответа', 'ответов')}</a>
-      </footer>
-      ${canManage ? `
-        <div class="accounts-card__acts">
-          <button type="button" class="accounts-act" data-accounts-edit="${esc(p.id)}">Править</button>
-          <button type="button" class="accounts-act accounts-act--${sold ? 'return' : 'sold'}"
-                  data-accounts-close="${esc(p.id)}" data-accounts-sold="${sold ? '0' : '1'}">${
-            sold ? 'Вернуть на доску' : 'Аккаунт продан'}</button>
-        </div>` : ''}
+      </footer>${acts}
     </article>`;
 }
 
@@ -354,6 +396,12 @@ export function renderAccountCard(p, canManage = false) {
 export function renderAccounts(s) {
   const shown = s.posts.filter((p) => s.showSold || !p.accountSoldAt);
   const mine = (p) => Boolean(s.me) && s.me.id === p.authorId;
+  /*
+    ЛС пишет человек, а не гость и не тот, кому база запретила писать: база
+    отвергла бы и то, и другое текстом отказа, а кнопка, которая всегда отказывает,
+    хуже кнопки, которой нет.
+  */
+  const canDm = (p) => Boolean(s.me) && !s.me.banned && s.me.id !== p.authorId;
   const empty = s.ready === false
     ? 'Доска появится вместе с форумом.'
     : s.query
@@ -374,7 +422,7 @@ export function renderAccounts(s) {
       ${s.loading && !s.posts.length
         ? skWithCaption('Читаем доску…', 'tile', 6)
         : shown.length
-          ? `<div class="accounts-grid">${shown.map((p) => renderAccountCard(p, mine(p))).join('')}</div>`
+          ? `<div class="accounts-grid">${shown.map((p) => renderAccountCard(p, mine(p), canDm(p))).join('')}</div>`
           : `<div class="accounts-empty">
               <p>${s.loading ? 'Читаем доску…' : empty}</p>
               <p class="muted">${s.showSold
