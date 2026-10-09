@@ -22,7 +22,7 @@
 import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
 import { skWithCaption } from '../ui/skeleton.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
-import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
+import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, FORUM_TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
@@ -1424,8 +1424,10 @@ function renderExpiryField(tags) {
   const now = Date.now();
   /*
     Метка «нужен» стоит у тех вариантов, которые база примет при метке «Набор»,
-    «Срочно», «Обмен» или «Аккаунты»: автоподстановка подставляет ровно такой
-    вариант, и человеку видно, что выбор честный, а не случайный.
+    «Срочно» или «Обмен»: автоподстановка подставляет ровно такой вариант, и
+    человеку видно, что выбор честный, а не случайный. «Аккаунты» здесь не
+    названы, хотя база требует срок и у них: этой метки в форме темы больше нет,
+    она принадлежит вкладке доски.
   */
   const required = [...new Set(Object.values(defaults).map(Number))]
     .filter((d) => days.includes(d));
@@ -1436,11 +1438,11 @@ function renderExpiryField(tags) {
         <option value="">Бессрочно</option>
         ${days
           .map(
-            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора, срочных тем, обмена и аккаунтов)' : ''}</option>`
+            (d) => `<option value="${d}">${d} ${pluralWord(d, 'день', 'дня', 'дней')} — до ${esc(shortDate(now + d * 86400000))}${required.includes(d) ? ' (нужен для набора, срочных тем и обмена)' : ''}</option>`
           )
           .join('')}
       </select>
-      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор», «Срочно», «Обмен» или «Аккаунты» срок нужен
+      <small class="muted" data-forum-expiry-hint${needsExpiry(tags) ? '' : ' hidden'}>Теме с меткой «Набор», «Срочно» или «Обмен» срок нужен
         обязательно: он подставится сам, но его можно выбрать другой.</small>
     </label>`;
 }
@@ -1571,9 +1573,11 @@ function barterControl(p, s) {
   размечена `shopOnly` в rules.js, и объявление пишут на своей вкладке
   (src/pages/accounts.js). Две формы на те же две колонки расходились бы при
   каждой правке чисел, а вторая ничего не добавляла — тема-объявление
-  создаётся тем же createPost. В теме объявление по-прежнему видно: строки
-  ниже показывают обе части, а кнопка отметки «продано» остаётся здесь для
-  модературы, которой тема видна в ленте.
+  создаётся тем же createPost. Самой метки на форуме тоже не видно: ни кнопки в
+  строке фильтра, ни чипа у темы — список общих меток держит FORUM_TOPIC_TAGS.
+  Тема-объявление в ленте по-прежнему остаётся темой: строки ниже показывают обе
+  части, а кнопка отметки «продано» живёт здесь для модературы, которой тема
+  видна в ленте.
 */
 
 /**
@@ -1736,7 +1740,7 @@ function renderComposer(s) {
 
         <fieldset class="forum-topic-tags">
           <legend>Теги темы <small>до трёх</small></legend>
-          ${TOPIC_TAGS.filter((tag) => !tag.shopOnly).map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"${tags.includes(tag.id) ? ' checked' : ''}><span>${esc(tag.label)}</span></label>`).join('')}
+          ${FORUM_TOPIC_TAGS.map((tag) => `<label><input type="checkbox" name="tags" value="${esc(tag.id)}"${tags.includes(tag.id) ? ' checked' : ''}><span>${esc(tag.label)}</span></label>`).join('')}
         </fieldset>
 
         ${renderExpiryField(tags)}
@@ -1989,7 +1993,7 @@ function renderFeedControls(s) {
       <div class="forum-tag-filter" role="group" aria-label="Теги">
         <button type="button" class="forum-tag${s.tag === 'all' ? ' is-on' : ''}" data-forum-tag="all"
                 aria-pressed="${s.tag === 'all' ? 'true' : 'false'}">Все теги</button>
-        ${TOPIC_TAGS.map((tag) => `<button type="button" class="forum-tag${s.tag === tag.id ? ' is-on' : ''}" data-forum-tag="${esc(tag.id)}"
+        ${FORUM_TOPIC_TAGS.map((tag) => `<button type="button" class="forum-tag${s.tag === tag.id ? ' is-on' : ''}" data-forum-tag="${esc(tag.id)}"
                 aria-pressed="${s.tag === tag.id ? 'true' : 'false'}">#${esc(tag.label)}</button>`).join('')}
       </div>
     </div>`;
@@ -2159,6 +2163,24 @@ function renderFeed(s) {
     }`;
 }
 
+/*
+  Чипы меток у темы. Список берётся из FORUM_TOPIC_TAGS, и метки доски в нём
+  нет: объявление остаётся темой форума, но помечать его в ленте словом, которое
+  читатель не может ни поставить, ни отфильтровать, незачем — для продажи есть
+  вкладка, а в карточке предложение видно по строкам «В аккаунте» и «Цена».
+  Метка, которой нет в списке правил, тоже не показывается: её придумала не эта
+  версия сайта, и название она себе не найдёт.
+*/
+const FORUM_TAG_LABEL = new Map(FORUM_TOPIC_TAGS.map((tag) => [tag.id, tag.label]));
+
+function renderTagChips(tags) {
+  const shown = (Array.isArray(tags) ? tags : []).filter((tag) => FORUM_TAG_LABEL.has(tag));
+  if (!shown.length) return '';
+  return `<div class="forum-post__tags">${shown
+    .map((tag) => `<button type="button" class="forum-tag" data-forum-tag="${esc(tag)}">#${esc(FORUM_TAG_LABEL.get(tag))}</button>`)
+    .join('')}</div>`;
+}
+
 /**
  * Карточка поста в ленте.
  *
@@ -2244,7 +2266,7 @@ export function renderPostCard(p, s) {
         ${isOpen ? esc(p.title) : `<a href="#/forum/${esc(p.id)}">${esc(p.title)}</a>`}
       </h2>
 
-      ${p.tags?.length ? `<div class="forum-post__tags">${p.tags.map((tag) => `<button type="button" class="forum-tag" data-forum-tag="${esc(tag)}">#${esc(TOPIC_TAGS.find((item) => item.id === tag)?.label || tag)}</button>`).join('')}</div>` : ''}
+      ${renderTagChips(p.tags)}
 
       ${barterLines(p)}
 

@@ -681,14 +681,23 @@ function trackPageview(path) {
  * `#/forum?new=accounts`. Теперь объявление пишется только на вкладке
  * магазина, и на форуме такой формы больше нет: если оставить ссылку как есть,
  * человек придёт на ленту с закрытым композером и решит, что страница сломалась.
+ *
+ * Тем же путём идёт старый фильтр `#/forum?tag=accounts`: чипа такой метки на
+ * форуме больше не рисуется, и оставленный адрес показывал бы ленту, отобранную
+ * по примете, которой человек не видит.
+ *
  * Поэтому адрес переписываем до того, как его прочитает маршрутизатор, —
  * replaceState не дерёт человека назад и не добавляет в историю лишний шаг.
  */
 function redirectLegacyAccountHash() {
   const [path, search = ''] = location.hash.replace(/^#\/?/, '').split('?');
   if (path.split('/')[0] !== 'forum') return;
-  if (new URLSearchParams(search).get('new') !== 'accounts') return;
-  history.replaceState(null, '', '#/accounts?new=accounts');
+  const params = new URLSearchParams(search);
+  if (params.get('new') === 'accounts') {
+    history.replaceState(null, '', '#/accounts?new=accounts');
+  } else if (params.get('tag') === 'accounts') {
+    history.replaceState(null, '', '#/accounts');
+  }
 }
 
 function render() {

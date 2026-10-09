@@ -11293,8 +11293,8 @@ console.log('\nAN. Доска аккаунтов');
     метку «Аккаунты» больше не предлагает (см. `shopOnly` в правилах), поэтому
     здесь стоит сверять и точки подключения вкладки (адрес, живость,
     размонтирование соседними страницами, редирект старой ссылки), и то, что в
-    ленте не осталось ни полей доски, ни колонок в запросе, и что снятые
-    объявления режет экран, а не запрос.
+    ленте не осталось ни полей доски, ни колонок в запросе, ни самой метки на
+    экране, и что снятые объявления режет экран, а не запрос.
   */
   const { readFile } = await import('node:fs/promises');
   /*
@@ -11453,9 +11453,10 @@ console.log('\nAN. Доска аккаунтов');
       && /name="account_price"[\s\S]{0,160}maxlength="\$\{L\.accountPriceMax\}"/.test(boardSrc));
   check('а композер форума их больше не спрашивает: метка не предлагается, полей нет',
     !pagesSrc.includes('name="account_offer"') && !pagesSrc.includes('renderAccountFields')
-      && /TOPIC_TAGS\.filter\(\(tag\) => !tag\.shopOnly\)/.test(pagesSrc)
+      && pagesSrc.includes('FORUM_TOPIC_TAGS.map((tag) => `<label>')
+      && rules.FORUM_TOPIC_TAGS.every((tag) => !tag.shopOnly)
       && rules.TOPIC_TAGS.find((t) => t.id === 'accounts').shopOnly === true
-      && rules.TOPIC_TAGS.filter((t) => !t.shopOnly).length === rules.TOPIC_TAGS.length - 1);
+      && rules.FORUM_TOPIC_TAGS.length === rules.TOPIC_TAGS.length - 1);
   check('в запрос темы колонки доски не уезжают ни при каком раскладе: лента объявлений не пишет',
     !mountSrc.includes('needsAccountLines') && !/draft\.accountOffer/.test(mountSrc)
       && !pagesSrc.includes('data-forum-account-fields'));
@@ -11515,16 +11516,21 @@ console.log('\nAN. Доска аккаунтов');
     поймал, что с приходом четвёртой метки текст остался трёхметочным, а
     обещанная автоподстановка не работала при приходе по ссылке: прежние
     проверки сверяли отказы базы и наличие полей, а не эти два места.
+    С тех пор форма темы разучилась ставить метку доски, и перечислять её в
+    подсказке значит описывать то, чего на форуме уже не видно: слова держат
+    ровно те метки, которые композер предлагает.
   */
-  const expiryLabels = rules.EXPIRY_TAG_IDS.map(
-    (id) => rules.TOPIC_TAGS.find((t) => t.id === id).label
-  );
+  const expiryLabels = rules.FORUM_TOPIC_TAGS
+    .filter((tag) => rules.EXPIRY_TAG_IDS.includes(tag.id))
+    .map((tag) => tag.label);
   const expiryHint = /data-forum-expiry-hint[^>]*>([\s\S]{0,240}?)<\/small>/.exec(pagesSrc);
-  check('подсказка срока называет все метки, которым база требует срок',
-    Boolean(expiryHint) && expiryLabels.every((label) => expiryHint[1].includes(`«${label}»`)));
+  check('подсказка срока называет все метки форума, которым база требует срок',
+    Boolean(expiryHint) && expiryLabels.length === rules.EXPIRY_TAG_IDS.length - 1
+      && expiryLabels.every((label) => expiryHint[1].includes(`«${label}»`))
+      && !expiryHint[1].includes('«Аккаунты»'));
   const expiryOption = /required\.includes\(d\) \? ' \(нужен для([^']*)\)' : ''/.exec(pagesSrc);
   check('пометка у нужного срока в списке вариантов называет те же метки',
-    Boolean(expiryOption)
+    Boolean(expiryOption) && !/аккаунт/i.test(expiryOption[1])
       && (expiryOption[1].match(/,| и /g) || []).length === expiryLabels.length - 1);
   check('срок подставляется и при приходе по ссылке, а не только по клику по метке',
     /function autofillExpiry\(form, tagId\)/.test(mountSrc)
@@ -11594,6 +11600,29 @@ console.log('\nAN. Доска аккаунтов');
       && view().includes('href="#/forum"'));
   equal('адрес форума больше не знает намерения «объявление»: его расбирает только вкладка',
     composeIntentFromSearch('new=accounts'), '');
+  /*
+    Метка остаётся признаком объявления в базе: по ней вкладка отбирает темы,
+    по ней триггер требует состав с ценой. Видеть её на форуме человек не
+    должен — у продажи есть своё место, и чип, который нельзя ни поставить, ни
+    применить, был бы украшением, а не информацией.
+  */
+  const { renderPostCard } = await import('../src/pages/forum.js');
+  const seatState = {
+    me: null, openPostId: null, editingPostId: null, comments: [], alliances: [], categories: {},
+  };
+  check('ни кнопки в строке фильтра, ни чипа у темы: разметка форума метки доски не знает',
+    !/\bTOPIC_TAGS\b/.test(pagesSrc)
+      && /class="forum-tag-filter"[\s\S]{0,700}?FORUM_TOPIC_TAGS\.map/.test(pagesSrc)
+      && pagesSrc.includes('${renderTagChips(p.tags)}'));
+  check('вживую карточка объявления не несёт чипа «Аккаунты», а общую метку носит',
+    (() => {
+      const html = renderPostCard(mk({ tags: ['accounts', 'guide'] }), seatState);
+      return !html.includes('#Аккаунты') && html.includes('#Гайд');
+    })());
+  check('тема только с меткой доски не получает пустого блока чипов',
+    !/forum-post__tags/.test(renderPostCard(mk({}), seatState)));
+  check('старый фильтр ленты по метке доски не показывает отбор без приметы, а ведёт на вкладку',
+    /else if \(params\.get\('tag'\) === 'accounts'\) \{[\s\S]{0,60}history\.replaceState\(null, '', '#\/accounts'\);/.test(mainSrc));
   check('число «ещё» даёт кнопку, а не молчание',
     view({ posts: [mk({})], total: 9, more: true, showSold: true }).includes('data-accounts-more'));
   check('пустая доска и пустой превью — разные вещи',
@@ -11633,7 +11662,8 @@ console.log('\nAN. Доска аккаунтов');
   const adsRule = rules.RULES.find((r) => r.id === 'ads');
   check('правило про рекламу переписано, а не снято: аккаунты — на доске, сбор денег по-прежнему под запретом',
     adsRule.title.includes('аккаунты — на доске')
-      && adsRule.body.includes('сбор денег') && adsRule.body.includes('меткой «Аккаунты»')
+      && adsRule.body.includes('сбор денег')
+      && adsRule.body.includes('вкладку «Аккаунты»') && !adsRule.body.includes('меткой «Аккаунты»')
       && adsRule.body.includes('Денег сайт не берёт'));
   check('правило называет ограничение доски и запрет светить контакты',
     adsRule.body.includes('Телефон, почту и дискорд в текст объявления не пишите'));
