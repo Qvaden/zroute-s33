@@ -7,17 +7,18 @@
  *
  * ПОЧЕМУ ЭТО ОТДЕЛЬНАЯ ВКЛАДКА, А НЕ РАЗДЕЛ ЛЕНТЫ.
  *
- * Объявление остаётся темой форума: метка «Аккаунты», две колонки у неё, и всё
- * остальное — ответы, жалоба, срок, удаление — общие с форумом. Вкладка нужна
- * затем, чтобы покупать и продавать приходилось в одном месте, а не в семи
- * разделах ленты: человек ищет «почём аккаунт», а не «в какой теме это
- * написал Ковыль».
+ * Объявление остаётся темой форума: две колонки у неё, и всё остальное —
+ * ответы, жалоба, срок, удаление — общие с форумом. Вкладка нужна затем, чтобы
+ * покупать и продавать приходилось в одном месте, а не в семи разделах ленты:
+ * человек ищет «почём аккаунт», а не «в какой теме это написал Ковыль».
+ * Свой цвет и своё движение у доски тоже не украшение: на неё приходят искать
+ * товар, и открываться она обязана как прилавок, а не как ещё один список.
+ * Краска и анимации — в `forum.css`, раздел «Витрина продаж».
  *
  * ПОЧЕМУ ОБЪЯВЛЕНИЕ ПИШЕТСЯ ЗДЕСЬ, А НЕ В КОМПОЗЕРЕ ФОРУМА.
  *
  * Метка «Аккаунты» не предлагается в форме новой темы (см. `shopOnly` в
- * `rules.js`): у витрины свой ящик с четырьмя полями, и человек, который
- * пришёл продать, не обязан разбираться, зачем ему «Раздел» и «Теги темы».
+ * `rules.js`): у витрины свой ящик с четырьмя полями, и человек, который * пришёл продать, не обязан разбираться, зачем ему «Раздел» и «Теги темы».
  * Один путь, а не два, — и расходить им нечему. Тема при этом создаётся тем же
  * `createPost`, что и любая другая: метку ставит форма, раздел берёт «Разное»,
  * а текстом темы становится описание аккаунта, если комментарий не написан.
@@ -160,7 +161,7 @@ function renderComposer(s) {
         <b>${editing ? (foreign ? 'Правка чужого объявления' : 'Правка объявления') : 'Новое объявление'}</b>
         <span class="muted">${foreign
           ? `Автор остаётся ${esc(edited.authorNick)}: состав и цена — его слово, меняйте их только по договорённости с ним. Тема с ответами остаётся на месте.`
-          : 'Тема с меткой «Аккаунты» — торг и вопросы пишутся в её ответах.'}</span>
+          : 'Объявление — тема форума в разделе «Разное»: торг и вопросы пишутся в её ответах.'}</span>
       </div>
 
       <div class="accounts-fields">
@@ -233,7 +234,7 @@ function renderNotice() {
   const L = CONFIG.forum.limits;
   return `
     <p class="accounts-notice">
-      Объявление — обычная тема форума с меткой «Аккаунты»: торг, вопросы и
+      Объявление — обычная тема форума: торг, вопросы и
       договорённости пишутся в её ответах. Сайт денег не берёт: цена — слово
       автора, сделка происходит мимо форума, гарантий и возврата у нас нет.
       Телефон, почту и дискорд в объявлении не пишите — для связи есть ник
@@ -253,19 +254,26 @@ function renderNotice() {
  *
  * Кнопка объявления видна только вошедшему: без входа она вела бы к форме,
  * которую база отвергнет текстом «сначала войдите», а это обещание вслух.
+ *
+ * Точка в надзаголовке — не декор: она дёргается, пока доска читается, и
+ * замирает, когда объявления легли. Без неё первый заход выглядел бы пустой
+ * страницей, а пустая страница на витрине читается как «товара нет».
  */
 function renderHero(s, shownCount) {
   const total = Number(s.total) || 0;
   const cta = s.me
-    ? '<button type="button" class="forum-btn accounts-hero__cta" data-accounts-new>Выставить аккаунт</button>'
+    ? '<button type="button" class="forum-btn forum-btn--primary accounts-hero__cta" data-accounts-new>Выставить аккаунт</button>'
     : '<a class="forum-btn forum-btn--ghost accounts-hero__cta" href="#/forum">Войдите и выставьте аккаунт</a>';
   return `
     <header class="panel__head accounts-hero">
       <div class="accounts-hero__text">
-        <span class="eyebrow">Магазин аккаунтов</span>
+        <span class="accounts-eyebrow${s.loading ? ' is-loading' : ''}">
+          <i class="accounts-eyebrow__dot" aria-hidden="true"></i>${
+            s.loading ? 'Читаем доску' : 'Продажа аккаунтов'}
+        </span>
         <h1>Кто отдаёт аккаунт и почём</h1>
         <p class="muted">
-          Здесь только то, что отмечено меткой «Аккаунты»; договор и вопросы — в
+          Объявления с составом, ценой и скриншотами; договор и вопросы — в
           теме, ссылка на неё в заголовке карточки. Написать автору лично можно
           прямо с карточки.
         </p>
@@ -292,6 +300,11 @@ function renderHero(s, shownCount) {
  * Поиск идёт тем же запросом, что и лента (`q` у `listPosts`), а не по
  * прочитанной странице: «ищу банки» на доске должно находить объявление,
  * которое ещё не доехало до экрана.
+ *
+ * Запрос читает название и текст темы, и только. Отдельного поиска по колонке
+ * цены нет, поэтому placeholder и подсказка на пустой доске перечисляют то, что
+ * в тексте действительно бывает, — обещать «ищем по цене» значило бы учить
+ * человека промахиать.
  */
 function renderControls(s) {
   return `
@@ -307,8 +320,8 @@ function renderControls(s) {
       </label>
       <label class="accounts-search">
         <input type="search" name="q" data-accounts-q autocomplete="off" spellcheck="false"
-               aria-label="Поиск по доске объявлений"
-               placeholder="Поиск по доске: уровень, ресурс, цена" value="${esc(s.query ?? '')}">
+               aria-label="Поиск по названию и тексту объявления"
+               placeholder="Поиск: название, что в аккаунте, условия" value="${esc(s.query ?? '')}">
       </label>
     </div>`;
 }
@@ -362,6 +375,9 @@ export function dmOpening(p) {
   return `По объявлению «${title}» (${price}) — ещё продаётся?`;
 }
 
+/** Свежим объявление считают сутки после выкладки. */
+export const FRESH_AD_MS = 86400000;
+
 /**
  * Одна карточка объявления.
  *
@@ -384,10 +400,21 @@ export function dmOpening(p) {
  * продавцу», автору и модературе — свои кнопки. Второй ряд под тем же объявлением
  * означал бы, что карточка покупателя выше карточки автора, а доска сравнивает
  * цены глазами по строкам.
+ *
+ * `index` — номер в списке, и нужен он не для красоты: порядковый номер уезжает
+ * в CSS-переменную `--i`, а из неё считается задержка появления плитки. Без
+ * номера доска выезжала бы целом плахтой, и глаза не успевали бы за тем, где
+ * начало и где конец.
+ *
+ * Метка «свежее» — про сутки, а не про первый экран: на доске, отфильтрованной
+ * по «обсуждаемым», вчерашнее объявление лежит внизу, и без него человек не
+ * понял бы, что это новый товар, а не забытый старый.
  */
-export function renderAccountCard(p, canManage = false, canDm = false, asModerator = false) {
+export function renderAccountCard(p, canManage = false, canDm = false, asModerator = false, index = 0) {
   const sold = Boolean(p.accountSoldAt);
   const expired = Boolean(p.expiresAt) && new Date(p.expiresAt).getTime() <= Date.now();
+  const created = new Date(p.createdAt).getTime();
+  const fresh = Number.isFinite(created) && Date.now() - created < FRESH_AD_MS && !sold && !expired;
   const href = `#/forum/${esc(p.id)}`;
   const answers = p.commentCount ?? 0;
   /*
@@ -418,14 +445,17 @@ export function renderAccountCard(p, canManage = false, canDm = false, asModerat
   const acts = dm || canManage ? `
         <div class="accounts-card__acts">${dm}${manage}
         </div>` : '';
+  const marks = [
+    sold ? `<span class="accounts-card__sold" title="Снято с доски ${esc(shortDate(p.accountSoldAt))}: отметку ставят автор и модература — кто именно, сайт не запоминает">Продано</span>` : '',
+    expired ? '<span class="accounts-card__over" title="Срок действия темы вышел">Срок вышел</span>' : '',
+    fresh ? '<span class="accounts-card__fresh" title="Объявление выложено за последние сутки">свежее</span>' : '',
+    !expired && p.expiresAt ? `<span class="accounts-card__until" title="Объявление висит до ${esc(shortDate(p.expiresAt))}">до ${esc(shortDate(p.expiresAt))}</span>` : '',
+  ].filter(Boolean).join('');
   return `
-    <article class="accounts-card${sold ? ' accounts-card--sold' : ''}${expired ? ' accounts-card--expired' : ''}">
-      <div class="accounts-card__marks">
-        ${sold ? `<span class="accounts-card__sold" title="Снято с доски ${esc(shortDate(p.accountSoldAt))}: отметку ставят автор и модература — кто именно, сайт не запоминает">Продано</span>` : ''}
-        ${expired ? '<span class="accounts-card__over" title="Срок действия темы вышел">Срок вышел</span>' : ''}
-        ${!expired && p.expiresAt ? `<span class="accounts-card__until" title="Объявление висит до ${esc(shortDate(p.expiresAt))}">до ${esc(shortDate(p.expiresAt))}</span>` : ''}
-      </div>
-      <h3 class="accounts-card__title"><a href="${href}">${esc(p.title)}</a></h3>
+    <article class="accounts-card${sold ? ' accounts-card--sold' : ''}${expired ? ' accounts-card--expired' : ''}${fresh ? ' accounts-card--fresh' : ''}"
+             style="--i:${Number(index) || 0}">
+      ${marks ? `<div class="accounts-card__marks">${marks}</div>` : ''}
+      <h3 class="accounts-card__title"><a href="${href}">${esc(p.title)}<i class="accounts-card__go" aria-hidden="true">→</i></a></h3>
       ${renderCardShots(p, href)}
       <p class="accounts-card__offer">${esc(p.accountOffer || '—')}</p>
       <p class="accounts-card__price">${esc(p.accountPrice || 'цена не названа')}</p>
@@ -466,6 +496,29 @@ export function renderAccounts(s) {
     : s.query
       ? `По запросу «${s.query}» на доске ничего нет.`
       : 'Объявлений на доске нет.';
+  /*
+    Класс выезда стоит РОВНО на первой отрисовке визита. `paint()` перерисовывает
+    весь раздел через `innerHTML` при любом изменении — галочка проданных,
+    сортировка, каждый символ в поиске, — и без флага анимация проигрывалась бы
+    на каждую букву: список дёргался бы под руками человека.
+  */
+  const gridClass = s.entered ? 'accounts-grid' : 'accounts-grid accounts-grid--in';
+  /*
+    Пустая доска говорит разными словами в трёх разных случаях: проданные
+    скрыты галочкой, запрос ничего не нашёл, и объявлений правда нет. Третье —
+    единственное, где человеку есть что делать, поэтому там кнопка, а не
+    совет: без неё первый покупатель ушёл бы читать форум.
+  */
+  const emptyHint = s.query
+    ? 'Поиск читает название и текст темы: попробуйте другое слово или часть названия.'
+    : !s.showSold
+      ? 'Проданные и снятые скрыты: снимите галочку «показывать проданные», чтобы увидеть их все.'
+      : s.me
+        ? 'Доску открывает первое объявление — форма прямо здесь, на этой странице.'
+        : 'Доску открывает первое объявление: форма на этой странице появляется для вошедшего.';
+  const emptyCta = s.me && !s.query && !s.loading
+    ? '<p><button type="button" class="forum-btn forum-btn--primary accounts-empty__cta" data-accounts-new>Выставить аккаунт</button></p>'
+    : '';
   return `
     <section class="panel accounts-page">
       ${renderHero(s, shown.length)}
@@ -481,9 +534,10 @@ export function renderAccounts(s) {
       ${s.loading && !s.posts.length
         ? skWithCaption('Читаем доску…', 'tile', 6)
         : shown.length
-          ? `<div class="accounts-grid">${shown.map((p) => renderAccountCard(p, manages(p), canDm(p), manages(p) && !mine(p))).join('')}</div>`
+          ? `<div class="${gridClass}">${shown.map((p, i) => renderAccountCard(p, manages(p), canDm(p), manages(p) && !mine(p), i)).join('')}</div>`
           : `<div class="accounts-empty">
               <p>${s.loading ? 'Читаем доску…' : empty}</p>
+              ${s.query || s.loading ? '' : emptyCta}
               <p class="muted">${s.showSold
                 ? 'Можно написать первыми: «Выставить аккаунт» — форма здесь, на доске.'
                 : 'Проданные скрыты: снимите галочку «показывать проданные», чтобы увидеть их все.'}</p>

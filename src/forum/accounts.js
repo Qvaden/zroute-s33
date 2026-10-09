@@ -52,7 +52,7 @@ const KEPT = [
   '[data-editor]',
 ];
 
-/** @type {{sort: string, showSold: boolean, query: string, posts: any[], total: number, loading: boolean, more: boolean, error: string, ready: boolean|null, me: any, composing: boolean, editing: any}} */
+/** @type {{sort: string, showSold: boolean, query: string, posts: any[], total: number, loading: boolean, more: boolean, error: string, ready: boolean|null, me: any, composing: boolean, editing: any, entered: boolean}} */
 const state = {
   sort: DEFAULT_SORT,
   showSold: false,
@@ -66,6 +66,12 @@ const state = {
   me: null,
   composing: false,
   editing: null,
+  /*
+    Считал ли человек этот заход в доску. Разметка ставит класс выезда только
+    когда флаг ещё не поднят: `paint()` перерисовывает весь раздел при каждом
+    изменении, и без флага плитка выезжала бы заново на каждую букву поиска.
+  */
+  entered: false,
 };
 
 let host = null;
@@ -133,6 +139,8 @@ function paint() {
     }
   }
   paintShots();
+  // Флаг поднимаем после разметки: первый список ещё успевает выехать, следующий — уже нет.
+  if (state.posts.length) state.entered = true;
 }
 
 /**
@@ -699,6 +707,7 @@ export async function mountAccounts(container, search = '') {
   state.loading = true;
   state.composing = false;
   state.editing = null;
+  state.entered = false;
   paint();
   wire();
 

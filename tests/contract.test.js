@@ -11490,7 +11490,7 @@ console.log('\nAN. Доска аккаунтов');
 
   /* ── Вкладка-витрина подключена, а не лежит рядом ── */
   check('вкладка стоит в меню и живёт по своему адресу',
-    /\{\s*id: 'accounts',\s*label: 'Аккаунты',\s*live: true,/.test(mainSrc)
+    /\{\s*id: 'accounts',\s*label: 'Продажа аккаунтов',\s*live: true,/.test(mainSrc)
       && mainSrc.includes('if (id === \'accounts\') return `accounts:${search}`;'));
   check('она ждёт ответа хранилища, как живой раздел',
     /const liveFirst = [^;]*id === 'accounts'[^;]*;/.test(mainSrc));
@@ -11653,17 +11653,18 @@ console.log('\nAN. Доска аккаунтов');
       && /\.accounts-composer \{[\s\S]{0,320}?background: var\(--surface\)/.test(cssSrc));
   check('телефон: шапка и сетка складываются в одну колонку, а кнопки становятся во всю ширину',
     /@media \(max-width: 700px\)[\s\S]{0,1200}?\.accounts-hero \{ grid-template-columns: 1fr;[\s\S]{0,900}?\.accounts-grid \{ grid-template-columns: 1fr;[\s\S]{0,700}?\.accounts-act \{ min-height: 44px/.test(cssSrc));
-  check('главное действие витрины одето общей кнопкой сайта, а не собственным градиентом',
-    /class="forum-btn accounts-hero__cta"/.test(boardSrc)
+  check('главное действие витрины остаётся общей кнопкой сайта, но краску берёт бирюзовую',
+    /class="forum-btn forum-btn--primary accounts-hero__cta"/.test(boardSrc)
       && /class="forum-btn forum-btn--ghost accounts-hero__cta"/.test(boardSrc)
-      && !/\.accounts-hero__cta \{[^}]*background:/.test(cssSrc));
+      && /\.accounts-hero \.accounts-hero__cta \{[^}]*background: linear-gradient\(135deg, color-mix\(in srgb, var\(--shop\)[^}]*color: var\(--shop-ink\)/.test(cssSrc)
+      && /\.accounts-composer \.forum-btn--primary \{[^}]*color: var\(--shop-ink\)/.test(cssSrc));
 
   /* ── Правила форума: доска не отменила запрет торговли в ленте ── */
   const adsRule = rules.RULES.find((r) => r.id === 'ads');
   check('правило про рекламу переписано, а не снято: аккаунты — на доске, сбор денег по-прежнему под запретом',
     adsRule.title.includes('аккаунты — на доске')
       && adsRule.body.includes('сбор денег')
-      && adsRule.body.includes('вкладку «Аккаунты»') && !adsRule.body.includes('меткой «Аккаунты»')
+      && adsRule.body.includes('отдельной вкладкой «Продажа аккаунтов»') && !adsRule.body.includes('меткой «Аккаунты»')
       && adsRule.body.includes('Денег сайт не берёт'));
   check('правило называет ограничение доски и запрет светить контакты',
     adsRule.body.includes('Телефон, почту и дискорд в текст объявления не пишите'));
@@ -11870,7 +11871,7 @@ console.log('\nAN. Доска аккаунтов');
   /* Превью живут вне разметки и обязаны переживать перерисовку формы. */
   const paintFn = /function paint\(\) \{[\s\S]*?\n\}/.exec(behavSrc);
   check('превью дорисовываются в конце перерисовки: ссылка на Blob в innerHTML формы не помещается',
-    Boolean(paintFn) && /paintShots\(\);\s*\}$/.test(paintFn[0]));
+    Boolean(paintFn) && /paintShots\(\);[\s\S]{0,240}?\}$/.test(paintFn[0]));
   check('уход с вкладки освобождает ссылки на файлы, иначе браузер держит их до перезагрузки',
     /function unmountAccounts\(\)[\s\S]*?clearAllShots\(\);/.test(behavSrc)
       && behavSrc.includes('URL.revokeObjectURL(list[index].preview)')
@@ -14950,7 +14951,7 @@ console.log('\nAR. Написать продавцу');
   check('предупреждение доски не врёт про тайну: ЛС читает ещё и модерация',
     /личное сообщение видят только вы двое\s+да модерация сайта/.test(board(null)));
   check('личная кнопка выделена, а кнопки автора остались нейтральными',
-    /\.accounts-act--dm \{[^}]*border-color: color-mix\(in srgb, var\(--accent\) 45%, var\(--line\)\)/.test(cssSrc)
+    /\.accounts-act--dm \{[^}]*border-color: color-mix\(in srgb, var\(--shop\) 48%, var\(--line\)\)/.test(cssSrc)
       && /\.accounts-act--dm:disabled \{ cursor: default;/.test(cssSrc));
 
   /*
@@ -15500,6 +15501,206 @@ console.log('\nAT. Статьи отдельными страницами');
     Связь между документом и приложением при этом есть, и она одна: ссылка
     «открыть в приложении» под текстом. Проверяется она выше.
   */
+}
+
+// ── AU. Витрина продаж: имя, краска и своё движение ────────────────────────
+/*
+   Раздел отвечает на три вопроса, каждый из которых глаз видит, а правка теряет.
+
+   Имя. Пункт меню, заголовок окна, тексты правил, документ и статичное превью
+   перечисляют доску одними словами. Расходятся они молча: код при этом работает,
+   просто человек читает про «Аккаунты» там, где вкладка называется иначе.
+
+   Краска. Бирюза доски вне токенов `styles-v8.css` — то место, где светлая тема
+   переопределяет цвета без единого сообщения, поэтому числа проверяются
+   расчётом, а не глазом: одна правка тона, и надпись на плашке становится
+   нечитаемой ровно в одной из двух тем.
+
+   Движение. Раздел перерисовывается целиком на каждое изменение состояния, и
+   анимация, повешенная на сетку напрямую, играла бы на каждую букву поиска.
+   Это ровно тот дефект, который на скриншоте не виден никогда.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAU. Витрина продаж: имя, краска и своё движение');
+{
+  const { readFile } = await import('node:fs/promises');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const boardSrc = await readFile('src/pages/accounts.js', 'utf8');
+  const behavSrc = await readFile('src/forum/accounts.js', 'utf8');
+  const cssSrc = await readFile('src/forum.css', 'utf8');
+  const v8Src = await readFile('src/styles-v8.css', 'utf8');
+  const docsSrc = await readFile('docs/FORUM.md', 'utf8');
+  const previewSrc = await readFile('scripts/build-preview.mjs', 'utf8');
+  const supaSrc = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const rules = await import('../src/forum/rules.js');
+  const NAME = 'Продажа аккаунтов';
+
+  /* ── Имя одно во всех местах ── */
+  check('вкладка названа делом, а не предметом: «Продажа аккаунтов»',
+    mainSrc.includes(`id: 'accounts', label: '${NAME}'`)
+      && mainSrc.includes(`title: '${NAME} · Сервер 33'`));
+  check('правила форума ведут на вкладку тем же именем',
+    rules.RULES.some((r) => r.body.includes(`вкладка «${NAME}»`))
+      && rules.RULES.some((r) => r.body.includes(`вкладкой «${NAME}»`)));
+  check('старого названия нигде не осталось: ни в меню, ни в правилах, ни в превью',
+    !/label: 'Аккаунты'/.test(mainSrc) && !/label: 'Аккаунты'/.test(previewSrc)
+      && !rules.RULES.some((r) => r.body.includes('вкладку «Аккаунты»')));
+  check('статичное превью зовёт вкладку тем же именем, что и живой сайт',
+    previewSrc.includes(`label: '${NAME}'`));
+  check('документ описывает доску под новым именем и объясняет, почему оно такое',
+    docsSrc.includes(`«${NAME}», а не «Аккаунты»`));
+  check('строка состояния над шапкой называет доску и меняется на «читаем доску»',
+    boardSrc.includes(`<i class="accounts-eyebrow__dot" aria-hidden="true"></i>`)
+      && boardSrc.includes(`s.loading ? 'Читаем доску' : '${NAME}'`));
+
+  /* ── Краска: токены и посчитанный контраст ── */
+  const darkShop = /:root \{\s*--shop: (#[0-9a-f]{6});\s*--shop-ink: (#[0-9a-f]{6});/.exec(cssSrc);
+  const lightShop = /:root\[data-theme="light"\] \{\s*--shop: (#[0-9a-f]{6});\s*--shop-ink: (#[0-9a-f]{6});/.exec(cssSrc);
+  check('бирюза доски объявлена токеном в `:root` и перезадана в светлой теме',
+    Boolean(darkShop) && Boolean(lightShop));
+
+  const lum = (hex) => {
+    const c = hex.slice(1);
+    const [r, g, b] = [0, 2, 4].map((i) => {
+      const v = parseInt(c.slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const x = lum(a);
+    const y = lum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  const darkSurface = /:root \{[\s\S]{0,200}?--surface:\s+(#[0-9a-f]{6});/.exec(v8Src);
+  const lightSurface = /\[data-theme="light"\] \{[\s\S]{0,200}?--surface:\s+(#[0-9a-f]{6});/.exec(v8Src);
+  const pairs = darkShop && lightShop && darkSurface && lightSurface
+    ? [
+      ['тёмная: бирюза на поверхности', ratio(darkShop[1], darkSurface[1])],
+      ['светлая: бирюза на поверхности', ratio(lightShop[1], lightSurface[1])],
+      ['тёмная: чернила на бирюзе', ratio(darkShop[2], darkShop[1])],
+      ['светлая: чернила на бирюзе', ratio(lightShop[2], lightShop[1])],
+    ]
+    : [];
+  check('все четыре пары красок доски дотягивают до AA для обычного текста',
+    pairs.length === 4 && pairs.every(([, c]) => c >= 4.5),
+    pairs.map((p) => `${p[0]} — ${p[1].toFixed(2)}:1`).join(', '));
+  check('чернила на залитой плашке в двух темах РАЗНЫЕ, а не один тон на обеих',
+    darkShop && lightShop && darkShop[2] !== lightShop[2]);
+
+  /* ── Краска в светлой теме держится против чужого каскада ──
+     `refine.css` грузится ПОЗЖЕ `forum.css` и перекрашивает всякую `.forum-btn`
+     в янтарь правилом `(0,3,0)`. Равенство специфичности там проиграно заранее,
+     поэтому слой доски обязан быть сильнее — и по числу классов, и по порядку.
+     Слой молча отваливается от любой правки селектора, а глаз видит это как
+     «доска стала оранжевой», то есть как потерю всей идеи раздела. */
+  const refineSrc = await readFile('src/refine.css', 'utf8');
+  const htmlSrc = await readFile('index.html', 'utf8');
+  const cssFlat = cssSrc.replace(/\r\n/g, '\n');
+  const amber = /:root\[data-theme="light"\] \.forum-btn,/.test(refineSrc);
+  check('конфликт жив: refine.css по-прежнему красит все кнопки в янтарь',
+    amber && /:root\[data-theme="light"\] \.forum-btn[\s\S]{0,300}?#a94722/.test(refineSrc));
+  check('forum.css стоит в списке файлов РАНЬШЕ refine.css, поэтому слой доски сильнее по специфичности',
+    htmlSrc.search(/href="\.\/src\/forum\.css/) < htmlSrc.search(/href="\.\/src\/refine\.css/)
+      && htmlSrc.includes('href="./src/forum.css') && htmlSrc.includes('href="./src/refine.css'));
+
+  const lightLayer = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta,\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary,\n:root\[data-theme="light"\] \.accounts-empty \.forum-btn \{([^}]*)\}/.exec(cssFlat);
+  const lightHover = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta:hover:not\(:disabled\),\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary:hover:not\(:disabled\),\n:root\[data-theme="light"\] \.accounts-empty \.forum-btn:hover:not\(:disabled\) \{([^}]*)\}/.exec(cssFlat);
+  const pick = (m, what) => (m ? new RegExp(`${what}:\\s*([^;]+);`).exec(m[1]) : null);
+  check('три залитые кнопки доски в светлой теме держат бирюзу и свои чернила, а не янтарь',
+    Boolean(lightLayer) && /var\(--shop\)/.test(lightLayer ? lightLayer[1] : '')
+      && /var\(--shop-ink\)/.test(lightLayer ? lightLayer[1] : '')
+      && !/a94722|c86231|b95428|8e381b/i.test(lightLayer ? lightLayer[1] : ''));
+  check('hover этих же кнопок тоже перебит, а не остался янтарным',
+    Boolean(lightHover) && /var\(--shop-ink\)/.test(lightHover ? lightHover[1] : '')
+      && !/a94722|c86231|b95428|8e381b/i.test(lightHover ? lightHover[1] : ''));
+  /*
+     refine кладёт на `.forum-btn` янтарную рамку и коричневую тень. Если слой
+     доски возвращает только фон с чернилами, получается бирюзовая плашка в
+     оранжевом обводе: глаз читает её как обычную кнопку сайта, и смысл раздела
+     теряется на самой заметной кнопке.
+  */
+  check('рамка и тень кнопок доски в светлой теме тоже свои, а не янтарный обвод вокруг бирюзы',
+    Boolean(lightLayer) && Boolean(lightHover)
+      && /border-color:\s*color-mix\(in srgb, var\(--shop\)/.test(lightLayer[1])
+      && /box-shadow:[\s\S]{0,200}?var\(--shop\)/.test(lightLayer[1])
+      && /border-color:\s*color-mix\(in srgb, var\(--shop\)/.test(lightHover[1])
+      && /box-shadow:[\s\S]{0,200}?var\(--shop\)/.test(lightHover[1])
+      && !/a94722|121,\s*49,\s*22/i.test(`${lightLayer[1]}${lightHover[1]}`));
+
+  const mixHex = (hex, other, share) => {
+    const read = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const a = read(hex);
+    const b = read(other);
+    return `#${a.map((v, i) => Math.round(v * share + b[i] * (1 - share))
+      .toString(16).padStart(2, '0')).join('')}`;
+  };
+  const stopColors = (bgValue, shop, ink) => {
+    const stops = [];
+    for (const m of bgValue.matchAll(/color-mix\(in srgb, var\(--shop\) (\d+)%, (#[0-9a-f]{3,6})\)|(var\(--shop\))/g)) {
+      if (m[1]) {
+        const tint = m[2].length === 4
+          ? `#${m[2].slice(1).split('').map((c) => c + c).join('')}`
+          : m[2];
+        stops.push(mixHex(shop, tint, Number(m[1]) / 100));
+      } else stops.push(shop);
+    }
+    return { stops, ink };
+  };
+  const lightStops = [];
+  for (const m of [lightLayer, lightHover]) {
+    if (!m) continue;
+    const bg = pick(m, 'background');
+    if (bg) lightStops.push(...stopColors(bg[1], lightShop ? lightShop[1] : '#000000', lightShop ? lightShop[2] : '#ffffff').stops);
+  }
+  const lightInks = lightStops.map((s) => ratio(lightShop ? lightShop[2] : '#ffffff', s));
+  check('каждый стоп-цвет светлого градиента кнопок доски читается своими чернилами (AA)',
+    lightStops.length >= 3 && lightInks.length >= 3 && lightInks.every((c) => c >= 4.5),
+    lightStops.map((s, i) => `${s} — ${lightInks[i].toFixed(2)}:1`).join(', '));
+  check('в светлой теме градиент кнопки уходит в затемнение, а не в белёсый край: белёсый дал бы 3,9 : 1',
+    Boolean(pick(lightLayer || [null, ''], 'background'))
+      && /color-mix\(in srgb, var\(--shop\) \d+%, #000\)/.test((pick(lightLayer, 'background') || [, ''])[1]));
+  check('пункт меню доски красится своей бирюзой, как это уже делает кварт',
+    /\.nav__link\[href="#\/accounts"\] \{\s*color: var\(--shop\)/.test(cssSrc));
+  check('ни одного цвета, вписанного в разметку: доска берёт краску из токена',
+    !/#[0-9a-f]{6}/i.test(boardSrc) && (cssSrc.match(/--shop/g) || []).length > 30);
+
+  /* ── Движение: только на первой отрисовке ── */
+  check('флаг первой отрисовки живёт в состоянии и типе состояния',
+    /entered: boolean/.test(behavSrc) && /entered: false,/.test(behavSrc));
+  check('флаг поднимается ПОСЛЕ разметки и только когда объявления есть',
+    /paintShots\(\);[\s\S]{0,240}?if \(state\.posts\.length\) state\.entered = true;/.test(behavSrc));
+  check('уход с вкладки сбрасывает флаг: возврат считается новым входом',
+    /function mountAccounts\([\s\S]{0,900}?state\.entered = false;/.test(behavSrc));
+  check('класс выезда стоит ровно на первой отрисовке визита',
+    boardSrc.includes("const gridClass = s.entered ? 'accounts-grid' : 'accounts-grid accounts-grid--in';"));
+  check('анимация плиток привязана к классу выезда и нигде больше',
+    /\.accounts-grid--in > \.accounts-card \{\s*animation: accounts-in/.test(cssSrc)
+      && !/\.accounts-grid > \.accounts-card \{[^}]*animation:/.test(cssSrc));
+  const inFrames = /@keyframes accounts-in \{([\s\S]*?)\n\}/.exec(cssSrc);
+  check('выезд считает только transform и opacity: высота строки не меняется, и список не дёргается',
+    Boolean(inFrames) && !/height|margin|padding|width|top|left|font/.test(inFrames[1]));
+  check('задержка очереди ограничена потолком: дальняя плитка не ждёт полсекунды',
+    /animation-delay: calc\(min\(var\(--i, 0\), 9\) \* 45ms\)/.test(cssSrc)
+      && boardSrc.includes('style="--i:${Number(index) || 0}"'));
+  check('под prefers-reduced-motion движение доски выключено целиком, а стрелка видна',
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,700}?\.accounts-grid--in > \.accounts-card,[\s\S]{0,300}?animation: none;[\s\S]{0,600}?\.accounts-card__go \{ opacity: 1/.test(cssSrc));
+
+  /* ── Метка «свежее» ── */
+  check('свежесть — сутки, и число названо до того, кто его считает',
+    /export const FRESH_AD_MS = 86400000;/.test(boardSrc)
+      && boardSrc.indexOf('export const FRESH_AD_MS') < boardSrc.indexOf('export function renderAccountCard')
+      && boardSrc.includes('Date.now() - created < FRESH_AD_MS'));
+  check('свежее не бывает проданное и просроченное: плитка не зовёт туда, где товар снят',
+    /&& !sold && !expired;/.test(boardSrc)
+      && boardSrc.includes("fresh ? '<span class=\"accounts-card__fresh\""));
+
+  /* ── Честный поиск ── */
+  check('адаптер ищет по названию и тексту темы — ровно двумя колонками',
+    supaSrc.includes("params.set('or', `(title.ilike.*${query}*,body.ilike.*${query}*)`)"));
+  check('подсказка пустой доски и placeholder обещают только то, что поиск умеет',
+    boardSrc.includes('Поиск читает название и текст темы')
+      && /placeholder="Поиск: название, что в аккаунте, условия"/.test(boardSrc)
+      && !/placeholder="[^"]*цен/i.test(boardSrc));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

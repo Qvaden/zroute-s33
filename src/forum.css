@@ -3290,16 +3290,116 @@
   color: var(--mute);
 }
 
-/* ══ МАГАЗИН АККАУНТОВ ══════════════════════════════════════════════════════
+/* ══ ВИТРИНА ПРОДАЖ ═════════════════════════════════════════════════════════
    Витрина собрана как магазин, а не как ещё один раздел ленты: сверху — шапка
    с двумя числами и главным действием, ниже — сетка плиток, у каждой цена
    крупно. Объявление сравнивают с соседним, не переходя в тему, поэтому
    плитка читается за две строки: «что внутри» и «почём».
 
-   Все цвета берутся из токенов `styles-v8.css`, и светлая тема обязана
-   выглядеть собранной так же, как тёмная: ни одного цвета, который живёт
-   только в одной из двух.
+   СВОЙ ЦВЕТ.
+   Доска — единственное место сайта, куда приходят за товаром, и она обязана
+   выглядеть другим помещением, а не соседней вкладкой с тем же оранжевым. Поэтому
+   у неё собственная бирюза `--shop`, а `--accent` остаётся у форума, чата и
+   всего остального: пока цвет разный, человек по краске пункта меню понимает,
+   где он, не читая заголовок.
+
+   Числа подобраны по контрасту, а не «на глаз»: в тёмной теме `#3ee0b0` даёт
+   11.0 : 1 к `--surface`, в светлой `#0a5f52` — 6.9 : 1, обе пары проходят AA
+   для обычного текста. Чернила на плашке (`--shop-ink`) в двух темах РАЗНЫЕ:
+   почти чёрный на яркой бирюзе читается, белёсый на ней же в светлой теме дал
+   бы 2.2 : 1, то есть нечитаемую кнопку.
+
+   Все остальные цвета берутся из токенов `styles-v8.css`, и светлая тема
+   обязана выглядеть собранной так же, как тёмная: ни одного цвета, который
+   живёт только в одной из двух.
+
+   СВОЁ ДВИЖЕНИЕ.
+   Плитки выезжают по очереди, плашка цены ловит блик, стрелка у заголовка
+   дописана заранее. Анимации живут только на первой отрисовке визита:
+   `paint()` перерисовывает раздел на каждое изменение, и без класса
+   `accounts-grid--in` список дёргался бы при каждом символе поиска. Всё
+   движение убирается под `prefers-reduced-motion`.
 */
+
+:root {
+  --shop: #3ee0b0;
+  --shop-ink: #07130f;
+  --shop-line: color-mix(in srgb, var(--shop) 34%, var(--line));
+  --shop-soft: color-mix(in srgb, var(--shop) 9%, var(--raised));
+}
+:root[data-theme="light"] {
+  --shop: #0a5f52;
+  --shop-ink: #fbf8f1;
+}
+
+/*
+  Светлая тема витрины — отдельным слоем и нарочно здесь.
+
+  `refine.css` перекрашивает все сайтные кнопки в янтарь правилом
+  `:root[data-theme="light"] .forum-btn`. Оно сильнее наших двухклассных правил
+  и стоит в списке файлов позже, поэтому без этого блока главная кнопка доски
+  в светлой теме осталась бы оранжевой копией кнопки форума — ровно тем, от чего
+  доска отличается. Держим краску правилом на класс сильнее, и заодно перебиваем
+  янтарный hover.
+
+  Градиент уходит в затемнение, а не в белёсый угол, как в тёмной теме: белёсый
+  край на светлой бирюзе дал бы белым чернилам 3,9 : 1 — не проходит AA для
+  подписи в 13,5px. Затемнённый край держит 7,1 : 1, самый светлый угол hover —
+  5,6 : 1.
+
+  Рамку и тень перебиваем тем же правилом, и это не педантизм: `refine.css`
+  кладёт на `.forum-btn` янтарную рамку `#a94722` и brown-тень, а мы до правки
+  возвращали только фон с чернилами. Получалась бирюзовая кнопка в оранжевом
+  обводе — то есть доска теряла свою краску ровно там, где её видно первой,
+  и глаз считывал это как «обычная кнопка сайта», а не как витрина.
+*/
+:root[data-theme="light"] .accounts-hero .accounts-hero__cta,
+:root[data-theme="light"] .accounts-composer .forum-btn--primary,
+:root[data-theme="light"] .accounts-empty .forum-btn {
+  background: linear-gradient(135deg, var(--shop), color-mix(in srgb, var(--shop) 82%, #000));
+  color: var(--shop-ink);
+  border-color: color-mix(in srgb, var(--shop) 72%, #000);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
+    0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
+}
+:root[data-theme="light"] .accounts-hero .accounts-hero__cta:hover:not(:disabled),
+:root[data-theme="light"] .accounts-composer .forum-btn--primary:hover:not(:disabled),
+:root[data-theme="light"] .accounts-empty .forum-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shop) 90%, #fff), var(--shop));
+  color: var(--shop-ink);
+  border-color: color-mix(in srgb, var(--shop) 80%, #000);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent),
+    0 12px 26px -12px color-mix(in srgb, var(--shop) 80%, transparent);
+}
+
+/* Пункт меню доски — тот же приём, что у четвертьфинала: своя краска у ссылки,
+   чтобы «Где я» читалось по цвету, а не по тексту. */
+.nav__link[href="#/accounts"] {
+  color: var(--shop);
+  border: 1px solid color-mix(in srgb, var(--shop) 22%, transparent);
+  background: color-mix(in srgb, var(--shop) 5%, transparent);
+}
+.nav__link[href="#/accounts"]:hover {
+  color: var(--shop);
+  background: color-mix(in srgb, var(--shop) 13%, transparent);
+  border-color: color-mix(in srgb, var(--shop) 38%, transparent);
+}
+.nav__link[href="#/accounts"].is-active {
+  color: var(--shop-ink);
+  background: var(--shop);
+  border-color: var(--shop);
+  box-shadow: 0 5px 18px -9px color-mix(in srgb, var(--shop) 70%, transparent);
+}
+
+/*
+  Страница помечает себя сама: лёгкая бирюзовая подсветка по верхнему канту и
+  по фону. `position: relative` у `.panel` уже есть, поэтому свой `::after`
+  ложится поверх общей рамки, но под содержимое.
+*/
+.accounts-page {
+  border-top: 1px solid var(--shop-line);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--shop) 16%, transparent), var(--shadow);
+}
 
 .accounts-page .panel__head { margin-bottom: 12px; }
 
@@ -3313,6 +3413,34 @@
   border-bottom: 1px solid var(--line);
 }
 .accounts-hero__text { min-width: 0; }
+/*
+  Надзаголовок доски — своя плашка, а не общий `.eyebrow`: текст над H1
+  говорит, живая ли витрина. Точка дёргается, пока объявления читаются, и
+  замирает, когда они легли, — «Читаем доску» без этого был бы просто текстом,
+  которому нельзя верить.
+*/
+.accounts-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--shop-line);
+  border-radius: 999px;
+  background: var(--shop-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--shop);
+}
+.accounts-eyebrow__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--shop);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--shop) 18%, transparent);
+}
+.accounts-eyebrow.is-loading .accounts-eyebrow__dot { animation: s33-pulse-dot 1.1s ease-in-out infinite; }
 .accounts-hero h1 {
   margin: 5px 0 0;
   font-size: clamp(22px, 3.4vw, 30px);
@@ -3346,39 +3474,57 @@
 }
 .accounts-stat dd { margin: 2px 0 0; font-size: 13.5px; font-weight: 800; color: var(--text); }
 .accounts-stat--screen {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
-  background: color-mix(in srgb, var(--accent) 8%, var(--raised));
+  border-color: var(--shop-line);
+  background: var(--shop-soft);
 }
-.accounts-stat--screen dd { color: var(--accent); }
+.accounts-stat--screen dd { color: var(--shop); }
 /*
   Кнопка в шапке — общая сайтная, поэтому её форма перебивается слоем
   отделки: у `.forum-btn` свои углы, и правило той же силы, стоящее ниже в
   списке файлов, побеждает. Плашка здесь написана двумя классами — иначе
   главное действие витрины выглядело бы прямоугольным рядом с круглыми чипами.
-*/
-.accounts-hero .accounts-hero__cta { border-radius: 999px; padding: 10px 22px; }
 
+  Краска у кнопки своя, бирюзовая: `.forum-btn` по умолчанию оранжевый, и без
+  этой правки главная кнопка доски была бы копией кнопки форума. Чернила
+  (`--shop-ink`) берутся из той же темы, что и фон плашки, поэтому надпись
+  читается и в тёмной, и в светлой.
+*/
+.accounts-hero .accounts-hero__cta {
+  border-radius: 999px;
+  padding: 10px 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, #fff), var(--shop));
+  color: var(--shop-ink);
+  box-shadow: 0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
+}
+.accounts-hero .accounts-hero__cta:hover:not(:disabled) { box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--shop) 80%, transparent); }
+.accounts-hero .accounts-hero__cta:focus-visible { outline-color: var(--shop); }
+
+/*
+  Правила одним абзацем: кант бирюзовый, как у всей доски, а полоса слева
+  золотая — про то, что речь про деньги и договор. Две краски в одном блоке
+  держат смысл: «это витрина» и «тут торговля».
+*/
 .accounts-notice {
   margin: 0 0 14px;
   padding: 10px 13px 10px 15px;
-  border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
+  border: 1px solid var(--shop-line);
   border-left: 3px solid var(--gold);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--gold) 7%, var(--raised));
+  background: linear-gradient(100deg, var(--shop-soft), color-mix(in srgb, var(--gold) 6%, var(--raised)));
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--mute);
 }
 
 /*
-  Ящик объявления — форма прямо на вкладке. Выделена рамкой в цвет акцента,
+  Ящик объявления — форма прямо на вкладке. Выделена рамкой в цвет доски,
   чтобы между «читаю чужое» и «написал своё» был видимый переход: человек не
   должен гадать, где заканчивается доска и начинается его черновик.
 */
 .accounts-composer {
   margin: 0 0 16px;
   padding: 14px 16px 16px;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border: 1px solid var(--shop-line);
   border-radius: var(--r);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -3396,6 +3542,15 @@
 .accounts-fields .forum-field { min-width: 0; }
 .accounts-fields .forum-field textarea { min-height: 92px; }
 .accounts-composer__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+/*
+  Кнопка публикации объявления — бирюзовая, как всё на доске: форма стоит на
+  этой странице, и оранжевая кнопка внутри неё выглядела бы приглашением в
+  форум, а не началом торговли.
+*/
+.accounts-composer .forum-btn--primary {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, #fff), var(--shop));
+  color: var(--shop-ink);
+}
 /*
   Строка прикрепления в ящике объявления — та же `.forum-attach`, что у темы и
   чата, поэтому своих стилей ей не нужно. Отдельная плашка только у заметки про
@@ -3424,7 +3579,7 @@
   color: var(--mute);
   cursor: pointer;
 }
-.accounts-controls__sold input { width: 16px; height: 16px; accent-color: var(--accent); }
+.accounts-controls__sold input { width: 16px; height: 16px; accent-color: var(--shop); }
 /* Поиск — справа в том же ряду и тянется на всё свободное место: доску
    ищут по уровню и ресурсу, и поле должно быть видно без второго ряда. */
 .accounts-search { flex: 1 1 220px; min-width: 0; }
@@ -3438,12 +3593,14 @@
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
+  transition: border-color .16s var(--ease), box-shadow .18s var(--ease);
 }
-.accounts-search input:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.accounts-search input:hover { border-color: color-mix(in srgb, var(--shop) 44%, var(--line)); }
 .accounts-search input:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--shop);
   outline-offset: 1px;
   border-color: transparent;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--shop) 12%, transparent);
 }
 
 .accounts-chip {
@@ -3456,12 +3613,13 @@
   background: var(--raised);
   border: 1px solid var(--line);
   cursor: pointer;
-  transition: color .15s, border-color .15s, background .15s;
+  transition: color .15s, border-color .15s, background .15s, transform .15s var(--ease);
 }
-.accounts-chip:hover { color: var(--text); border-color: var(--accent); }
+.accounts-chip:hover { color: var(--text); border-color: var(--shop); }
+.accounts-chip:active { transform: translateY(1px); }
 .accounts-chip.is-on {
-  color: #14100c;
-  background: var(--accent);
+  color: var(--shop-ink);
+  background: var(--shop);
   border-color: transparent;
 }
 
@@ -3470,8 +3628,24 @@
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
 }
+/*
+  Витрина выезжает по плитке. Класс стоит только на первой отрисовке визита
+  (флаг `entered` в `forum/accounts.js`), потому что раздел перерисовывается
+  целиком при каждом изменении, и без него список прыгал бы на каждую букву
+  поиска. Задержка берётся из `--i`, который разметка кладёт на карточку;
+  `min(..., 9)` — чтобы дальние плитки не ждали своей очереди полсекунды.
+*/
+@keyframes accounts-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.accounts-grid--in > .accounts-card {
+  animation: accounts-in .42s var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 9) * 45ms);
+}
 
 .accounts-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3480,24 +3654,55 @@
   min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-top: 3px solid var(--gold);
   border-radius: var(--r);
   background: linear-gradient(180deg, var(--raised), var(--surface));
   transition: transform .16s var(--ease), box-shadow .18s var(--ease), border-color .16s var(--ease);
 }
+/*
+  Кант плитки — полоска от бирюзы доски к золоту цены: она и есть смысл
+  витрины, «товар → деньги». Полоска лежит ВНУТРИ рамки, поэтому высота
+  карточки от неё не меняется и сетка не дёргается при наведении.
+*/
+.accounts-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  border-radius: var(--r) var(--r) 0 0;
+  background: linear-gradient(90deg, var(--shop), var(--gold) 78%);
+  opacity: .8;
+  transition: opacity .18s var(--ease);
+}
 /* Плитку поднимаем при наведении: объявление выбирают, и отклик должен быть
    сразу виден, иначе человек тыкает в карточку, думая, что она кликабельна. */
 .accounts-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
-  border-color: color-mix(in srgb, var(--gold) 34%, var(--line));
-  border-top-color: var(--gold);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px -22px color-mix(in srgb, var(--shop) 70%, transparent), var(--shadow);
+  border-color: color-mix(in srgb, var(--shop) 30%, var(--line));
 }
+.accounts-card:hover::before { opacity: 1; }
 .accounts-card__title { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .accounts-card__title a { color: var(--text); text-decoration: none; }
-.accounts-card__title a:hover { color: var(--accent); }
+.accounts-card__title a:hover { color: var(--shop); }
 /*
-  Полоска скриншотов. Плитки тяжутся по свободной ширине рядом (16/9 — формат
+  Стрелка у заголовка зарезервирована местом: она проявляется только
+  прозрачностью, поэтому строка не дергается, когда человек ведёт глазами по
+  доске. Без неё карточка выглядит текстом, а не входом в тему.
+*/
+.accounts-card__go {
+  font-style: normal;
+  margin-left: 4px;
+  opacity: 0;
+  transform: translateX(-4px);
+  display: inline-block;
+  transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+.accounts-card:hover .accounts-card__go,
+.accounts-card__title a:focus-visible .accounts-card__go { opacity: 1; transform: none; }
+/*
+  Полоска скриншотов. Плитки растягиваются по свободной ширине рядом (16/9 — формат
   игрового кадра), а не в один фиксированный квадрат: на узкой карточке
   три плитки по 90 px превратили бы объявление в колонку иконок.
   Чип «+N» — не наложение, а своя плитка в конце ряда: под картинкой живёт
@@ -3518,8 +3723,18 @@
   background: var(--raised);
   transition: border-color .15s var(--ease);
 }
-.accounts-card__shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.accounts-card__shot:hover { border-color: var(--accent); }
+/* Картинка внутри своей плитки чуть приезжает ближе к глазам: рамка
+   одной лишь подсветки не даёт понять, что это кадр, а не плашка. `overflow:
+   hidden` у плитки уже есть, поэтому кадр не вылезет за скругление. */
+.accounts-card__shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .3s var(--ease);
+}
+.accounts-card__shot:hover { border-color: var(--shop); }
+.accounts-card__shot:hover img { transform: scale(1.06); }
 .accounts-card__more {
   flex: 0 0 auto;
   display: grid;
@@ -3534,20 +3749,38 @@
   text-decoration: none;
   transition: color .15s, border-color .15s;
 }
-.accounts-card__more:hover { color: var(--text); border-color: var(--accent); }
+.accounts-card__more:hover { color: var(--text); border-color: var(--shop); }
 /* Цена — плашкой, а не строкой текста: её сравнивают между карточками,
-   и глаз должен цеплять её, не читая абзац. */
+   и глаз должен цеплять её, не читая абзац. Блик по плашке на наведении
+   говорит то же, что приподнятая плитка: это действующее объявление, его
+   можно открыть. `overflow: hidden` режет блик по скруглению. */
 .accounts-card__price {
+  position: relative;
+  overflow: hidden;
   align-self: flex-start;
   margin: 0;
   padding: 4px 12px;
   border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--gold) 14%, var(--raised));
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--gold);
   overflow-wrap: anywhere;
+}
+.accounts-card__price::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -38%;
+  width: 24%;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, #fff 34%, transparent), transparent);
+  transform: translateX(-140%) skewX(-18deg);
+}
+.accounts-card:hover .accounts-card__price::after {
+  opacity: 1;
+  animation: s33-sheen .62s var(--ease-out) both;
 }
 .accounts-card__offer {
   margin: 0;
@@ -3565,6 +3798,7 @@
 .accounts-card__marks { display: flex; flex-wrap: wrap; gap: 6px; }
 .accounts-card__sold,
 .accounts-card__over,
+.accounts-card__fresh,
 .accounts-card__until {
   padding: 2px 9px;
   border: 1px solid var(--line);
@@ -3574,6 +3808,22 @@
   font-weight: 700;
   white-space: nowrap;
 }
+/*
+  «Свежее» — единственная плашка на доске, которая не про состояние объявления,
+  а про его возраст, и живёт она в общем ряду с отметками срока. Бирюзовая
+  подсветка и один мягкий пульс при выезде: новый товар на витрине ищут первым,
+  и он же — то, что человек мог пропустить вчера.
+*/
+@keyframes accounts-fresh {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--shop) 34%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--shop) 12%, transparent); }
+}
+.accounts-card__fresh {
+  border-color: var(--shop-line);
+  background: var(--shop-soft);
+  color: var(--shop);
+}
+.accounts-grid--in .accounts-card__fresh { animation: accounts-fresh 1.5s ease-in-out 1; }
 .accounts-card__sold {
   border-color: color-mix(in srgb, var(--win) 40%, var(--line));
   color: var(--win);
@@ -3595,7 +3845,7 @@
 }
 .accounts-card__nick { color: var(--link); font-weight: 600; text-decoration: none; }
 .accounts-card__nick:hover { text-decoration: underline; }
-.accounts-card__talk { margin-left: auto; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.accounts-card__talk { margin-left: auto; color: var(--shop); text-decoration: none; white-space: nowrap; }
 .accounts-card__talk:hover { text-decoration: underline; }
 /* Своё объявление правят отсюда же, откуда смотрят чужие: кнопки одним рядом
    под футером, чтобы «Продано» и «Править» не прыгали по карточке. */
@@ -3619,17 +3869,18 @@
   cursor: pointer;
   transition: color .15s, border-color .15s, background .15s;
 }
-.accounts-act:hover { color: var(--text); border-color: var(--accent); }
+.accounts-act:hover { color: var(--text); border-color: var(--shop); }
 .accounts-act--sold:hover { color: var(--win); border-color: var(--win); }
 .accounts-act--return:hover { color: var(--gold); border-color: var(--gold); }
 /* «Написать продавцу» — единственное действие чужого объявления, поэтому оно
    подсвечено, а кнопки автора остаются нейтральными: на одном ряду человек не
-   должен выбирать, какая из них его. */
+   должен выбирать, какая из них его. Подсветка бирюзовая: это главное действие
+   доски, и оно должно звучать той же краской, что и кнопка «Выставить аккаунт». */
 .accounts-act--dm {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-  color: var(--accent);
+  border-color: color-mix(in srgb, var(--shop) 48%, var(--line));
+  color: var(--shop);
 }
-.accounts-act--dm:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.accounts-act--dm:hover { color: var(--text); background: color-mix(in srgb, var(--shop) 13%, transparent); }
 .accounts-act--dm:disabled { cursor: default; opacity: .6; }
 /* Пунктир — про то, что действие чужое: объявление по-прежнему принадлежит
    автору, а кнопка у модературы та же, что у него. Рамка, а не новый ряд:
@@ -3637,16 +3888,19 @@
 .accounts-act--mod { border-style: dashed; }
 .accounts-act--mod:hover { color: var(--text); border-color: var(--accent); }
 /* Проданное и просроченное не прячем, но и не зовём: объявление помнят по
-   цене, и снятая плитка честнее исчезнувшей. Наведение такое объявление не
-   получает — оно не ждёт клика. */
+   цене, и снятая плитка честнее исчезнувшей. Кант у такого объявления гаснет
+   до обычной линии — полоска «товар → деньги» над снятой с доски плиткой
+   обещала бы то, чего уже нет. Наведение такое объявление не получает — оно не
+   ждёт клика. */
 .accounts-card--sold,
 .accounts-card--expired {
-  border-top-color: var(--line);
   background: var(--raised);
   opacity: .62;
 }
+.accounts-card--sold::before,
+.accounts-card--expired::before { background: var(--line); opacity: 1; }
 .accounts-card--sold:hover,
-.accounts-card--expired:hover { transform: none; box-shadow: none; border-color: var(--line); border-top-color: var(--line); }
+.accounts-card--expired:hover { transform: none; box-shadow: none; border-color: var(--line); }
 
 .accounts-error {
   margin: 0 0 12px;
@@ -3668,6 +3922,13 @@
 }
 .accounts-empty p { margin: 0 0 6px; }
 .accounts-empty p:last-child { margin: 0; font-size: 12px; }
+/* Пустая доска зовёт выставить первое объявление той же бирюзой, что и шапка:
+   на пустой витрине это единственная кнопка, и она должна выглядеть началом
+   торговли, а не переходом в форум. */
+.accounts-empty .forum-btn {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, #fff), var(--shop));
+  color: var(--shop-ink);
+}
 
 /*
   Телефон: шапка складывается в один столбец и кнопка объявления становится
@@ -3688,4 +3949,22 @@
   .accounts-chip { min-height: 44px; }
   .accounts-act { min-height: 44px; flex: 1 1 auto; }
   .accounts-card__talk { margin-left: 0; }
+}
+
+/*
+  Кто попросил тишины в системе — тот её получает и здесь: витрина остаётся
+  бирюзовой и с кантом, но ничего не выезжает, не пульсирует и не бликует.
+  Стрелка у заголовка при этом видна всегда — без движения она единственный
+  признак того, что строка кликабельна.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .accounts-grid--in > .accounts-card,
+  .accounts-grid--in .accounts-card__fresh,
+  .accounts-eyebrow.is-loading .accounts-eyebrow__dot { animation: none; }
+  .accounts-card:hover { transform: none; }
+  .accounts-card__shot img,
+  .accounts-card__shot:hover img { transform: none; transition: none; }
+  .accounts-card:hover .accounts-card__price::after { animation: none; opacity: 0; }
+  .accounts-card__go { opacity: 1; transform: none; transition: none; }
+  .accounts-chip:active { transform: none; }
 }
