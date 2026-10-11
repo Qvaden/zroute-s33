@@ -14546,7 +14546,7 @@ console.log('\nAO. Раздел — страница');
     /\.evt-remind select,/.test(refine));
   check('планка накрывает действия с ленты, заголовок темы, поиск по гайдам и ширину чипов',
     /\.feed-card__source,\s*\.forum-chron__more,\s*\.forum-btn,\s*\.forum-post__title a,\s*\.burger,\s*input\[type="search"\],/.test(refine)
-      && /\.forum-save, button\.forum-tag, \.seg__btn \{ min-width: 44px; \}/.test(refine));
+      && /\.forum-save, button\.forum-tag, \.seg__btn, \.burger \{ min-width: 44px; \}/.test(refine));
 
   /*
     Промер брейкпоинтов (заход 13) добавил к планке цели, которые до этого не
