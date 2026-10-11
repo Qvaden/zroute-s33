@@ -14553,10 +14553,16 @@ console.log('\nAO. Раздел — страница');
     накрывались ничем: чипы сортировки витрины держали 44 px только ниже 700 px,
     хотя планка привязана к пальцу, а не к ширине; квадрат переключателя темы
     вообще не имел ни роста, ни ширины под пальцем.
+
+    Заход 15 домерил то же место с другой стороны: на 768 px переключатель
+    показал 40×44. Обе цифры в правиле стояли, а съехалась именно ширина —
+    шапка не переносится, и flex-ребёнок по умолчанию отдаёт пикселы, когда
+    президентская доска выедает строку. Поэтому планка считается выполненной
+    только вместе с запретом сжиматься.
   */
   check('пальцевая планка догнала чипы сортировки витрины, её флажок-подпись и переключатель темы',
     /\.accounts-chip,\s*\.accounts-controls__sold \{ min-height: 44px; \}/.test(refine)
-      && /\.theme-toggle \{ width: 44px; height: 44px;/.test(refine));
+      && /\.theme-toggle \{ width: 44px; height: 44px;[^}]*flex-shrink: 0; \}/.test(refine));
 
   /*
     Мерка мыши (24 px) раньше считала только кнопки-ссылки с классом. Ссылка
@@ -16322,6 +16328,205 @@ console.log('\nAW. AA у токенов обеих тем');
   check('тихие подписи пьедестала берут токен острова, а не подборку зелёных hex',
     /\.quart-podium-card__place \{[^}]*color: var\(--quart-quiet\)/.test(v8)
       && /\.quart-podium-card__meta \{[^}]*color: var\(--quart-quiet\)/.test(v8));
+}
+
+/* ── AX. Полоса разделов на телефоне и ссылки в подвале ─────────────────────
+
+   Бриф (§31) требует мобильного меню из четырёх частых разделов и «Ещё»,
+   §32 — ссылки разделов в подвале. Оба пункта закрыты одним приёмом: полоса
+   лежит в разметке страницы, а «Ещё» открывает уже существующее боковое меню.
+
+   Что здесь может сломаться молча:
+
+   Адрес. Ячейки полосы переписываются руками в index.html, а разделы живут
+   в ROUTES. Опечатка в href не видна глазу и превращает клетку в кнопку,
+   которая бросает человека на «Форум» (роутер не знает такого id). Поэтому
+   каждый адрес сверяется со списком разделов, а не с памятью.
+
+   Два входа — одно состояние. Кнопок, открывающих ящик, теперь две. Если
+   aria-expanded ставится одной из них, вторая при закрытом меню утверждает
+   диктору, что раскрыта. То же и со счётчиком непрочитанных: копий «Чатов»
+   две, и поиск по одному меню оставляет вторую без числа.
+
+   Место под полосой. Она прижата к нижнему краю и лежит НАД страницей,
+   поэтому её высота нужна четвёрке мест: концу содержимого, подвалу, чату
+   и короткому сообщению. Если хоть где-то вместо токена написано число,
+   при следующей правке роста полоса ляжет на ввод сообщения — и человек
+   этого не увидит, потому что намеренного наложения тут нет.
+
+   Порядок слоёв. Полоса должна быть выше содержимого, ниже затемнения ящика
+   и ниже модального окна: иначе открытое окно форума остаётся с висящей
+   поверх него кнопкой «Чаты».
+
+   Подвал. Пять ссылок ведут туда же, куда и меню, и тоже проверяются
+   адресами; ряд назван, чтобы программа экрана объявляла его группой.
+────────────────────────────────────────────────────────────────────────── */
+console.log('\nAX. Полоса разделов и подвал');
+{
+  const { readFile } = await import('node:fs/promises');
+  const indexHtml = await readFile('index.html', 'utf8');
+  const mainJs = await readFile('src/main.js', 'utf8');
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+  const forum = await readFile('src/forum.css', 'utf8');
+  const mobile = await readFile('src/mobile.css', 'utf8');
+  const refine = await readFile('src/refine.css', 'utf8');
+
+  /* Разделы, которые человек вообще может выбрать: hidden в список не входит. */
+  const routesStart = mainJs.indexOf('const ROUTES = [');
+  const routesBlock = mainJs.slice(routesStart, mainJs.indexOf('\n];', routesStart));
+  const shown = [...routesBlock.matchAll(/id: '([a-z]+)', label: '([^']+)'/g)]
+    .filter(([, id]) => !new RegExp(`id: '${id}'[^}]*hidden: true`).test(routesBlock))
+    .map((m) => ({ id: m[1], label: m[2] }));
+
+  const barMarkup = /<nav id="tabbar" class="tabbar" aria-label="([^"]+)">([\s\S]*?)<\/nav>/.exec(indexHtml);
+  const cells = barMarkup ? [...barMarkup[2].matchAll(/<a class="tabbar__link" href="#\/([a-z]+)"/g)].map((m) => m[1]) : [];
+
+  check('полоса разделов стоит в разметке страницы, а не собирается из js',
+    Boolean(barMarkup) && !/<nav id="tabbar"/.test(mainJs),
+    barMarkup ? '' : 'в index.html нет <nav id="tabbar">');
+  check('полоса идёт сразу за содержимым и до подвала',
+    Boolean(barMarkup)
+      && indexHtml.indexOf('<main id="app"') < indexHtml.indexOf('<nav id="tabbar"')
+      && indexHtml.indexOf('<nav id="tabbar"') < indexHtml.indexOf('<footer class="site-foot'),
+    'порядок: содержимое → полоса → подвал');
+  check('у полосы есть имя, поэтому диктор объявляет её группой и даёт пропустить',
+    Boolean(barMarkup) && barMarkup[1].length > 3, barMarkup ? barMarkup[1] : '');
+
+  check('в полосе ровно четыре раздела и одна кнопка «Ещё»',
+    cells.length === 4 && /<button type="button" class="tabbar__more"/.test(indexHtml),
+    `ячеек ${cells.length}`);
+  const dead = cells.filter((id) => !shown.some((r) => r.id === id));
+  check(`каждая ячейка ведёт на существующий раздел (${cells.join(', ')})`,
+    dead.length === 0, dead.length ? `нет такого раздела: ${dead.join(', ')}` : '');
+  check('полоса — часть оглавления, а не второе оглавление',
+    cells.length < shown.length, `в меню разделов ${shown.length}`);
+
+  /*
+    «Ещё» не имеет права заводить свой список: два оглавления на одном
+    телефоне человек обязан сверять глазами, и одно из них гарантированно
+    устаревает.
+  */
+  check('«Ещё» управляет тем же боковым меню, что и кнопка в шапке',
+    /aria-controls="side"/.test(indexHtml)
+      && (indexHtml.match(/<aside id="side"/g) || []).length === 1,
+    'в документе не один ящик разделов');
+  check('у «Ещё» есть обработчик, который двигает общее состояние',
+    /tabbarMore\?\.addEventListener\('click', \(\) => \{[\s\S]{0,120}setSideOpen\(!isSideOpen\(\)\)/
+      .test(mainJs));
+  check('раскрытое состояние сообщают обе кнопки, а не одна',
+    /document\.querySelectorAll\('\[aria-controls="side"\]'\)\.forEach\(\(btn\) => \{\s*btn\.setAttribute\('aria-expanded', String\(open\)\)/
+      .test(mainJs));
+
+  /*
+    Активная клетка. Полоса статичная, поэтому её подсветка не наследуется
+    от меню: без вызова из renderNav она остаётся подсвеченной на прошлом
+    разделе.
+  */
+  check('смена раздела подсвечивает клетку полосы',
+    /function syncTabbar\(activeId\)/.test(mainJs)
+      && /function renderNav[\s\S]{0,2600}?\bnav\.innerHTML[\s\S]{0,600}?syncTabbar\(activeId\);/.test(mainJs),
+    'renderNav не вызывает syncTabbar');
+  check('клетка говорит диктору, где человек, а не только красится',
+    /cell\.classList\.toggle\('is-active', on\)/.test(mainJs)
+      && /cell\.setAttribute\('aria-current', 'page'\)/.test(mainJs));
+
+  /*
+    Счётчик непрочитанных: копий «Чатов» две, и значение обязано быть одним.
+  */
+  check('значок непрочитанных ищется по всему документу, а не внутри меню',
+    /document\.querySelectorAll\('\[data-nav-chats-badge\]'\)/.test(mainJs)
+      && !/nav\.querySelector\('\[data-nav-chats-badge\]'\)/.test(mainJs));
+  check('копий значка ровно две — одна в разметке полосы, вторая в шаблоне меню',
+    (indexHtml.match(/data-nav-chats-badge/g) || []).length === 1
+      && /'<span class="nav__badge" data-nav-chats-badge hidden><\/span>'/.test(mainJs),
+    `${(indexHtml.match(/data-nav-chats-badge/g) || []).length} в разметке`);
+
+  /*
+    Высота полосы — одна мерка на четыре места. Проверка ищет не числа,
+    а то, что ни одно из них не написано на месте.
+
+    В мерку входит и верхняя граница полосы: промер на 390 и 320 px показал
+    мессенджер, который залезал на полосу на 1 px — ровно на её линию.
+    Поэтому тут следят и за тем, чтобы полоса красила границу тем же токеном,
+    которым её резервируют: иначе число разъедётся по двум файлам.
+  */
+  check('рост полосы, её граница и запас под неё объявлены токенами',
+    /--tabbar-h: (\d+)px;/.test(v8)
+      && /--tabbar-edge: (\d+)px;/.test(v8)
+      && /--tabbar-space: calc\(var\(--tabbar-h\) \+ var\(--tabbar-edge\) \+ env\(safe-area-inset-bottom, 0px\)\);/.test(v8)
+      && Number(/--tabbar-h: (\d+)px/.exec(v8)[1]) >= 44,
+    /--tabbar-h: (\d+)px/.test(v8) ? `${/--tabbar-h: (\d+)px/.exec(v8)[1]}px` : 'токена нет');
+  check('полоса рисует верхнюю границу тем же токеном, которым её резервируют',
+    /\.tabbar \{[\s\S]{0,900}border-top: var\(--tabbar-edge\) solid/, mobile);
+  const reservations = [
+    [/#app \{ padding-bottom: calc\(var\(--tabbar-space\)/, mobile, 'конец содержимого'],
+    [/\.site-foot \{ padding-bottom: calc\(var\(--tabbar-space\)/, mobile, 'подвал'],
+    [/\.chat-layout \{[\s\S]{0,200}height: calc\(var\(--chat-vh, 100dvh\) - var\(--chat-head-h, 58px\) - var\(--tabbar-space\)\)/, refine, 'чат'],
+    [/\.forum-toast \{\s*bottom: calc\(var\(--tabbar-space\)/, refine, 'короткое сообщение'],
+  ];
+  check('все, кто упирается в нижний край, уступают полосе место из токена',
+    reservations.every(([re, src]) => re.test(src)),
+    reservations.filter(([re, src]) => !re.test(src)).map(([, , name]) => name).join(', '));
+
+  /*
+    Широкий экран: оглавление всегда видно слева, и полоса на нём — второй
+    копией того же списка. Скрыта она базовым правилом, а не перебивкой
+    внутри `@media (min-width: 1040px)`: тогда при любом промахе с порядком
+    файлов на мониторе оставались бы две навигации.
+  */
+  const hideBar = mobile.indexOf('.tabbar { display: none; }');
+  const showBar = mobile.search(/\.tabbar \{\s*position: fixed/);
+  check('вне телефона полоса скрыта базовым правилом, а не перебивкой',
+    hideBar !== -1 && showBar !== -1 && hideBar < showBar,
+    `скрытие ${hideBar}, показ ${showBar}`);
+
+  /*
+    Слои. Полоса обязана лежать над содержимым, но уходить под затемнение
+    ящика, модальное окно и короткое сообщение.
+  */
+  const zIndexOf = (src, sel) => {
+    const re = new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{[^}]*?z-index: (\\d+)`);
+    const m = re.exec(src);
+    return m ? Number(m[1]) : null;
+  };
+  const layers = {
+    'шапка': zIndexOf(v8, '.site-head'),
+    'полоса': zIndexOf(mobile, '.tabbar'),
+    'затемнение': zIndexOf(forum, '.side-veil'),
+    'ящик': zIndexOf(forum, '.side'),
+    'окно форума': zIndexOf(forum, '.forum-modal'),
+    'сообщение': zIndexOf(forum, '.forum-toast'),
+  };
+  check('полоса выше шапки и содержимого, но под ящиком, окном и сообщением',
+    Object.values(layers).every((z) => z !== null)
+      && layers['шапка'] < layers['полоса']
+      && layers['полоса'] < layers['затемнение']
+      && layers['затемнение'] < layers['ящик']
+      && layers['ящик'] < layers['окно форума']
+      && layers['окно форума'] < layers['сообщение'],
+    Object.entries(layers).map(([n, z]) => `${n} ${z}`).join(', '));
+
+  /* ── Подвал: ряд ссылок (§32) ───────────────────────────────────────────── */
+  const footNav = /<nav class="site-foot__nav" aria-label="([^"]+)">([\s\S]*?)<\/nav>/.exec(indexHtml);
+  const footLinks = footNav ? [...footNav[2].matchAll(/<a href="#\/([a-z]+)">([^<]+)<\/a>/g)] : [];
+
+  check('в подвале есть названный ряд ссылок на разделы',
+    Boolean(footNav) && footNav[1].length > 3 && footLinks.length >= 4,
+    footNav ? `${footLinks.length} ссылок` : 'ряда нет');
+  const deadFoot = footLinks.filter((m) => !shown.some((r) => r.id === m[1]));
+  check(`ссылки подвала ведут на живые разделы (${footLinks.map((m) => m[1]).join(', ')})`,
+    deadFoot.length === 0, deadFoot.map((m) => m[1]).join(', '));
+  check('каждая ссылка подвала названа словом, а не значком',
+    footLinks.every((m) => m[2].trim().length > 1),
+    footLinks.filter((m) => m[2].trim().length <= 1).map((m) => m[1]).join(', '));
+  check('подвал остался строкой состояния: три факта на месте',
+    /class="site-foot__note"/.test(indexHtml) && /id="source-badge"/.test(indexHtml)
+      && /class="site-foot__how"/.test(indexHtml));
+  check('ссылка подвала подписана чернилами ряда, а не глухой подписью',
+    /\.site-foot__nav a \{[^}]*color: var\(--dim\)/.test(v8)
+      && /\.site-foot__nav \{\s*flex: 1 1 100%/.test(v8));
+  check('под пальцем ссылки подвала стоят под общей планкой',
+    /\.site-foot__nav a \{ min-height: 44px; min-width: 44px; \}/.test(refine));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

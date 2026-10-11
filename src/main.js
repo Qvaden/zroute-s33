@@ -214,6 +214,8 @@ const bootLoader = document.getElementById('boot-loader');
 const side = document.getElementById('side');
 const sideToggle = document.getElementById('side-toggle');
 const sideVeil = document.getElementById('side-veil');
+const tabbar = document.getElementById('tabbar');
+const tabbarMore = document.getElementById('tabbar-more');
 const routeAnnouncer = document.getElementById('route-announcer');
 const isFirstVisit = !document.documentElement.classList.contains('s33-loader-seen');
 const bootStartedAt = performance.now();
@@ -363,20 +365,52 @@ function renderNav(activeId) {
   nav.innerHTML =
     `<span class="nav__group">Общение</span>${primary.map(link).join('')}` +
     `<span class="nav__group">Сервер</span>${rest.map(link).join('')}`;
+  syncTabbar(activeId);
   refreshChatsBadge();
+}
+
+/*
+  ПОЛОСА РАЗДЕЛОВ: ТОТ ЖЕ РАЗДЕЛ, ЧТО И В ОГЛАВЛЕНИИ.
+
+  Полоса лежит в разметке страницы статично и сама по себе умеет только
+  переходить по адресу, поэтому её активная клетка не наследует подсветку
+  меню — её надо поставить. Иначе человек нажал «Рейтинг», страница
+  поменялась, а в полосе по-прежнему подсвечен «Форум»: две подписи одного
+  вопроса («где я») отвечают по-разному.
+
+  Клетка опознаётся по своему адресу, а не по названию раздела: меню
+  подсвечивает вкладку по `navAs` (страница справочника принадлежит вкладке
+  «Гайдов»), и тот же активный раздел полоса обязана показать тем же
+  идентификатором. Раздела без своей клетки в полосе это не касается: там
+  просто нечего подсвечивать.
+*/
+function syncTabbar(activeId) {
+  if (!tabbar) return;
+  tabbar.querySelectorAll('a[href]').forEach((cell) => {
+    const on = cell.getAttribute('href').replace(/^#\/?/, '') === activeId;
+    cell.classList.toggle('is-active', on);
+    if (on) cell.setAttribute('aria-current', 'page');
+    else cell.removeAttribute('aria-current');
+  });
 }
 
 /*
   Счётчик непрочитанных у пункта «Чаты». Считается при каждой смене раздела
   и раз в минуту — этого хватает: внутри чата свои обновления.
+
+  Значок ищется по всему документу, а не внутри меню: «Чаты» теперь на двух
+  входах — в боковой панели и в полосе разделов, и один номер на двух
+  подписях означал бы, что один из них врёт.
 */
 let badgeTimer = 0;
 async function refreshChatsBadge() {
   const n = await unreadChatsTotal();
-  const el = nav.querySelector('[data-nav-chats-badge]');
-  if (!el) return;
-  el.hidden = !n;
-  el.textContent = n > 99 ? '99+' : String(n);
+  const els = document.querySelectorAll('[data-nav-chats-badge]');
+  if (!els.length) return;
+  els.forEach((el) => {
+    el.hidden = !n;
+    el.textContent = n > 99 ? '99+' : String(n);
+  });
   window.clearTimeout(badgeTimer);
   badgeTimer = window.setTimeout(refreshChatsBadge, 60000);
 }
@@ -390,7 +424,14 @@ async function refreshChatsBadge() {
 */
 function setSideOpen(open) {
   document.documentElement.classList.toggle('is-side-open', open);
-  sideToggle?.setAttribute('aria-expanded', String(open));
+  /*
+    «Раскрыто» сообщают все кнопки, которые этим меню управляют: их две —
+    «Меню» в шапке и «Ещё» в полосе разделов. Атрибут повешен на одну из них
+    означал бы, что вторая при закрытом меню выглядит открытой.
+  */
+  document.querySelectorAll('[aria-controls="side"]').forEach((btn) => {
+    btn.setAttribute('aria-expanded', String(open));
+  });
   if (sideVeil) sideVeil.hidden = !open;
 
   /*
@@ -398,10 +439,17 @@ function setSideOpen(open) {
     открывший меню с клавиатуры, остаётся фокусом на кнопке, а следующий Tab
     уводит его в содержимое страницы — то есть меню открылось, но добраться
     до вкладок нельзя.
+
+    Обратно фокус отдаётся тому, кто меню открыл: после «Ещё» возврат в шапку
+    унёс бы фокус за десять сантиметров вверх, и следующий Tab начал бы не
+    оттуда, где человек остановился. Если же открывающая кнопка исчезла
+    (полоса гаснет на широком экране), отдаётся шапке — она видна всегда,
+    когда меню вообще можно открыть.
   */
   if (open) side?.querySelector('.nav__link')?.focus({ preventScroll: true });
   else if (document.activeElement && side?.contains(document.activeElement)) {
-    sideToggle?.focus({ preventScroll: true });
+    const back = sideOpener && sideOpener.offsetParent !== null ? sideOpener : sideToggle;
+    back?.focus({ preventScroll: true });
   }
 }
 
@@ -409,7 +457,26 @@ function isSideOpen() {
   return document.documentElement.classList.contains('is-side-open');
 }
 
-sideToggle?.addEventListener('click', () => setSideOpen(!isSideOpen()));
+/* Кто открыл меню — ему его и закрывать обратно с точки зрения фокуса. */
+let sideOpener = null;
+
+sideToggle?.addEventListener('click', () => {
+  sideOpener = sideToggle;
+  setSideOpen(!isSideOpen());
+});
+
+/*
+  «Ещё» в полосе разделов открывает то же самое боковое меню, а не второе.
+  Два отдельных списка разделов на одном телефоне означало бы, что у человека
+  есть два оглавления, которые могут разойтись, и он обязан проверить оба,
+  чтобы найти нужный раздел. Здесь же полоса держит четыре часто нужных
+  раздела, а всё остальное — за той же дверью, что и всегда.
+*/
+tabbarMore?.addEventListener('click', () => {
+  sideOpener = tabbarMore;
+  setSideOpen(!isSideOpen());
+});
+
 sideVeil?.addEventListener('click', () => setSideOpen(false));
 
 /*
