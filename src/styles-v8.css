@@ -77,10 +77,16 @@
   /*
     Геометрия жёсткая: 6 / 10 / 14. Прежние 8 / 14 / 20 делали из каждой панели
     мягкую карточку соцсети, а командный центр держится на прямых углах.
+    --surface-radius (рамка поверхности панели) и --r-pill (капсула кнопки) —
+    те же два числа, только названные по роли: 16 px и 999 px встречались в
+    правилах сотню раз как литерал, и проверить, что нигде не появилось
+    случайное 15 или 17, было невозможно.
   */
   --r-sm: 6px;
   --r:    10px;
   --r-lg: 14px;
+  --r-xl: 16px;
+  --r-pill: 999px;
 
   /*
     РЯД РАЗДЕЛОВ НА ТЕЛЕФОНЕ — ОДНА МЕРКА НА ВЕСЬ САЙТ.
@@ -128,9 +134,16 @@
   --fs-body:    15px;
   --fs-card:    clamp(16px, 2vw, 19px);
   --fs-h2:      clamp(22px, 2.8vw, 31px);
-  --fs-h1:      clamp(30px, 4.6vw, 50px);
-  --fs-hero:    clamp(40px, 8.4vw, 76px);
-  --fs-stat:    clamp(30px, 5.4vw, 46px);
+  --fs-h1:      clamp(30px, 4.2vw, 46px);
+  --fs-hero:    clamp(42px, 8.4vw, 78px);
+  --fs-stat:    clamp(32px, 3.2vw, 42px);
+  /*
+    Нижняя граница каждой пары clamp — это телефон, верхняя — широкий экран.
+    Так «отдельная шкала для mobile» (§7) и полоса 42–52 px для заголовка
+    героя (§22) получаются сами собой: на 390 px работает нижняя граница,
+    выше 1000 px — верхняя, и между ними нет ни одной ширины, где кегль
+    выпадал бы из ряда.
+  */
 
   /*
     Фактура командного центра: сетка, уголки и свечение. Подобрана так, чтобы
@@ -227,7 +240,7 @@
   width: 36px;
   height: 36px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r);
   background: none;
   color: var(--dim);
   cursor: pointer;
@@ -432,7 +445,7 @@ h1,h2,h3,h4 {
   padding: 8px 14px;
   font-size: 13.5px; font-weight: 500;
   color: var(--dim); text-decoration: none;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
   transition: color .18s var(--ease), background .18s var(--ease);
 }
@@ -519,7 +532,7 @@ h1,h2,h3,h4 {
 }
 .hero__num {
   font-family: Unbounded, sans-serif; font-weight: 800;
-  font-size: clamp(52px, 13vw, 96px);
+  font-size: var(--fs-hero);
   line-height: .84;
   letter-spacing: -.05em;
   background: linear-gradient(172deg, #fff 18%, #7d848f);
@@ -567,7 +580,7 @@ h1,h2,h3,h4 {
 .split__col--loss .split__title { color: var(--loss); }
 .split__count {
   font-family: Unbounded, sans-serif; font-size: 12px; letter-spacing: 0;
-  padding: 2px 9px; border-radius: 999px;
+  padding: 2px 9px; border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text);
 }
 .split__bar { height: 3px; flex: 1; border-radius: 2px; background: currentColor; opacity: .22; }
@@ -631,7 +644,7 @@ h1,h2,h3,h4 {
   display: flex; align-items: center; gap: 10px;
   min-height: 38px; /* тот же рост, что у кнопок сайта: в цель должно попадаться пальцем */
   padding: 10px 13px;
-  border: 1px solid var(--line); border-radius: 10px;
+  border: 1px solid var(--line); border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 3%, transparent);
   font-family: Inter, sans-serif; font-size: 11.5px; font-weight: 700;
   letter-spacing: .13em; text-transform: uppercase; color: var(--text);
@@ -757,7 +770,7 @@ h1,h2,h3,h4 {
   color: var(--text);
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 9px 14px 9px 34px;
   outline: none;
   transition: border-color .16s var(--ease), background .16s var(--ease);
@@ -773,14 +786,14 @@ h1,h2,h3,h4 {
   display: flex; gap: 2px; flex: none;
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 3px;
 }
 .seg__btn {
   font: inherit; font-size: 12.5px; font-weight: 500;
   color: var(--dim);
   background: none; border: 0; cursor: pointer;
-  padding: 6px 13px; border-radius: 999px;
+  padding: 6px 13px; border-radius: var(--r-pill);
   white-space: nowrap;
   transition: color .15s var(--ease), background .15s var(--ease);
 }
@@ -965,7 +978,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .stat { background: var(--surface); padding: var(--s-2) var(--s-2); display: flex; flex-direction: column; gap: 2px; }
 .stat__label { font-size: var(--fs-eyebrow); font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--mute); }
 .stat__value {
-  font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-h2); line-height: 1.1;
+  font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-stat); line-height: 1.1;
   font-variant-numeric: tabular-nums;
   display: flex; align-items: baseline; gap: var(--s-1);
 }
@@ -1001,7 +1014,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .vs__dates { grid-area: dates; font-size: var(--fs-meta); color: var(--mute); }
 .vs__badge {
   grid-area: badge; justify-self: start;
-  font-size: var(--fs-eyebrow); font-weight: 600; padding: 2px var(--s-1); border-radius: 999px;
+  font-size: var(--fs-eyebrow); font-weight: 600; padding: 2px var(--s-1); border-radius: var(--r-pill);
 }
 .vs__badge--win  { color: var(--win-ink);  background: color-mix(in srgb, var(--win) 15%, transparent); }
 .vs__badge--loss { color: var(--loss-ink); background: color-mix(in srgb, var(--loss) 15%, transparent); }
@@ -1068,7 +1081,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 
 /* ── Хронология: шапка и стена трофеев ──────────────────────────────────── */
 .hero--tl::after { opacity: .7; }
-.tl__title { font-size: clamp(26px, 6vw, 40px); margin: 4px 0 0; letter-spacing: -.03em; }
+.tl__title { font-size: var(--fs-h1); margin: 4px 0 0; letter-spacing: -.03em; }
 
 .tl__stats {
   display: flex; flex-wrap: wrap; gap: 22px 34px;
@@ -1143,7 +1156,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .verdict--loss .verdict__week b { color: var(--loss); }
 
 .verdict__body { min-width: 0; }
-.verdict__text { font-size: clamp(17px, 4.4vw, 26px); letter-spacing: -.02em; margin: 0; }
+.verdict__text { font-size: var(--fs-h2); letter-spacing: -.02em; margin: 0; }
 .verdict__dates { margin: 5px 0 0; font-size: 12.5px; color: var(--mute); }
 
 /* Календарь: год → месяц. Через год недель станет больше пятидесяти,
@@ -1166,7 +1179,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   color: var(--dim);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 6px 13px;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
@@ -1189,7 +1202,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   padding: 6px 11px 6px 9px;
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
@@ -1220,7 +1233,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   font-family: Unbounded, sans-serif; font-weight: 700; font-size: 13px;
   color: var(--mute);
   background: var(--surface);
-  padding: 3px 11px; border-radius: 999px;
+  padding: 3px 11px; border-radius: var(--r-pill);
   border: 1px solid var(--line);
 }
 .tl__year::after { content: ''; flex: 1; height: 1px; background: var(--line); }
@@ -1485,7 +1498,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .quart-hero h1, .quart-hero h2 {
   margin-top: 13px;
   color: #f5f9ee;
-  font-size: clamp(38px, 9vw, 76px);
+  font-size: var(--fs-hero);
   line-height: .95;
   letter-spacing: -.07em;
   text-transform: uppercase;
@@ -1557,7 +1570,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   gap: 15px;
   margin: 0 4px 18px;
 }
-.quart-board__head h2 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
+.quart-board__head h2 { margin-top: 7px; color: #edf5e9; font-size: var(--fs-h2); }
 .quart-board__head p { margin: 0; color: #768878; font-size: 12px; }
 .quart-section-label { color: var(--quart-cyan); font-size: 11px; }
 .quart-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 13px; }
@@ -1607,7 +1620,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   background: linear-gradient(90deg, transparent 0 32%, color-mix(in srgb, var(--violet) 25%, transparent) 32.1% 32.2%, transparent 32.3% 66%, color-mix(in srgb, var(--electric) 20%, transparent) 66.1% 66.2%, transparent 66.3%);
 }
 .quart-podium__heading { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: end; gap: 14px; margin: 0 4px 16px; }
-.quart-podium__heading h2 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
+.quart-podium__heading h2 { margin-top: 7px; color: #edf5e9; font-size: var(--fs-h2); }
 .quart-podium__note { color: #849a82; font-size: 11px; }
 .quart-podium__grid { position: relative; z-index: 1; display: grid; gap: 8px; }
 .quart-podium-card {
@@ -1619,7 +1632,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   min-height: 84px;
   padding: 10px 12px 10px 8px;
   border: 1px solid #2b3b2a;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: rgba(11,18,13,.65);
   color: inherit;
   text-decoration: none;
@@ -1700,7 +1713,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 /* ── Достижения альянса ─────────────────────────────────────────────────── */
 .achievement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; }
 .achievement { display: flex; align-items: center; gap: 10px; min-height: 62px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--raised); }
-.achievement__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 10px; background: color-mix(in srgb, var(--achievement-color) 16%, transparent); color: var(--achievement-color); font-size: 19px; }
+.achievement__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: var(--r); background: color-mix(in srgb, var(--achievement-color) 16%, transparent); color: var(--achievement-color); font-size: 19px; }
 .achievement b, .achievement small { display: block; }
 .achievement b { color: var(--text); font-size: 12px; }
 .achievement small { margin-top: 3px; color: var(--dim); font-size: 11px; }
@@ -1719,7 +1732,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 
 /* Галерея фотографий события */
 .tl__gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
-.tl__gallery a { display: block; overflow: hidden; border-radius: 10px; background: var(--raised); }
+.tl__gallery a { display: block; overflow: hidden; border-radius: var(--r); background: var(--raised); }
 .tl__gallery .tl__img { display: block; width: 100%; height: 150px; object-fit: cover; transition: transform .2s var(--ease); }
 .tl__gallery a:hover .tl__img { transform: scale(1.03); }
 @media (max-width: 420px) { .tl__gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tl__gallery .tl__img { height: 112px; } }
@@ -2069,7 +2082,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .role-card::after{right:auto;bottom:auto;left:0;top:0;width:100%;height:1px;border:0;border-radius:0;background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.22}
 
 /* Панель президента вручную — она видна на всех открытых вкладках */
-.president-board{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:10px;margin:10px 0 0;padding:9px 13px;border:1px solid color-mix(in srgb, var(--electric) 24%, transparent);border-left:2px solid var(--electric);border-radius:10px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 9%, transparent),color-mix(in srgb, var(--text) 2.5%, transparent));box-shadow:0 10px 24px -20px rgba(0,0,0,.6)}
+.president-board{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:10px;margin:10px 0 0;padding:9px 13px;border:1px solid color-mix(in srgb, var(--electric) 24%, transparent);border-left:2px solid var(--electric);border-radius: var(--r);background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 9%, transparent),color-mix(in srgb, var(--text) 2.5%, transparent));box-shadow:0 10px 24px -20px rgba(0,0,0,.6)}
 .president-board__signal{width:7px;height:7px;border-radius:50%;background:var(--electric)}
 .president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.14em;white-space:nowrap}.president-board__name{color:var(--text);font-size:14px}.president-board__alliance{color:var(--gold);font-family:Unbounded,sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em}.president-board__note{color:var(--mute);font-size:11px;text-align:right}
 @media(max-width:700px){.president-board{grid-template-columns:auto 1fr auto;gap:6px 8px;padding:9px 10px}.president-board__label{grid-column:2/-1;font-size:11px}.president-board__name{grid-column:2;font-size:13px}.president-board__alliance{grid-column:3;font-size:13px}.president-board__note{grid-column:2/-1;text-align:left;font-size:11px}}
@@ -2085,7 +2098,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 
 /* ── Карточка статуса президента: доведённый вид диспетчерского центра ─────*/
 .president-board{position:relative;display:block;isolation:isolate;overflow:hidden;margin:14px 0 0;padding:15px 18px 14px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-left:3px solid var(--electric);border-radius:18px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10.5%, transparent),color-mix(in srgb, var(--text) 2.8%, transparent) 48%,rgba(247,190,72,.055)),linear-gradient(180deg,rgba(16,27,34,.96),rgba(9,14,20,.96));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 8%, transparent),inset 0 -18px 36px rgba(0,0,0,.14),0 14px 34px -24px color-mix(in srgb, var(--electric) 75%, transparent)}
-.president-board__head{display:flex;align-items:center;gap:9px;min-width:0;margin-bottom:13px}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px color-mix(in srgb, var(--electric) 10%, transparent)}.president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:4px 7px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius:999px;color:var(--electric);font:800 11px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
+.president-board__head{display:flex;align-items:center;gap:9px;min-width:0;margin-bottom:13px}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px color-mix(in srgb, var(--electric) 10%, transparent)}.president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:4px 7px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius: var(--r-pill);color:var(--electric);font:800 11px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
 .president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:var(--text);font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap}.president-board__alliance{flex:none;color:var(--gold-ink);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid color-mix(in srgb, var(--electric) 13%, transparent);color:var(--mute);font-size:11px;line-height:1.4}
 @media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:11px;letter-spacing:.14em}.president-board__live{padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:15px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:11px}}
 @media(max-width:390px){.president-board__identity{display:grid;grid-template-columns:1fr auto;align-items:center}.president-board__name{font-size:15px}.president-board__alliance{font-size:14px}}
@@ -2140,7 +2153,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .quart-page{--quart-acid:#d3a6ff;--quart-cyan:#9f86c9}
 
 /* ── Последняя отделка интерфейса: единые поверхности, ритм и границы ─────*/
-:root{--surface-radius:16px;--surface-gap:14px}
+:root{--surface-radius:var(--r-xl);--surface-gap:14px}
 .panel,.hero,.quart-hero,.quart-board,.quart-podium,.achievements-panel,.card,.leader,.podium-card,.quart-card,.bot-feature,.bot-promise,.guide-extra-card{min-width:0;box-sizing:border-box;border-radius:var(--surface-radius)}
 .panel,.quart-board,.quart-podium,.achievements-panel{padding:18px}
 .panel__head{margin-bottom:13px}.panel__head p{max-width:68ch;line-height:1.5}
@@ -2172,8 +2185,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 }
 @media(max-width:420px){
   .wrap{padding-left:10px;padding-right:10px}
-  .panel,.hero,.quart-hero,.quart-board,.quart-podium,.achievements-panel{padding:13px 11px;border-radius:14px}
-  .panel__head h2{font-size:17px}
+  .panel,.hero,.quart-hero,.quart-board,.quart-podium,.achievements-panel{padding:13px 11px;border-radius: var(--r-lg)}
   .quart-controls,.ctl{gap:7px}
 }
 
@@ -2242,7 +2254,7 @@ summary.tl__row { cursor: pointer; }
   display: block;
   margin: 0;
   color: var(--text);
-  font-size: 15.5px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -2352,7 +2364,7 @@ summary.tl__row { cursor: pointer; }
 .tl__comment-avatar {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--raised-2);
   color: var(--dim);
   display: grid;
@@ -2413,7 +2425,7 @@ summary.tl__row { cursor: pointer; }
   padding: 5px 11px;
   background: transparent;
   border: 1px dashed var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--dim);
   font-family: inherit;
   font-size: 12.5px;
@@ -2515,7 +2527,7 @@ summary.tl__row { cursor: pointer; }
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-family: Inter, sans-serif;
   font-size: 14px;
   font-weight: 700;

@@ -97,7 +97,7 @@
   текст игры.
 */
 .guide-handbook { margin-top: 22px; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); padding-top: 14px; }
-.guide-handbook h2 { font-size: 17px; margin: 4px 0 0; }
+.guide-handbook h2 { font-size: var(--fs-h2); margin: 4px 0 0; }
 .guide-handbook .hb-search { max-width: 560px; }
 
 /* ── Собранные страницы: строка разделов и оглавление ────────────────────── */

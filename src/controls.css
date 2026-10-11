@@ -46,7 +46,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font-family: inherit;
@@ -240,7 +240,7 @@
   cursor: pointer;
 }
 .adm-field input[type='color']::-webkit-color-swatch-wrapper { padding: 3px; }
-.adm-field input[type='color']::-webkit-color-swatch { border: none; border-radius: 6px; }
+.adm-field input[type='color']::-webkit-color-swatch { border: none; border-radius: var(--r-sm); }
 
 /* ── Подписи полей ────────────────────────────────────────────────────────── */
 

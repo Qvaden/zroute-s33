@@ -196,14 +196,19 @@ html {
 }
 
 /*
-  Крупные заголовки на телефоне. clamp с vw в знаменателе даёт на 360px
-  слишком мелко, а на 320px — совсем нечитаемо, потому что нижняя граница
-  подбиралась под окно компьютера.
+  Число недели в герое. Бриф (§22) даёт заголовку героя на телефоне полосу
+  42–52 px, и нижняя граница шкалы (--fs-hero = 42 px) в неё уже попадает,
+  но на 390 px clamp считает 42 от узкого окна примерно так же, как на 320:
+  на маленьком телефоне цифра обязана оставаться доминантой экрана, поэтому
+  здесь она закреплена серединой полосы — 46 px.
+
+  Заголовки разделов на телефоне больше не подправляются словом «19px»:
+  название раздела размером с подпись карточки было главной причиной того,
+  что страница читалась плоским списком. Кегль даёт шкала из токенов, у
+  которой нижняя граница и есть телефон.
 */
 @media (max-width: 420px) {
-  .hero__num { font-size: 40px; }
-  .forum-chron__title { font-size: 20px; line-height: 1.15; }
-  .tl__title, .verdict__text { font-size: 19px; }
+  .hero__num { font-size: 46px; }
   .adm-h1 { font-size: 21px; }
 }
 
@@ -310,7 +315,7 @@ html {
 .tl__group-count {
   padding: 2px 8px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--mute);
   font-size: 11px;
 }
@@ -361,7 +366,6 @@ html {
   .tl__group-head { gap: 8px; }
   /* Уголок ужимаем до одного символа: место нужнее заголовку записи. */
   .tl__chev { margin-left: 3px; font-size: 11px; }
-  .tl__item .tl__title { font-size: 14.5px; }
   .tl__meta { font-size: 11px; }
 }
 
@@ -391,13 +395,13 @@ html {
 .forum-profile__role--blogger {
   padding: 2px 8px;
   border: 1px solid rgba(49,197,181,.4);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: #31c5b5;
 }
 .forum-profile__ally {
   padding: 2px 8px;
   border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--gold);
   font-family: Unbounded, sans-serif;
   font-size: 11.5px;
@@ -469,7 +473,7 @@ html {
 .forum-blog__badge {
   padding: 3px 10px;
   border: 1px solid rgba(49,197,181,.4);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(49,197,181,.08);
   color: #31c5b5;
   font-size: 11px;
@@ -572,7 +576,7 @@ html {
   display: block;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r);
   background: var(--raised);
 }
 .forum-shots img {
@@ -602,7 +606,7 @@ html {
   min-height: 40px;
   padding: 8px 13px;
   border: 1px dashed var(--line);
-  border-radius: 10px;
+  border-radius: var(--r);
   color: var(--dim);
   font-size: 12.5px;
   cursor: pointer;
@@ -629,7 +633,7 @@ html {
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: rgba(6,7,9,.78);
   color: #ffb3ba;
   font-size: 13px;
@@ -655,7 +659,7 @@ html {
   margin-left: 6px;
   padding: 1px 6px;
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--gold);
   font-family: Unbounded, sans-serif;
   font-size: 11px;
@@ -701,7 +705,7 @@ html {
     margin: 0 0 0 auto;
     max-width: 420px;
     padding: 7px 12px;
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     border-width: 1px;
     /*
       Дышащая тень и бегущий блеск отвлекали от содержимого страницы.
@@ -845,13 +849,11 @@ html {
 }
 
 /*
-  Заголовки страниц на большом экране были подобраны под окно поменьше
-  и на 1920 выглядят мелко относительно ширины полосы чтения.
+  Заголовки на широком экране больше правятся не здесь. Кегль целиком решает
+  clamp из шкалы токенов (styles-v8), у которого верхняя граница и есть
+  «широкий экран»: прежние 68 px и 30 px побеждали шкалу только потому, что
+  этот файл подключается позже, а не потому, что так было задумано.
 */
-@media (min-width: 1240px) {
-  .hero__num { font-size: 68px; }
-  .tl__title { font-size: 30px; }
-}
 
 /* ── Метка роли ───────────────────────────────────────────────────────────── */
 
@@ -883,7 +885,7 @@ html {
   margin-left: 5px;
   padding: 0 4px;
   border: 1px solid color-mix(in srgb, var(--role-tone) 30%, transparent);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--role-tone) 10%, transparent);
   color: var(--role-tone);
   /* Не наследует полужирность родителя: метка не должна спорить с ником. */
@@ -1276,7 +1278,7 @@ html {
   padding: 0 34px 0 14px;
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--text);
   font: inherit;
   text-align: left;
@@ -1343,7 +1345,7 @@ html {
   overscroll-behavior: contain;
   padding: 5px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--raised-2);
   box-shadow: 0 18px 44px -18px rgba(0,0,0,.85), 0 4px 18px -10px rgba(0,0,0,.6);
   opacity: 0;

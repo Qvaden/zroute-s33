@@ -3873,7 +3873,7 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     становятся выпадающим списком, короткие сегменты — плотнее.
   */
   check('выпадающий список разделов получил стили',
-    /\.pick__btn \{[^}]*border-radius: 999px/.test(mobileCss) && /\.pick__menu\b/.test(mobileCss));
+    /\.pick__btn \{[^}]*border-radius: var\(--r-pill\)/.test(mobileCss) && /\.pick__menu\b/.test(mobileCss));
   check('на телефоне длинный сегмент разделов уступает место списку',
     /@media \(max-width: 759px\)[\s\S]{0,300}\.seg--cat,[\s\S]{0,100}\.seg--type \{ display: none/.test(mobileCss));
   check('на телефоне пан вбок отрезается, а не тянет страницу',
