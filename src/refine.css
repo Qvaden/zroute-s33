@@ -63,7 +63,7 @@
   position: absolute; top: 8px; left: 8px; z-index: 200;
   transform: translateY(-200%);
   padding: 10px 16px; border-radius: var(--r-sm, 8px);
-  background: var(--accent); color: #14100c; font-weight: 600;
+  background: var(--accent); color: var(--on-accent); font-weight: 600;
   text-decoration: none;
 }
 .skip-link:focus { transform: none; }
@@ -645,7 +645,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   place-items: center;
   border-radius: 999px;
   background: var(--accent);
-  color: #14100c;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -927,7 +927,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-msg__body { font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
 .chat-msg__body p { margin: 0 0 3px; }
 .chat-msg__body p:last-child { margin-bottom: 0; }
-.chat-msg__body a { color: var(--accent); }
+.chat-msg__body a { color: var(--accent-ink); }
 
 /*
   Разметка сообщения чата. Набор тегов тот же, что на форуме (белый список
@@ -1142,7 +1142,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .chat-format .forum-md { margin: 0; }
 .chat-compose__btn[aria-pressed='true'] {
-  color: var(--accent);
+  color: var(--accent-ink);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .chat-compose__btn--format { font-size: 13px; font-weight: 700; letter-spacing: -.5px; }
@@ -1155,7 +1155,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
-  color: #14100c;
+  color: var(--on-accent);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -1308,7 +1308,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .chat-poll__head { display: grid; gap: 2px; }
-.chat-poll__badge { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.chat-poll__badge { color: var(--accent-ink); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .chat-poll__question { font-size: 13px; line-height: 1.4; }
 .chat-poll__options { display: grid; gap: 5px; }
 .chat-poll__opt {
@@ -1338,7 +1338,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .chat-poll__text { position: relative; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .chat-poll__stat { position: relative; flex: none; color: var(--mute); font-size: 11px; }
-.chat-poll__opt.is-voted .chat-poll__stat { color: var(--accent); }
+.chat-poll__opt.is-voted .chat-poll__stat { color: var(--accent-ink); }
 .chat-poll__foot { display: flex; gap: 8px; font-size: 11px; }
 
 /* ── Создание опроса ─────────────────────────────────────────────────────── */
@@ -1383,7 +1383,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-size: 11.5px;
   cursor: pointer;
 }
-.chat-reply-quote__nick { color: var(--accent); font-weight: 700; }
+.chat-reply-quote__nick { color: var(--accent-ink); font-weight: 700; }
 .chat-reply-quote__body { color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .chat-reply-banner {
@@ -1397,7 +1397,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .chat-reply-banner__info { flex: 1; min-width: 0; display: grid; gap: 1px; font-size: 11.5px; }
-.chat-reply-banner__label b { color: var(--accent); }
+.chat-reply-banner__label b { color: var(--accent-ink); }
 .chat-reply-banner__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .chat-reply-banner__cancel { border: 0; background: none; color: var(--mute); cursor: pointer; }
 .chat-reply-banner__cancel:hover { color: var(--soft-bad); }
@@ -1415,7 +1415,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
   line-height: 1;
 }
@@ -1426,7 +1426,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   height: 20px;
   border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 15px;
   font-weight: 900;
 }
@@ -1443,7 +1443,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: 6px;
   line-height: 1;
 }
-.chat-msg__react-btn:hover { color: var(--accent); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.chat-msg__react-btn:hover { color: var(--accent-ink); background: color-mix(in srgb, var(--text) 5%, transparent); }
 
 .chat-msg__react-trigger { position: relative; }
 .chat-msg__reactions-pop {
@@ -1493,7 +1493,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .chat-reaction-chip b { color: var(--mute); font-size: 11px; }
-.chat-reaction-chip.is-mine b { color: var(--accent); }
+.chat-reaction-chip.is-mine b { color: var(--accent-ink); }
 
 /* ── Кнопка «вниз» ──────────────────────────────────────────────────────── */
 
@@ -1630,7 +1630,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 /* ── Упоминания @ник в сообщениях ────────────────────────────────────────── */
 
 .chat-msg__body a[href^="#/user/"] {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
   text-decoration: none;
 }
@@ -1738,10 +1738,10 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-weight: 600;
 }
 .chat-leaderboard__nick a { color: var(--text); text-decoration: none; }
-.chat-leaderboard__nick a:hover { color: var(--accent); }
+.chat-leaderboard__nick a:hover { color: var(--accent-ink); }
 .chat-leaderboard__nick small { display: block; font-size: 11px; }
 .chat-leaderboard__count {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -2022,12 +2022,12 @@ body:has(.chat-layout) .site-foot { display: none; }
 */
 :root[data-theme="light"] .brand__num {
   animation: none;
-  color: #241a0e;
+  color: var(--on-accent);
   background: linear-gradient(145deg, #e89440, #c8751f);
   box-shadow: 0 3px 10px -3px rgba(217,130,43,.4);
 }
 :root[data-theme="light"] .nav__link.is-active {
-  color: #241a0e;
+  color: var(--on-accent);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: var(--accent);
   box-shadow: 0 3px 10px -4px rgba(217,130,43,.5);
@@ -2147,8 +2147,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   --text: #f2f4f7;
   --dim:  #b4bcc8;
   /* Тот же порог AA, что и в основной тёмной теме: #666e7b на тёмном острове
-     был 3.61:1. Остров остаётся островом — меняется только подпись. */
-  --mute:  #808a9a;
+     был 3.61:1, а #808a9a не вывозил бирюзовые плашки (4,45:1). Остров
+     остаётся островом — меняется только подпись. */
+  --mute:  #8c95a3;
   --electric: #a7a3c2;
   --accent: #ff5a36;
   --accent-dk: #d83a32;
@@ -2158,6 +2159,21 @@ body:has(.chat-layout) .site-foot { display: none; }
   --loss:  #f2555f;
   --line: #222a36;
   color: #f2f4f7;
+}
+
+/*
+  Телефон не должен превращать доску президента обратно в монумент. Тёмный
+  подслоем в базовом правиле запечён в фон (rgba(16,27,34,.96)), а компактная
+  полоса шапки из mobile.css действует только от 760 px. Ниже этой границы
+  плашка оставалась тёмной и в светлой теме, где её чернила берутся от
+  светлой палитры: имя президента давало 1,12:1, а метка альянса — 2,63:1.
+*/
+@media (max-width: 759px) {
+  :root[data-theme="light"] .president-board {
+    background: linear-gradient(110deg,
+      color-mix(in srgb, var(--electric) 10%, transparent),
+      color-mix(in srgb, var(--text) 3%, transparent));
+  }
 }
 
 /*
@@ -2197,20 +2213,6 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .bot-cta:hover { color: #081011; background: #b9fff4; }
 :root[data-theme="light"] .roles-notice__mark { border-color: #d9b83a; background: linear-gradient(145deg, #ffd968, #f5c44a); color: #4a3a06; }
 :root[data-theme="light"] .quart-controls .search input { color: #e9f3e7; }
-
-/*
-  КНОПКИ: янтарные, тактильные — плоский янтарь с чернильным текстом,
-  hover осветляет и приподнимает. Никаких градиентных «конфет».
-*/
-:root[data-theme="light"] .forum-btn,
-:root[data-theme="light"] .chat-compose__send {
-  background: var(--accent);
-  color: #241a0e;
-}
-:root[data-theme="light"] .forum-btn:hover:not(:disabled) {
-  background: #e08e39;
-  box-shadow: 0 6px 16px -8px rgba(217,130,43,.55);
-}
 
 /* Переключатель темы: тёмно-графитовая кнопка, hover — янтарный. */
 :root[data-theme="light"] .theme-toggle {
@@ -2327,7 +2329,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
   border-radius: var(--r-sm, 8px);
 }
-.forum-nicklog__item code { color: var(--accent); overflow-wrap: anywhere; }
+.forum-nicklog__item code { color: var(--accent-ink); overflow-wrap: anywhere; }
 .forum-nicklog__item .muted { font-size: 12px; }
 @media (max-width: 640px) {
   .forum-verify .forum-btn { width: 100%; min-height: 44px; }
@@ -2415,20 +2417,30 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .hero::after { opacity: .16; background: repeating-linear-gradient(58deg, rgba(117,76,35,.13) 0 1px, transparent 1px 12px); }
 :root[data-theme="light"] .hero__num { background: linear-gradient(172deg, #44382b, #aa5227); -webkit-background-clip: text; background-clip: text; }
 
+/*
+  КНОПКИ: янтарные, тактильные — плоский янтарь с чернильным текстом, hover
+  осветляет плашку. Градиентная «конфета» тут была не украшением, а дефектом:
+  верхний её край #c86231 светлее янтаря, и светлая подпись #fff9ee читалась
+  за 3,8 : 1 — ниже AA. Плоский `--accent` с `--on-accent` даёт 4,7 : 1 на
+  самой тёмной точке кнопки, и той же краской держит 8,1 : 1 на осветлённом
+  hover. Правило одно на весь сайт: раньше их было два, и второе просто
+  побеждало первое по порядку файлов.
+*/
 :root[data-theme="light"] .forum-btn,
 :root[data-theme="light"] .chat-compose__send,
 :root[data-theme="light"] .adm-btn--primary {
-  color: #fff9ee;
-  border-color: #a94722;
-  background: linear-gradient(180deg, #c86231, #a94722);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 8px 15px -12px rgba(121,49,22,.7);
+  color: var(--on-accent);
+  border-color: var(--accent-dk);
+  background: var(--accent);
+  box-shadow: 0 8px 15px -12px rgba(121,49,22,.7);
 }
 :root[data-theme="light"] .forum-btn:hover:not(:disabled),
+:root[data-theme="light"] .chat-compose__send:not(:disabled):hover,
 :root[data-theme="light"] .adm-btn--primary:hover {
-  color: #fff9ee;
-  border-color: #8e381b;
-  background: linear-gradient(180deg, #b95428, #8e381b);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 10px 18px -12px rgba(121,49,22,.75);
+  color: var(--on-accent);
+  border-color: var(--accent-dk);
+  background: #e08e39;
+  box-shadow: 0 10px 18px -12px rgba(121,49,22,.75);
 }
 :root[data-theme="light"] :where(.forum-field input, .forum-field textarea, .forum-field select, .search input, .adm-field input, .adm-field textarea, .adm-field select) {
   color: var(--text);
@@ -2537,7 +2549,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .forum-alliance-sub { display:flex; align-items:center; gap:7px; width:100%; min-height:32px; padding:5px 7px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
 .forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:11px; }
 .forum-alliance-sub.is-on { border-color:color-mix(in srgb,var(--accent) 52%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
-.forum-alliance-sub.is-on span { color:var(--accent); }
+.forum-alliance-sub.is-on span { color:var(--accent-ink); }
 
 .about-page { display:grid; gap:16px; max-width:960px; margin:0 auto; }
 .about-page .about-panel { margin:0; padding:clamp(16px,3vw,28px); color:var(--text); background:var(--surface); }
@@ -2545,7 +2557,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .about-panel h2 { margin:0 0 18px; font-size:clamp(19px,3vw,25px); }
 .about-panel h3 { margin:0 0 10px; font-size:17px; }
 .about-panel p { margin:12px 0 0; line-height:1.7; overflow-wrap:anywhere; }
-.about-panel a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
+.about-panel a { color:var(--accent-ink); text-decoration:underline; text-underline-offset:3px; }
 .about-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
 .about-card { min-width:0; padding:16px; border:1px solid var(--line); border-radius:var(--r); }
 .about-page .about-panel--privacy { border-inline-start:4px solid var(--accent); }
@@ -2652,20 +2664,30 @@ body:has(.chat-layout) #app { min-height: 0; }
 
 /*
   Командный центр главной. Контур повторяет форму приезжающих данных, а не
-  угадывает её: цифры сняты с живой страницы замером — герой 558 px на
-  мониторе и 653 px на телефоне, панель источника 176 px в своей колонке,
-  плашка лидера 100, счёт недели 84, строка «Кто именно» 40.
-  Карточки под героем — те же 190 px, что и в .sk--card, поэтому весь контур
-  резервирует 1578 px против 1555 px живых цифр на мониторе и 1673 против
-  1675 на телефоне. Прежние семь карточек давали 1408 — нехватку страница
-  добирала рывком в 147 px ровно в момент прихода данных.
+  угадывает её: цифры сняты с живой страницы замером — содержимое героя без
+  полосы кадра 495 px на мониторе и 684 px на телефоне, панель источника
+  176 px в своей колонке, плашка лидера 100, счёт недели 84, строка
+  «Кто именно» 40.
+
+  Резерв героя — формула, а не число. Герой держит первый экран, то есть свою
+  высоту считает от окна (78 % на мониторе, не меньше 70 % на телефоне), плюс
+  полоса кадра сверху: зафиксированные 558 px совпали бы с живым экраном
+  только на том мониторе, где их измерили. max() здесь повторяет max() живой
+  вёрстки — что из двух больше, ту высоту и занимает герой. Полоса берётся из
+  той же меры --hero-art-h, что и у героя, и без класса --art на карточке
+  обращается в ноль: пустой слот не резервирует место под кадр, которого нет.
+
+  Карточки под героем — те же 190 px, что и в .sk--card. Прежние семь
+  карточек давали 1408 — нехватку страница добирала рывком в 147 px ровно в
+  момент прихода данных; сколько страница дёргается теперь, меряет прогон
+  CLS (tools/walk.mjs), а не эти комментарии.
 
   Панель — рамка внутри рамки, и это не украшение: на живом экране панель
   источника стоит внутри героя своей коробкой. Без неё контур резервировал
   бы высоту героя, но не его композицию, и левая колонка разъезжалась бы.
 */
 .sk--ops .sk__card { --sk-h: 190px; }
-.sk--ops .sk__card--ops { --sk-h: 653px; }
+.sk--ops .sk__card--ops { --sk-h: max(min(70vh, 700px), calc(684px + var(--hero-art-h, 0px))); }
 .sk__card--ops { display: grid; gap: 24px; align-items: start; align-content: center; }
 .sk__ops { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .sk__line--title { width: 58%; height: 46px; border-radius: 12px; }
@@ -2678,9 +2700,12 @@ body:has(.chat-layout) #app { min-height: 0; }
 .sk__bars .sk__line:nth-child(2) { height: 40px; }
 .sk__bars .sk__line:nth-child(3) { height: 20px; }
 @media (min-width: 900px) {
-  .sk--ops .sk__card--ops { --sk-h: 558px; }
+  .sk--ops .sk__card--ops { --sk-h: max(min(70vh, 700px), calc(495px + var(--hero-art-h, 0px))); }
   .sk__card--ops { grid-template-columns: minmax(0, 1fr) minmax(250px, 330px); }
   .sk__side { min-height: 176px; }
+}
+@media (min-width: 1024px) and (min-height: 720px) {
+  .sk--ops .sk__card--ops { --sk-h: max(min(78vh, 820px), calc(495px + var(--hero-art-h, 0px))); }
 }
 
 .sk__caption { margin: 0 0 10px; color: var(--dim); font-size: 13px; }
@@ -2757,18 +2782,37 @@ body:has(.chat-layout) #app { min-height: 0; }
   строки — от 18 до 23 px. Стоят они тоньше не из-за высоты шрифта, а потому,
   что ссылка-действие наследует высоту переноса строки.
 
-  Нативные флажки 16×16 (поле поиска по гайдам и фильтры витрины) в список не
-  входят намеренно: их размер задаёт сам браузер, а критерий такие цели вычитает.
-  Рядом с каждым есть подпись, и именно по неё кликают.
+  Про флажки нужно было не рассказывать, а мерить. Прежняя формулировка «их
+  размер задаёт браузер, а рядом есть подпись, и кликают по ней» вычитала
+  флажок 16×16 из проверки — и оставляла без замера саму подпись: на витрине
+  строка «показывать проданные» оказалась 22 px, то есть не дотягивала и до
+  мерки мыши. Поэтому теперь считается коробка label, в котором флажок живёт:
+  именно она и есть цель пальца, а голый input из проверки убран, чтобы не
+  считать одну цель дважды.
 
-  Все девять имён названы голым классом, без тега перед точкой. Это не косметика:
-  `button.forum-save` сильнее того `.forum-save`, который стоит в тач-планке, и
-  первый же промер после правки вернул флажок закладки 44×33 — то есть ровно ту
-  перебитую планку, из-за которой весь этот блок и появился.
+  Шестой промер — тот, что считает ссылки при любом указателе, а не только под
+  пальцем, — назвал четыре действия, которые планку мыши вообще не накрывали:
+  ник автора (16 px), «Вся летопись сервера» (15 px), заголовок темы на ленте
+  (22 px) и заголовок карточки на странице «О проекте» (22 px).
+
+  Ник растёт до 24, но не до 44 — и это решение, а не недосмотр. Он стоит
+  второй строкой в плотной шапке карточки, где рядом переносные плашки и
+  время, и 44-планка подняла бы заголовок каждой карточки ленты на
+  четверть. Для второстепенного текстового действия в строке метаданных
+  критерий требует ровно 24 — они и названы общей меркой.
+
+  Все имена ниже названы голым классом — кроме тех двух, где класс в разметке
+  сам по себе ничего не значит и берётся вместе с родителем («.forum-post__title
+  a», «.about-card h3 a»). Это не косметика: `button.forum-save` сильнее того
+  `.forum-save`, который стоит в тач-планке, и первый же промер после правки
+  вернул флажок закладки 44×33 — то есть ровно ту перебитую планку, из-за
+  которой весь этот блок и появился.
 */
 .upd-card__source, .feed-card__source, .quart-next__more, .forum-alliance-card,
-.forum-save, .forum-post__expand, .who__more, .live__more, .back {
-  min-height: 24px;
+.forum-save, .forum-post__expand, .who__more, .live__more, .back,
+.forum-nick, .forum-chron__more, .forum-post__title a, .about-card h3 a,
+.accounts-controls__sold {
+  display: inline-flex; align-items: center; min-height: 24px;
 }
 @media (hover: none) and (pointer: coarse) {
   .forum-react__btn,
@@ -2801,11 +2845,28 @@ body:has(.chat-layout) #app { min-height: 0; }
   .forum-chron__more,
   .forum-btn,
   .forum-post__title a,
+  .burger,
   input[type="search"],
   .forum-field input,
   .forum-field select,
   .evt-remind select,
-  .accounts-search input { min-height: 44px; }
+  .accounts-search input,
+  .accounts-chip,
+  .accounts-controls__sold { min-height: 44px; }
+  /*
+    Шапка: промер пальцем назвал в ней две цели по 36 px — «бургер» и
+    переключатель темы. Планка выше их не накрывала: у «бургера» свои 44 px
+    живут в forum.css, а этот файл перебивает их строкой `.burger { min-height:
+    36px }` — тот же класс, позже по списку. Переключатель же вообще задан
+    фиксированным квадратом 36×36, поэтому ему нужен и рост, и ширина.
+  */
+  .theme-toggle { width: 44px; height: 44px; border-radius: 12px; }
+  /*
+    Витрина продаж: чипы сортировки стоят в 44 px только ниже 700 px — правило
+    привязано к ширине, хотя планка привязана к пальцу. На планшете в 768 px по
+    пальцу они оставались 40. Флажок «показывать проданные» и вовсе не имел
+    планки: под пальцем считается его подпись, а не квадратик флажка.
+  */
   /* Флажок закладки: высота 44, а ширина оставалась 34 — палец промахивался
      по горизонтали туда же, откуда его уже выгнали по вертикали. Тот же
      промер догнал чип тега (41 px) и кнопку переключателя (39): рост по

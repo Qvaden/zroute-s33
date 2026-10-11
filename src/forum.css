@@ -75,7 +75,7 @@
 */
 .side .nav__link.is-active {
   position: relative;
-  color: #14100c;
+  color: var(--on-accent);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
   box-shadow: 0 8px 22px -14px var(--accent);
 }
@@ -339,7 +339,7 @@
   padding: 4px 9px;
   border: 1px solid rgba(53,208,127,.28);
   border-radius: 999px;
-  color: var(--win);
+  color: var(--win-ink);
   font: 800 11px/1 Inter, sans-serif;
   letter-spacing: .16em;
 }
@@ -410,11 +410,11 @@
 .forum-chron__item--win { border-color: rgba(53,208,127,.24); }
 .forum-chron__item--loss { border-color: rgba(255,71,87,.24); }
 .forum-chron__when { color: var(--mute); font-size: 11px; }
-.forum-chron__item--win .forum-chron__what { color: var(--soft-ok); }
-.forum-chron__item--loss .forum-chron__what { color: var(--soft-bad); }
+.forum-chron__item--win .forum-chron__what { color: var(--win-ink); }
+.forum-chron__item--loss .forum-chron__what { color: var(--loss-ink); }
 
 .forum-chron__more {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
@@ -449,7 +449,7 @@
   flex: none;
   border-radius: 9px;
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-family: Unbounded, sans-serif;
   font-size: 15px;
 }
@@ -685,7 +685,7 @@
   font-size: 11.5px;
 }
 .forum-notify__count.is-new {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 
@@ -849,7 +849,7 @@
   font-size: 11px;
 }
 .forum-notify__go {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
   opacity: 0;
   transition: opacity .15s var(--ease);
@@ -954,7 +954,7 @@
   border: 1px solid transparent;
   border-radius: 10px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
-  color: #14100c;
+  color: var(--on-accent);
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 600;
@@ -1045,8 +1045,8 @@
   font: 700 11px/1 ui-monospace, SFMono-Regular, monospace;
 }
 .forum-recovery__steps li.is-now { color: var(--text); font-weight: 600; }
-.forum-recovery__steps li.is-now::before { border-color: var(--accent); color: var(--accent); }
-.forum-recovery__steps li.is-done::before { content: '✓'; border-color: var(--accent); color: var(--accent); }
+.forum-recovery__steps li.is-now::before { border-color: var(--accent); color: var(--accent-ink); }
+.forum-recovery__steps li.is-done::before { content: '✓'; border-color: var(--accent); color: var(--accent-ink); }
 
 .forum-recovery__nick { font-size: 12.5px; }
 .forum-recovery__status { font-weight: 600; }
@@ -1087,7 +1087,7 @@
   height: 30px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 18px;
   line-height: 1;
 }
@@ -1137,7 +1137,7 @@
 .forum-md__btn[aria-pressed='true'] {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .forum-md__btn:active { transform: scale(.95); }
 .forum-md__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -1398,7 +1398,7 @@
 
 .forum-post__title { margin: 0 0 9px; font-size: clamp(16px, 2.1vw, 20px); }
 .forum-post__title a { color: inherit; text-decoration: none; }
-.forum-post__title a:hover { color: var(--accent); }
+.forum-post__title a:hover { color: var(--accent-ink); }
 
 .forum-post__body { color: var(--dim); font-size: 13.5px; line-height: 1.62; }
 .forum-post__body p { margin: 0 0 9px; }
@@ -1408,7 +1408,7 @@
 .forum-post__expand {
   display: inline-block;
   margin-top: 4px;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
@@ -1466,7 +1466,7 @@
   transition: color .15s var(--ease), border-color .15s var(--ease);
 }
 .forum-save:hover { color: var(--text); border-color: var(--line); }
-.forum-save.is-on { color: var(--accent); }
+.forum-save.is-on { color: var(--accent-ink); }
 .forum-save:disabled { color: var(--mute); opacity: .5; cursor: not-allowed; }
 
 .forum-act {
@@ -1492,7 +1492,7 @@
   flex: none;
   border-radius: 8px;
   background: rgba(255,71,87,.12);
-  color: var(--loss);
+  color: var(--loss-ink);
   font-size: 13px;
 }
 .forum-post__gone b { font-size: 13.5px; }
@@ -1929,7 +1929,7 @@
   gap: 12px;
 }
 .forum-rank__level { font-size: 12.5px; color: var(--dim); }
-.forum-rank__level b { color: var(--accent); font-weight: 800; letter-spacing: .02em; }
+.forum-rank__level b { color: var(--accent-ink); font-weight: 800; letter-spacing: .02em; }
 .forum-rank__bar {
   position: relative;
   height: 8px;
@@ -1981,7 +1981,7 @@
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -.01em;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .forum-rep__label { font-size: 12.5px; color: var(--dim); }
 .forum-rep__hint { margin: 4px 0 0; font-size: 11.5px; }
@@ -1992,7 +1992,7 @@
   color: var(--dim);
 }
 .forum-rep__sources li { margin-top: 2px; }
-.forum-rep__sources b { color: var(--accent); }
+.forum-rep__sources b { color: var(--accent-ink); }
 
 /* Подтверждённое со стороны достижение тёплое: «много писал» и «признали» — не одно и то же. */
 .forum-rank__ach--confirmed {
@@ -2238,7 +2238,7 @@
   font-variant-numeric: tabular-nums;
 }
 .forum-lead__rank--top {
-  color: #14100c;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: transparent;
 }
@@ -2285,7 +2285,7 @@
 }
 .guide-chip:hover { color: var(--text); border-color: var(--accent); }
 .guide-chip.is-on {
-  color: #14100c;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: transparent;
 }
@@ -2295,7 +2295,7 @@
 */
 .guide-chip--mine { border-style: dashed; margin-left: auto; }
 .guides-page__signin { margin: 0 0 12px; font-size: 12.5px; }
-.guides-page__signin a { color: var(--accent); }
+.guides-page__signin a { color: var(--accent-ink); }
 
 .guide-search {
   display: flex;
@@ -2337,7 +2337,7 @@
 .quart-next__more {
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-ink);
   text-decoration: none;
 }
 .quart-next__more b { font-size: 13px; }
@@ -2379,7 +2379,7 @@
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .guide-card__title { font-size: 15px; line-height: 1.35; }
 .guide-card__by { font-size: 11.5px; }
@@ -2436,9 +2436,9 @@
   color: var(--dim);
   background: var(--raised-2);
 }
-.guide-badge--verified { color: var(--win); border-color: var(--win); }
+.guide-badge--verified { color: var(--win-ink); border-color: var(--win); }
 .guide-badge--outdated { color: var(--gold); border-color: var(--gold); }
-.guide-badge--signal { color: var(--loss); border-color: var(--loss); }
+.guide-badge--signal { color: var(--loss-ink); border-color: var(--loss); }
 /*
   «Не проверен» — теперь самое частое состояние гайда: игроки публикуют сразу.
   Метка нейтральная и пунктирная: это не похвала и не порицание, а честное
@@ -2536,10 +2536,10 @@
   font-weight: 700;
 }
 .guide-req__sla--soon { color: var(--gold); }
-.guide-req__sla--late { color: var(--loss); }
+.guide-req__sla--late { color: var(--loss-ink); }
 .guide-req__details { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
 .guide-req__outcome { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; }
-.guide-req__outcome a { color: var(--accent); }
+.guide-req__outcome a { color: var(--accent-ink); }
 .guide-req__answer {
   margin: 3px 0 0;
   padding-left: 8px;
@@ -2568,7 +2568,7 @@
   border: 1px solid color-mix(in srgb, var(--win) 45%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--win) 12%, transparent);
-  color: var(--win);
+  color: var(--win-ink);
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
@@ -2576,7 +2576,7 @@
 .forum-post__expiry--over {
   border-color: color-mix(in srgb, var(--loss) 55%, var(--line));
   background: color-mix(in srgb, var(--loss) 14%, transparent);
-  color: var(--loss);
+  color: var(--loss-ink);
 }
 
 /* Строка продления — только в открытой теме: в ленте таких кнопок на каждый
@@ -2596,7 +2596,7 @@
   font-size: 12.5px;
 }
 .forum-expiry__state { font-weight: 700; color: var(--text); }
-.forum-expiry__state--over { color: var(--loss); }
+.forum-expiry__state--over { color: var(--loss-ink); }
 .forum-expiry__btns { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .forum-expiry__btns button[disabled] { opacity: .55; }
 
@@ -2635,7 +2635,7 @@
 }
 .cal-tab:hover { color: var(--text); border-color: var(--accent); }
 .cal-tab.is-active {
-  color: #14100c;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: transparent;
 }
@@ -2700,14 +2700,14 @@
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .evt-card__when i { font-size: 11.5px; font-style: normal; color: var(--dim); }
 
 .evt-card__body { display: grid; gap: 6px; min-width: 0; }
 .evt-card__title { margin: 0; font-size: 15px; line-height: 1.35; }
 .evt-card__title a { color: var(--text); text-decoration: none; }
-.evt-card__title a:hover { color: var(--accent); }
+.evt-card__title a:hover { color: var(--accent-ink); }
 .evt-card__meta {
   margin: 0;
   display: flex;
@@ -2722,14 +2722,14 @@
    а представление страницы кому идёт — это не публичная информация. */
 .evt-seats { font-size: 12px; color: var(--dim); }
 .evt-seats b { color: var(--text); }
-.evt-seats em { font-style: normal; color: var(--loss); }
+.evt-seats em { font-style: normal; color: var(--loss-ink); }
 .evt-seats--full { font-weight: 700; }
 
 .evt-card__side { display: grid; gap: 6px; justify-items: end; }
 .evt-link {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-ink);
   text-decoration: none;
   white-space: nowrap;
   padding: 5px 9px;
@@ -2752,7 +2752,7 @@
 .evt-actions .forum-error { display: block; }
 
 .evt-btn.is-on {
-  color: #14100c;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: transparent;
 }
@@ -2979,17 +2979,17 @@
   white-space: nowrap;
 }
 .upd-kind--patch {
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .upd-kind--notice {
-  color: var(--gold);
+  color: var(--gold-ink);
   border-color: color-mix(in srgb, var(--gold) 40%, var(--line));
   background: color-mix(in srgb, var(--gold) 10%, transparent);
 }
 .upd-kind--issue {
-  color: var(--loss);
+  color: var(--loss-ink);
   border-color: color-mix(in srgb, var(--loss) 40%, var(--line));
   background: color-mix(in srgb, var(--loss) 10%, transparent);
 }
@@ -3054,7 +3054,7 @@
   margin: 7px 0 0;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--loss);
+  color: var(--loss-ink);
 }
 
 /* ── Форма модерации ─────────────────────────────────────────────────────── */
@@ -3121,7 +3121,7 @@
   background: color-mix(in srgb, var(--loss) 12%, transparent);
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--loss);
+  color: var(--loss-ink);
 }
 
 .upd-none {
@@ -3179,7 +3179,7 @@
 }
 
 .feed__hint { margin: 5px 0 10px; font-size: 12px; line-height: 1.5; color: var(--mute); }
-.feed__hint a { color: var(--accent); text-decoration: none; }
+.feed__hint a { color: var(--accent-ink); text-decoration: none; }
 
 .feed-list { list-style: none; margin: 0; padding: 0; }
 
@@ -3198,7 +3198,15 @@
 
 .feed-card--live { border-left-color: var(--win); }
 .feed-card--soon { border-left-color: var(--gold); }
-.feed-card--ended { border-left-color: var(--line); opacity: .7; }
+/*
+  Законченное событие приглушали всей карточкой: opacity: .7 давало по
+  строке «прошло» — и заодно убивали AA внутри неё. Титул на залитой
+  подложке после 70 % непрозрачности превращался в #6c6862 и читался
+  за 4,49 : 1, а подпись фазы — за 2,62 : 1. Приглушение теперь делает
+  чернила, а не группа пикселей: плашки под текстом остаются своими
+  цветами, и каждая пара «краска — подложка» меряется напрямую.
+*/
+.feed-card--ended { border-left-color: var(--line); color: var(--mute); }
 
 .feed-card__phase {
   padding: 2px 8px;
@@ -3208,14 +3216,20 @@
   letter-spacing: .05em;
   text-transform: uppercase;
   background: color-mix(in srgb, var(--win) 16%, transparent);
-  color: var(--win);
+  color: var(--win-ink);
 }
 .feed-card--soon .feed-card__phase {
   background: color-mix(in srgb, var(--gold) 16%, transparent);
-  color: var(--gold);
+  color: var(--gold-ink);
 }
+/*
+  «Кончилось» — самая тихая фаза, и подкраска под ней была вредна: в тёмной
+  теме 16 % своих же чернил осветляли плашку до 4,18 : 1, в светлой той же
+  плашкой подпись падала до 3,99 : 1. Без подложки текст сидит прямо на
+  карточке и держит 5,24 : 1 и 4,89 : 1.
+*/
 .feed-card--ended .feed-card__phase {
-  background: color-mix(in srgb, var(--mute) 16%, transparent);
+  background: transparent;
   color: var(--mute);
 }
 
@@ -3231,7 +3245,7 @@
 }
 
 /* Ссылка на страницу события в магазине: пересказ можно проверить. */
-.feed-card__source { font-size: 11.5px; color: var(--accent); text-decoration: none; }
+.feed-card__source { font-size: 11.5px; color: var(--accent-ink); text-decoration: none; }
 .feed-card__source:hover { text-decoration: underline; }
 
 .feed-card__action {
@@ -3253,7 +3267,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--loss);
+  color: var(--loss-ink);
 }
 
 .feed-none {
@@ -3271,7 +3285,7 @@
   background: color-mix(in srgb, var(--loss) 12%, transparent);
   font-size: 12px;
   line-height: 1.45;
-  color: var(--loss);
+  color: var(--loss-ink);
 }
 
 .feed__run {
@@ -3321,6 +3335,15 @@
 :root[data-theme="light"] {
   --shop: #0a5f52;
   --shop-ink: #fbf8f1;
+  /*
+    Подкраска витрины в светлой теме строится на САМОМ СВЕТЛОМ основании
+    (`--raised-2`, почти белое стекло), а не на `--raised`. Причина — замер
+    пикселом: подпись «на экране» и абзац правил своими бирюзово-золотыми
+    плашками на `--raised` давали 4,28 : 1 и 4,35 : 1, то есть не дотягивали
+    до AA. На светлом основании та же краска остаётся бирюзовой полоской, но
+    текст на ней читается за 5,3 : 1.
+  */
+  --shop-soft: color-mix(in srgb, var(--shop) 9%, var(--raised-2));
 }
 
 /*
@@ -3501,7 +3524,7 @@
   border: 1px solid var(--shop-line);
   border-left: 3px solid var(--gold);
   border-radius: 12px;
-  background: linear-gradient(100deg, var(--shop-soft), color-mix(in srgb, var(--gold) 6%, var(--raised)));
+  background: linear-gradient(100deg, var(--shop-soft), color-mix(in srgb, var(--gold) 6%, var(--raised-2)));
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--mute);
@@ -3817,11 +3840,11 @@
 .accounts-grid--in .accounts-card__fresh { animation: accounts-fresh 1.5s ease-in-out 1; }
 .accounts-card__sold {
   border-color: color-mix(in srgb, var(--win) 40%, var(--line));
-  color: var(--win);
+  color: var(--win-ink);
 }
 .accounts-card__over {
   border-color: color-mix(in srgb, var(--loss) 40%, var(--line));
-  color: var(--loss);
+  color: var(--loss-ink);
 }
 .accounts-card__foot {
   display: flex;
@@ -3861,7 +3884,7 @@
   transition: color .15s, border-color .15s, background .15s;
 }
 .accounts-act:hover { color: var(--text); border-color: var(--shop); }
-.accounts-act--sold:hover { color: var(--win); border-color: var(--win); }
+.accounts-act--sold:hover { color: var(--win-ink); border-color: var(--win); }
 .accounts-act--return:hover { color: var(--gold); border-color: var(--gold); }
 /* «Написать продавцу» — единственное действие чужого объявления, поэтому оно
    подсвечено, а кнопки автора остаются нейтральными: на одном ряду человек не

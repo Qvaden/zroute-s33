@@ -1,9 +1,34 @@
 import { esc, fmtDate, deltaBadge, plural, pluralWord } from '../ui/helpers.js';
 import { raceChart } from '../ui/chart.js';
 import { byWeekStart, findCurrentWeek } from '../data/week-order.js';
+import { heroImage, heroAlt } from '../ui/hero-slot.js';
 
 /* Формы слова «день» для счёта: 1 день, 2 дня, 5 дней. */
 const DAYS = ['день', 'дня', 'дней'];
+
+/**
+ * Слой картинки под содержимым героя.
+ *
+ * Кадр занимает верхнюю полосу героя, а не ложится фоном под буквами: высота
+ * полосы задана в CSS (`--hero-art-h` в styles-v8.css), и ровно на неё растёт
+ * верхний отступ героя. Поэтому файл любого формата — горизонтальный,
+ * вертикальный, квадратный — обрезается (`object-fit: cover`) в одну и ту же
+ * полосу, а все цифры остаются на посчитанной поверхности героя.
+ *
+ * Высота известна браузеру до первого байта картинки, так что при её приходе
+ * ничего не сдвигается; контур ожидания резервирует полосу вместе с героем.
+ *
+ * `fetchpriority="high"` — потому что это самый заметный образ первого
+ * экрана, а `decoding="async"` — потому что раскодирование кадра не должно
+ * задерживать текст недели.
+ */
+function heroMedia() {
+  const src = heroImage();
+  if (!src) return '';
+  return `<div class="hero__media">
+            <img class="hero__img" src="${esc(src)}" alt="${esc(heroAlt())}" fetchpriority="high" decoding="async">
+          </div>`;
+}
 
 /**
  * Полных календарных дней от сегодня до даты. Отрицательных не бывает:
@@ -35,7 +60,8 @@ function daysUntil(date, now = new Date()) {
  */
 function renderOutage() {
   return `
-    <section class="hero">
+    <section class="hero hero--lead${heroImage() ? ' hero--media' : ''}">
+      ${heroMedia()}
       <div class="hero__top">
         <div class="hero__ident">
           <span class="eyebrow">Цифры сейчас не видны</span>
@@ -83,7 +109,8 @@ function renderPreSeason(standings, allWeeks) {
   const upcoming = ordered.find((w) => w.endDate >= today) ?? ordered[0];
 
   return `
-    <section class="hero">
+    <section class="hero hero--lead${heroImage() ? ' hero--media' : ''}">
+      ${heroMedia()}
       <div class="hero__top">
         <span class="eyebrow">Отсчёт начинается</span>
         <h1 class="hero__week">
@@ -390,7 +417,8 @@ export function renderHome(view = {}) {
       : `внесено ${recorded} из ${total}`;
 
   return `
-    <section class="hero hero--ops">
+    <section class="hero hero--ops hero--lead${heroImage() ? ' hero--media' : ''}">
+      ${heroMedia()}
       <div class="hero__top">
         <div class="hero__ident">
           <span class="eyebrow">Итоги недели</span>

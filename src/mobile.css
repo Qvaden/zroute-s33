@@ -354,7 +354,7 @@ html {
   line-height: 1;
   transition: transform .18s var(--ease), color .18s var(--ease);
 }
-.tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent); }
+.tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent-ink); }
 
 @media (max-width: 420px) {
   .tl__group-name { font-size: 12px; }
@@ -508,7 +508,7 @@ html {
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-.forum-profile__posts a:hover { color: var(--accent); }
+.forum-profile__posts a:hover { color: var(--accent-ink); }
 .forum-profile__post-meta {
   display: flex;
   gap: 10px;
@@ -648,7 +648,7 @@ html {
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-.forum-nick:hover { color: var(--accent); }
+.forum-nick:hover { color: var(--accent-ink); }
 
 /* Тег альянса рядом с ником в ленте: мелко и сдержанно. */
 .forum-post__ally {
@@ -1226,7 +1226,7 @@ html {
 }
 .pick__opt:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4%, transparent); }
 .pick__opt[aria-selected="true"] {
-  color: #14100c;
+  color: var(--on-accent);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
   font-weight: 600;
 }

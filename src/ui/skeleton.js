@@ -15,6 +15,8 @@
   подгонять контур удобнее рядом с теми же карточками, чью высоту он повторяет.
 */
 
+import { heroImage } from './hero-slot.js';
+
 /** Три полоски-строки: текст ещё не пришёл, но его место видно. */
 function lines(count) {
   return `<span class="sk__lines">${'<i class="sk__line"></i>'.repeat(count)}</span>`;
@@ -31,16 +33,21 @@ function lines(count) {
  *          источника, остальное — карточки, которые идут под ним.
  *
  * Про 'ops' отдельно. Обычный контур из одинаковых карточек резервирует
- * высоту списка, а первая настоящая карточка главной — рамка на 558 px, и
- * под ней ещё панель на 176 px. Без такой же рамки в контуре страница
- * сдвигалась бы на полэкрана ровно в момент прихода данных.
+ * высоту списка, а первая настоящая карточка главной — герой во весь первый
+ * экран, и под ним ещё панель на 176 px. Без такой же рамки в контуре
+ * страница сдвигалась бы на полэкрана ровно в момент прихода данных.
+ *
+ * Высота героя зависит от окна и от полосы кадра, поэтому резерв в refine.css
+ * — не одно число, а та же формула, что у живого героя. Класс --art на первой
+ * карточке появляется только когда путь к картинке в config.js непустой: без
+ * него резерв не должен хранить место под кадр, которого не будет.
  */
 function block(kind, index) {
   if (kind === 'post') return `<div class="sk__card"><span class="sk__ava"></span>${lines(3)}</div>`;
   if (kind === 'row') return `<div class="sk__card">${lines(2)}</div>`;
   if (kind === 'tile') return '<div class="sk__card"></div>';
   if (kind === 'ops' && index === 0) {
-    return '<div class="sk__card sk__card--ops"><div class="sk__ops">'
+    return `<div class="sk__card sk__card--ops${heroImage() ? ' sk__card--ops--art' : ''}"><div class="sk__ops">`
       + '<i class="sk__line sk__line--title"></i>'
       + `${lines(2)}</div><div class="sk__side">${lines(3)}</div>`
       + '<div class="sk__bars"><i class="sk__line"></i><i class="sk__line"></i><i class="sk__line"></i></div></div>';

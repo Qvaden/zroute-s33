@@ -23,15 +23,24 @@
   /*
     Второстепенный текст (подписи плиток, даты, строки про автомат).
     Прежний #666e7b давал 3.07:1 на самой светлой панели — ниже порога AA для
-    обычного текста. #808a9a держит 4.5:1 и на --surface, и на --raised-2.
+    обычного текста. #8c95a3 держит ≥5,1:1 и на --surface, и на --raised-2, и на
+    плашках, которые светлее подложки (бирюзовая --shop-soft, полоса летописи).
   */
-  --mute:      #808a9a;
+  --mute:      #8c95a3;
 
   --accent:    #ff5a36;
   --accent-dk: #d83a32;
   /* Чернила signal-оранжевым: подписи и ссылки в тексте. В тёмной теме это
      тот же #ff5a36 (6,0:1 и выше), в светлой — отдельно подобранный тон. */
   --accent-ink: #ff5a36;
+  /*
+    Чернила НА залитой плашке: фон кнопки — это сам акцент, поэтому подпись
+    обязана быть темнее бумаги, а не светлее. В тёмной теме это собственный
+    цвет страницы, в светлой — абсолютный чёрный: #14100c на янтаре #c05a24
+    давал 4,26:1, и ни один тёплый оттенок чёрного порога 4,5 не добирает,
+    потому что янтарь светлой темы темнее своего собрата из тёмной.
+  */
+  --on-accent: #080a0f;
 
   /*
     Призы рейтинга одним рядом: место №1, №2 и №3 красятся отсюда, а не
@@ -41,6 +50,11 @@
   --gold:      #d9a94a;
   --silver:    #b3bcc9;
   --bronze:    #c08a5f;
+  /* Чернила золота: бейдж «Объявление» сидит на своей же подкраске, и там
+     #d9a94a как подпись проходит, а в светлой теме золото темнее бумаги и
+     требует отдельного тона. В тёмной теме чернила — само золото, здесь они
+     лишь называются, чтобы код не выбирал hex на глаз. */
+  --gold-ink:  #d9a94a;
   --win:       #46b87f;
   --loss:      #f2555f;
 
@@ -136,15 +150,26 @@
   --accent:    #c05a24;
   --accent-dk: #943e19;
   /* Чернила отдельным токеном: #c05a24 как фон кнопки с чёрным текстом даёт
-     6,5:1, а как текст на белом стекле — только 3,6:1. Одна и та же краска
-     не может быть и плашкой, и подписью, поэтому подпись несёт тёмный тон. */
+     6,5:1, а как текст на четырёх светлых поверхностях — только 3,37…4,19.
+     Одна и та же краска не может быть и плашкой, и подписью, поэтому подпись
+     несёт тёмный тон: #943e19 держит на тех же поверхностях 5,39…6,68. */
   --accent-ink: #943e19;
+  /* Чернила на залитой янтарём плашке. Здесь нужен именно абсолютный чёрный:
+     #14100c на #c05a24 даёт 4,26:1, и ни один тёплый оттенок чёрного порог
+     4,5 не добирает, потому что янтарь светлой темы темнее своего собрата из
+     тёмной. Теплоту надписи глаз на плашке всё равно не читает — она тонет
+     в насыщенном фоне. */
+  --on-accent: #000;
   /* Золото — и плашка приза, и подпись «Лидер сезона», и номер места у №1.
      Как текст оно обязано дотягивать до 4,5 на худшей светлой поверхности,
      а ею оказался не `--raised-2` (#e5e0d5 → 4,63:1), а тёплая плашка
      главной на 320 px: #835a1a дал на ней 4,44:1. Сдвиг на #805719 —
      ровно те же 4 сотых, которые глаз не видит, но порог не пропускает. */
   --gold:      #805719;
+  /* Золото как подпись на своей же подкраске: #805719 на тёплой плашке бейджа
+     дал 4,24 : 1, то есть ровно ту же ошибку, из-за которой уже отделены
+     --win-ink и --loss-ink. Здесь тон темнее на треть, плашка не тронута. */
+  --gold-ink:  #6b4a13;
   /* Те же три приза в светлой теме: тёмная половина палитры, иначе серебро
      и бронза на белом стекле карточки исчезают (проверено: 5,0:1 и 5,3:1). */
   --silver:    #5f6a7a;
@@ -293,7 +318,7 @@
 .guide-content li { margin-bottom: 4px; }
 
 * { box-sizing: border-box; }
-::selection { background: var(--accent); color: #080a0f; }
+::selection { background: var(--accent); color: var(--on-accent); }
 
 html { scroll-behavior: smooth; }
 
@@ -368,7 +393,7 @@ h1,h2,h3,h4 {
   width: 40px; height: 40px; flex: none;
   display: grid; place-items: center;
   border-radius: 11px;
-  color: #14100c;
+  color: var(--on-accent);
   background: linear-gradient(145deg, #ffa04a, var(--accent));
   box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--accent) 55%, transparent);
 }
@@ -390,7 +415,7 @@ h1,h2,h3,h4 {
   transition: color .18s var(--ease), background .18s var(--ease);
 }
 .nav__link:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4.5%, transparent); }
-.nav__link.is-active { color: #14100c; background: var(--accent); font-weight: 600; }
+.nav__link.is-active { color: var(--on-accent); background: var(--accent); font-weight: 600; }
 
 /* ── Общие блоки ────────────────────────────────────────────────────────── */
 #app { padding-top: 24px; padding-bottom: 48px; }
@@ -420,7 +445,7 @@ h1,h2,h3,h4 {
   font-family: Inter, sans-serif;
   font-size: 11px; font-weight: 700;
   letter-spacing: .16em; text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .grid-2 { display: grid; gap: 18px; }
@@ -624,7 +649,7 @@ h1,h2,h3,h4 {
 }
 .live__label {
   font-family: Inter, sans-serif; font-size: 11px; font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink);
 }
 .live__label b { color: var(--text); font-size: 12.5px; letter-spacing: .06em; }
 .live__dots { display: flex; gap: 5px; margin: 2px 0; }
@@ -643,7 +668,7 @@ h1,h2,h3,h4 {
 .preseason__title {
   font-family: Inter, sans-serif;
   font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
   display: flex; align-items: center; gap: 9px; margin-bottom: 11px;
 }
 
@@ -738,7 +763,7 @@ h1,h2,h3,h4 {
   transition: color .15s var(--ease), background .15s var(--ease);
 }
 .seg__btn:hover { color: var(--text); }
-.seg__btn.is-on { color: #14100c; background: var(--accent); font-weight: 600; }
+.seg__btn.is-on { color: var(--on-accent); background: var(--accent); font-weight: 600; }
 
 /* ── Рейтинг: премиальный лидерборд ───────────────────────────────────────
    Место — крупная табличная цифра, а не мелкий значок слева: глаз идёт по
@@ -800,8 +825,12 @@ h1,h2,h3,h4 {
 .lad__wl { grid-area: wl; font-family: Unbounded, sans-serif; font-size: var(--fs-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
 .lad__wl b { font-weight: 700; }
 .lad__wl i { color: var(--mute); font-style: normal; margin: 0 3px; }
-.c-win { color: var(--win); }
-.c-loss { color: var(--loss); }
+/* Четыре подписи исхода — это текст, а не плашка, поэтому они берутся
+   чернилами: в светлой теме сами `--win` и `--loss` дают 4,27 и 4,19 на
+   панелях, то есть мимо AA для строки в 15–16 px. Мобильный промер поймал
+   «−4» ровно на этой границе — 4,47. */
+.c-win { color: var(--win-ink); }
+.c-loss { color: var(--loss-ink); }
 
 .lad__pts {
   grid-area: pts; text-align: right; align-self: center;
@@ -809,15 +838,15 @@ h1,h2,h3,h4 {
   color: var(--dim);
   font-variant-numeric: tabular-nums;
 }
-.lad__pts.pos { color: var(--win); }
-.lad__pts.neg { color: var(--loss); }
+.lad__pts.pos { color: var(--win-ink); }
+.lad__pts.neg { color: var(--loss-ink); }
 
 .lad__spark { grid-area: spark; display: none; }
 
 .lad__empty { text-align: center; color: var(--mute); padding: var(--s-4) 0; font-size: var(--fs-body); }
 .lad__period {
   margin: 8px 0 0;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -870,7 +899,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   font-size: var(--fs-body); font-weight: 500; color: var(--dim); text-decoration: none;
   transition: color var(--t-fast) var(--ease);
 }
-.back:hover { color: var(--accent); }
+.back:hover { color: var(--accent-ink); }
 
 .ally {
   position: relative; overflow: hidden;
@@ -998,8 +1027,8 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .name { font-weight: 500; }
 
 .delta { font-size: var(--fs-eyebrow); margin-left: 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.delta--up { color: var(--win); }
-.delta--down { color: var(--loss); }
+.delta--up { color: var(--win-ink); }
+.delta--down { color: var(--loss-ink); }
 /* «Без изменений» не гасим полупрозрачностью: тире и так тонкий, а .45
    уводило его под порог читаемости. couleur — тот же --mute, что и у подписей. */
 .delta--flat { color: var(--mute); }
@@ -1011,7 +1040,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .dot--pending { background: var(--line); border: 1px dashed var(--mute); }
 
 .streak { font-size: var(--fs-eyebrow); margin-left: 7px; white-space: nowrap; font-weight: 600; }
-.streak--win { color: var(--accent); }
+.streak--win { color: var(--accent-ink); }
 .streak--loss { color: var(--mute); }
 .spark { display: block; }
 
@@ -1123,7 +1152,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 }
 .cal__btn:hover { color: var(--text); border-color: var(--mute); }
 .cal__btn.is-on {
-  color: #080a0f;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -1151,9 +1180,9 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .wk__what { color: var(--mute); }
 .wk__what b { color: var(--dim); }
 .wk--win { border-color: color-mix(in srgb, var(--win) 34%, transparent); }
-.wk--win .wk__num { color: var(--win); }
+.wk--win .wk__num { color: var(--win-ink); }
 .wk--loss { border-color: color-mix(in srgb, var(--loss) 34%, transparent); }
-.wk--loss .wk__num { color: var(--loss); }
+.wk--loss .wk__num { color: var(--loss-ink); }
 
 .ctl--tl { margin: 18px 0 16px; }
 
@@ -1183,7 +1212,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .tl__item { display: flex; gap: 15px; padding-bottom: 24px; position: relative; }
 .tl__body { flex: 1; padding-top: 3px; }
 .tl__meta { display: flex; gap: 11px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
-.tl__type { font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.tl__type { font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
 .tl__meta time { font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; }
 .tl__body h3 { font-size: 16px; margin-bottom: 4px; }
 .tl__body p { margin: 0; color: var(--dim); font-size: 14px; }
@@ -1242,7 +1271,9 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .card:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); transform: translateY(-2px); }
 .card__num {
   font-family: Unbounded, sans-serif; font-weight: 800; font-size: 12px;
-  color: var(--accent); opacity: .75;
+  /* Без приглушения прозрачностью: 75 % непрозрачности уводили номер карточки
+     под 4,5 : 1 на тёплой бумаге, а иерархию здесь держит сам тон чернил. */
+  color: var(--accent-ink);
   display: block; margin-bottom: 7px;
 }
 .card h3 { font-size: 16px; margin-bottom: 8px; letter-spacing: -.015em; }
@@ -1260,13 +1291,13 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 }
 .prose--dont li::before {
   content: '×'; position: absolute; left: 3px; top: -.05em;
-  color: var(--loss); font-size: 15px; font-weight: 700;
+  color: var(--loss-ink); font-size: 15px; font-weight: 700;
 }
 .prose--week strong { color: var(--text); }
 
 .prose { max-width: 64ch; }
 .prose h2 { font-size: 20px; margin: 24px 0 9px; }
-.prose h3 { font-size: 15px; margin: 22px 0 8px; color: var(--accent); font-family: Inter, sans-serif; font-weight: 700; letter-spacing: .01em; }
+.prose h3 { font-size: 15px; margin: 22px 0 8px; color: var(--accent-ink); font-family: Inter, sans-serif; font-weight: 700; letter-spacing: .01em; }
 .prose h4 { font-size: 14px; margin: 17px 0 6px; }
 .prose p { margin: 0 0 12px; color: var(--dim); }
 .prose ul { margin: 0 0 15px; padding-left: 20px; color: var(--dim); }
@@ -1320,6 +1351,14 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   --quart-acid: #d3a6ff;
   --quart-cyan: #9f86c9;
   --quart-ink: #11150d;
+  /*
+    Тихая подпись острова: номер места и подпись «очки». Остров остаётся
+    тёмным в обеих темах, поэтому и чернила у него свои, вне токенов страницы.
+    Прежний #66816a читался на подложке карточки за 3,85 : 1, а #6d856e — за
+    4,43 : 1: обе пары не дотягивали до AA, хотя глаз видел их «почти
+    читаемыми». #7d9a76 держит 5,28 : 1 на худшей подложке острова.
+  */
+  --quart-quiet: #7d9a76;
   position: relative;
   margin-bottom: 18px;
 }
@@ -1530,14 +1569,18 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .quart-podium-card:hover { transform: translateY(-3px); border-color: var(--quart-acid); background: rgba(29,45,27,.9); }
 .quart-podium-card--gold { border-color: color-mix(in srgb, var(--violet) 62%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--violet) 15%, transparent), rgba(10,18,12,.62) 68%); }
 .quart-podium-card--silver { border-color: color-mix(in srgb, var(--electric) 35%, transparent); }
-.quart-podium-card__place { grid-area: place; color: #6f8b6a; font-family: Unbounded, sans-serif; font-size: 12px; text-align: center; }
+/* Пьедестал сидит на том же тёмном острове, что и плитки списка, поэтому его
+   тихие подписи берут тот же `--quart-quiet`, а не три отдельных зелёных тона,
+   которые тут когда-то подобрали вручную. Промер телефона это и вскрыл: номер
+   места «02» на #6f8b6a дал 4,29 : 1 вместо 4,5. */
+.quart-podium-card__place { grid-area: place; color: var(--quart-quiet); font-family: Unbounded, sans-serif; font-size: 12px; text-align: center; }
 .quart-podium-card--gold .quart-podium-card__place { color: var(--quart-acid); }
-.quart-podium-card__medal { grid-area: medal; color: #6e8866; font-size: 19px; }
+.quart-podium-card__medal { grid-area: medal; color: var(--quart-quiet); font-size: 19px; }
 .quart-podium-card--gold .quart-podium-card__medal { color: var(--quart-acid); }
 .quart-podium-card--silver .quart-podium-card__medal { color: var(--quart-cyan); }
 .quart-podium-card__tag { grid-area: tag; color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text)); font-family: Unbounded, sans-serif; font-size: 11px; font-weight: 800; }
 .quart-podium-card > b { grid-area: name; overflow: hidden; color: #f0f7eb; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.quart-podium-card__meta { grid-area: meta; color: #799078; font-size: 11px; }
+.quart-podium-card__meta { grid-area: meta; color: var(--quart-quiet); font-size: 11px; }
 .quart-podium-card > strong { grid-area: score; color: var(--quart-acid); font-family: Unbounded, sans-serif; font-size: 23px; }
 .quart-board { margin-top: 0; }
 .quart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -1560,7 +1603,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .quart-card--m2 { border-color: color-mix(in srgb, var(--electric) 45%, transparent); }
 .quart-card--m3 { border-color: rgba(139,168,148,.46); }
 .quart-card__top, .quart-card__bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.quart-card__rank { color: #66816a; font-family: Unbounded, sans-serif; font-size: 11px; }
+.quart-card__rank { color: var(--quart-quiet); font-family: Unbounded, sans-serif; font-size: 11px; }
 .quart-card--m1 .quart-card__rank { color: var(--quart-acid); }
 .quart-card__tag { overflow: hidden; color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text)); font-family: Unbounded, sans-serif; font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .quart-card__name { overflow: hidden; margin-top: 10px; color: #eaf4e6; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -1568,7 +1611,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .quart-card__form .dot { width: 11px; height: 11px; border-radius: 3px; }
 .quart-card__bottom strong { color: var(--quart-acid); font-family: Unbounded, sans-serif; font-size: 18px; }
 .quart-card:not(.quart-card--m1):not(.quart-card--m2):not(.quart-card--m3) .quart-card__bottom strong { color: #d9e8d7; }
-.quart-card__bottom strong small { color: #6d856e; font-family: Inter, sans-serif; font-size: 11px; letter-spacing: .1em; }
+.quart-card__bottom strong small { color: var(--quart-quiet); font-family: Inter, sans-serif; font-size: 11px; letter-spacing: .1em; }
 @media (min-width: 620px) {
   .quart-podium__grid { grid-template-columns: repeat(3, 1fr); align-items: stretch; }
   .quart-podium-card { min-height: 138px; grid-template-columns: 1fr auto; grid-template-areas: "medal place" "tag tag" "name name" "meta score"; padding: 15px; }
@@ -1583,7 +1626,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 
 /* Фильтры: активная кнопка остаётся читаемой даже при наведении. */
 .seg__btn.is-on:hover,
-.quart-controls .seg__btn.is-on:hover { color: #14100c; }
+.quart-controls .seg__btn.is-on:hover { color: var(--on-accent); }
 
 /* В карточках Кварта тег всегда закреплён у правого края верхней строки. */
 .quart-podium-card__tag { justify-self: end; text-align: right; }
@@ -1608,7 +1651,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .achievement--perfect { --achievement-color: var(--accent); }
 .achievement-empty { margin: 0; padding: 14px; color: var(--dim); border: 1px dashed var(--line); border-radius: var(--r-sm); }
 
-.achievement-count { display: inline-flex; align-items: center; gap: 2px; margin-left: 7px; color: var(--accent); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.achievement-count { display: inline-flex; align-items: center; gap: 2px; margin-left: 7px; color: var(--accent-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 .achievement--crown { --achievement-color: #f3c969; }
 .achievement--veteran { --achievement-color: #c8d0dc; }
@@ -1984,7 +2027,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 /* ── Карточка статуса президента: доведённый вид диспетчерского центра ─────*/
 .president-board{position:relative;display:block;isolation:isolate;overflow:hidden;margin:14px 0 0;padding:15px 18px 14px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-left:3px solid var(--electric);border-radius:18px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10.5%, transparent),color-mix(in srgb, var(--text) 2.8%, transparent) 48%,rgba(247,190,72,.055)),linear-gradient(180deg,rgba(16,27,34,.96),rgba(9,14,20,.96));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 8%, transparent),inset 0 -18px 36px rgba(0,0,0,.14),0 14px 34px -24px color-mix(in srgb, var(--electric) 75%, transparent)}
 .president-board__head{display:flex;align-items:center;gap:9px;min-width:0;margin-bottom:13px}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px color-mix(in srgb, var(--electric) 10%, transparent)}.president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:4px 7px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius:999px;color:var(--electric);font:800 11px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
-.president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:#f2f7f8;font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap}.president-board__alliance{flex:none;color:var(--gold);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid color-mix(in srgb, var(--electric) 13%, transparent);color:var(--mute);font-size:11px;line-height:1.4}
+.president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:var(--text);font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap}.president-board__alliance{flex:none;color:var(--gold-ink);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid color-mix(in srgb, var(--electric) 13%, transparent);color:var(--mute);font-size:11px;line-height:1.4}
 @media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:11px;letter-spacing:.14em}.president-board__live{padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:15px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:11px}}
 @media(max-width:390px){.president-board__identity{display:grid;grid-template-columns:1fr auto;align-items:center}.president-board__name{font-size:15px}.president-board__alliance{font-size:14px}}
 
@@ -2206,7 +2249,7 @@ summary.tl__row { cursor: pointer; }
   transition: transform .18s var(--ease), color .18s var(--ease);
 }
 .tl__row:hover .tl__chev { color: var(--dim); }
-.tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent); }
+.tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   .tl__details-body { animation: none; }
@@ -2295,7 +2338,7 @@ summary.tl__row { cursor: pointer; }
   border: 0;
   border-radius: 8px;
   background: var(--accent);
-  color: #14100c;
+  color: var(--on-accent);
   font: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -2350,19 +2393,21 @@ summary.tl__row { cursor: pointer; }
 }
 
 /* Выбранная плашка: заливка акцентом, как у активной кнопки календаря.
-   Тёмный текст на оранжевом держит контраст — и цифра, и подпись читаются. */
+   Все строки плашки идут одними чернилами. Приглушать подпись прозрачностью
+   нельзя: на янтаре #c05a24 чёрный текст дотягивает до 4,5 : 1 только целым,
+   при 88 % непрозрачности выходит 4,36 : 1, и замер пикселом это ловит. */
 .wk.is-sel {
   background: var(--accent);
   border-color: var(--accent);
-  color: #14100c;
+  color: var(--on-accent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent), 0 8px 18px -14px var(--accent);
 }
 .wk.is-sel .wk__num,
 .wk.is-sel.wk--win,
-.wk.is-sel.wk--loss { color: #14100c; }
-.wk.is-sel .wk__what { color: rgba(20, 16, 12, .74); }
+.wk.is-sel.wk--loss { color: var(--on-accent); }
+.wk.is-sel .wk__what { color: var(--on-accent); }
 .wk.is-sel.wk--win .wk__what b,
-.wk.is-sel.wk--loss .wk__what b { color: #14100c; }
+.wk.is-sel.wk--loss .wk__what b { color: var(--on-accent); }
 
 /* Видимый вердикт — выбранный: лёгкая оранжевая рамка-подсветка держит
    вместе плашку сверху и карточку судьбы, не споря с исходом (зелёный/красный). */
@@ -2430,7 +2475,7 @@ summary.tl__row { cursor: pointer; }
 .hero__cta--primary {
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent));
   border-color: color-mix(in srgb, var(--accent) 62%, #fff);
-  color: #080a0f;
+  color: var(--on-accent);
   box-shadow: 0 10px 26px -16px var(--accent);
 }
 .hero__cta--ghost {
@@ -2529,18 +2574,118 @@ summary.tl__row { cursor: pointer; }
 }
 
 /*
-   На широком экране герой держит заметную часть окна, но высота взята не
-   из желания растянуть первый экран: минимум такой, чтобы при коротком сезоне
-   блок не сжимался в полоску, а при длинном рос сам. Центр — потому что
-   свободных строк обычно чуть больше одной, и distribute их сверху некрасиво.
+   ПОЛОСА ВЫСОТЫ. Первый экран командного центра обязан быть экраном, а не
+   шапкой над таблицей: 78 % окна на мониторе, не меньше 70 % на телефоне —
+   тот коридор, который просит бриф. Верхнюю границу держит min(): на окне
+   с ростом 1400 px полоса в 85 % была бы стеной воздуха между цифрами и
+   краем, и первую строку рейтинга пришлось бы искать глазами.
+
+   min-height, а не height: при длинном сезоне герой выше полосы, и это
+   правильно — цифры не режутся. Центр, а не верх: свободных строк обычно
+   чуть больше одной, и распределить их сверху некрасиво.
+
+   body перед классом — не украшение. Паддинги героя переписываются в четырёх
+   файлах подряд, и последний из них идёт позже этого правила; без признака
+   тела правило кадра проиграло бы голым .hero по порядку файлов.
 */
+body .hero--lead {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+@media (max-width: 1023px) {
+  body .hero--lead { min-height: min(70vh, 700px); }
+}
 @media (min-width: 1024px) and (min-height: 720px) {
-  .hero--ops {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: min(62vh, 560px);
-  }
+  body .hero--lead { min-height: min(78vh, 820px); }
+}
+
+/* ── Кинематографический кадр героя ───────────────────────────────────────
+   Путь к картинке лежит в config.js (hero.image). Пока он пуст, ни одного
+   правила ниже не происходит вовсе: класс hero--media появляется только
+   вместе с путём, а значит пустой слот не стоит странице ни пиксела, ни
+   байта, и текущий облик не меняется ни на градус.
+
+   ПОЧЕМУ ПОЛОСА, А НЕ ФОН ПОД БУКВАМИ. Контраст текста над фотографией
+   нельзя проверить измерением: пикселы картинки известны только браузеру, и
+   любой снимок владельца может оказаться белым небом ровно там, где стоит
+   подпись недели. Поэтому кадр занимает верхнюю полосу и растворяется в
+   поверхности ниже, а все буквы остаются на своей подкраске — ровно на том
+   фоне, который уже посчитан обеими темами.
+*/
+/*
+   Мера живёт не на :root, а на двух элементах сразу: на герое с кадром и на
+   первой карточке контура главной. Так полоса известна контуру ровно в тех
+   случаях, когда её на самом деле рисуют, — пустой слот не резервирует под
+   себя ни пиксела.
+*/
+body .hero--media, .sk__card--ops--art { --hero-art-h: clamp(140px, 22vh, 240px); }
+
+/*
+   На телефоне полоска короче, чем на мониторе, и вот почему: без кадра герой
+   и так снимает 81 % экрана (замер на 390×844 — 684 px), и любые 22vh сверху
+   делают его выше окна. 14vh оставляют полосу атмосферы, но не превращают
+   первый экран в одну картинку: с кадром герой — 802 px, из которых сама
+   фотография занимает 118 px, а всё остальное — цифры недели.
+*/
+@media (max-width: 1023px) {
+  body .hero--media, .sk__card--ops--art { --hero-art-h: clamp(104px, 14vh, 180px); }
+}
+
+body .hero--media {
+  padding-top: calc(var(--hero-art-h) + 16px);
+}
+
+.hero__media {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: var(--hero-art-h);
+  z-index: -2;
+  overflow: hidden;
+  /* Кадр уходит в поверхность героя мягко, без среза: жёсткая линия снизу
+     читалась бы как вставленная картинка, а не как атмосфера раздела. */
+  -webkit-mask-image: linear-gradient(180deg, #000 0 58%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0 58%, transparent 100%);
+}
+
+.hero__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Правее центра: левый край полосы — там, где начинается «Неделя», и кадр
+     не должен упираться в первую букву. */
+  object-position: 68% 32%;
+}
+
+/* Вуаль кадра: затемнение сверху вниз и к бокам, чтобы полоса не спорила с
+   цифрами под ней. Затеняется только сам кадр — буквы под вуаль не попадают. */
+.hero__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 150% at 50% -20%, transparent 40%, color-mix(in srgb, var(--bg) 55%, transparent) 100%),
+    linear-gradient(96deg, color-mix(in srgb, var(--bg) 74%, transparent) 0 12%, transparent 46%, color-mix(in srgb, var(--bg) 34%, transparent) 100%);
+}
+
+/*
+   Атмосфера командного центра — сетка и виньетка. Она играет и без кадра:
+   бриф просит кинематографичности, а тяжёлая картинка для этого не нужна.
+   Линии тонкие и редкие (32 px), иначе сетка начнёт спорить с цифрами рейтинга.
+*/
+.hero--lead::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--hud-grid) 0 1px, transparent 1px 32px),
+    linear-gradient(180deg, var(--hud-grid) 0 1px, transparent 1px 32px);
+  background-position: center top;
+  -webkit-mask-image: radial-gradient(120% 100% at 78% 0%, #000 12%, transparent 74%);
+  mask-image: radial-gradient(120% 100% at 78% 0%, #000 12%, transparent 74%);
 }
 
 /* Контур ожидания того же языка, что карточки рейтинга: тонкий акцентный

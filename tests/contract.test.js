@@ -14254,9 +14254,12 @@ console.log('\nAN. Доска аккаунтов');
     четырёх файлов, и решал порядок загрузки: «ответить» оставался 36 px вместо
     положенных 44. Составные селекторы в списке повторяют те, что выше (24 и
     26 px), — иначе перебить их можно только местом в файле, а не силой.
+
+    Зазор в 1 200 символов — это длина самого списка: проверка следит, что
+    планка по-прежнему объявлена одним блоком, а не разъехалась на несколько.
   */
   check('тач-цель 44 px: реакции, действия, флажок и переключатели держит один блок в refine.css',
-    /@media \(hover: none\) and \(pointer: coarse\) \{\n\s*\.forum-react__btn,\n\s*\.forum-comment__foot \.forum-react__btn,[\s\S]{0,900}\.accounts-search input \{ min-height: 44px; \}/.test(refineSrc));
+    /@media \(hover: none\) and \(pointer: coarse\) \{\n\s*\.forum-react__btn,\n\s*\.forum-comment__foot \.forum-react__btn,[\s\S]{0,1200}\.accounts-controls__sold \{ min-height: 44px; \}/.test(refineSrc));
   check('в mobile.css не осталось конкурирующих высот у кнопок ленты',
     !/forum-react__btn,[\s\S]{0,240}min-height: 36px/.test(mobileSrc)
       && !/\.seg__btn, \.cal__btn \{ min-height:/.test(mobileSrc));
@@ -14527,7 +14530,12 @@ console.log('\nAO. Раздел — страница');
   const touchCss = await Promise.all([
     'src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css', 'src/refine.css',
   ].map((f) => readFile(f, 'utf8')));
-  const underPlan = touchCss.flatMap((src) => [...src.matchAll(
+  /*
+    Комментарий — не объявление. Первый же прогон поймал «36» не в правиле, а
+    в тексте, который как раз и объяснял, почему эти 36 px перебиты. Поэтому
+    комментарий вырезается до перебора, а не подгоняется под него.
+  */
+  const underPlan = touchCss.flatMap((src) => [...src.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(
     /@media \(hover: none\) and \(pointer: coarse\) \{([\s\S]*?)\n\}/g)]
     .flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+(?:\.\d+)?)px/g)]
       .map((h) => Number(h[1]))))
@@ -14537,8 +14545,29 @@ console.log('\nAO. Раздел — страница');
   check('поле напоминания в календаре стоит под общей планкой',
     /\.evt-remind select,/.test(refine));
   check('планка накрывает действия с ленты, заголовок темы, поиск по гайдам и ширину чипов',
-    /\.feed-card__source,\s*\.forum-chron__more,\s*\.forum-btn,\s*\.forum-post__title a,\s*input\[type="search"\],/.test(refine)
+    /\.feed-card__source,\s*\.forum-chron__more,\s*\.forum-btn,\s*\.forum-post__title a,\s*\.burger,\s*input\[type="search"\],/.test(refine)
       && /\.forum-save, button\.forum-tag, \.seg__btn \{ min-width: 44px; \}/.test(refine));
+
+  /*
+    Промер брейкпоинтов (заход 13) добавил к планке цели, которые до этого не
+    накрывались ничем: чипы сортировки витрины держали 44 px только ниже 700 px,
+    хотя планка привязана к пальцу, а не к ширине; квадрат переключателя темы
+    вообще не имел ни роста, ни ширины под пальцем.
+  */
+  check('пальцевая планка догнала чипы сортировки витрины, её флажок-подпись и переключатель темы',
+    /\.accounts-chip,\s*\.accounts-controls__sold \{ min-height: 44px; \}/.test(refine)
+      && /\.theme-toggle \{ width: 44px; height: 44px;/.test(refine));
+
+  /*
+    Мерка мыши (24 px) раньше считала только кнопки-ссылки с классом. Ссылка
+    без класса — ник автора, «Вся летопись сервера», заголовок темы в карточке
+    и заголовок раздела на странице «О проекте» — наследовала высоту строки и
+    оставалась 15–22 px при любом указателе. Заодно проверено, что разворот в
+    inline-flex стоит в общей мерке, а не в тач-блоке: на строчном элементе
+    min-height не действует, и без этого числа на десктопе не было бы вовсе.
+  */
+  check('мерка мыши накрывает текстовые действия и флажок-подпись витрины',
+    /\.forum-nick, \.forum-chron__more, \.forum-post__title a, \.about-card h3 a,\n\.accounts-controls__sold \{\n  display: inline-flex; align-items: center; min-height: 24px;\n\}/.test(refine));
 
   /*
     Третий замер поймал не только промахи планки: правка «последней отделки»
@@ -14591,12 +14620,15 @@ console.log('\nAO. Раздел — страница');
   /*
     Второстепенный текст обязан дотягивать до порога AA (4.5:1) в обеих темах.
     Значения подобраны по самой светлой панели своей темы, а не по фону «в
-    среднем»: именно на панельных карточках контраст был хуже всего.
+    среднем»: именно на панельных карточках контраст был хуже всего. В тёмной
+    теме самой светлой подложкой оказалась не --raised-2, а бирюзовая плашка
+    витрины (--shop-soft → #1c2526) и полоса летописи (#21242c): на них
+    #808a9a давал 4,45:1, поэтому подпись поднята до #8c95a3 (≥5,1:1).
   */
-  check('тёмная тема: --mute не ниже AA', /--mute:\s*#808a9a/.test(v8));
+  check('тёмная тема: --mute не ниже AA', /--mute:\s*#8c95a3/.test(v8));
   check('светлая тема: --mute не ниже AA', /--mute:\s*#645e52/.test(v8));
   check('тёмные острова в светлой теме используют тот же --mute',
-    /--mute:\s*#808a9a/.test(refine));
+    /--mute:\s*#8c95a3/.test(refine));
 
   /*
     Цвет альянса не может быть и плашкой, и подписью.
@@ -15031,9 +15063,17 @@ console.log('\nAQ. Стабильность кадра');
   */
   check('контур главной подогнан под форму командного центра',
     /skWithCaption\('Загружаем данные…', id === 'home' \? 'ops' : 'card', id === 'home' \? 6 : 7\)/.test(mainJs)
-      && /^<div class="sk sk--ops" aria-hidden="true"><div class="sk__card sk__card--ops">/.test(skeleton('ops', 6))
+      && /^<div class="sk sk--ops" aria-hidden="true"><div class="sk__card sk__card--ops(?= |">)/.test(skeleton('ops', 6))
       && (skeleton('ops', 6).match(/sk__side/g) || []).length === 1
       && cards(skeleton('card', 7)) === 7);
+  /*
+    Рамка полосы кадра обязана появляться в контуре ровно тогда, когда кадр
+    будет нарисован. Разойдутся — резерв не досчитает или пересчитает высоту
+    полосы, и страница дёрнется в момент прихода данных.
+  */
+  check('контур резервирует полосу кадра только когда кадр действительно вписан',
+    skeleton('ops', 2).includes('sk__card--ops--art')
+      === Boolean(String(CONFIG.hero.image ?? '').trim()));
 }
 
 /* ── AR. «Написать продавцу»: личная связь на доске ──────────────────────
@@ -15791,7 +15831,7 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
   const cssFlat = cssSrc.replace(/\r\n/g, '\n');
   const amber = /:root\[data-theme="light"\] \.forum-btn,/.test(refineSrc);
   check('конфликт жив: refine.css по-прежнему красит все кнопки в янтарь',
-    amber && /:root\[data-theme="light"\] \.forum-btn[\s\S]{0,300}?#a94722/.test(refineSrc));
+    amber && /:root\[data-theme="light"\] \.forum-btn[\s\S]{0,300}?background: var\(--accent\)/.test(refineSrc));
   check('forum.css стоит в списке файлов РАНЬШЕ refine.css, поэтому слой доски сильнее по специфичности',
     htmlSrc.search(/href="\.\/src\/forum\.css/) < htmlSrc.search(/href="\.\/src\/refine\.css/)
       && htmlSrc.includes('href="./src/forum.css') && htmlSrc.includes('href="./src/refine.css'));
@@ -15918,9 +15958,15 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
    базы, поэтому не вправе называть ни час, когда цифра вернётся, ни число,
    которого он не читал.
 
-   Четвёртая — байтовые высоты контура главной. Они сняты замером с живого
-   экрана, и правка числа без перерисовки замера — ровно та поломка, из-за
-   которой страница дёргается в момент прихода данных.
+   Четвёртая — резерв высоты контура главной. Он обязан совпадать с живым
+   героем, иначе страница дёргается в момент прихода данных, поэтому здесь
+   проверяется формула резерва и та же мера полосы, которую рисует герой, а не
+   число, снятое одним прогоном: живая база перекладывает подписи, и байтовая
+   связь на старое число начала бы спорить с реальностью.
+
+   Пятая — слот картинки. Путь к кадру один (config.js), знают о нём двое
+   (герой и контур) через общий модуль, и пустой путь обязан не рисовать
+   ничего: ни `<img>`, ни класса, ни резерва полосы.
 ────────────────────────────────────────────────────────────────────────────── */
 console.log('\nAV. Честная пустота и контур командного центра');
 {
@@ -15940,6 +15986,7 @@ console.log('\nAV. Честная пустота и контур командн�
   const { renderTimeline } = await import('../src/pages/timeline.js');
   const { renderGuide } = await import('../src/pages/guide.js');
   const { renderHome } = await import('../src/pages/home.js');
+  const { skeleton } = await import('../src/ui/skeleton.js');
   const { unavailableNote } = await import('../src/ui/helpers.js');
 
   const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -16016,11 +16063,85 @@ console.log('\nAV. Честная пустота и контур командн�
   check('кварт получает причину отдельно: он собирается из двух полей, а не из всего view',
     /route\.render\(\{[\s\S]{0,600}?loadError: view\.loadError,/.test(mainSrc));
 
-  /* ── Контур главной: высоты сняты замером с живого экрана ── */
-  check('контур командного центра держит замерные высоты героя в обеих ориентациях',
-    /\.sk--ops \.sk__card--ops \{\s*--sk-h: 653px;/.test(refineSrc)
-      && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk--ops \.sk__card--ops \{\s*--sk-h: 558px;/
-        .test(refineSrc));
+  /* ── Контур главной: резерв — формула, а не замерное число ── */
+  /*
+     Раньше здесь стояли байтовые связи на 653 px и 558 px, и они были правы
+     ровно до первого живого переноса подписи лидера. Живая база переложила
+     строку — герой телефона вырос до 684 px, а проверка продолжала требовать
+     653 и звала поломкой то, что поломкой не было.
+
+     Сейчас резерв собирается формулой: нижняя граница кадра (min-коридор
+     брифа) и высота, снятая одним прогоном, плюс та же мера полосы, что
+     рисует герой. Поэтому проверяется формула, а не число, и перенос подписи
+     больше не обязан заканчиваться правкой теста.
+  */
+  check('контур командного центра резервирует героя той же формулой, что задаёт его высоту',
+    /\.sk--ops \.sk__card--ops \{\s*--sk-h: max\(min\(70vh, 700px\), calc\(684px \+ var\(--hero-art-h, 0px\)\)\);/.test(refineSrc)
+      && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk--ops \.sk__card--ops \{\s*--sk-h: max\(min\(70vh, 700px\), calc\(495px \+ var\(--hero-art-h, 0px\)\)\);/.test(refineSrc));
+  check('ветка 78vh у контура живёт в том же условии, что и у героя: монитор от 1024 px и ростом от 720 px',
+    /@media \(min-width: 1024px\) and \(min-height: 720px\) \{\s*\.sk--ops \.sk__card--ops \{\s*--sk-h: max\(min\(78vh, 820px\), calc\(495px \+ var\(--hero-art-h, 0px\)\)\);/.test(refineSrc));
+  check('замерных чисел высоты в резерве больше нет: ни 558, ни 653',
+    !/--sk-h: 558px|--sk-h: 653px/.test(refineSrc));
+  check('полосу кадра задаёт одно правило на героя и на контур — они не разминулись',
+    /body \.hero--media, \.sk__card--ops--art \{\s*--hero-art-h: clamp\(140px, 22vh, 240px\);/.test(v8Src)
+      && /@media \(max-width: 1023px\) \{\s*body \.hero--media, \.sk__card--ops--art \{\s*--hero-art-h: clamp\(104px, 14vh, 180px\);/.test(v8Src));
+  check('первый экран держит коридор брифа и сверху, и снизу: min() не даёт полосе стать стеной',
+    /body \.hero--lead \{\s*min-height: min\(70vh, 700px\);/.test(v8Src)
+      && /body \.hero--lead \{\s*min-height: min\(78vh, 820px\);/.test(v8Src)
+      && !/body \.hero--lead \{\s*height:/.test(v8Src));
+  check('полоса не наезжает на буквы: верхний отступ героя растёт ровно на меру кадра',
+    /body \.hero--media \{\s*padding-top: calc\(var\(--hero-art-h\) \+ 16px\);/.test(v8Src));
+  check('кадр лежит под содержимым героя, а не за его фоном и не поверх цифр',
+    /\.hero__media \{[\s\S]{0,200}?z-index: -2;/.test(v8Src)
+      && /^\.hero \{[^}]*isolation: isolate;/m.test(v8Src));
+  check('кадр растворяется в поверхности, а не обрезается линией',
+    /mask-image: linear-gradient\(180deg, #000 0 58%, transparent 100%\);/.test(v8Src)
+      && /\.hero__img \{[\s\S]{0,200}?object-fit: cover;/.test(v8Src));
+
+  /* ── Слот кадра: один путь в config.js и право быть пустым ── */
+  const slotSrc = await readFile('src/ui/hero-slot.js', 'utf8');
+  const skelSrc = await readFile('src/ui/skeleton.js', 'utf8');
+  const { heroImage } = await import('../src/ui/hero-slot.js');
+  check('о наличии кадра спрашивают в одном модуле, а не в двух страницах',
+    /export function heroImage\(\)/.test(slotSrc)
+      && !/CONFIG/.test(homeSrc) && !/CONFIG/.test(skelSrc));
+  const withImage = renderHome({ loadError: DOWN });
+  const withImageSk = skeleton('ops', 2);
+  const path = CONFIG.hero.image;
+  CONFIG.hero.image = '   ';
+  const blankHome = renderHome({ loadError: DOWN });
+  const blankSk = skeleton('ops', 2);
+  check('пробелы вместо пути — это пусто: кадр не рисуется и не резервируется',
+    heroImage() === '' && !/hero__media|hero__img|hero--media/.test(blankHome)
+      && !/sk__card--ops--art/.test(blankSk));
+  CONFIG.hero.image = path;
+  check('при непустом пути герой получает класс кадра, а контур — рамку полосы',
+    /class="hero hero--lead hero--media"/.test(withImage)
+      && /class="sk__card sk__card--ops sk__card--ops--art"/.test(withImageSk));
+  check('кадр везёт путь из config.js, а не тот, что помнит страница',
+    withImage.includes(`src="${CONFIG.hero.image}"`) && !/hero__img" src=""/.test(withImage));
+  check('кадр грузится первым и не блокирует раскодированием текст недели',
+    /<img[^>]*fetchpriority="high"[^>]*decoding="async"/.test(withImage)
+      || /<img[^>]*decoding="async"[^>]*fetchpriority="high"/.test(withImage));
+  check('подпись кадра тоже из config.js: пустая — декорация, которую не пересказывают вслух',
+    withImage.includes(`alt="${CONFIG.hero.alt}"`)
+      && /export function heroAlt\(\)/.test(slotSrc));
+  check('три героя главной спрашивают про кадр одинаково, иначе слот встанет не везде',
+    (homeSrc.match(/hero--lead\$\{heroImage\(\) \? ' hero--media' : ''\}/g) || []).length === 3);
+  {
+    const { access, stat } = await import('node:fs/promises');
+    const file = String(CONFIG.hero.image ?? '').replace(/^\.\//, '');
+    let size = null;
+    let exists = false;
+    try {
+      size = (await stat(file)).size;
+      exists = true;
+    } catch { /* путь не ведёт на файл — проверка ниже это и называет */ }
+    check('путь, вписанный в config.js, лежит на диске: битый кадр сайт не покажет',
+      exists && file.startsWith('public/hero/'), exists ? '' : `нет файла ${file}`);
+    check('кадр весит не больше обещанных 250 КБ: герой открывается первым',
+      exists && size <= 250 * 1024, exists ? '' : 'файла нет');
+  }
   check('панель источника в контуре равна живой панели: 176 px на мониторе, 162 на телефоне',
     /\.sk__side \{[\s\S]{0,200}?min-height: 162px;/.test(refineSrc)
       && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk__side \{\s*min-height: 176px;/.test(refineSrc));
@@ -16184,6 +16305,23 @@ console.log('\nAW. AA у токенов обеих тем');
   check('под prefers-reduced-motion движение выключено глобально, а не по одной кнопке',
     /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{ animation: none !important; transition: none !important; \}/
       .test(v8));
+
+  /*
+    Мобильный промер (заход 13) нашёл не «мелко», а два подписанных текстом
+    места, где краска-плашка работает подписью: «−4» в строке рейтинга на
+    светлой `--loss` — 4,47 : 1, номер места на пьедестале на самодельном
+    зелёном hex — 4,29 : 1. Оба то, для чего чернила уже заведены отдельными
+    токенами, и проверка держит именно это: подпись строки обязана брать
+    токен «краска как текст», а не саму краску.
+  */
+  check('исход в строке рейтинга подписан чернилами, а не краской-плашкой',
+    /\.c-win \{ color: var\(--win-ink\); \}/.test(v8)
+      && /\.c-loss \{ color: var\(--loss-ink\); \}/.test(v8)
+      && /\.lad__pts\.pos \{ color: var\(--win-ink\); \}/.test(v8)
+      && /\.lad__pts\.neg \{ color: var\(--loss-ink\); \}/.test(v8));
+  check('тихие подписи пьедестала берут токен острова, а не подборку зелёных hex',
+    /\.quart-podium-card__place \{[^}]*color: var\(--quart-quiet\)/.test(v8)
+      && /\.quart-podium-card__meta \{[^}]*color: var\(--quart-quiet\)/.test(v8));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────
