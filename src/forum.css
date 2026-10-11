@@ -76,7 +76,7 @@
 .side .nav__link.is-active {
   position: relative;
   color: #14100c;
-  background: linear-gradient(135deg, #ff9a4a, var(--accent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
   box-shadow: 0 8px 22px -14px var(--accent);
 }
 .side .nav__link.is-active::before {
@@ -113,7 +113,7 @@
   display: inline-grid;
   place-items: center;
   border-radius: 10px;
-  background: #ff4757;
+  background: var(--loss);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -236,8 +236,8 @@
     Три полоски вообще узнаёт не каждый. Поэтому рядом стоит слово «Меню»:
     оно снимает вопрос целиком и стоит десяти пикселов ширины.
   */
-  background: linear-gradient(145deg, rgba(255,154,74,.16), rgba(255,106,43,.1));
-  box-shadow: inset 0 0 0 1px rgba(255,106,43,.14), 0 6px 18px -14px var(--accent);
+  background: linear-gradient(145deg, rgba(255,154,74,.16), color-mix(in srgb, var(--accent) 10%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent), 0 6px 18px -14px var(--accent);
   color: var(--text);
   font-family: inherit;
   font-size: 12.5px;
@@ -263,8 +263,8 @@
 }
 
 .burger:hover {
-  border-color: rgba(255,106,43,.5);
-  background: linear-gradient(145deg, rgba(255,154,74,.24), rgba(255,106,43,.15));
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: linear-gradient(145deg, rgba(255,154,74,.24), color-mix(in srgb, var(--accent) 15%, transparent));
 }
 .burger:active { transform: scale(.97); }
 .burger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -274,8 +274,8 @@
 .is-side-open .burger__lines i:nth-child(2) { opacity: 0; }
 .is-side-open .burger__lines i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 .is-side-open .burger {
-  border-color: rgba(255,106,43,.5);
-  background: linear-gradient(145deg, rgba(255,154,74,.26), rgba(255,106,43,.17));
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: linear-gradient(145deg, rgba(255,154,74,.26), color-mix(in srgb, var(--accent) 17%, transparent));
 }
 
 /*
@@ -310,9 +310,6 @@
 @media (min-width: 1040px) {
   .brand--head { display: none; }
 }
-/* Надпись «СЕЙЧАС // СЕРВЕР 33» из styles-v8.css встала бы поверх статуса. */
-.site-head__inner::before { display: none; }
-#app::before { display: none; }
 /*
   Место доски в шапке. Её вид (одна строка вместо блока на 90 пикселов)
   задаётся в mobile.css — там же объяснено, почему.
@@ -457,7 +454,7 @@
   height: 32px;
   flex: none;
   border-radius: 9px;
-  background: rgba(255,106,43,.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
   font-family: Unbounded, sans-serif;
   font-size: 15px;
@@ -520,7 +517,7 @@
   font-size: 10.5px;
 }
 .forum-notice p { margin: 0 0 8px; color: var(--dim); font-size: 13px; line-height: 1.55; }
-.forum-notice--off { border-color: rgba(255,201,60,.24); }
+.forum-notice--off { border-color: color-mix(in srgb, var(--gold) 24%, transparent); }
 .forum-notice--local { border-color: rgba(167,163,194,.2); }
 .forum-notice code {
   padding: 1px 5px;
@@ -667,7 +664,7 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  background: #ff4757;
+  background: var(--loss);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -950,7 +947,7 @@
 .forum-reply textarea:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .forum-btn {
@@ -962,7 +959,7 @@
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: 10px;
-  background: linear-gradient(135deg, #ff9a4a, var(--accent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
   color: #14100c;
   font-family: inherit;
   font-size: 13.5px;
@@ -1095,7 +1092,7 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: rgba(255,106,43,.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
   font-size: 18px;
   line-height: 1;
@@ -1141,11 +1138,11 @@
 }
 .forum-md__btn:hover {
   border-color: var(--accent);
-  background: rgba(255,106,43,.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .forum-md__btn[aria-pressed='true'] {
   border-color: var(--accent);
-  background: rgba(255,106,43,.18);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
 }
 .forum-md__btn:active { transform: scale(.95); }
@@ -1208,7 +1205,7 @@
 .forum-editor:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .forum-editor:empty::before,
 .forum-editor.is-empty::before {
@@ -1251,7 +1248,7 @@
   padding: 8px 12px;
   border-left: 3px solid var(--accent);
   border-radius: 0 8px 8px 0;
-  background: rgba(255,106,43,.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
   color: var(--dim);
 }
 .forum-editor blockquote p,
@@ -1352,7 +1349,7 @@
 }
 
 .forum-post { margin-bottom: 0; }
-.forum-post--pinned { border-color: rgba(255,201,60,.28); }
+.forum-post--pinned { border-color: color-mix(in srgb, var(--gold) 28%, transparent); }
 .forum-post--trail {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent 34%);
@@ -1545,8 +1542,8 @@
   color: var(--soft-bad);
 }
 .forum-react__btn--more.is-on {
-  border-color: rgba(255,201,60,.42);
-  background: rgba(255,201,60,.1);
+  border-color: color-mix(in srgb, var(--gold) 42%, transparent);
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
   color: var(--soft-warn);
 }
 .forum-react__plus { color: var(--mute); font-size: 13px; }
@@ -1559,8 +1556,8 @@
 */
 .forum-thank { margin-left: 5px; }
 .forum-thank.is-on {
-  border-color: rgba(255,201,60,.5);
-  background: rgba(255,201,60,.12);
+  border-color: color-mix(in srgb, var(--gold) 50%, transparent);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
   color: var(--soft-warn);
 }
 .forum-thank:disabled { opacity: .5; }
@@ -1597,7 +1594,7 @@
   cursor: pointer;
 }
 .forum-emoji__item:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
-.forum-emoji__item.is-on { border-color: rgba(255,201,60,.4); background: rgba(255,201,60,.1); }
+.forum-emoji__item.is-on { border-color: color-mix(in srgb, var(--gold) 40%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent); }
 .forum-emoji__item b { font-size: 11px; }
 
 /* У правого края списка не хватает места — открываем влево. */
@@ -1709,7 +1706,7 @@
 }
 .forum-modal__rule:has(input:checked) {
   border-color: var(--accent);
-  background: rgba(255,106,43,.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .forum-modal__actions { display: flex; gap: 8px; margin-top: 4px; }
 
@@ -2005,8 +2002,8 @@
 
 /* Подтверждённое со стороны достижение тёплое: «много писал» и «признали» — не одно и то же. */
 .forum-rank__ach--confirmed {
-  border-color: rgba(255,201,60,.5);
-  background: rgba(255,201,60,.12);
+  border-color: color-mix(in srgb, var(--gold) 50%, transparent);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
   color: var(--soft-warn);
 }
 

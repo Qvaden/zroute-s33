@@ -14840,7 +14840,18 @@ console.log('\nAQ. Стабильность кадра');
      статическим разделам, которые ждут данные рейтинга.
   */
   check('первый кадр сайта — контур для статики, пустота для живого',
-    /app\.innerHTML = liveFirst \? '' : `/.test(mainJs));
+    /app\.innerHTML = liveFirst \? ''\s*: `<div class="loading">/.test(mainJs));
+  /*
+    Контур главной — не те же семь карточек, что у остальных вкладок: первая
+    настоящая рамка там героя на полэкрана, и справа у него панель источника.
+    Проверяется и выбор вида по вкладке, и то, что остальные статики своё
+    «card» не потеряли.
+  */
+  check('контур главной подогнан под форму командного центра',
+    /skWithCaption\('Загружаем данные…', id === 'home' \? 'ops' : 'card', id === 'home' \? 6 : 7\)/.test(mainJs)
+      && /^<div class="sk sk--ops" aria-hidden="true"><div class="sk__card sk__card--ops">/.test(skeleton('ops', 6))
+      && (skeleton('ops', 6).match(/sk__side/g) || []).length === 1
+      && cards(skeleton('card', 7)) === 7);
 }
 
 /* ── AR. «Написать продавцу»: личная связь на доске ──────────────────────
@@ -15701,6 +15712,296 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
     boardSrc.includes('Поиск читает название и текст темы')
       && /placeholder="Поиск: название, что в аккаунте, условия"/.test(boardSrc)
       && !/placeholder="[^"]*цен/i.test(boardSrc));
+}
+
+// ── AV. Честная пустота и контур командного центра ──────────────────────────
+/*
+   Пустой экран говорит одно из двух: «результатов ещё нет» или «результаты
+   есть, но прочитать их нечем». До этого захода пять разделов сайта на обе
+   ситуации печатали первую фразу, и при аварии она была неправдой — причём
+   неправдой, которую нельзя проверить: человек закрывал вкладку, решив,
+   что сайт мёртв, хотя таблица жила.
+
+   Проверяются четыре вещи, каждая из которых теряется при следующей правке.
+
+   Первая — разделение двух пустот по всем страницам данных, на живом рендере,
+   а не по регулярным выражениям в тексте файла: у каждого экрана обязано быть
+   два разных текста.
+
+   Вторая — один голос аварии. Формулировка живёт в helpers.unavailableNote
+   ровно в одном месте; страницы обязаны её вызывать. Как только кто-то
+   впишет похожий текст себе, расхождение станет вопросом времени.
+
+   Третья — никаких выдуманных обещаний. Экран аварии не знает расписания
+   базы, поэтому не вправе называть ни час, когда цифра вернётся, ни число,
+   которого он не читал.
+
+   Четвёртая — байтовые высоты контура главной. Они сняты замером с живого
+   экрана, и правка числа без перерисовки замера — ровно та поломка, из-за
+   которой страница дёргается в момент прихода данных.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAV. Честная пустота и контур командного центра');
+{
+  const { readFile } = await import('node:fs/promises');
+  const helpersSrc = await readFile('src/ui/helpers.js', 'utf8');
+  const ladderSrc = await readFile('src/pages/ladder.js', 'utf8');
+  const quartSrc = await readFile('src/pages/quarter-final.js', 'utf8');
+  const tlSrc = await readFile('src/pages/timeline.js', 'utf8');
+  const guideSrc = await readFile('src/pages/guide.js', 'utf8');
+  const homeSrc = await readFile('src/pages/home.js', 'utf8');
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  const v8Src = await readFile('src/styles-v8.css', 'utf8');
+  const refineSrc = await readFile('src/refine.css', 'utf8');
+
+  const { renderLadder } = await import('../src/pages/ladder.js');
+  const { renderQuarter } = await import('../src/pages/quarter-final.js');
+  const { renderTimeline } = await import('../src/pages/timeline.js');
+  const { renderGuide } = await import('../src/pages/guide.js');
+  const { renderHome } = await import('../src/pages/home.js');
+  const { unavailableNote } = await import('../src/ui/helpers.js');
+
+  const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const DOWN = 'замер: ни база, ни снимок не ответили';
+
+  /* ── Один голос аварии ── */
+  check('аварийную формулировку задаёт одна функция helpers',
+    /export function unavailableNote\(\)/.test(helpersSrc));
+  check('четыре страницы данных вызывают её, а не пересказывают своими словами',
+    [ladderSrc, quartSrc, tlSrc, guideSrc].every((src) => /unavailableNote/.test(src))
+      && ![ladderSrc, quartSrc, tlSrc, guideSrc].some((src) => /ни живая база/.test(src)));
+  const note = text(unavailableNote());
+  check('в объяснении аварии названы оба источника, а не один из них',
+    note.includes('ни живая база, ни автоматический снимок'));
+  check('объяснение не обещает канал связи и не называет срок: цифр в нём нет',
+    !/\d/.test(note) && !/письмо|телеграм|поддержка|минут|часов/.test(note));
+  check('объяснение указывает на рабочую кнопку повтора над содержимым',
+    note.includes('«Повторить»')
+      && /<button[^>]*data-boot-retry>Повторить<\/button>/.test(mainSrc));
+
+  /* ── Две пустоты на каждой странице данных ── */
+  const ladBlank = text(renderLadder({}));
+  const ladDown = text(renderLadder({ loadError: DOWN }));
+  check('рейтинг: до начала сезона говорится про невнесённые итоги',
+    ladBlank.includes('Результатов пока нет'));
+  check('рейтинг: при аварии тот же текст запрещён — он был бы неправдой',
+    ladDown.includes('не дошли') && !/как только внесут первые итоги/.test(ladDown));
+
+  const qBlank = text(renderQuarter({ standings: [], quarter: { weeks: [] } }));
+  const qDown = text(renderQuarter({ standings: [], quarter: { weeks: [] }, loadError: DOWN }));
+  check('кварт: заголовок различает «ещё не начат» и «не дошли»',
+    qBlank.includes('Период ещё не начат') && qDown.includes('Данные не дошли')
+      && !qDown.includes('Период ещё не начат'));
+
+  const tlBlank = text(renderTimeline({ events: [] }));
+  const tlDown = text(renderTimeline({ events: [], loadError: DOWN }));
+  check('летопись: пустота при аварии не обещает первую запись',
+    tlBlank.includes('Ещё ни одной записи') && tlDown.includes('Записи не дошли')
+      && !/Первая запись появится/.test(tlDown));
+
+  /* ── Доказательная часть «Малым альянсам»: 0% против 0% ── */
+  const gBlank = renderGuide({ texts: [], standings: [], weeks: [], results: [] });
+  check('малым альянсам: пустая таблица не рисует сравнение трети с нулями',
+    !/Нижняя треть/.test(gBlank));
+  check('малым альянсам: порог сравнивания считается только по неполному списку',
+    /if \(loadError \|\| !active\.length \|\| results\.length < active\.length\)/.test(guideSrc));
+  check('малым альянсам: при аварии экран говорит про непрочитанные данные',
+    text(renderGuide({ texts: [], standings: [], weeks: [], results: [], loadError: DOWN }))
+      .includes('не дошли'));
+
+  /* ── Главная: авария ≠ предсезонка ── */
+  const homeDown = text(renderHome({ loadError: DOWN }));
+  check('главная: при аварии экран говорит про непрочитанное, а не про несуществующее',
+    homeDown.includes('не удалось прочитать')
+      && !/это не ошибка|первый VS в истории|Недели ещё не заведены/.test(homeDown));
+  check('главная: до первого внесённого результата остаётся рассказ про начало отсчёта',
+    text(renderHome({
+      allWeeks: [{ number: 7, startDate: new Date('2026-12-01'), endDate: new Date('2026-12-07') }],
+    })).includes('первый VS в истории сайта')
+      && !text(renderHome({})).includes('не удалось прочитать'));
+  check('главная: экран аварии отличает себя только при пустой таблице',
+    /if \(loadError && !summary\) return renderOutage\(\);/.test(homeSrc));
+  check('главная: повтор на экране аварии — рабочая кнопка, а не обещание',
+    renderHome({ loadError: DOWN }).includes('data-boot-retry')
+      && /\[data-boot-retry\]'\)\) boot\(\)/.test(mainSrc));
+  check('экраны аварии не выдумывают ни число, ни срок возврата данных',
+    !/\d/.test(homeDown) && !/\d/.test(ladDown) && !/\d/.test(tlDown));
+
+  /* ── Поле аварии есть в обоих кадрах, иначе страницы его не увидят ── */
+  check('кадр с данными относит аварию: loadError пустой строкой',
+    /loadError: '',/.test(mainSrc));
+  check('пустой кадр несёт причину аварии',
+    /view = emptyView\(String\(err\.message \?\? err\)\)/.test(mainSrc));
+  check('кварт получает причину отдельно: он собирается из двух полей, а не из всего view',
+    /route\.render\(\{[\s\S]{0,600}?loadError: view\.loadError,/.test(mainSrc));
+
+  /* ── Контур главной: высоты сняты замером с живого экрана ── */
+  check('контур командного центра держит замерные высоты героя в обеих ориентациях',
+    /\.sk--ops \.sk__card--ops \{\s*--sk-h: 653px;/.test(refineSrc)
+      && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk--ops \.sk__card--ops \{\s*--sk-h: 558px;/
+        .test(refineSrc));
+  check('панель источника в контуре равна живой панели: 176 px на мониторе, 162 на телефоне',
+    /\.sk__side \{[\s\S]{0,200}?min-height: 162px;/.test(refineSrc)
+      && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk__side \{\s*min-height: 176px;/.test(refineSrc));
+  check('колонки контура повторяют сетку героя, а не растягиваются по высоте',
+    /\.sk__card--ops \{\s*display: grid; gap: 24px; align-items: start; align-content: center/.test(refineSrc)
+      && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk__card--ops \{\s*grid-template-columns: minmax\(0, 1fr\) minmax\(250px, 330px\);/.test(refineSrc));
+
+  /* ── Зоны нажатия на экране аварии ── */
+  check('повтор и переход на экране аварии — не меньше 44 px по короткой стороне',
+    /\.hero__cta \{[\s\S]{0,200}?min-height: 44px;/.test(v8Src));
+}
+
+// ── AW. AA у токенов обеих тем ───────────────────────────────────────────────
+/*
+   Палитра редизайна собрана из токенов, и ровно поэтому её можно проверить
+   арифметикой, а не глазом: берём оба блока темы из `styles-v8.css` и считаем
+   контраст по формуле WCAG. Глазом такое не видеть: 4,53 и 4,61 выглядят
+   одинаково читаемо, а правка одного канала уводит первую за порог.
+
+   Проверяются три группы.
+
+   Первая — чернила текста (`--text`, `--dim`, `--mute`, `--link`) против всех
+   четырёх поверхностей обеих тем. Это ядро страницы: подписи плиток, даты,
+   строки про автомат. Порог — 4.5:1, обычный текст. Заход 1 уже один раз
+   ловил `--mute` на 3.07:1, и поймал его не дизайн-ревью, а замер.
+
+   Вторая — акцентные краски как текст. Порог здесь 3:1, то есть AA для
+   крупного текста: акцентом красятся заголовки, статистика и плашки, а не
+   сплошной текст. Всё, что не доходит до 4.5 как обычный текст, не прячется,
+   а названо в документе об архитектуре, и проверку этого держим здесь.
+
+   Третья — шкалы, а не числа на месте: лестница отступов, полосы кеглей,
+   ширина контента и длительности. Редизайн живёт токенами; если следующая
+   правка впишет в блок `padding: 26px`, система перестанет быть системой,
+   и проверить это регуляркой дешевле, чем спорить на ревью.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAW. AA у токенов обеих тем');
+{
+  const { readFile } = await import('node:fs/promises');
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+  const arch = await readFile('docs/ARCHITECTURE.md', 'utf8');
+
+  const darkBlock = /^:root \{([\s\S]*?)\n\}/m.exec(v8);
+  const lightBlock = /\n\[data-theme="light"\] \{([\s\S]*?)\n\}/m.exec(v8);
+  const readTokens = (body) => {
+    const out = {};
+    for (const m of body.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
+      if (!(m[1] in out)) out[m[1]] = m[2].toLowerCase();
+    }
+    return out;
+  };
+  const dark = darkBlock ? readTokens(darkBlock[1]) : null;
+  const light = lightBlock ? readTokens(lightBlock[1]) : null;
+
+  const lum = (hex) => {
+    const c = hex.slice(1);
+    const [r, g, b] = [0, 2, 4].map((i) => {
+      const v = parseInt(c.slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const x = lum(a);
+    const y = lum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+
+  const surfaces = ['--bg', '--surface', '--raised', '--raised-2'];
+  const inks = ['--text', '--dim', '--mute', '--link'];
+  check('обе темы собраны токенами: четыре поверхности и четыре чернила есть и там и там',
+    Boolean(dark) && Boolean(light)
+      && surfaces.every((s) => s in dark && s in light)
+      && inks.every((i) => i in dark && i in light));
+
+  const floors = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    for (const ink of inks) {
+      for (const s of surfaces) floors.push([`${theme}: ${ink} на ${s}`, ratio(t[ink], t[s])]);
+    }
+  }
+  check('все четыре чернила текста на каждой поверхности обеих тем дотягивают до AA (4,5)',
+    floors.length === 32 && floors.every(([, c]) => c >= 4.5),
+    floors.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; '));
+  const floorWorst = floors.reduce((a, b) => (b[1] < a[1] ? b : a));
+  check('самая тонкая пара названа числом, а не «в среднем нормально»',
+    floorWorst[1] >= 4.5, `${floorWorst[0]} — ${floorWorst[1].toFixed(2)}:1`);
+
+  /*
+     Худшая поверхность в каждой теме своя: в тёмной это светлая панель
+     `--raised-2`, в светлой — бежевая `--raised`. Правка одной из них молча
+     уводит вниз сразу четыре краски, поэтому проверяем их по отдельности.
+  */
+  check('худшая поверхность каждой темы остаётся в AA для подписей и ссылок',
+    dark && light
+      && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(dark[i], dark['--raised-2']) >= 4.5)
+      && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(light[i], light['--raised']) >= 4.5));
+
+  const accents = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    for (const ink of ['--accent', '--accent-dk', '--gold', '--win', '--loss']) {
+      for (const s of surfaces) accents.push([`${theme}: ${ink} на ${s}`, ratio(t[ink], t[s])]);
+    }
+  }
+  check('акцентные краски как текст дотягивают до 3:1 — AA для крупного текста',
+    accents.length === 40 && accents.every(([, c]) => c >= 3),
+    accents.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; '));
+  const subNormalAA = accents.filter(([, c]) => c < 4.5);
+  check('всё, что не доходит до AA как обычный текст, не спрятано: это названо в документе',
+    subNormalAA.length > 0 && arch.includes('цвета альянсов')
+      && /AA для крупного текста/.test(arch),
+    `${subNormalAA.length} пар: ${subNormalAA.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')}`);
+
+  /* Чернила на залитой плашке: фон кнопки — это сам акцент. */
+  check('чернила на залитой акцентом плашке тёмной темы дотягивают до AA',
+    dark && ratio(dark['--bg'], dark['--accent']) >= 4.5,
+    `#080a0f на ${dark ? dark['--accent'] : '—'} — ${dark ? ratio(dark['--bg'], dark['--accent']).toFixed(2) : '—'}:1`);
+
+  /* ── Шкалы редизайна ── */
+  const steps = [...v8.matchAll(/--s-([1-8]):\s*(\d+)px/g)].map((m) => [+m[1], +m[2]]);
+  check('лестница отступов — ровно восемь ступеней 8/12/16/24/32/48/64/96, и больше ничего',
+    steps.length === 8 && steps.map((s) => s[1]).join('/') === '8/12/16/24/32/48/64/96');
+
+  const band = (name) => {
+    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(v8);
+    if (!m) return null;
+    const nums = [...m[1].matchAll(/(\d+(?:\.\d+)?)px/g)].map((x) => +x[1]);
+    return { min: Math.min(...nums), max: Math.max(...nums) };
+  };
+  /*
+     Верхняя граница кегли обязана оставаться в полосе брифа: герой, разросшийся
+     за 80 px, перестаёт быть заголовком и режет глаз. Нижняя — это телефон, и
+     она не имеет права упасть ниже читаемого.
+  */
+  const bands = {
+    'fs-hero': [36, 80], 'fs-h1': [28, 56], 'fs-h2': [20, 36], 'fs-card': [14, 20],
+    'fs-stat': [28, 48], 'fs-body': [14, 16], 'fs-meta': [11, 13], 'fs-eyebrow': [11, 13],
+  };
+  const measured = Object.entries(bands).map(([n, [lo, hi]]) => [n, band(n), lo, hi]);
+  check('каждая кегль-ступень объявлена токеном и сидит в своей полосе',
+    measured.every(([, b]) => b) && measured.every(([, b, lo, hi]) => b.min >= lo && b.max <= hi),
+    measured.map(([n, b]) => `${n} ${b ? `${b.min}–${b.max}px` : 'нет'}`).join(', '));
+  check('заголовок карточки не мельчает ниже 16 px, а подпись не крупнее 13 px',
+    (() => {
+      const card = band('fs-card');
+      const meta = band('fs-meta');
+      const eye = band('fs-eyebrow');
+      return card && meta && eye && card.max >= 16 && meta.max <= 13 && eye.max <= 13;
+    })());
+
+  const wrap = /--wrap:\s*(\d+)px/.exec(v8);
+  check('ширина контента в полосе 1200–1400 px и задана одним токеном',
+    Boolean(wrap) && Number(wrap[1]) >= 1200 && Number(wrap[1]) <= 1400,
+    wrap ? `--wrap: ${wrap[1]}px` : 'токена нет');
+  check('длительности движения — 150–250 мс, ровно как требует дисциплина анимации',
+    /--t-fast:\s*(\d+)ms/.test(v8) && /--t-med:\s*(\d+)ms/.test(v8)
+      && [Number(/--t-fast:\s*(\d+)ms/.exec(v8)[1]), Number(/--t-med:\s*(\d+)ms/.exec(v8)[1])]
+        .every((ms) => ms >= 150 && ms <= 250));
+  check('под prefers-reduced-motion движение выключено глобально, а не по одной кнопке',
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{ animation: none !important; transition: none !important; \}/
+      .test(v8));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl } from '../ui/helpers.js';
+import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl, unavailableNote } from '../ui/helpers.js';
 import { EVENT_TYPE, EVENT_TYPE_ORDER, verdictText, pillText } from '../logic/event-types.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -15,11 +15,23 @@ const WEEKS_SHOWN = 4;
  *
  * Про подстановку по умолчанию: недоступная таблица результатов больше
  * не закрывает сайт целиком, поэтому страница может законно получить пустоту.
+ *
+ * Пустота эта двух родов, и различать их должен экран, а не читатель догадками:
+ * «Ещё ни одной записи» — про начало летописи, «Записи не дошли» — про то,
+ * что записи есть, но прочитать их сейчас нечем.
  */
-export function renderTimeline({ events } = {}) {
+export function renderTimeline({ events, loadError = '' } = {}) {
   const list = Array.isArray(events) ? events : [];
 
   if (!list.length) {
+    if (loadError) {
+      return `
+        <section class="hero hero--tl">
+          <span class="eyebrow">Хроника завоеваний</span>
+          <h1 class="tl__title">Записи не дошли</h1>
+          ${unavailableNote()}
+        </section>`;
+    }
     return `
       <section class="hero hero--tl">
         <span class="eyebrow">Хроника завоеваний</span>

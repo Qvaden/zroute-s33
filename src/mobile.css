@@ -393,7 +393,7 @@ html {
 }
 .forum-profile__ally {
   padding: 2px 8px;
-  border: 1px solid rgba(255,201,60,.3);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
   border-radius: 999px;
   color: var(--gold);
   font-family: Unbounded, sans-serif;
@@ -651,7 +651,7 @@ html {
 .forum-post__ally {
   margin-left: 6px;
   padding: 1px 6px;
-  border: 1px solid rgba(255,201,60,.26);
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
   border-radius: 999px;
   color: var(--gold);
   font-family: Unbounded, sans-serif;
@@ -708,8 +708,7 @@ html {
     box-shadow: inset 0 1px color-mix(in srgb, var(--text) 6%, transparent);
     background: linear-gradient(110deg, rgba(167,163,194,.1), color-mix(in srgb, var(--text) 3%, transparent));
   }
-  .president-board::before,
-  .president-board::after { display: none; }
+  .president-board::before { display: none; }
 
   /* Голова доски перестаёт быть отдельным ярусом и встаёт в ту же строку. */
   .president-board__head {
@@ -802,29 +801,6 @@ html {
   */
   :root { --wrap: 1240px; }
 }
-
-/*
-  ДЕКОРАТИВНЫЕ НАДПИСИ В УГЛАХ.
-
-  «СЕЙЧАС // СЕРВЕР 33», «СИСТЕМА В СЕТИ», «ТАКТИЧЕСКИЙ ОБЗОР», «S33 / СТАТУС
-  ШТАБА» — следы того периода, когда сайту добавляли «атмосферу командного
-  центра». Каждая по отдельности безобидна, все вместе создают шум: на экране
-  одновременно четыре надписи, которые ничего не сообщают и ни на что
-  не ведут.
-
-  Хуже другое: они стоят абсолютным позиционированием в углах блоков, и при
-  сужении окна наезжают на настоящий текст. Именно так «СИСТЕМА В СЕТИ»
-  оказывалась поверх номера недели.
-
-  Оставляю одну — значок свежести в президентской доске, где он означает
-  настоящее: данные обновляются вручную и показывают текущее положение.
-  Остальные убираю.
-*/
-.site-head__inner::before,
-#app::before,
-.hero__top::after,
-.bot-hero::before,
-.president-board::after { display: none !important; }
 
 /*
   Полоса под шапкой с бегущим блеском. На телефоне её не видно вовсе,
@@ -938,11 +914,11 @@ html {
   перетягивала внимание с ника, хотя служит подписью к нему, а не заголовком.
 */
 .role-badge--owner {
-  border-color: rgba(255,201,60,.4);
-  background: linear-gradient(135deg, rgba(255,201,60,.16), rgba(255,201,60,.06));
-  box-shadow: 0 0 9px -5px rgba(255,201,60,.5), inset 0 1px color-mix(in srgb, var(--text) 8%, transparent);
+  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 16%, transparent), color-mix(in srgb, var(--gold) 6%, transparent));
+  box-shadow: 0 0 9px -5px color-mix(in srgb, var(--gold) 50%, transparent), inset 0 1px color-mix(in srgb, var(--text) 8%, transparent);
 }
-.role-badge--owner i { filter: drop-shadow(0 0 3px rgba(255,201,60,.45)); }
+.role-badge--owner i { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--gold) 45%, transparent)); }
 
 /*
   Блогер — не роль, а отметка: писать блог может участник любой роли, поэтому
@@ -1250,7 +1226,7 @@ html {
 .pick__opt:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4%, transparent); }
 .pick__opt[aria-selected="true"] {
   color: #14100c;
-  background: linear-gradient(135deg, #ff9a4a, var(--accent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
   font-weight: 600;
 }
 

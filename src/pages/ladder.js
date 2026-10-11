@@ -1,4 +1,4 @@
-import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel } from '../ui/helpers.js';
+import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavailableNote } from '../ui/helpers.js';
 
 /**
  * Общий рейтинг — главная ценность сайта.
@@ -24,10 +24,11 @@ export function renderLadder({
   period = null,
   variant = 'season',
   achievements,
+  loadError = '',
 } = {}) {
   const list = Array.isArray(standings) ? standings : [];
 
-  if (!list.length) return renderEmpty(eyebrow, title);
+  if (!list.length) return renderEmpty(eyebrow, title, loadError);
 
   const byId = new Map(list.map((r) => [r.alliance.id, r.alliance]));
   const rows = list.map((r) => rowHtml(r, byId, variant, achievements)).join('');
@@ -101,19 +102,24 @@ export function renderLadder({
  * Состояние без данных.
  *
  * Не «ошибка» и не пустая страница: то, что результатов ещё нет, — обычное
- * положение дел в начале сезона и при недоступном источнике. Человек должен
- * прочитать, почему пусто, а не решить, что сайт сломался.
+ * положение дел в начале сезона. Человек должен прочитать, почему пусто,
+ * а не решить, что сайт сломался.
+ *
+ * Но пустой экран бывает и при готовой таблице: база молчит и снимок молчит,
+ * до рейтинга не дошло ничего. Об этом рассказывает unavailableNote, и
+ * различать два случая обязательно: «появится, как только внесут первые итоги»
+ * про готовые итоги — просто неправда.
  */
-function renderEmpty(eyebrow, title) {
+function renderEmpty(eyebrow, title, loadError) {
   return `
     <section class="panel">
       <header class="panel__head">
         <span class="eyebrow">${esc(eyebrow)}</span>
         <h1 class="panel__title">${esc(title)}</h1>
       </header>
-      <p class="muted">
-        Результатов пока нет. Рейтинг появится, как только внесут первые итоги VS.
-      </p>
+      ${loadError
+        ? unavailableNote()
+        : '<p class="muted">Результатов пока нет. Рейтинг появится, как только внесут первые итоги VS.</p>'}
     </section>`;
 }
 

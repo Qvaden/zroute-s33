@@ -9,7 +9,7 @@
 
   <!-- Установка на телефон -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#0a0b0d">
+  <meta name="theme-color" content="#080a0f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -86,11 +86,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=102">
+  <link rel="modulepreload" href="./src/main.js?v=103">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=1">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -99,7 +99,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=44">
+  <link rel="stylesheet" href="./src/forum.css?v=45">
   <!--
     Телефон — последним слоем.
 
@@ -108,7 +108,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=24">
+  <link rel="stylesheet" href="./src/mobile.css?v=25">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -121,12 +121,12 @@
     Один файл на сайт и панель: правила для select уже лежали в четырёх местах
     admin.css и спорили друг с другом.
   -->
-  <link rel="stylesheet" href="./src/controls.css?v=2">
+  <link rel="stylesheet" href="./src/controls.css?v=3">
   <!--
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=27">
+  <link rel="stylesheet" href="./src/refine.css?v=28">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -165,7 +165,7 @@
         <small>Z ROUTE: REDEMPTION</small>
       </div>
       <div class="boot-loader__signal"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="boot-loader__status"><span>ИНИЦИАЛИЗАЦИЯ СЕРВЕРА</span><b>В СЕТИ</b></div>
+      <div class="boot-loader__status"><span>СБОРКА ЭКРАНА</span><b>ИЩЕМ ДАННЫЕ</b></div>
     </div>
   </div>
   <header class="site-head">
@@ -279,7 +279,7 @@
     </p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=102"></script>
+  <script type="module" src="./src/main.js?v=103"></script>
 
   <script>
     /*

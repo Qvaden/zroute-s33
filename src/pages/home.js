@@ -20,6 +20,54 @@ function daysUntil(date, now = new Date()) {
 
 
 /**
+ * ДАННЫЕ НЕ ДОШЛИ — экран обязан сказать это, а не притворяться предсезонкой.
+ *
+ * Для кода два состояния выглядят одинаково: результатов нет. Для человека
+ * разница принципиальная, и старое поведение её стирало: страница печатала
+ * «Ни одного результата пока не внесено — и это не ошибка» и «Недели ещё не
+ * заведены» ровно в тот момент, когда ошибка была, а недели давно заведены —
+ * их просто не удалось прочитать.
+ *
+ * Здесь ничего не выдумывается и не смягчается: называется факт (цифр не
+ * видно), его причина (ни база, ни снимок не ответили), что по-прежнему
+ * работает (форум, чаты, календарь, справочник) и что можно сделать (повторить
+ * тем же обработчиком, что и в полоске над разделом).
+ */
+function renderOutage() {
+  return `
+    <section class="hero">
+      <div class="hero__top">
+        <div class="hero__ident">
+          <span class="eyebrow">Цифры сейчас не видны</span>
+          <h1 class="hero__week">
+            <span class="hero__word">Рейтинг</span>
+            <span class="hero__num num" aria-hidden="true">—</span>
+          </h1>
+          <div class="hero__dates">ни живая база, ни автоматический снимок не ответили</div>
+          <div class="hero__actions">
+            <button type="button" class="hero__cta hero__cta--primary" data-boot-retry>Запросить ещё раз</button>
+            <a class="hero__cta hero__cta--ghost" href="#/forum">Форум сервера</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="preseason">
+        <p class="preseason__lead">
+          Здесь пусто не потому, что результатов ещё нет, а потому, что их не
+          удалось прочитать. Придумывать цифры страница не будет: пока таблица
+          недоступна, на ней нет ни номера недели, ни очков, ни движения
+          в рейтинге.
+        </p>
+        <p class="preseason__note muted">
+          Работает как обычно форум, личные сообщения, календарь встреч и
+          справочник гайдов. Кнопка выше повторяет тот же запрос данных,
+          с которого сайт стартует при открытии.
+        </p>
+      </div>
+    </section>`;
+}
+
+/**
  * Состояние до первого внесённого результата.
  *
  * Отсчёт истории начинается с этой недели, поэтому таблица пока пуста
@@ -48,6 +96,10 @@ function renderPreSeason(standings, allWeeks) {
               ? `${fmtDate(upcoming.startDate)} — ${fmtDate(upcoming.endDate)} · первый VS в истории сайта`
               : 'Недели ещё не заведены'
           }
+        </div>
+        <div class="hero__actions">
+          <a class="hero__cta hero__cta--primary" href="#/forum">Форум сервера<span aria-hidden="true"> →</span></a>
+          <a class="hero__cta hero__cta--ghost" href="#/about">О проекте</a>
         </div>
       </div>
 
@@ -253,10 +305,20 @@ function renderLive({ allWeeks, results, quarter, quarterStandings }, now = new 
  * тайлов, и это был самый большой блок на странице про самый короткий
  * факт. Теперь счёт — две цифры, а кто именно прячется под «Кто именно»;
  * список целиком всё равно есть в рейтинге.
+ *
+ * Про правую панель: экран результатов живёт без подписки и без колокольчика,
+ * поэтому человеку полезно знать ровно другое — насколько полны те цифры,
+ * что он видит. Панель говорит это посчитанными числами и открыто называет
+ * источник: живая база, снимок с часом или ничего. Никаких «онлайн»,
+ * «сектор» и прочей мишуры, которую сайт не может проверить, здесь нет.
  */
 export function renderHome(view = {}) {
-  const { summary, standings, movers, weeks, allWeeks } = view;
+  const { summary, standings, movers, weeks, allWeeks, results, dataMeta, loadError } = view;
   const list = Array.isArray(standings) ? standings : [];
+
+  // Пустая таблица бывает двух видов, и человек обязан понять, какого именно.
+  // Авария — не предсезонка: в ней нельзя писать «это не ошибка».
+  if (loadError && !summary) return renderOutage();
 
   // Пока не внесён ни один результат, показывать нечего — но и «пусто» писать
   // нельзя: в этом состоянии сайт проживёт несколько дней после запуска,
@@ -265,7 +327,28 @@ export function renderHome(view = {}) {
 
   const { week, winners, losers, recorded } = summary;
   const leader = list[0];
-  const total = list.filter((r) => r.alliance.active).length;
+  const active = list.filter((r) => r.alliance.active);
+  const total = active.length;
+
+  /*
+    HUD считает только то, что действительно лежит в наборе. Ни одной
+    выдуманной цифры здесь быть не может по построению: каждое значение —
+    число, посчитанное из standings, results и отметки, которую положил в
+    view main.js. Если соперников в таблице меньше двух, отрыва не бывает —
+    и на экране так и написано словами, а не нулём.
+  */
+  const rows = Array.isArray(results) ? results : [];
+  const playedWeeks = new Set(rows.map((r) => r.weekId)).size;
+  const records = active.reduce((n, r) => n + (r.played || 0), 0);
+  const gap = active.length > 1 ? active[0].points - active[1].points : null;
+  const meta = dataMeta ?? { source: '', stamp: '' };
+  const sourceLabel = meta.source === 'снимок'
+    ? `снимок${meta.stamp ? ` от ${meta.stamp}` : ''}`
+    : meta.source === '' ? 'данные не пришли' : 'только что из базы';
+  const hudStat = (label, value, word = false) =>
+    `<div class="hud__stat"><dt>${label}</dt><dd class="num${word ? ' is-word' : ''}">${value}</dd></div>`;
+  const gapWord = gap === null || gap === 0;
+  const gapText = gap === null ? 'нет второго' : gap === 0 ? 'вровень' : `+${gap}`;
 
   const tiles = (items) =>
     items.length
@@ -297,7 +380,7 @@ export function renderHome(view = {}) {
        <span class="muted">${r.place} место</span>
      </li>`;
 
-  const top5 = list.filter((r) => r.alliance.active).slice(0, 5);
+  const top5 = active.slice(0, 5);
   // Движение за неделю — необязательная часть: без него страница осмысленна.
   const moved = movers ?? { up: [], down: [] };
 
@@ -307,9 +390,9 @@ export function renderHome(view = {}) {
       : `внесено ${recorded} из ${total}`;
 
   return `
-    <section class="hero">
+    <section class="hero hero--ops">
       <div class="hero__top">
-        <div>
+        <div class="hero__ident">
           <span class="eyebrow">Итоги недели</span>
           <h1 class="hero__week">
             <span class="hero__word">Неделя</span>
@@ -320,7 +403,24 @@ export function renderHome(view = {}) {
             <span class="hero__sep">·</span>
             ${entered}
           </div>
+          <div class="hero__actions">
+            <a class="hero__cta hero__cta--primary" href="#/ladder">Весь рейтинг<span aria-hidden="true"> →</span></a>
+            <a class="hero__cta hero__cta--ghost" href="#/forum">Форум сервера</a>
+          </div>
         </div>
+
+        <aside class="hud" aria-label="Откуда на экране цифры">
+          <p class="hud__source">
+            <span class="hud__source-label">Источник</span>
+            <span class="hud__source-value">${esc(sourceLabel)}</span>
+          </p>
+          <dl class="hud__stats">
+            ${hudStat('альянсов в игре', total)}
+            ${hudStat('недель с VS', playedWeeks)}
+            ${hudStat('записей за сезон', records)}
+            ${hudStat('отрыв лидера', gapText, gapWord)}
+          </dl>
+        </aside>
       </div>
 
       ${

@@ -26,12 +26,25 @@ function lines(count) {
  *   post — аватар и текст: лента форума, страница участника;
  *   card — карточка с абзацем: заметки обновлений, дни календаря;
  *   row  — компактная строка: список гайдов;
- *   tile — плитка: доска аккаунтов.
+ *   tile — плитка: доска аккаунтов;
+ *   ops  — командный центр главной: первым блоком герой с колонкой панели
+ *          источника, остальное — карточки, которые идут под ним.
+ *
+ * Про 'ops' отдельно. Обычный контур из одинаковых карточек резервирует
+ * высоту списка, а первая настоящая карточка главной — рамка на 558 px, и
+ * под ней ещё панель на 176 px. Без такой же рамки в контуре страница
+ * сдвигалась бы на полэкрана ровно в момент прихода данных.
  */
-function block(kind) {
+function block(kind, index) {
   if (kind === 'post') return `<div class="sk__card"><span class="sk__ava"></span>${lines(3)}</div>`;
   if (kind === 'row') return `<div class="sk__card">${lines(2)}</div>`;
   if (kind === 'tile') return '<div class="sk__card"></div>';
+  if (kind === 'ops' && index === 0) {
+    return '<div class="sk__card sk__card--ops"><div class="sk__ops">'
+      + '<i class="sk__line sk__line--title"></i>'
+      + `${lines(2)}</div><div class="sk__side">${lines(3)}</div>`
+      + '<div class="sk__bars"><i class="sk__line"></i><i class="sk__line"></i><i class="sk__line"></i></div></div>';
+  }
   return `<div class="sk__card">${lines(2)}</div>`;
 }
 
@@ -43,7 +56,7 @@ function block(kind) {
  * которую вызывающая страница печатает сама.
  */
 export function skeleton(kind, n = 4) {
-  const list = Array.from({ length: Math.max(1, n) }, () => block(kind)).join('');
+  const list = Array.from({ length: Math.max(1, n) }, (_, index) => block(kind, index)).join('');
   return `<div class="sk sk--${kind}" aria-hidden="true">${list}</div>`;
 }
 

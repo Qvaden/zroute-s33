@@ -433,6 +433,39 @@ window.matchMedia('(min-width: 1040px)').addEventListener('change', (e) => {
   if (e.matches) setSideOpen(false);
 });
 
+/*
+  ПЛОТНАЯ ШАПКА В ПРОКРУТКЕ.
+
+  Пока страница не сдвинута, шапка стоит над началом hero и её полупрозрачный
+  фон не за что смешивать. Как только под шапку заезжает таблица, тот же фон
+  начинает превращать цифры в кашу, поэтому сдвиг больше 8 px добавляет класс
+  и стиль делает шапку сплошной.
+
+  8 px, а не 0: лёгкий пружинящий сдвиг на телефоне не должен каждый раз
+  включать и выключать оформление. Считаем в кадре анимации и только когда
+  состояние реально сменилось — слушатель висит на всех прокрутках страницы.
+*/
+const siteHead = document.querySelector('.site-head');
+let headScrolled = false;
+let headFrame = 0;
+
+function syncHeadState() {
+  headFrame = 0;
+  const scrolled = (window.scrollY || window.pageYOffset || 0) > 8;
+  if (scrolled === headScrolled) return;
+  headScrolled = scrolled;
+  siteHead.classList.toggle('is-scrolled', scrolled);
+}
+
+function requestHeadSync() {
+  if (!headFrame) headFrame = requestAnimationFrame(syncHeadState);
+}
+
+if (siteHead) {
+  window.addEventListener('scroll', requestHeadSync, { passive: true });
+  syncHeadState();
+}
+
 /* ── Переход к содержимому ──────────────────────────────────────────── */
 
 /*
@@ -949,7 +982,17 @@ function render() {
       unmountCalendar();
       unmountUpdates();
       app.innerHTML = route.id === 'quarter'
-        ? route.render({ standings: view.quarterStandings, quarter: view.quarter })
+        ? route.render({
+            standings: view.quarterStandings,
+            quarter: view.quarter,
+            /*
+              Кварт собирается из двух полей, а не из whole view, поэтому про
+              аварию ему приходится напоминать отдельно: без этой строки пустой
+              экран Кварта рассказывал бы про невнесённые итоги даже тогда,
+              когда итоги внесены и просто непрочитаны.
+            */
+            loadError: view.loadError,
+          })
         : route.id === 'bot'
           ? route.render()
           : route.render(view);
@@ -1035,6 +1078,7 @@ function emptyView(loadError = '') {
     quarter: { weeks: [], playedWeeks: 0, number: 0, startNumber: 0, endNumber: 0, endDate: null },
     summary: null, movers: { up: [], down: [] },
     placeHistory: new Map(), achievements: new Map(),
+    dataMeta: { source: '', stamp: '' },
     problems: [],
     loadError,
   };
@@ -1162,7 +1206,14 @@ async function boot() {
   const liveFirst = id === 'forum' || id === 'chats' || id === 'calendar'
     || id === 'updates' || id === 'accounts' || id === 'handbook' || (id === 'user' && param);
 
-  app.innerHTML = liveFirst ? '' : `<div class="loading">${skWithCaption('Загружаем данные…', 'card', 7)}</div>`;
+  /*
+    Контур подгоняется под форму будущих данных, а не ставится одна рамка на
+    все вкладки. Главная начинается не с карточки списка, а с героя на полэкрана
+    и панели источника в его правой колонке: семь карточек по 190 px резервировали
+    бы другую высоту, и в момент прихода цифр страница всё равно разъезжалась бы.
+  */
+  app.innerHTML = liveFirst ? ''
+    : `<div class="loading">${skWithCaption('Загружаем данные…', id === 'home' ? 'ops' : 'card', id === 'home' ? 6 : 7)}</div>`;
   if (liveFirst) {
     view = emptyView();
     render();
@@ -1219,6 +1270,16 @@ async function refreshView() {
       movers: computeMovers(standings),
       placeHistory: computePlaceHistory(data.alliances, weeks, data.results, CONFIG.scoring),
       achievements: computeAchievements(data.alliances, data.weeks, data.results),
+      /*
+        Откуда на экране цифры. Страница не лезет в слой данных сама: ей
+        кладут готовое — источник и час, если показан снимок. Без этого любая
+        вкладка могла бы либо молчать про свежесть, либо выдумывать её.
+      */
+      dataMeta: { source: lastLoad.source, stamp: snapshotStamp(lastLoad.snapshotAt) },
+      // Данные пришли: объяснять аварию странице больше нечего. Поле остаётся
+      // на месте, потому что пустой кадр после падения несёт в нём текст
+      // ошибки — у двух кадров должен быть один и тот же набор полей.
+      loadError: '',
       problems,
     };
 

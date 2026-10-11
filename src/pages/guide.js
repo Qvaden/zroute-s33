@@ -1,4 +1,4 @@
-import { esc, miniMarkdown, splitSections, plural } from '../ui/helpers.js';
+import { esc, miniMarkdown, splitSections, plural, unavailableNote } from '../ui/helpers.js';
 import { computeAllianceHistory, computeBestStreaks } from '../logic/standings.js';
 import { parseGuidePage } from '../logic/guide-roles.js';
 
@@ -14,7 +14,7 @@ import { parseGuidePage } from '../logic/guide-roles.js';
  * а не разработчик. Заголовки «## » превращаются в карточки — верстать
  * ничего не нужно.
  */
-export function renderGuide({ texts, standings, weeks, results } = {}) {
+export function renderGuide({ texts, standings, weeks, results, loadError = '' } = {}) {
   const byKey = Object.fromEntries((texts ?? []).map((t) => [t.key, t]));
   const page = parseGuidePage(byKey['guide-page'], {
     roles: parseGuidePage(byKey['guide-roles']).roles,
@@ -22,7 +22,7 @@ export function renderGuide({ texts, standings, weeks, results } = {}) {
     donts: byKey['guide-donts'], benefits: byKey['guide-benefits'],
   });
   return `
-    ${renderProof(standings ?? [], weeks ?? [], results ?? [], page)}
+    ${renderProof(standings ?? [], weeks ?? [], results ?? [], page, loadError)}
     ${renderLeadershipRoles(page)}
     ${renderExtraBlocks(page.extraBlocks)}
     ${renderList({ title: page.benefitsTitle, body: page.benefitsBody }, page.benefitsTitle, 'week')}
@@ -62,7 +62,7 @@ function renderLeadershipRoles(page) {
  * Доказательная часть: сравнение верхней и нижней трети таблицы
  * по трём показателям. Считается из тех же данных, что и рейтинг.
  */
-function renderProof(standings, weeks, results = [], page = {}) {
+function renderProof(standings, weeks, results = [], page = {}, loadError = '') {
   const active = standings.filter((r) => r.alliance.active);
   const third = Math.max(1, Math.floor(active.length / 3));
   const top = active.slice(0, third);
@@ -73,9 +73,24 @@ function renderProof(standings, weeks, results = [], page = {}) {
     выродилось бы в «0% против 0%» — это выглядит как поломка и, что хуже,
     подрывает сам аргумент. Пока цифр не набралось, честнее сказать прямо.
 
-    Порог — одна полная неделя: меньше этого сравнивать нечего.
+    Порог — одна полная неделя: меньше этого сравнивать нечего. Пустой список
+    альянсов проверяется отдельно: при нуле «top» и «bottom» полосы сравнения
+    напечатали бы те же нули, а страница между тем уверяла, что сравнение
+    вот-вот появится.
+
+    При аварии (loadError) вместо надежды на первые итоги рассказывается
+    про непрочитанные данные — итоги могут быть готовы, просто до экрана
+    не дошли.
   */
-  if (results.length < active.length) {
+  if (loadError || !active.length || results.length < active.length) {
+    if (loadError) {
+      return `
+        <section class="hero hero--guide">
+          <span class="eyebrow">Наглядно</span>
+          <h1 class="tl__title">${esc(page.proofTitle || 'Что даёт сильный альянс')}</h1>
+          ${unavailableNote()}
+        </section>`;
+    }
     return `
       <section class="hero hero--guide">
         <span class="eyebrow">Наглядно</span>

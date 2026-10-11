@@ -1,4 +1,4 @@
-import { esc, formDots, plural, standingsRowLabel } from '../ui/helpers.js';
+import { esc, formDots, plural, standingsRowLabel, unavailableNote } from '../ui/helpers.js';
 import { formatQuarterLeft } from '../ui/quarter-timer.js';
 
 /**
@@ -14,7 +14,7 @@ import { formatQuarterLeft } from '../ui/quarter-timer.js';
  * return: здесь та же договорённость, только в двух словах, чтобы не
  * раздваивать её на два файла.
  */
-export function renderQuarter({ standings, quarter } = {}) {
+export function renderQuarter({ standings, quarter, loadError = '' } = {}) {
   const list = Array.isArray(standings) ? standings : [];
   const period = quarter ?? { weeks: [] };
 
@@ -23,12 +23,14 @@ export function renderQuarter({ standings, quarter } = {}) {
       <section class="panel">
         <header class="panel__head">
           <span class="eyebrow">Кварт</span>
-          <h1 class="panel__title">Период ещё не начат</h1>
+          <h1 class="panel__title">${loadError ? 'Данные не дошли' : 'Период ещё не начат'}</h1>
         </header>
-        <p class="muted">
-          Кварт считается по последним четырём неделям. Он появится,
-          как только внесут первые итоги VS.
-        </p>
+        ${loadError
+          ? unavailableNote()
+          : `<p class="muted">
+              Кварт считается по последним четырём неделям. Он появится,
+              как только внесут первые итоги VS.
+            </p>`}
       </section>`;
   }
 

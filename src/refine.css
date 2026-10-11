@@ -187,7 +187,7 @@
 .panel__head h1.panel__title {
   font-size: clamp(16px, 2.2vw, 19px);
   letter-spacing: -.045em;
-  text-shadow: 0 0 22px rgba(255, 106, 43, .13);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 .eyebrow { font-size: 11px; letter-spacing: .14em; }
 .grid-2 { gap: var(--gap); }
@@ -540,7 +540,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-join__input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .chat-create { flex: none; padding: 0 10px 10px; }
@@ -785,7 +785,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   flex: none;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(255,201,60,.05);
+  background: color-mix(in srgb, var(--gold) 5%, transparent);
 }
 .chat-invite__code { display: flex; align-items: baseline; gap: 10px; }
 .chat-invite__code .num {
@@ -908,7 +908,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-msg__head .forum-nick { font-size: 12.5px; font-weight: 700; }
 .chat-msg__tag {
   padding: 0 5px;
-  border: 1px solid rgba(255,201,60,.26);
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
   border-radius: 999px;
   color: var(--gold);
   font-family: Unbounded, sans-serif;
@@ -937,7 +937,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: 4px 9px;
   border-left: 2px solid var(--accent);
   border-radius: 0 6px 6px 0;
-  background: rgba(255,106,43,.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
   color: var(--dim);
 }
 .chat-msg__body blockquote p { margin: 0; }
@@ -1053,7 +1053,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-compose__input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 /*
   Плейсхолдер для contenteditable — как в редакторе форума. Держится и на
@@ -1135,7 +1135,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-format .forum-md { margin: 0; }
 .chat-compose__btn[aria-pressed='true'] {
   color: var(--accent);
-  background: rgba(255,106,43,.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .chat-compose__btn--format { font-size: 13px; font-weight: 700; letter-spacing: -.5px; }
 .chat-compose__send {
@@ -1146,7 +1146,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   height: 42px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ff9a4a, var(--accent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
   color: #14100c;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1570,7 +1570,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-search__input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255,106,43,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ── Меню редких действий в карточке поста ───────────────────────────────────
@@ -1654,7 +1654,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   flex: none;
   padding: 7px 12px;
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(255,201,60,.04);
+  background: color-mix(in srgb, var(--gold) 4%, transparent);
   font-size: 12px;
 }
 .chat-pinned__badge { font-size: 14px; }
@@ -1998,26 +1998,15 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 
 /*
-  ШАПКА: стеклянная командная панель. Надпись «СЕЙЧАС // СЕРВЕР 33»
-  превращается в статусный бейдж «В СЕТИ» — капсула с зелёной точкой, без неона.
+  ШАПКА: стеклянная командная панель — тёплая линия низа и мягкая тень.
+  Статуса сети здесь нет намеренно: в момент отрисовки шапка ничего про связь
+  не знает, а рисовать «в сети» до ответа базы — значит врать человеку.
 */
 :root[data-theme="light"] .site-head {
   border-bottom-color: rgba(217,130,43,.35);
   box-shadow: 0 10px 30px -24px rgba(31,48,64,.25);
 }
 :root[data-theme="light"] .site-head:hover { box-shadow: 0 10px 26px -20px rgba(31,48,64,.3); }
-:root[data-theme="light"] .site-head__inner::before {
-  content: '● В СЕТИ';
-  top: 5px; right: 12px;
-  padding: 3px 9px;
-  border: 1px solid #b9dfcc;
-  border-radius: 999px;
-  background: #e1f2ea;
-  color: #267b5b;
-  font: 700 8px/1 Inter, sans-serif;
-  letter-spacing: .14em;
-}
-:root[data-theme="light"] #app::before { color: #267b5b; }
 
 /*
   ПЛИТКА «33» — янтарная сигнальная табличка с чернильной цифрой; активная
@@ -2093,7 +2082,6 @@ body:has(.chat-layout) .site-foot { display: none; }
   -webkit-background-clip: text; background-clip: text; color: transparent;
   text-shadow: none;
 }
-:root[data-theme="light"] .hero__top::after { color: var(--dim); }
 
 :root[data-theme="light"] .lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 10px 22px -18px rgba(31,48,64,.4); }
 :root[data-theme="light"] .tl__img:hover { box-shadow: 0 14px 28px -18px rgba(31,48,64,.35); }
@@ -2151,19 +2139,19 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .roles-panel,
 :root[data-theme="light"] .role-card,
 :root[data-theme="light"] .quart-page {
-  --text: #f4f6f9;
-  --dim:  #99a1ad;
+  --text: #f2f4f7;
+  --dim:  #b4bcc8;
   /* Тот же порог AA, что и в основной тёмной теме: #666e7b на тёмном острове
      был 3.61:1. Остров остаётся островом — меняется только подпись. */
   --mute:  #808a9a;
   --electric: #a7a3c2;
-  --accent: #ff6a2b;
-  --accent-dk: #d4501a;
-  --gold:  #ffc93c;
-  --win:   #35d07f;
-  --loss:  #ff4757;
-  --line: #23272f;
-  color: #f4f6f9;
+  --accent: #ff5a36;
+  --accent-dk: #d83a32;
+  --gold:  #e0b34a;
+  --win:   #46b87f;
+  --loss:  #f2555f;
+  --line: #222a36;
+  color: #f2f4f7;
 }
 :root[data-theme="light"] .bot-cta,
 :root[data-theme="light"] .bot-launch__mark {
@@ -2330,15 +2318,13 @@ body:has(.chat-layout) .site-foot { display: none; }
   box-shadow: 0 8px 26px -24px rgba(59,43,25,.55);
   backdrop-filter: blur(18px) saturate(.86);
 }
-:root[data-theme="light"] .site-head__inner::before {
-  content: 'Z ROUTE // 33';
-  color: var(--mute);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  letter-spacing: .18em;
-}
 :root[data-theme="light"] .site-head::after { background: linear-gradient(90deg, transparent, rgba(192,90,36,.7), transparent); }
+/* Бумажная шапка в прокрутке: плотнее фон, заметнее линия низа. */
+:root[data-theme="light"] .site-head.is-scrolled {
+  background: rgba(247,244,236,.97);
+  border-bottom-color: rgba(123,101,69,.4);
+  box-shadow: 0 12px 30px -26px rgba(59,43,25,.6);
+}
 :root[data-theme="light"] .brand__num {
   color: #fff7ea;
   background: linear-gradient(145deg, #c56430, #913c1e);
@@ -2627,6 +2613,39 @@ body:has(.chat-layout) #app { min-height: 0; }
   поэтому резерв считается с ним: 250 px, а не 210 px пустого описания.
 */
 .sk--tile .sk__card { --sk-h: 250px; }
+
+/*
+  Командный центр главной. Контур повторяет форму приезжающих данных, а не
+  угадывает её: цифры сняты с живой страницы замером — герой 558 px на
+  мониторе и 653 px на телефоне, панель источника 176 px в своей колонке,
+  плашка лидера 100, счёт недели 84, строка «Кто именно» 40.
+  Карточки под героем — те же 190 px, что и в .sk--card, поэтому весь контур
+  резервирует 1578 px против 1555 px живых цифр на мониторе и 1673 против
+  1675 на телефоне. Прежние семь карточек давали 1408 — нехватку страница
+  добирала рывком в 147 px ровно в момент прихода данных.
+
+  Панель — рамка внутри рамки, и это не украшение: на живом экране панель
+  источника стоит внутри героя своей коробкой. Без неё контур резервировал
+  бы высоту героя, но не его композицию, и левая колонка разъезжалась бы.
+*/
+.sk--ops .sk__card { --sk-h: 190px; }
+.sk--ops .sk__card--ops { --sk-h: 653px; }
+.sk__card--ops { display: grid; gap: 24px; align-items: start; align-content: center; }
+.sk__ops { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.sk__line--title { width: 58%; height: 46px; border-radius: 12px; }
+.sk__side {
+  min-height: 162px; padding: 13px 15px;
+  border: 1px solid var(--line); border-radius: var(--r);
+}
+.sk__bars { grid-column: 1 / -1; display: grid; gap: 24px; align-content: start; }
+.sk__bars .sk__line { height: 56px; border-radius: 12px; }
+.sk__bars .sk__line:nth-child(2) { height: 40px; }
+.sk__bars .sk__line:nth-child(3) { height: 20px; }
+@media (min-width: 900px) {
+  .sk--ops .sk__card--ops { --sk-h: 558px; }
+  .sk__card--ops { grid-template-columns: minmax(0, 1fr) minmax(250px, 330px); }
+  .sk__side { min-height: 176px; }
+}
 
 .sk__caption { margin: 0 0 10px; color: var(--dim); font-size: 13px; }
 
