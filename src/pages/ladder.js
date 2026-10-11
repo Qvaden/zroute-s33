@@ -170,7 +170,7 @@ function rowHtml(r, byId, variant = 'season', achievements) {
      data-active="${a.active ? 1 : 0}">
 
     <span class="lad__place">
-      <b class="num">${r.place}</b>${deltaBadge(r.delta)}
+      <b class="num">${String(r.place).padStart(2, '0')}</b>${deltaBadge(r.delta)}
     </span>
 
     <span class="lad__ident">

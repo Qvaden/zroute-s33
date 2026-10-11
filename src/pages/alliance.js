@@ -58,12 +58,12 @@ export function renderAlliance(view, allianceId) {
     </section>`;
 
   const stats = [
-    { label: 'Место', value: row.place, extra: deltaBadge(row.delta) },
+    { label: 'Место', value: `#${String(row.place).padStart(2, '0')}`, extra: deltaBadge(row.delta) },
     { label: 'Очки', value: `${row.points > 0 ? '+' : ''}${row.points}`, cls: row.points > 0 ? 'pos' : row.points < 0 ? 'neg' : '' },
     { label: 'Победы', value: row.wins, cls: 'pos' },
     { label: 'Поражения', value: row.losses, cls: 'neg' },
     { label: 'Доля побед', value: `${Math.round(row.winRate * 100)}%` },
-    { label: 'Лучшее место', value: bestPlace },
+    { label: 'Лучшее место', value: `#${String(bestPlace).padStart(2, '0')}` },
   ];
 
   return `

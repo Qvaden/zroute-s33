@@ -29,9 +29,36 @@
 
   --accent:    #ff5a36;
   --accent-dk: #d83a32;
-  --gold:      #e0b34a;
+  /* Чернила signal-оранжевым: подписи и ссылки в тексте. В тёмной теме это
+     тот же #ff5a36 (6,0:1 и выше), в светлой — отдельно подобранный тон. */
+  --accent-ink: #ff5a36;
+
+  /*
+    Призы рейтинга одним рядом: место №1, №2 и №3 красятся отсюда, а не
+    случайными hex по всему файлу. Золото матовое, а не лакированное: цифра
+    важнее блеска, и лакированное золото спорило бы с именем альянса.
+  */
+  --gold:      #d9a94a;
+  --silver:    #b3bcc9;
+  --bronze:    #c08a5f;
   --win:       #46b87f;
   --loss:      #f2555f;
+
+  /*
+    Одна и та же краска не может быть плашкой и подписью. Бейдж исхода сидит
+    на своей же подкраске (15 % цвета), и там --win как текст даёт 3,56:1,
+    а --loss 3,19:1 — ниже AA. Чернила отдельно: тот же тон, чуть притенённый
+    текстом темы. Замер по всем 28 оттенкам альянсов: 85 % цвета держат 5,4:1.
+  */
+  --win-ink:  color-mix(in oklab, var(--win) 85%, var(--text));
+  --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
+  /*
+    Цвет альянса приходит из данных, ручного подбора нет вовсе, поэтому
+    чернилом его делает доля текста темы: 30 % в тёмной теме дают 5,24:1 на
+    худшем оттенке (#8f49d4) на его же подкрашенной плашке. Плашка, грань и
+    квадратик цвета остаются нетронутыми — принадлежность читается ими.
+  */
+  --tag-ink-keep: 70%;
 
   /*
     Геометрия жёсткая: 6 / 10 / 14. Прежние 8 / 14 / 20 делали из каждой панели
@@ -99,16 +126,38 @@
   --line:      #d4ccbd;
   --line-soft: #dfd8ca;
 
---text:      #2b2822;
+  --text:      #2b2822;
   --dim:       #625d53;
-  /* Тот же порог AA, что и в тёмной теме: #756e61 на --raised был 3.84:1. */
-  --mute:      #696357;
+  /* Тот же порог AA, что и в тёмной теме, но с запасом на подкрашенных
+     панелях: #696357 на тёплой плашке главной давал 4,47:1 — на сотую ниже
+     порога, и поймал это не ревью, а замер пикселом. */
+  --mute:      #645e52;
 
   --accent:    #c05a24;
   --accent-dk: #943e19;
-  --gold:      #9a6a24;
+  /* Чернила отдельным токеном: #c05a24 как фон кнопки с чёрным текстом даёт
+     6,5:1, а как текст на белом стекле — только 3,6:1. Одна и та же краска
+     не может быть и плашкой, и подписью, поэтому подпись несёт тёмный тон. */
+  --accent-ink: #943e19;
+  /* Золото — и плашка приза, и подпись «Лидер сезона», и номер места у №1.
+     Как текст оно обязано дотягивать до 4,5 на худшей светлой поверхности,
+     а ею оказался не `--raised-2` (#e5e0d5 → 4,63:1), а тёплая плашка
+     главной на 320 px: #835a1a дал на ней 4,44:1. Сдвиг на #805719 —
+     ровно те же 4 сотых, которые глаз не видит, но порог не пропускает. */
+  --gold:      #805719;
+  /* Те же три приза в светлой теме: тёмная половина палитры, иначе серебро
+     и бронза на белом стекле карточки исчезают (проверено: 5,0:1 и 5,3:1). */
+  --silver:    #5f6a7a;
+  --bronze:    #8a5a34;
   --win:       #28745a;
   --loss:      #b84b45;
+  /* Те же чернила в светлой теме: цвета альянсов там ярче самой темы, и
+     65 % цвета — минимум, при котором худший оттенок бейджа доходит до 5,06:1. */
+  --win-ink:  color-mix(in oklab, var(--win) 65%, var(--text));
+  --loss-ink: color-mix(in oklab, var(--loss) 65%, var(--text));
+  /* Светлой теме нужно 70 % текста: неоновый #00ff77 из снимка без этого
+     остаётся 1,9:1, а с этим — 5,18:1. */
+  --tag-ink-keep: 30%;
 
   --shadow: 0 1px 0 rgba(255,255,255,.72) inset, 0 12px 32px -24px rgba(69,51,30,.32);
 
@@ -116,7 +165,7 @@
   --link:      #79502b;
   --soft-ok:   #28745a;
   --soft-bad:  #b84b45;
-  --soft-warn: #9a6a24;
+  --soft-warn: #835a1a;
 
   /* Сетка на светлом фоне — тёмная, иначе исчезает. */
   --hud-grid: rgba(44,58,74,.07);
@@ -147,13 +196,18 @@
 [data-theme="light"] .theme-toggle .icon-sun { display: grid; }
 [data-theme="light"] .theme-toggle .icon-moon { display: none; }
 
-/* ── Онлайн индикатор ─────────────────────────────────────────────────── */
+/* ── Индикатор «был в сети» ────────────────────────────────────────────── */
+
+/*
+  Значок ставится по настоящему времени lastSeenAt, а не по выдуманному
+  «онлайн всегда». Свечения убрано: точка читается как знак состояния, и
+  перестает спорить с текстом ника.
+*/
 .online-dot {
   display: inline-block;
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--win);
-  box-shadow: 0 0 6px var(--win);
   flex-shrink: 0;
   vertical-align: middle;
   margin-left: 4px;
@@ -188,7 +242,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   color: var(--dim);
-  font-size: 9px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -207,7 +261,7 @@
 .quart-timer .num {
   font-size: 17px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* ── Статья недели ─────────────────────────────────────────────────────── */
@@ -320,7 +374,7 @@ h1,h2,h3,h4 {
 }
 .brand__text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand__text b { font-family: Unbounded, sans-serif; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
-.brand__text small { color: var(--mute); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+.brand__text small { color: var(--mute); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
 
 .nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; padding-bottom: 6px; }
 .nav::-webkit-scrollbar { display: none; }
@@ -364,7 +418,7 @@ h1,h2,h3,h4 {
 
 .eyebrow {
   font-family: Inter, sans-serif;
-  font-size: 10.5px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   letter-spacing: .16em; text-transform: uppercase;
   color: var(--accent);
 }
@@ -438,7 +492,7 @@ h1,h2,h3,h4 {
 }
 .leader__crown { font-size: 21px; filter: saturate(1.2); }
 .leader__body { flex: 1; min-width: 150px; }
-.leader__label { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+.leader__label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
 .leader__name { font-family: Unbounded, sans-serif; font-size: clamp(19px, 4.6vw, 27px); font-weight: 700; margin-top: 2px; }
 .leader__meta { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
 .leader__pts {
@@ -483,7 +537,7 @@ h1,h2,h3,h4 {
   transition: transform .16s var(--ease), background .16s var(--ease);
 }
 .tile:hover { transform: translateY(-2px); background: color-mix(in srgb, var(--text) 7%, transparent); }
-.tile b { font-family: Unbounded, sans-serif; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--tag-color); }
+.tile b { font-family: Unbounded, sans-serif; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text)); }
 
 /* ── Счёт недели ────────────────────────────────────────────────────────── */
 /*
@@ -510,7 +564,7 @@ h1,h2,h3,h4 {
   font-weight: 800; line-height: 1;
 }
 .weekscore__cell span {
-  font-family: Inter, sans-serif; font-size: 10.5px; font-weight: 700;
+  font-family: Inter, sans-serif; font-size: 11px; font-weight: 700;
   letter-spacing: .13em; text-transform: uppercase; color: var(--dim);
 }
 .winscore { border-left-color: var(--win); }
@@ -569,7 +623,7 @@ h1,h2,h3,h4 {
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .live__label {
-  font-family: Inter, sans-serif; font-size: 10.5px; font-weight: 700;
+  font-family: Inter, sans-serif; font-size: 11px; font-weight: 700;
   letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
 }
 .live__label b { color: var(--text); font-size: 12.5px; letter-spacing: .06em; }
@@ -596,7 +650,7 @@ h1,h2,h3,h4 {
 /* ── Взлёты и падения ───────────────────────────────────────────────────── */
 .movers { display: grid; gap: 18px; }
 @media (min-width: 520px) { .movers { grid-template-columns: 1fr 1fr; } }
-.movers__title { font-family: Inter, sans-serif; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 9px; }
+.movers__title { font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 9px; }
 .movers__title--up { color: var(--win); }
 .movers__title--down { color: var(--loss); }
 .movers__list { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
@@ -606,17 +660,18 @@ h1,h2,h3,h4 {
 /* ── Подиум ─────────────────────────────────────────────────────────────── */
 .podium { list-style: none; margin: 0; padding: 0; }
 .podium__item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0; border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) 0; border-bottom: 1px solid var(--line-soft);
 }
 .podium__item:last-child { border-bottom: 0; }
 .podium__place {
-  font-family: Unbounded, sans-serif; font-size: 19px; font-weight: 800;
-  width: 26px; color: var(--mute);
+  font-family: Unbounded, sans-serif; font-size: var(--fs-card); font-weight: 800;
+  width: 2ch; color: var(--mute);
+  font-variant-numeric: tabular-nums;
 }
 .podium__item--1 .podium__place { color: var(--gold); }
-.podium__item--2 .podium__place { color: #c8cdd6; }
-.podium__item--3 .podium__place { color: #c98a52; }
+.podium__item--2 .podium__place { color: var(--silver); }
+.podium__item--3 .podium__place { color: var(--bronze); }
 .podium__name { flex: 1; font-weight: 500; }
 .podium__points { font-family: Unbounded, sans-serif; font-size: 18px; font-weight: 700; color: var(--win); }
 
@@ -626,7 +681,7 @@ h1,h2,h3,h4 {
 .ch__grid { stroke: var(--line); stroke-width: 1; }
 .ch__grid--zero { stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-dasharray: 3 3; }
 .ch__ytick, .ch__xtick {
-  fill: var(--mute); font-family: Inter, sans-serif; font-size: 10px; font-variant-numeric: tabular-nums;
+  fill: var(--mute); font-family: Inter, sans-serif; font-size: 11px; font-variant-numeric: tabular-nums;
 }
 .ch__ytick { text-anchor: end; }
 .ch__xtick { text-anchor: middle; }
@@ -685,62 +740,81 @@ h1,h2,h3,h4 {
 .seg__btn:hover { color: var(--text); }
 .seg__btn.is-on { color: #14100c; background: var(--accent); font-weight: 600; }
 
-/* ── Рейтинг: строки ────────────────────────────────────────────────────── */
+/* ── Рейтинг: премиальный лидерборд ───────────────────────────────────────
+   Место — крупная табличная цифра, а не мелкий значок слева: глаз идёт по
+   колонке рангов и сразу видит порядок. Медаль красит именно цифру, а не
+   полосу-бордюр: полоса спорит с цветом альянса, который и так стоит в
+   плашке-теге. Hover спокойный — подсветка строки без свечения и без сдвига:
+   список читают столбцом, и дёрганье под курсором мешает сравнивать строки.
+*/
 .lad__head {
   display: none;
-  font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+  font-size: var(--fs-eyebrow); font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
   color: var(--mute);
-  padding: 0 8px 10px; border-bottom: 1px solid var(--line);
+  padding: 0 var(--s-2) var(--s-2); border-bottom: 1px solid var(--line);
 }
+.lad__head > :first-child { text-align: right; }
 .ta-r { text-align: right; }
 
 .lad__row {
   display: grid;
-  grid-template-columns: 54px auto 1fr auto;
+  grid-template-columns: 56px auto 1fr auto;
   grid-template-areas:
     "place ident ident pts"
     "place form  wl    pts";
-  gap: 3px 10px;
+  gap: var(--s-1) var(--s-2);
   align-items: center;
-  padding: 11px 8px;
+  padding: var(--s-2);
   border-bottom: 1px solid var(--line-soft);
-  border-left: 2px solid transparent;
-  transition: background .14s var(--ease), border-color .14s var(--ease);
+  transition: background var(--t-fast) var(--ease);
 }
-.lad__row:hover { background: color-mix(in srgb, var(--text) 3.2%, transparent); border-left-color: var(--tag-color); }
-.lad__row--off { opacity: .42; }
-.lad__row--m1 { border-left-color: var(--gold); }
-.lad__row--m2 { border-left-color: #c8cdd6; }
-.lad__row--m3 { border-left-color: #c98a52; }
-
-.lad__place { grid-area: place; display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
-.lad__place b { font-family: Unbounded, sans-serif; font-size: 15px; font-weight: 700; color: var(--dim); }
+.lad__row:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+/*
+  Распавшийся альянс не гасят полупрозрачностью: opacity .42 уводил и ник, и
+  очки ниже порога AA — строку было видно, но нельзя прочитать. Теперь строка
+  читается целиком, а «не в деле» говорят порядок и подпись.
+*/
+.lad__row--off .lad__place b,
+.lad__row--off .lad__name,
+.lad__row--off .lad__pts { color: var(--mute); }
+.lad__row--off .lad__pts.pos,
+.lad__row--off .lad__pts.neg { color: var(--mute); }
 .lad__row--m1 .lad__place b { color: var(--gold); }
-.lad__row--m2 .lad__place b { color: #c8cdd6; }
-.lad__row--m3 .lad__place b { color: #c98a52; }
+.lad__row--m2 .lad__place b { color: var(--silver); }
+.lad__row--m3 .lad__place b { color: var(--bronze); }
+
+.lad__place { grid-area: place; display: flex; align-items: baseline; justify-content: flex-end; gap: var(--s-1); white-space: nowrap; }
+.lad__place b {
+  font-family: Unbounded, sans-serif; font-size: var(--fs-card); font-weight: 700;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lad__place .delta { margin-left: 0; }
 
 .lad__ident { grid-area: ident; display: flex; align-items: center; gap: 0; flex-wrap: wrap; min-width: 0; }
 .lad__name { font-weight: 500; }
-.lad__off { font-size: 11px; color: var(--mute); font-style: normal; margin-left: 7px; }
+.lad__off { font-size: var(--fs-eyebrow); color: var(--mute); font-style: normal; margin-left: 7px; }
 
 .lad__form { grid-area: form; }
-.lad__wl { grid-area: wl; font-family: Unbounded, sans-serif; font-size: 12.5px; font-weight: 600; }
+.lad__wl { grid-area: wl; font-family: Unbounded, sans-serif; font-size: var(--fs-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
 .lad__wl b { font-weight: 700; }
-.lad__wl i { color: var(--mute); font-style: normal; margin: 0 3px; opacity: .6; }
+.lad__wl i { color: var(--mute); font-style: normal; margin: 0 3px; }
 .c-win { color: var(--win); }
 .c-loss { color: var(--loss); }
 
 .lad__pts {
-  grid-area: pts; text-align: right;
-  font-family: Unbounded, sans-serif; font-size: 19px; font-weight: 800;
+  grid-area: pts; text-align: right; align-self: center;
+  font-family: Unbounded, sans-serif; font-size: var(--fs-card); font-weight: 700;
   color: var(--dim);
+  font-variant-numeric: tabular-nums;
 }
 .lad__pts.pos { color: var(--win); }
 .lad__pts.neg { color: var(--loss); }
 
 .lad__spark { grid-area: spark; display: none; }
 
-.lad__empty { text-align: center; color: var(--mute); padding: 28px 0; font-size: 14px; }
+.lad__empty { text-align: center; color: var(--mute); padding: var(--s-4) 0; font-size: var(--fs-body); }
 .lad__period {
   margin: 8px 0 0;
   color: var(--accent);
@@ -751,7 +825,7 @@ h1,h2,h3,h4 {
 
 .panel--quarter .lad__head { display: none; }
 .panel--quarter .lad__row {
-  grid-template-columns: 54px 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   grid-template-areas:
     "place ident pts"
     "place form pts";
@@ -773,22 +847,28 @@ h1,h2,h3,h4 {
     grid-template-areas:
       "place ident pts"
       "place form pts";
-    gap: 5px 10px;
+    gap: var(--s-1) var(--s-2);
   }
   .panel--quarter .lad__pts { align-self: center; }
 }
 
-.lad__count { margin: 14px 0 0; }
+.lad__count { margin: var(--s-2) 0 0; }
 
 /* Строка рейтинга — ссылка на карточку альянса. */
 a.lad__row { color: inherit; text-decoration: none; cursor: pointer; }
-a.lad__row:hover .lad__name { color: var(--tag-color); }
+a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--text)) var(--tag-ink-keep), var(--text)); }
 
-/* ── Карточка альянса ───────────────────────────────────────────────────── */
+/* ── Карточка альянса: экран одного объекта ───────────────────────────────
+   Плашка-тег работает эмблемой: она единственная крашенная в цвет альянса,
+   поэтому глаз находит её мгновенно. Имя — H1 страницы и берётся из шкалы
+   заголовков, а не из придуманного clamp. Цифры собраны в одну сетку с
+   волосяными разделителями: командный центр показывает данные таблицей, а
+   не россыпью карточек.
+*/
 .back {
-  display: inline-block; margin-bottom: 14px;
-  font-size: 13px; font-weight: 500; color: var(--dim); text-decoration: none;
-  transition: color .15s var(--ease);
+  display: inline-block; margin-bottom: var(--s-2);
+  font-size: var(--fs-body); font-weight: 500; color: var(--dim); text-decoration: none;
+  transition: color var(--t-fast) var(--ease);
 }
 .back:hover { color: var(--accent); }
 
@@ -797,32 +877,32 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background:
-    radial-gradient(620px 260px at 12% -40%, color-mix(in srgb, var(--tag-color) 22%, transparent), transparent 62%),
+    radial-gradient(620px 260px at 12% -40%, color-mix(in srgb, var(--tag-color) 18%, transparent), transparent 62%),
     linear-gradient(165deg, var(--raised-2), var(--surface) 64%);
-  padding: 22px 18px;
-  margin-bottom: 18px;
+  padding: var(--s-4) var(--s-3);
+  margin-bottom: var(--s-4);
   box-shadow: var(--shadow);
   animation: rise .5s var(--ease) both;
 }
-@media (min-width: 760px) { .ally { padding: 28px 30px; } }
+@media (min-width: 760px) { .ally { padding: var(--s-5); } }
 
-.ally__head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.ally__head { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 .ally__tag {
   flex: none;
   font-family: Unbounded, sans-serif; font-weight: 800;
-  font-size: clamp(16px, 3.6vw, 22px); letter-spacing: .02em;
-  padding: 10px 14px; border-radius: 12px;
-  color: var(--tag-color);
+  font-size: var(--fs-card); letter-spacing: .02em;
+  padding: var(--s-1) var(--s-2); border-radius: var(--r);
+  color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text));
   background: color-mix(in srgb, var(--tag-color) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--tag-color) 40%, transparent);
 }
-.ally__name { font-size: clamp(25px, 6.4vw, 42px); letter-spacing: -.03em; }
-.ally__sub { margin: 5px 0 0; font-size: 13px; color: var(--dim); }
+.ally__name { font-size: var(--fs-h1); letter-spacing: -.03em; }
+.ally__sub { margin: var(--s-1) 0 0; font-size: var(--fs-meta); color: var(--dim); }
 
 .ally__stats {
   display: grid; gap: 1px;
   grid-template-columns: repeat(2, 1fr);
-  margin-top: 22px;
+  margin-top: var(--s-4);
   background: var(--line);
   border: 1px solid var(--line);
   border-radius: var(--r);
@@ -831,21 +911,23 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 @media (min-width: 620px) { .ally__stats { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 900px) { .ally__stats { grid-template-columns: repeat(6, 1fr); } }
 
-.stat { background: var(--surface); padding: 13px 14px; display: flex; flex-direction: column; gap: 3px; }
-.stat__label { font-size: 11px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--mute); }
+.stat { background: var(--surface); padding: var(--s-2) var(--s-2); display: flex; flex-direction: column; gap: 2px; }
+.stat__label { font-size: var(--fs-eyebrow); font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--mute); }
 .stat__value {
-  font-family: Unbounded, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1;
+  font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-h2); line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  display: flex; align-items: baseline; gap: 6px;
+  display: flex; align-items: baseline; gap: var(--s-1);
 }
 .stat__value.pos { color: var(--win); }
 .stat__value.neg { color: var(--loss); }
 
 .ch--big svg { min-height: 200px; }
-.ch__legend { margin: 8px 0 0; font-size: 12px; color: var(--mute); display: flex; align-items: center; gap: 7px; }
+.ch__legend { margin: var(--s-1) 0 0; font-size: var(--fs-meta); color: var(--mute); display: flex; align-items: center; gap: var(--s-1); }
 .ch__dash { display: inline-block; width: 20px; height: 0; border-top: 1.5px dashed var(--mute); }
 
-/* Хроника всех VS */
+/* Хроника всех VS: исход читается словами, а не только цветом полосы.
+   Неделя без записи не гаснет на 45% — такие строки как раз и нужно
+   прочесть, чтобы увидеть пробел в сезоне. */
 .vs { list-style: none; margin: 0; padding: 0; }
 .vs__row {
   display: grid;
@@ -853,30 +935,31 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   grid-template-areas:
     "week dates  total"
     "week badge  total";
-  gap: 2px 12px;
+  gap: 2px var(--s-2);
   align-items: center;
-  padding: 10px 10px;
+  padding: var(--s-1) var(--s-1);
   border-bottom: 1px solid var(--line-soft);
   border-left: 2px solid transparent;
 }
 .vs__row:last-child { border-bottom: 0; }
 .vs__row--win  { border-left-color: color-mix(in srgb, var(--win) 60%, transparent); }
 .vs__row--loss { border-left-color: color-mix(in srgb, var(--loss) 60%, transparent); }
-.vs__row--none { opacity: .45; }
+.vs__row--none { border-left-color: var(--line); }
 
-.vs__week { grid-area: week; font-family: Unbounded, sans-serif; font-weight: 700; font-size: 13px; color: var(--dim); }
-.vs__dates { grid-area: dates; font-size: 12.5px; color: var(--mute); }
+.vs__week { grid-area: week; font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-meta); color: var(--dim); }
+.vs__dates { grid-area: dates; font-size: var(--fs-meta); color: var(--mute); }
 .vs__badge {
   grid-area: badge; justify-self: start;
-  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  font-size: var(--fs-eyebrow); font-weight: 600; padding: 2px var(--s-1); border-radius: 999px;
 }
-.vs__badge--win  { color: var(--win);  background: color-mix(in srgb, var(--win) 15%, transparent); }
-.vs__badge--loss { color: var(--loss); background: color-mix(in srgb, var(--loss) 15%, transparent); }
-.vs__badge--none { color: var(--mute); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.vs__badge--win  { color: var(--win-ink);  background: color-mix(in srgb, var(--win) 15%, transparent); }
+.vs__badge--loss { color: var(--loss-ink); background: color-mix(in srgb, var(--loss) 15%, transparent); }
+.vs__badge--none { color: var(--mute); background: color-mix(in srgb, var(--text) 6%, transparent); }
 .vs__sign { display: none; }
 .vs__total {
   grid-area: total; text-align: right;
-  font-family: Unbounded, sans-serif; font-weight: 700; font-size: 16px; color: var(--dim);
+  font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-card); color: var(--dim);
+  font-variant-numeric: tabular-nums;
 }
 
 @media (min-width: 620px) {
@@ -884,7 +967,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
     grid-template-columns: 56px 150px 1fr 44px 70px;
     grid-template-areas: "week dates badge sign total";
   }
-  .vs__sign { grid-area: sign; display: block; text-align: right; font-size: 12.5px; color: var(--mute); font-variant-numeric: tabular-nums; }
+  .vs__sign { grid-area: sign; display: block; text-align: right; font-size: var(--fs-meta); color: var(--mute); font-variant-numeric: tabular-nums; }
 }
 
 @media (min-width: 880px) {
@@ -894,10 +977,10 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
        превращается в пользу, потому что линия становится читаемее. */
     grid-template-columns: 74px minmax(180px, 22rem) 92px 84px 74px minmax(130px, 1fr);
     grid-template-areas: "place ident form wl pts spark";
-    gap: 10px;
+    gap: var(--s-2);
   }
   .lad__head { display: grid; }
-  .lad__row { padding: 10px 8px; }
+  .lad__row { padding: var(--s-1) var(--s-2); }
   .lad__spark { display: block; }
   .lad__wl { text-align: left; }
   .lad__spark svg { width: 100%; height: 28px; }
@@ -905,19 +988,21 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 
 .tag {
   display: inline-block;
-  font-family: Unbounded, sans-serif; font-size: 11.5px; font-weight: 800; letter-spacing: .03em;
-  padding: 3px 7px; border-radius: 5px;
-  color: var(--tag-color, var(--dim));
+  font-family: Unbounded, sans-serif; font-size: var(--fs-meta); font-weight: 800; letter-spacing: .03em;
+  padding: 2px var(--s-1); border-radius: var(--r-sm);
+  color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text));
   background: color-mix(in srgb, var(--tag-color, #888) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--tag-color, #888) 26%, transparent);
-  margin-right: 8px;
+  margin-right: var(--s-1);
 }
 .name { font-weight: 500; }
 
-.delta { font-size: 10px; margin-left: 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.delta { font-size: var(--fs-eyebrow); margin-left: 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .delta--up { color: var(--win); }
 .delta--down { color: var(--loss); }
-.delta--flat { color: var(--mute); opacity: .45; }
+/* «Без изменений» не гасим полупрозрачностью: тире и так тонкий, а .45
+   уводило его под порог читаемости. couleur — тот же --mute, что и у подписей. */
+.delta--flat { color: var(--mute); }
 
 .form { display: inline-flex; gap: 3px; }
 .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
@@ -925,7 +1010,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .dot--loss { background: var(--loss); }
 .dot--pending { background: var(--line); border: 1px dashed var(--mute); }
 
-.streak { font-size: 10.5px; margin-left: 7px; white-space: nowrap; font-weight: 600; }
+.streak { font-size: var(--fs-eyebrow); margin-left: 7px; white-space: nowrap; font-weight: 600; }
 .streak--win { color: var(--accent); }
 .streak--loss { color: var(--mute); }
 .spark { display: block; }
@@ -967,8 +1052,8 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   font-size: clamp(24px, 5.4vw, 32px); line-height: 1;
   color: var(--gold);
 }
-.trophy__date { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
-.trophy__days { font-size: 10px; color: var(--mute); }
+.trophy__date { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
+.trophy__days { font-size: 11px; color: var(--mute); }
 
 /* ── Итог недели ────────────────────────────────────────────────────────────
    Первое, за чем заходят на вкладку после VS, — поэтому крупно и с цветом
@@ -991,7 +1076,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .verdict__week { text-align: center; flex: none; }
 .verdict__week span {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--mute);
@@ -1015,7 +1100,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .cal { margin-top: 18px; }
 .cal__label {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--mute);
@@ -1098,7 +1183,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .tl__item { display: flex; gap: 15px; padding-bottom: 24px; position: relative; }
 .tl__body { flex: 1; padding-top: 3px; }
 .tl__meta { display: flex; gap: 11px; align-items: baseline; flex-wrap: wrap; margin-bottom: 3px; }
-.tl__type { font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.tl__type { font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 .tl__meta time { font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; }
 .tl__body h3 { font-size: 16px; margin-bottom: 4px; }
 .tl__body p { margin: 0; color: var(--dim); font-size: 14px; }
@@ -1116,7 +1201,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   color: var(--dim); margin-bottom: 11px;
   display: flex; flex-direction: column; gap: 3px;
 }
-.proof__hint { font-size: 10.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--mute); }
+.proof__hint { font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--mute); }
 
 .proof__rows { display: grid; gap: 7px; }
 .proof__row { display: grid; grid-template-columns: 92px 1fr auto; gap: 9px; align-items: center; }
@@ -1187,13 +1272,26 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .prose ul { margin: 0 0 15px; padding-left: 20px; color: var(--dim); }
 .prose li { margin-bottom: 6px; }
 
-/* ── Подвал ─────────────────────────────────────────────────────────────── */
+/* ── Подвал: строка состояния командного центра ───────────────────────────*/
+
+/*
+  Три факта в один ряд: что это за сайт, откуда в нём числа и как часто их
+  правят. Ссылок здесь нет нарочно — навигация уже есть в шапке и в боковом
+  меню, а повтор внизу удваивал бы обход для программы экрана.
+*/
 .site-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-3);
   border-top: 1px solid var(--line);
-  padding-top: 20px; padding-bottom: 34px;
-  color: var(--mute); font-size: 12.5px;
+  padding-top: var(--s-3);
+  padding-bottom: var(--s-4);
+  color: var(--mute);
+  font-size: var(--fs-meta);
 }
 .site-foot p { margin: 0; }
+.site-foot b { color: var(--dim); font-weight: 600; }
 
 /* ── Появление ──────────────────────────────────────────────────────────── */
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
@@ -1274,7 +1372,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   align-items: center;
   gap: 7px;
   color: var(--quart-acid);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: .18em;
   text-transform: uppercase;
@@ -1284,7 +1382,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   height: 7px;
   border-radius: 50%;
   background: var(--quart-acid);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--violet) 11%, transparent), 0 0 14px var(--quart-acid);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--violet) 11%, transparent);
 }
 .quart-hero h1, .quart-hero h2 {
   margin-top: 13px;
@@ -1308,14 +1406,13 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
   text-align: right;
 }
 .quart-dial span,
-.quart-dial small { color: #9bac91; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }
+.quart-dial small { color: #9bac91; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
 .quart-dial b {
   color: var(--quart-acid);
   font-family: Unbounded, sans-serif;
   font-size: clamp(42px, 9vw, 72px);
   line-height: .95;
   letter-spacing: -.09em;
-  text-shadow: 0 0 28px color-mix(in srgb, var(--violet) 24%, transparent);
 }
 .quart-dial small { margin-top: 8px; color: var(--quart-cyan); letter-spacing: .06em; }
 .quart-hero__bottom {
@@ -1334,7 +1431,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-hero__countdown b { color: var(--quart-acid); font-size: 16px; }
 .quart-hero__legend { display: flex; gap: 5px; }
 .quart-led { width: 24px; height: 5px; border-radius: 99px; background: #394735; }
-.quart-led--on { background: var(--quart-acid); box-shadow: 0 0 9px color-mix(in srgb, var(--violet) 55%, transparent); }
+.quart-led--on { background: var(--quart-acid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--quart-acid) 22%, transparent); }
 
 .quart-board {
   position: relative;
@@ -1364,7 +1461,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 }
 .quart-board__head h2 { margin-top: 7px; color: #edf5e9; font-size: clamp(16px, 2.4vw, 22px); }
 .quart-board__head p { margin: 0; color: #768878; font-size: 12px; }
-.quart-section-label { color: var(--quart-cyan); font-size: 9px; }
+.quart-section-label { color: var(--quart-cyan); font-size: 11px; }
 .quart-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 13px; }
 .quart-controls .search { flex: 1 1 220px; }
 .quart-controls .search input,
@@ -1436,11 +1533,11 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-podium-card__place { grid-area: place; color: #6f8b6a; font-family: Unbounded, sans-serif; font-size: 12px; text-align: center; }
 .quart-podium-card--gold .quart-podium-card__place { color: var(--quart-acid); }
 .quart-podium-card__medal { grid-area: medal; color: #6e8866; font-size: 19px; }
-.quart-podium-card--gold .quart-podium-card__medal { color: var(--quart-acid); text-shadow: 0 0 13px color-mix(in srgb, var(--violet) 60%, transparent); }
+.quart-podium-card--gold .quart-podium-card__medal { color: var(--quart-acid); }
 .quart-podium-card--silver .quart-podium-card__medal { color: var(--quart-cyan); }
-.quart-podium-card__tag { grid-area: tag; color: var(--tag-color); font-family: Unbounded, sans-serif; font-size: 10.5px; font-weight: 800; }
+.quart-podium-card__tag { grid-area: tag; color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text)); font-family: Unbounded, sans-serif; font-size: 11px; font-weight: 800; }
 .quart-podium-card > b { grid-area: name; overflow: hidden; color: #f0f7eb; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.quart-podium-card__meta { grid-area: meta; color: #799078; font-size: 10px; }
+.quart-podium-card__meta { grid-area: meta; color: #799078; font-size: 11px; }
 .quart-podium-card > strong { grid-area: score; color: var(--quart-acid); font-family: Unbounded, sans-serif; font-size: 23px; }
 .quart-board { margin-top: 0; }
 .quart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -1463,15 +1560,15 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .quart-card--m2 { border-color: color-mix(in srgb, var(--electric) 45%, transparent); }
 .quart-card--m3 { border-color: rgba(139,168,148,.46); }
 .quart-card__top, .quart-card__bottom { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.quart-card__rank { color: #66816a; font-family: Unbounded, sans-serif; font-size: 10px; }
+.quart-card__rank { color: #66816a; font-family: Unbounded, sans-serif; font-size: 11px; }
 .quart-card--m1 .quart-card__rank { color: var(--quart-acid); }
-.quart-card__tag { overflow: hidden; color: var(--tag-color); font-family: Unbounded, sans-serif; font-size: 10.5px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.quart-card__tag { overflow: hidden; color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text)); font-family: Unbounded, sans-serif; font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .quart-card__name { overflow: hidden; margin-top: 10px; color: #eaf4e6; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .quart-card__form .form { gap: 4px; }
 .quart-card__form .dot { width: 11px; height: 11px; border-radius: 3px; }
 .quart-card__bottom strong { color: var(--quart-acid); font-family: Unbounded, sans-serif; font-size: 18px; }
 .quart-card:not(.quart-card--m1):not(.quart-card--m2):not(.quart-card--m3) .quart-card__bottom strong { color: #d9e8d7; }
-.quart-card__bottom strong small { color: #6d856e; font-family: Inter, sans-serif; font-size: 7px; letter-spacing: .1em; }
+.quart-card__bottom strong small { color: #6d856e; font-family: Inter, sans-serif; font-size: 11px; letter-spacing: .1em; }
 @media (min-width: 620px) {
   .quart-podium__grid { grid-template-columns: repeat(3, 1fr); align-items: stretch; }
   .quart-podium-card { min-height: 138px; grid-template-columns: 1fr auto; grid-template-areas: "medal place" "tag tag" "name name" "meta score"; padding: 15px; }
@@ -1511,7 +1608,7 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 .achievement--perfect { --achievement-color: var(--accent); }
 .achievement-empty { margin: 0; padding: 14px; color: var(--dim); border: 1px dashed var(--line); border-radius: var(--r-sm); }
 
-.achievement-count { display: inline-flex; align-items: center; gap: 2px; margin-left: 7px; color: var(--accent); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.achievement-count { display: inline-flex; align-items: center; gap: 2px; margin-left: 7px; color: var(--accent); font-size: 11px; font-weight: 700; white-space: nowrap; }
 
 .achievement--crown { --achievement-color: #f3c969; }
 .achievement--veteran { --achievement-color: #c8d0dc; }
@@ -1533,20 +1630,17 @@ a.lad__row:hover .lad__name { color: var(--tag-color); }
 }
 
 @keyframes s33-aurora { 0%, 100% { transform: translate3d(-2%, -1%, 0) scale(1); opacity: .72; } 50% { transform: translate3d(2%, 2%, 0) scale(1.05); opacity: 1; } }
-@keyframes s33-grain { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-1%, 1%); } 50% { transform: translate(1%, -1%); } 75% { transform: translate(1%, 1%); } }
 @keyframes s33-screen-in { from { opacity: 0; transform: translateY(12px) scale(.99); } to { opacity: 1; transform: none; } }
 @keyframes s33-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
-@keyframes s33-glow { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 28px -14px color-mix(in srgb, var(--accent) 80%, transparent); } }
-@keyframes s33-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
-@keyframes s33-float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-5px) rotate(.4deg); } }
+/* Пульс точка несёт смысл только там, где человек ждёт данные (см. forum.css). */
 @keyframes s33-pulse-dot { 0%, 100% { transform: scale(1); opacity: .8; } 50% { transform: scale(1.28); opacity: 1; } }
 
+/* Живой фон дышит медленно и один раз за экран: это атмосфера, а не мигание. */
 body::before { transform-origin: 50% 0; animation: s33-aurora 14s var(--ease) infinite; }
-body::after { animation: s33-grain 9s steps(2, end) infinite; }
 #app { animation: s33-screen-in .52s var(--ease-out) both; }
 .site-head { transition: background var(--t-med) var(--ease-out), border-color var(--t-med) var(--ease-out), box-shadow var(--t-med) var(--ease-out); }
 .site-head:hover { box-shadow: 0 12px 34px -24px color-mix(in srgb, var(--accent) 75%, transparent); }
-.brand__num { position: relative; overflow: hidden; animation: s33-glow 4s ease-in-out infinite; transition: transform .22s var(--ease-spring); }
+.brand__num { position: relative; overflow: hidden; transition: transform .22s var(--ease-spring); }
 .brand:hover .brand__num { transform: rotate(-5deg) scale(1.08); }
 .brand__num::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 25%, color-mix(in srgb, var(--text) 50%, transparent) 48%, transparent 68%); transform: translateX(-130%); transition: transform .55s var(--ease-out); }
 .brand:hover .brand__num::after { transform: translateX(130%); }
@@ -1565,12 +1659,10 @@ body::after { animation: s33-grain 9s steps(2, end) infinite; }
 button, .seg__btn, .cal__btn { transition: transform .16s var(--ease-out), color .18s var(--ease-out), background .18s var(--ease-out), border-color .18s var(--ease-out), box-shadow .18s var(--ease-out); }
 button:active, .seg__btn:active, .cal__btn:active { transform: scale(.96); }
 button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px currentColor; }
-.hero__num { background-size: 220% 100%; animation: s33-shimmer 6s linear infinite; }
-.dot { animation: s33-pulse-dot 2.8s ease-in-out infinite; }
+.dot { opacity: .92; }
 .tl__gallery { perspective: 800px; }
 .tl__img { transition: transform .3s var(--ease-spring), filter .3s var(--ease-out), box-shadow .3s var(--ease-out); }
 .tl__img:hover { transform: translateY(-6px) rotate(-1deg) scale(1.025); filter: saturate(1.12) brightness(1.08); box-shadow: 0 18px 34px -22px color-mix(in srgb, var(--accent) 80%, transparent); }
-.achievement__icon, .quart-podium-card__medal { animation: s33-float 4s ease-in-out infinite; }
 .quart-card:hover { box-shadow: 0 16px 34px -22px var(--quart-acid), inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent); }
 .loading::after { content: ' ·'; animation: s33-loading-dots 1.1s steps(4, end) infinite; }
 /*
@@ -1613,45 +1705,25 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-/* ── Extra delight: движение интерфейса без тяжёлого JavaScript ───────────── */
-@keyframes s33-scan { from { transform: translateX(-130%) skewX(-18deg); } to { transform: translateX(260%) skewX(-18deg); } }
-@keyframes s33-border { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
-@keyframes s33-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+/* ── Extra delight: движение интерфейса без тяжёлого JavaScript ─────────────
+   Здесь жили бегущие блики, пульсации и «дыхание» панелей. Бриф требует, чтобы
+   двигалось только то, что что-то сообщает: появление блока, отклик на нажатие
+   и рост линии на графике. Всё остальное — статичный вид, и ниже остались
+   ровно те правила, которые без движения продолжают что-то значить.
+*/
 @keyframes s33-line-draw { from { stroke-dashoffset: 900; } to { stroke-dashoffset: 0; } }
-@keyframes s33-status-win { 0%, 100% { box-shadow: 0 0 0 0 rgba(53,208,127,0); } 50% { box-shadow: 0 0 0 4px rgba(53,208,127,.10); } }
-@keyframes s33-status-loss { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,71,87,0); } 50% { box-shadow: 0 0 0 4px rgba(255,71,87,.10); } }
 
-.site-head::after { content: ''; position: absolute; left: 0; bottom: -1px; width: 22%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: s33-scan 7s var(--ease-in-out, linear) infinite; pointer-events: none; }
 .hero, .panel, .lad__row, .quart-card, .achievement, .tl__item, .leader, .podium__item { overflow: hidden; }
-.hero::before, .panel::after, .lad__row::after, .quart-card::after, .achievement::after, .tl__item::after { content: ''; position: absolute; inset: 0 auto 0 -45%; width: 28%; pointer-events: none; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 7.5%, transparent), transparent); transform: skewX(-18deg); opacity: 0; }
-.hero:hover::before, .panel:hover::after, .lad__row:hover::after, .quart-card:hover::after, .achievement:hover::after, .tl__item:hover::after { opacity: 1; animation: s33-scan .8s var(--ease-out) both; }
 .hero::before { z-index: 0; }
-.panel::after, .lad__row::after, .quart-card::after, .achievement::after, .tl__item::after { z-index: 1; }
 .hero__top, .panel > *, .lad__row > *, .quart-card > *, .achievement > *, .tl__item > * { position: relative; z-index: 2; }
-.panel__head h2, .quart-section-label, .tl__year { text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 13%, transparent); }
 
-.lad__row:hover, .quart-card:hover, .achievement:hover { border-color: color-mix(in srgb, var(--tag-color, var(--accent)) 62%, var(--line)); }
+.quart-card:hover, .achievement:hover { border-color: color-mix(in srgb, var(--tag-color, var(--accent)) 62%, var(--line)); }
 .lad__row:nth-child(odd) { animation-delay: 40ms; }
 .lad__row:nth-child(even) { animation-delay: 100ms; }
-.achievement:nth-child(3n + 1) .achievement__icon { animation-delay: -1.1s; }
-.achievement:nth-child(3n + 2) .achievement__icon { animation-delay: -.45s; }
-.achievement:nth-child(3n) .achievement__icon { animation-delay: -.8s; }
-.form .dot--win, .form .dot.c-win { animation: s33-status-win 2.2s ease-in-out infinite; }
-.form .dot--loss, .form .dot.c-loss { animation: s33-status-loss 2.2s ease-in-out infinite; }
-.streak--win, .quart-streak--win { animation: s33-breathe 2.4s ease-in-out infinite; }
-.streak--loss, .quart-streak--loss { animation: s33-breathe 2.8s ease-in-out infinite reverse; }
 .ch__line { stroke-dasharray: 900; animation: s33-line-draw 1.35s var(--ease-out) both; }
-.proof__fill { position: relative; overflow: hidden; }
-.proof__fill::after { content: ''; position: absolute; inset: 0; width: 28%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 32%, transparent), transparent); animation: s33-scan 3.2s ease-in-out infinite; }
-.quart-hero__glow { animation: s33-breathe 5s ease-in-out infinite; }
 .quart-podium-card:nth-child(1) { animation-delay: 70ms; }
 .quart-podium-card:nth-child(2) { animation-delay: 140ms; }
 .quart-podium-card:nth-child(3) { animation-delay: 210ms; }
-.quart-podium-card--gold .quart-podium-card__medal { animation: s33-breathe 2.6s ease-in-out infinite; }
-
-@media (prefers-reduced-motion: reduce) {
-  .site-head::after, .hero::before, .panel::after, .lad__row::after, .quart-card::after, .achievement::after, .tl__item::after, .proof__fill::after { display: none; }
-}
 
 /* ── Mobile motion: никакого долгого зажатия для красивого эффекта ────────── */
 @media (hover: none) and (pointer: coarse) {
@@ -1670,7 +1742,6 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
   .panel:hover, .hero:hover { border-color: var(--line); box-shadow: var(--shadow); }
   .quart-card:hover { border-color: #26372a; box-shadow: none; }
   .tl__gallery a:hover .tl__img, .tl__img:hover { transform: none; filter: none; box-shadow: none; }
-  .hero:hover::before, .panel:hover::after, .lad__row:hover::after, .quart-card:hover::after, .achievement:hover::after, .tl__item:hover::after { opacity: 0; animation: none; }
 
   /* На обычный тап — короткий физический отклик, видимый без удержания. */
   .nav__link:active, .tile:active, .seg__btn:active, .cal__btn:active { transform: scale(.95); }
@@ -1678,9 +1749,6 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
   .tl__gallery a:active .tl__img { transform: scale(1.04); filter: saturate(1.14) brightness(1.08); }
   .brand:active .brand__num { transform: rotate(-4deg) scale(1.08); }
   .hero:active, .panel:active { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-
-  /* Чуть заметнее живые статусы на небольшом экране. */
-  .dot, .achievement__icon, .quart-podium-card__medal { animation-duration: 2.2s; }
 }
 
 /* ── WOW redesign: тактический командный центр Server 33 ────────────────── */
@@ -1730,22 +1798,18 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, color-mix(in s
 }
 .hero::after { opacity: .78; background: repeating-linear-gradient(58deg, color-mix(in srgb, var(--accent) 11%, transparent) 0 2px, transparent 2px 12px); }
 .hero__word { color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
-.hero__num { text-shadow: 0 0 38px color-mix(in srgb, var(--text) 12%, transparent); }
 .leader { border-color: color-mix(in srgb, var(--gold) 48%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--gold) 17%, transparent), color-mix(in srgb, var(--text) 3.5%, transparent) 58%, color-mix(in srgb, var(--electric) 5%, transparent)); box-shadow: inset 3px 0 0 var(--gold), 0 14px 34px -26px color-mix(in srgb, var(--gold) 80%, transparent); }
-.leader__crown { display: inline-block; transform-origin: center; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--gold) 60%, transparent)); animation: s33-float 4s ease-in-out infinite; }
-.leader__pts { text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 42%, transparent); }
+.leader__crown { display: inline-block; }
 .panel { border-color: color-mix(in srgb, var(--text) 10%, transparent); background: linear-gradient(145deg, color-mix(in srgb, var(--raised) 94%, transparent), color-mix(in srgb, var(--surface) 96%, transparent)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 14px 34px -25px rgba(0,0,0,.9); }
 .panel::before { background: linear-gradient(90deg, var(--accent), var(--electric), transparent 72%); opacity: .48; }
 .panel__head h2 { letter-spacing: -.045em; }
 .eyebrow { color: var(--electric); }
-.lad__row { border-color: color-mix(in srgb, var(--text) 7%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--text) 3.5%, transparent), transparent 72%); box-shadow: inset 3px 0 0 transparent; }
-.lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 14px 26px -24px color-mix(in srgb, var(--accent) 70%, transparent); }
+.lad__row { border-color: color-mix(in srgb, var(--text) 7%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--text) 3.5%, transparent), transparent 72%); }
 .quart-hero { border-color: color-mix(in srgb, var(--violet) 36%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--violet) 22%, transparent), 0 20px 55px -34px color-mix(in srgb, var(--violet) 60%, transparent); }
 .tl__item { border-color: color-mix(in srgb, var(--electric) 16%, transparent); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--electric) 42%, transparent), 0 14px 36px -28px color-mix(in srgb, var(--electric) 40%, transparent); }
 .tl__item:hover { border-color: color-mix(in srgb, var(--electric) 55%, transparent); }
 .achievement { background: linear-gradient(135deg, color-mix(in srgb, var(--text) 5.5%, transparent), color-mix(in srgb, var(--text) 1.8%, transparent)); }
 .achievement:hover { box-shadow: 0 16px 30px -24px var(--achievement-color); }
-.site-foot { border-top-color: color-mix(in srgb, var(--electric) 16%, transparent); }
 
 @media (max-width: 759px) {
   .nav { margin-top: 2px; padding-top: 5px; }
@@ -1759,12 +1823,6 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, color-mix(in s
 @keyframes s33-aurora {
   0%, 100% { transform: translate3d(calc(-2% + var(--s33-parallax-x, 0px)), calc(-1% - var(--s33-parallax-y, 0px) * .06 + var(--s33-parallax-pointer-y, 0px)), 0) scale(1); opacity: .72; }
   50% { transform: translate3d(calc(2% + var(--s33-parallax-x, 0px)), calc(2% - var(--s33-parallax-y, 0px) * .06 + var(--s33-parallax-pointer-y, 0px)), 0) scale(1.05); opacity: 1; }
-}
-@keyframes s33-grain {
-  0%, 100% { transform: translate3d(0, calc(var(--s33-parallax-y, 0px) * -.025), 0); }
-  25% { transform: translate3d(-1%, calc(1% + var(--s33-parallax-y, 0px) * -.025), 0); }
-  50% { transform: translate3d(1%, calc(-1% + var(--s33-parallax-y, 0px) * -.025), 0); }
-  75% { transform: translate3d(1%, calc(1% + var(--s33-parallax-y, 0px) * -.025), 0); }
 }
 .hero::after { transform: translate3d(var(--s33-parallax-x, 0px), calc(var(--s33-parallax-y, 0px) * .12), 0) rotate(4deg); }
 
@@ -1780,13 +1838,14 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, color-mix(in s
 
 /* ── Micro-interactions: быстрый и понятный отклик интерфейса ─────────────── */
 @keyframes s33-control-pop { 0% { transform: scale(.94); } 65% { transform: scale(1.035); } 100% { transform: scale(1); } }
-@keyframes s33-focus-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--electric) 0%, transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--electric) 12%, transparent); } }
 @keyframes s33-sheen { from { transform: translateX(-140%) skewX(-18deg); } to { transform: translateX(220%) skewX(-18deg); } }
 
 button, .nav__link, .seg__btn, .cal__btn, .tile, .tl__gallery a { position: relative; overflow: hidden; }
 button::after, .nav__link::after, .seg__btn::after, .cal__btn::after, .tile::after, .tl__gallery a::after { content: ''; position: absolute; inset: 0 auto 0 -38%; width: 24%; pointer-events: none; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 20%, transparent), transparent); transform: translateX(-140%) skewX(-18deg); opacity: 0; }
-button:hover::after, .nav__link:hover::after, .seg__btn:hover::after, .cal__btn:hover::after, .tile:hover::after, .tl__gallery a:hover::after { opacity: 1; animation: s33-sheen .62s var(--ease-out) both; }
-button:focus-visible, .nav__link:focus-visible, .seg__btn:focus-visible, .cal__btn:focus-visible, .tile:focus-visible, .tl__gallery a:focus-visible { outline: 2px solid var(--electric); outline-offset: 3px; animation: s33-focus-pulse 1.5s ease-in-out infinite; }
+button:hover::after, .nav__link:hover::after, .seg__btn:hover::after, .cal__btn:hover::after, .tile:hover::after, .tl__gallery a:hover::after { opacity: 1; animation: s33-sheen var(--t-med) var(--ease-out) both; }
+/* Кольцо фокуса горит ровно, пока элемент выбран: мигающий фокус труднее
+   найти глазами, а читателю программы экрана он не нужен вовсе. */
+button:focus-visible, .nav__link:focus-visible, .seg__btn:focus-visible, .cal__btn:focus-visible, .tile:focus-visible, .tl__gallery a:focus-visible { outline: 2px solid var(--electric); outline-offset: 3px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--electric) 14%, transparent); }
 button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .22s var(--ease-out); }
 .nav__link.is-active { animation: s33-control-pop .28s var(--ease-out); }
 .seg__btn.is-on, .cal__btn.is-on { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent), 0 6px 16px -12px currentColor; }
@@ -1813,17 +1872,17 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .boot-loader::before { content: ''; position: absolute; inset: 0; background: linear-gradient(color-mix(in srgb, var(--text) 2.5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--text) 2.5%, transparent) 1px, transparent 1px); background-size: 42px 42px; mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%); }
 .boot-loader::after { content: ''; position: absolute; top: 0; left: -30%; width: 24%; height: 100%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--electric) 12%, transparent), transparent); transform: skewX(-15deg); animation: boot-scan 2.6s ease-in-out infinite; }
 .boot-loader__core { position: relative; z-index: 1; display: grid; justify-items: center; min-width: min(310px, 82vw); }
-.boot-loader__mark { position: relative; display: grid; place-items: center; contain: paint; width: 92px; height: 92px; border: 1px solid color-mix(in srgb, var(--accent) 80%, transparent); border-radius: 25px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); color: #12100d; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 6%, transparent), 0 0 50px -12px color-mix(in srgb, var(--accent) 95%, transparent); animation: boot-mark-in .78s var(--ease-spring) both; }
+.boot-loader__mark { position: relative; display: grid; place-items: center; contain: paint; width: 92px; height: 92px; border: 1px solid color-mix(in srgb, var(--accent) 80%, transparent); border-radius: 25px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); color: #12100d; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 6%, transparent), 0 18px 40px -24px rgba(0,0,0,.75); animation: boot-mark-in .78s var(--ease-spring) both; }
 .boot-loader__mark::before, .boot-loader__mark::after { content: ''; position: absolute; inset: -13px; border: 1px solid color-mix(in srgb, var(--electric) 35%, transparent); border-radius: 31px; animation: boot-ring 5s linear infinite; }
 .boot-loader__mark::after { inset: -23px; border-color: color-mix(in srgb, var(--accent) 18%, transparent); border-style: dashed; animation-direction: reverse; animation-duration: 8s; }
 .boot-loader__mark span { font: 800 31px/1 Unbounded, sans-serif; letter-spacing: -.08em; }
 .boot-loader__brand { display: grid; gap: 4px; margin-top: 25px; text-align: center; }
 .boot-loader__brand strong { color: var(--text); font: 800 16px/1 Unbounded, sans-serif; letter-spacing: .04em; }
-.boot-loader__brand small { color: var(--electric); font: 600 9px/1 Inter, sans-serif; letter-spacing: .2em; }
+.boot-loader__brand small { color: var(--electric); font: 600 11px/1 Inter, sans-serif; letter-spacing: .2em; }
 .boot-loader__signal { display: flex; align-items: center; gap: 5px; height: 22px; margin-top: 27px; }
 .boot-loader__signal i { display: block; width: 4px; height: 14px; border-radius: 3px; background: var(--accent); animation: boot-signal 1s var(--ease) infinite; }
 .boot-loader__signal i:nth-child(2) { animation-delay: .12s; } .boot-loader__signal i:nth-child(3) { animation-delay: .24s; } .boot-loader__signal i:nth-child(4) { animation-delay: .36s; } .boot-loader__signal i:nth-child(5) { animation-delay: .48s; }
-.boot-loader__status { display: flex; justify-content: space-between; width: 100%; margin-top: 10px; color: var(--dim); font: 700 9px/1 Inter, sans-serif; letter-spacing: .14em; animation: boot-status 1.2s ease-in-out infinite alternate; }
+.boot-loader__status { display: flex; justify-content: space-between; width: 100%; margin-top: 10px; color: var(--dim); font: 700 11px/1 Inter, sans-serif; letter-spacing: .14em; animation: boot-status 1.2s ease-in-out infinite alternate; }
 .boot-loader__status b { color: var(--electric); font-weight: 700; }
 .boot-loader__slow { margin: 18px 0 0; padding: 0 6px; max-width: min(330px, 86vw); color: var(--dim); font: 500 12px/1.55 Inter, sans-serif; text-align: center; }
 @media (prefers-reduced-motion: reduce) {
@@ -1832,24 +1891,21 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 }
 
 /* ── Страница бота-справочника в Telegram                                   */
-@keyframes bot-orbit { from { transform: rotate(0deg) translateX(0); } 50% { transform: rotate(180deg) translateX(10px); } to { transform: rotate(360deg) translateX(0); } }
-@keyframes bot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-@keyframes bot-signal { 0%, 100% { opacity: .28; transform: scaleX(.7); } 50% { opacity: 1; transform: scaleX(1); } }
 .bot-hero { position: relative; overflow: hidden; min-height: 410px; background: radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--electric) 14%, transparent), transparent 24%), linear-gradient(135deg, rgba(23,28,35,.98), rgba(10,14,18,.98)); }
-.bot-hero__orb { position: absolute; border: 1px solid color-mix(in srgb, var(--electric) 25%, transparent); border-radius: 50%; pointer-events: none; animation: bot-orbit 13s linear infinite; }
-.bot-hero__orb--one { width: 280px; height: 280px; right: -78px; top: -78px; box-shadow: 0 0 70px -30px var(--electric); }
-.bot-hero__orb--two { width: 150px; height: 150px; right: 56px; top: 35px; border-color: color-mix(in srgb, var(--accent) 30%, transparent); animation-duration: 9s; animation-direction: reverse; }
+.bot-hero__orb { position: absolute; border: 1px solid color-mix(in srgb, var(--electric) 25%, transparent); border-radius: 50%; pointer-events: none; }
+.bot-hero__orb--one { width: 280px; height: 280px; right: -78px; top: -78px; }
+.bot-hero__orb--two { width: 150px; height: 150px; right: 56px; top: 35px; border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .bot-hero__top { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 22px; }
 .bot-hero__lead { max-width: 650px; margin: 18px 0 0; color: var(--dim); font-size: 16px; line-height: 1.7; }
 .bot-hero__lead strong { color: var(--electric); font-size: 1.14em; font-weight: 900; }
 .bot-hero__signal { display: grid; align-content: center; justify-items: center; gap: 8px; min-width: 84px; color: var(--electric); font: 800 22px/1 Unbounded, sans-serif; }
-.bot-hero__signal i { display: block; width: 42px; height: 2px; background: var(--electric); animation: bot-signal 1.2s ease-in-out infinite; }
-.bot-hero__signal i:nth-child(2) { animation-delay: .14s; } .bot-hero__signal i:nth-child(3) { animation-delay: .28s; } .bot-hero__signal i:nth-child(4) { animation-delay: .42s; }
+.bot-hero__signal i { display: block; width: 42px; height: 2px; background: var(--electric); opacity: .75; }
+.bot-hero__signal i:nth-child(2), .bot-hero__signal i:nth-child(3) { opacity: .5; }
 .bot-hero__bottom { position: absolute; right: 24px; bottom: 24px; left: 24px; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 700px; }
 .bot-stat { display: grid; gap: 5px; padding: 12px 14px; border-left: 2px solid var(--electric); background: color-mix(in srgb, var(--electric) 5.5%, transparent); }
-.bot-stat b { display: block; color: var(--electric); font: 900 clamp(22px, 3vw, 30px)/.95 Unbounded, sans-serif; letter-spacing: -.06em; text-shadow: 0 0 18px color-mix(in srgb, var(--electric) 28%, transparent); } .bot-stat span { color: var(--dim); font-size: 12px; font-weight: 600; }
+.bot-stat b { display: block; color: var(--electric); font: 900 clamp(22px, 3vw, 30px)/.95 Unbounded, sans-serif; letter-spacing: -.06em; } .bot-stat span { color: var(--dim); font-size: 12px; font-weight: 600; }
 .bot-launch { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px; border-color: color-mix(in srgb, var(--electric) 27%, transparent); background: linear-gradient(110deg, color-mix(in srgb, var(--electric) 10%, transparent), color-mix(in srgb, var(--text) 3.5%, transparent) 55%, color-mix(in srgb, var(--accent) 6%, transparent)); }
-.bot-launch__mark { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid var(--electric); border-radius: 20px; color: #0b1011; background: var(--electric); font-size: 29px; box-shadow: 0 0 32px -13px var(--electric); animation: bot-float 3.4s ease-in-out infinite; }
+.bot-launch__mark { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid var(--electric); border-radius: 20px; color: #0b1011; background: var(--electric); font-size: 29px; }
 .bot-launch__copy h2 { margin: 5px 0 10px; font-size: clamp(22px, 3vw, 29px); font-weight: 900; } .bot-launch__copy p { max-width: 620px; margin: 0; color: var(--dim); font-size: 16px; line-height: 1.65; }
 .bot-launch__handle { align-self: start; color: var(--electric); font: 700 11px/1 Inter, sans-serif; letter-spacing: .08em; }
 .bot-cta { display: inline-flex; align-items: center; gap: 16px; margin-top: 18px; padding: 12px 15px; border: 1px solid var(--electric); border-radius: 7px; color: #081011; background: var(--electric); font-weight: 800; text-decoration: none; transition: transform .22s var(--ease-spring), box-shadow .22s var(--ease-out), background .22s var(--ease-out); }
@@ -1861,7 +1917,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .bot-feature__index { color: var(--mute); font: 800 12px/1 Inter, sans-serif; letter-spacing: .14em; } .bot-feature__icon { margin: 28px 0 20px; color: var(--electric); font: 800 28px/1 Unbounded, sans-serif; } .bot-feature--accent .bot-feature__icon { color: var(--accent); }
 .bot-feature h3 { margin: 0 0 10px; font-size: clamp(18px, 2vw, 21px); font-weight: 900; letter-spacing: -.02em; } .bot-feature p { margin: 0; color: var(--dim); font-size: 16px; font-weight: 500; line-height: 1.65; }
 .bot-promise { display: grid; grid-template-columns: 1.05fr 1fr; gap: 30px; align-items: center; margin-top: 22px; border-color: color-mix(in srgb, var(--gold) 25%, transparent); background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 9%, transparent), color-mix(in srgb, var(--text) 2.5%, transparent)); }
-.bot-promise__line { position: absolute; width: 2px; height: 74px; background: var(--gold); box-shadow: 0 0 22px var(--gold); } .bot-promise h2 { max-width: 540px; margin-top: 6px; } .bot-promise p { margin: 0; color: var(--dim); line-height: 1.75; } .bot-promise strong { color: var(--gold); }
+.bot-promise__line { position: absolute; width: 2px; height: 74px; background: var(--gold); } .bot-promise h2 { max-width: 540px; margin-top: 6px; } .bot-promise p { margin: 0; color: var(--dim); line-height: 1.75; } .bot-promise strong { color: var(--gold); }
 .bot-final { display: grid; justify-items: center; padding: 70px 20px 30px; text-align: center; } .bot-final h2 { margin: 12px 0 2px; font-size: clamp(26px, 5vw, 46px); } .bot-final em { color: var(--electric); font-style: normal; }
 .bot-cta--large { margin-top: 22px; padding: 14px 18px; }
 @media (max-width: 800px) { .bot-feature-grid { grid-template-columns: repeat(2, 1fr); } .bot-launch { grid-template-columns: auto 1fr; } .bot-launch__handle { grid-column: 2; } }
@@ -1875,17 +1931,17 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .role-card::after { content: ''; position: absolute; right: -28px; bottom: -40px; width: 120px; height: 120px; border: 1px solid currentColor; border-radius: 50%; opacity: .12; pointer-events: none; }
 .role-card:hover { transform: translateY(-5px); border-color: currentColor; box-shadow: 0 16px 30px -25px currentColor; }
 .role-card--gold { color: var(--gold); } .role-card--orange { color: var(--accent); } .role-card--violet { color: #c7a6ff; } .role-card--cyan { color: var(--electric); } .role-card--red { color: #ff7f7f; }
-.role-card__top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; } .role-card__icon { font-size: 25px; filter: saturate(1.1); } .role-card__tag { padding: 4px 7px; border: 1px solid currentColor; border-radius: 4px; opacity: .72; font: 800 9px/1 Inter, sans-serif; letter-spacing: .12em; }
+.role-card__top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; } .role-card__icon { font-size: 25px; filter: saturate(1.1); } .role-card__tag { padding: 4px 7px; border: 1px solid currentColor; border-radius: 4px; opacity: .72; font: 800 11px/1 Inter, sans-serif; letter-spacing: .12em; }
 .role-card h3 { margin: 18px 0 6px; color: var(--text); font-size: 18px; font-weight: 900; } .role-card__intro { min-height: 42px; margin: 0 0 8px; color: var(--dim); font-size: 13px; line-height: 1.45; }
 .role-card ul { display: grid; gap: 5px; margin: 0; padding: 0 0 0 16px; color: var(--dim); font-size: 12px; line-height: 1.42; } .role-card li::marker { color: currentColor; }
 .role-card__assistant { display: inline-flex; align-self: flex-start; margin-top: auto; padding-top: 10px; color: currentColor; font-size: 11px; font-weight: 800; }
 .roles-notice { display: grid; grid-template-columns: 44px 1fr; gap: 15px; align-items: start; margin-top: 12px; border-color: color-mix(in srgb, var(--gold) 34%, transparent); background: linear-gradient(110deg, color-mix(in srgb, var(--gold) 9%, transparent), color-mix(in srgb, var(--text) 2.5%, transparent)); }
-.roles-notice__mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; color: #18130a; background: var(--gold); font: 900 20px/1 Unbounded, sans-serif; box-shadow: 0 0 22px -10px var(--gold); }
+.roles-notice__mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; color: #18130a; background: var(--gold); font: 900 20px/1 Unbounded, sans-serif; }
 .roles-notice h3 { margin: 5px 0 8px; color: var(--gold); font-size: 18px; } .roles-notice p { max-width: 900px; margin: 6px 0 0; color: var(--dim); font-size: 13px; line-height: 1.55; }
 @media (max-width: 900px) { .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
 
-.roles-credit { margin: 18px 0 0; color: var(--mute); font-size: 10px; line-height: 1.4; letter-spacing: .02em; text-align: center; opacity: .78; }
+.roles-credit { margin: 18px 0 0; color: var(--mute); font-size: 11px; line-height: 1.4; letter-spacing: .02em; text-align: center; opacity: .78; }
 
 /* ── Блоки руководства, которые делают люди                                */
 .guide-extra-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px 0; }
@@ -1894,32 +1950,27 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .guide-extra-card--gold { border-top-color: var(--gold); } .guide-extra-card--orange { border-top-color: var(--accent); } .guide-extra-card--violet { border-top-color: #c7a6ff; } .guide-extra-card--red { border-top-color: #ff7f7f; }
 @media (max-width: 560px) { .guide-extra-grid { grid-template-columns: 1fr; gap: 10px; } .guide-extra-card { padding: 16px; } }
 
-/* Свой цвет, который выбрал человек в полном редакторе руководства */
-.role-card[style*="--role-color"]{--tone:var(--role-color);border-color:color-mix(in srgb,var(--role-color) 62%,var(--line));box-shadow:inset 0 0 32px color-mix(in srgb,var(--role-color) 8%,transparent),0 0 24px color-mix(in srgb,var(--role-color) 12%,transparent)}
-.role-card[style*="--role-color"] .role-card__icon,.role-card[style*="--role-color"] .role-card__tag{color:var(--role-color);text-shadow:0 0 16px color-mix(in srgb,var(--role-color) 52%,transparent)}
+/* Свой цвет, который выбрал человек в полном редакторе руководства.
+   Цвет держит рамку и чернила значка; свечение вокруг карточки убрано. */
+.role-card[style*="--role-color"]{--tone:var(--role-color);border-color:color-mix(in srgb,var(--role-color) 62%,var(--line))}
+.role-card[style*="--role-color"] .role-card__icon,.role-card[style*="--role-color"] .role-card__tag{color:var(--role-color)}
 .role-card[style*="--role-color"]::after{background:linear-gradient(90deg,transparent,var(--role-color),transparent);opacity:.42}
-.guide-extra-card[style*="--extra-color"]{border-color:color-mix(in srgb,var(--extra-color) 58%,var(--line));box-shadow:inset 0 0 36px color-mix(in srgb,var(--extra-color) 8%,transparent),0 0 22px color-mix(in srgb,var(--extra-color) 10%,transparent)}
-.guide-extra-card[style*="--extra-color"] .eyebrow{color:var(--extra-color);text-shadow:0 0 14px color-mix(in srgb,var(--extra-color) 48%,transparent)}
+.guide-extra-card[style*="--extra-color"]{border-color:color-mix(in srgb,var(--extra-color) 58%,var(--line))}
+.guide-extra-card[style*="--extra-color"] .eyebrow{color:var(--extra-color)}
 
 /* Тонкий акцент у строки об авторстве */
-.roles-credit{position:relative;display:block;max-width:fit-content;margin:22px auto 0;padding:7px 14px 8px;color:color-mix(in srgb,var(--text) 72%,var(--mute));font-size:10.5px;line-height:1.45;letter-spacing:.035em;text-align:center;opacity:.9;border-top:1px solid color-mix(in srgb,var(--electric) 42%,transparent);border-bottom:1px solid color-mix(in srgb,var(--electric) 18%,transparent);text-shadow:0 0 12px color-mix(in srgb,var(--electric) 26%,transparent)}
-.roles-credit::before,.roles-credit::after{content:"✦";display:inline-block;margin:0 8px;color:var(--electric);font-size:9px;vertical-align:1px;opacity:.75}
-@media (max-width:560px){.roles-credit{max-width:92%;padding:7px 10px;font-size:10px}.roles-credit::before,.roles-credit::after{margin:0 5px}}
+.roles-credit{position:relative;display:block;max-width:fit-content;margin:22px auto 0;padding:7px 14px 8px;color:color-mix(in srgb,var(--text) 72%,var(--mute));font-size:11px;line-height:1.45;letter-spacing:.035em;text-align:center;opacity:.9;border-top:1px solid color-mix(in srgb,var(--electric) 42%,transparent);border-bottom:1px solid color-mix(in srgb,var(--electric) 18%,transparent)}
+.roles-credit::before,.roles-credit::after{content:"✦";display:inline-block;margin:0 8px;color:var(--electric);font-size:11px;vertical-align:1px;opacity:.75}
+@media (max-width:560px){.roles-credit{max-width:92%;padding:7px 10px;font-size:11px}.roles-credit::before,.roles-credit::after{margin:0 5px}}
 
-/* Спокойная атмосфера карточки: вместо кружков, которые отвлекают, — лёгкая бегущая линия */
-.role-card::after{right:auto;bottom:auto;left:-48%;top:0;width:48%;height:1px;border:0;border-radius:0;background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.48;animation:role-card-scan 8s ease-in-out infinite;will-change:transform}
-.role-card:nth-child(2)::after{animation-delay:-2.2s}.role-card:nth-child(3)::after{animation-delay:-4.4s}.role-card:nth-child(4)::after{animation-delay:-1.1s}.role-card:nth-child(5)::after{animation-delay:-3.3s}
-@keyframes role-card-scan{0%,18%{transform:translateX(0);opacity:0}32%{opacity:.42}58%,100%{transform:translateX(310%);opacity:0}}
-@media (prefers-reduced-motion:reduce){.role-card::after{animation:none;left:0;width:100%;opacity:.22}}
+/* Спокойная атмосфера карточки: тонкая светлая линия по верхнему краю. */
+.role-card::after{right:auto;bottom:auto;left:0;top:0;width:100%;height:1px;border:0;border-radius:0;background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.22}
 
 /* Панель президента вручную — она видна на всех открытых вкладках */
-.president-board{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:10px;margin:10px 0 0;padding:9px 13px;border:1px solid color-mix(in srgb, var(--electric) 24%, transparent);border-left:2px solid var(--electric);border-radius:10px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 9%, transparent),color-mix(in srgb, var(--text) 2.5%, transparent));box-shadow:inset 0 0 22px color-mix(in srgb, var(--electric) 4.5%, transparent),0 10px 28px -24px var(--electric);animation:president-board-breathe 5s ease-in-out infinite}
-.president-board__signal{width:7px;height:7px;border-radius:50%;background:var(--electric);box-shadow:0 0 12px var(--electric);animation:president-board-pulse 2s ease-in-out infinite}
-.president-board__label{color:var(--electric);font:800 9px/1 Inter,sans-serif;letter-spacing:.14em;white-space:nowrap}.president-board__name{color:var(--text);font-size:14px}.president-board__alliance{color:var(--gold);font-family:Unbounded,sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em}.president-board__note{color:var(--mute);font-size:10px;text-align:right}
-@keyframes president-board-breathe{0%,100%{box-shadow:inset 0 0 22px color-mix(in srgb, var(--electric) 4.5%, transparent),0 10px 28px -24px var(--electric)}50%{box-shadow:inset 0 0 28px color-mix(in srgb, var(--electric) 9%, transparent),0 12px 32px -22px var(--electric)}}
-@keyframes president-board-pulse{0%,100%{opacity:.55;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
-@media(max-width:700px){.president-board{grid-template-columns:auto 1fr auto;gap:6px 8px;padding:9px 10px}.president-board__label{grid-column:2/-1;font-size:8px}.president-board__name{grid-column:2;font-size:13px}.president-board__alliance{grid-column:3;font-size:13px}.president-board__note{grid-column:2/-1;text-align:left;font-size:9px}}
-@media(prefers-reduced-motion:reduce){.president-board,.president-board__signal{animation:none}}
+.president-board{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:10px;margin:10px 0 0;padding:9px 13px;border:1px solid color-mix(in srgb, var(--electric) 24%, transparent);border-left:2px solid var(--electric);border-radius:10px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 9%, transparent),color-mix(in srgb, var(--text) 2.5%, transparent));box-shadow:0 10px 24px -20px rgba(0,0,0,.6)}
+.president-board__signal{width:7px;height:7px;border-radius:50%;background:var(--electric)}
+.president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.14em;white-space:nowrap}.president-board__name{color:var(--text);font-size:14px}.president-board__alliance{color:var(--gold);font-family:Unbounded,sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em}.president-board__note{color:var(--mute);font-size:11px;text-align:right}
+@media(max-width:700px){.president-board{grid-template-columns:auto 1fr auto;gap:6px 8px;padding:9px 10px}.president-board__label{grid-column:2/-1;font-size:11px}.president-board__name{grid-column:2;font-size:13px}.president-board__alliance{grid-column:3;font-size:13px}.president-board__note{grid-column:2/-1;text-align:left;font-size:11px}}
 
 /* Компактные карточки хронологии: остальное перекрыто редизайном ленты ниже,
    здесь остаётся только анимация раскрытия деталей. */
@@ -1931,14 +1982,11 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @media(prefers-reduced-motion:reduce){.tl__details-body{animation:none}}
 
 /* ── Карточка статуса президента: доведённый вид диспетчерского центра ─────*/
-.president-board{position:relative;display:block;isolation:isolate;overflow:hidden;margin:14px 0 0;padding:15px 18px 14px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-left:3px solid var(--electric);border-radius:18px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10.5%, transparent),color-mix(in srgb, var(--text) 2.8%, transparent) 48%,rgba(247,190,72,.055)),linear-gradient(180deg,rgba(16,27,34,.96),rgba(9,14,20,.96));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 8%, transparent),inset 0 -18px 36px rgba(0,0,0,.14),0 14px 34px -24px color-mix(in srgb, var(--electric) 75%, transparent);animation:president-board-breathe 6s ease-in-out infinite}
-.president-board::before{content:'';position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 18%,color-mix(in srgb, var(--electric) 8%, transparent) 47%,transparent 70%);transform:translateX(-115%);animation:president-board-scan 8s cubic-bezier(.23,1,.32,1) infinite}
-.president-board__head{display:flex;align-items:center;gap:9px;min-width:0;margin-bottom:13px}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px color-mix(in srgb, var(--electric) 10%, transparent),0 0 16px var(--electric);animation:president-board-pulse 2.4s ease-in-out infinite}.president-board__label{color:var(--electric);font:800 10px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:4px 7px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius:999px;color:var(--electric);font:800 8px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
-.president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:#f2f7f8;font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 0 22px color-mix(in srgb, var(--text) 13%, transparent)}.president-board__alliance{flex:none;color:var(--gold);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em;text-shadow:0 0 18px rgba(247,190,72,.22)}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid color-mix(in srgb, var(--electric) 13%, transparent);color:var(--mute);font-size:10.5px;line-height:1.4}
-@keyframes president-board-scan{0%,55%{transform:translateX(-115%)}75%,100%{transform:translateX(115%)}}
-@media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:8.5px;letter-spacing:.14em}.president-board__live{font-size:7px;padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:15px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:9.5px}}
+.president-board{position:relative;display:block;isolation:isolate;overflow:hidden;margin:14px 0 0;padding:15px 18px 14px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-left:3px solid var(--electric);border-radius:18px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10.5%, transparent),color-mix(in srgb, var(--text) 2.8%, transparent) 48%,rgba(247,190,72,.055)),linear-gradient(180deg,rgba(16,27,34,.96),rgba(9,14,20,.96));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 8%, transparent),inset 0 -18px 36px rgba(0,0,0,.14),0 14px 34px -24px color-mix(in srgb, var(--electric) 75%, transparent)}
+.president-board__head{display:flex;align-items:center;gap:9px;min-width:0;margin-bottom:13px}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px color-mix(in srgb, var(--electric) 10%, transparent)}.president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:4px 7px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius:999px;color:var(--electric);font:800 11px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
+.president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:18px;min-width:0;padding-left:18px}.president-board__name{min-width:0;overflow:hidden;color:#f2f7f8;font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap}.president-board__alliance{flex:none;color:var(--gold);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em}.president-board__note{display:block;margin:11px 0 0;padding:8px 0 0 18px;border-top:1px solid color-mix(in srgb, var(--electric) 13%, transparent);color:var(--mute);font-size:11px;line-height:1.4}
+@media(max-width:700px){.president-board{margin-top:10px;padding:13px 13px 12px;border-radius:15px}.president-board__head{margin-bottom:11px}.president-board__label{font-size:11px;letter-spacing:.14em}.president-board__live{padding:4px 6px}.president-board__identity{align-items:flex-start;gap:8px;padding-left:16px}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:15px;line-height:1.25;text-align:right}.president-board__note{margin-top:9px;padding-left:16px;font-size:11px}}
 @media(max-width:390px){.president-board__identity{display:grid;grid-template-columns:1fr auto;align-items:center}.president-board__name{font-size:15px}.president-board__alliance{font-size:14px}}
-@media(prefers-reduced-motion:reduce){.president-board,.president-board::before,.president-board__signal{animation:none}}
 
 /* Панель президента не должна сливаться с оживлённым краем шапки. */
 .president-board{margin-bottom:20px}
@@ -1960,16 +2008,14 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   .tl__meta time,.tl__type{max-width:100%;overflow-wrap:anywhere}
   .tl__gallery{max-width:100%;overflow:hidden}
 }
-@keyframes s33-pulse-dot-contained{0%,100%{transform:scale(1);opacity:.86}50%{transform:scale(1.07);opacity:1}}
-.tl__dot{animation:s33-pulse-dot-contained 2.8s ease-in-out infinite}
 
 /* ── Узкая полоса президента для маленьких экранов ────────────────────────*/
 @media(max-width:700px){
   .president-board{display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:10px;padding:8px 10px;border-radius:12px;min-height:38px}
   .president-board__head{display:contents}
-  .president-board__signal{width:7px;height:7px;box-shadow:0 0 0 3px color-mix(in srgb, var(--electric) 10%, transparent),0 0 12px var(--electric)}
-  .president-board__label{flex:none;font-size:7px;letter-spacing:.1em}
-  .president-board__live{order:5;flex:none;margin-left:0;padding:3px 5px;font-size:6px;letter-spacing:.08em}
+  .president-board__signal{width:7px;height:7px;box-shadow:0 0 0 3px color-mix(in srgb, var(--electric) 10%, transparent)}
+  .president-board__label{flex:none;font-size:11px;letter-spacing:.1em}
+  .president-board__live{order:5;flex:none;margin-left:0;padding:3px 5px;font-size:11px;letter-spacing:.08em}
   .president-board__identity{display:flex;align-items:baseline;justify-content:flex-start;gap:7px;min-width:0;flex:1;padding-left:0}
   .president-board__name{min-width:0;flex:1;font-size:13px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .president-board__alliance{font-size:12.5px;line-height:1;white-space:nowrap}
@@ -1979,10 +2025,10 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 }
 @media(max-width:390px){
   .president-board{gap:6px;padding:7px 8px;min-height:34px}
-  .president-board__label{font-size:6.5px;letter-spacing:.07em}
+  .president-board__label{font-size:11px;letter-spacing:.07em}
   .president-board__name{font-size:12px}
   .president-board__alliance{font-size:11.5px}
-  .president-board__live{padding:3px 4px;font-size:5.5px}
+  .president-board__live{padding:3px 4px;font-size:11px}
 }
 
 /* ── Вкладка четвертьфинала: заметный, но свой акцент ──────────────────────*/
@@ -1999,7 +2045,14 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .grid-2,.proofs,.movers,.guide-extra-grid{gap:var(--surface-gap)}
 .hero{margin-bottom:var(--surface-gap)}
 .tl__item{min-width:0}.tl__body{min-width:0}.tl__body h3,.tl__body p{overflow-wrap:anywhere}
-.tl__gallery{display:flex;flex-wrap:wrap;gap:8px;max-width:100%}.tl__img{display:block;max-width:100%;height:auto}
+/*
+   Галерея здесь сбивалась в flex-строку без базиса: девять ссылок-фото в
+   контейнере 180 px сжимались до 2 px каждая, то есть кадр не видно и
+   попасть в него пальцем нельзя. Сетка из правила выше этот же поток держит
+   колонками от 120 px, а рамка кадра 150/112 px остаётся заданной — она же
+   резерв высоты под снимки, которые приедут позже.
+*/
+.tl__gallery{max-width:100%}.tl__gallery>a{min-width:0}.tl__img{display:block;max-width:100%}
 .quart-hero{margin-bottom:var(--surface-gap)}.quart-board{padding-top:18px}.quart-podium{padding:18px}.quart-podium__heading{margin-bottom:13px}
 .bot-section{margin-top:18px}.bot-feature{min-height:190px;padding:16px}.bot-feature__icon{margin:22px 0 16px}.bot-promise{margin-top:18px;padding:18px}.bot-final{padding:48px 16px 24px}
 .guide-extra-grid{margin:18px 0}.guide-extra-card{padding:17px}.guide-extra-card h2{margin:7px 0 9px}
@@ -2021,11 +2074,6 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   .panel__head h2{font-size:17px}
   .quart-controls,.ctl{gap:7px}
 }
-
-/* У золотой медали четвертьфинала правило «дыхания» перекрывало плавное покачивание. */
-@keyframes quart-gold-medal-float{0%,100%{transform:translateY(0) scale(1);filter:drop-shadow(0 0 7px color-mix(in srgb,var(--quart-acid) 38%,transparent))}50%{transform:translateY(-5px) scale(1.045);filter:drop-shadow(0 0 14px color-mix(in srgb,var(--quart-acid) 72%,transparent))}}
-.quart-podium-card--gold .quart-podium-card__medal{display:inline-block;transform-origin:center;animation:quart-gold-medal-float 2.8s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){.quart-podium-card--gold .quart-podium-card__medal{animation:none}}
 
 /* ── Хронология: лента как спокойный список ────────────────────────────────
    Прежний вид — рамочные квадратики с номерами, бегущая полоса слева, кружок
@@ -2110,14 +2158,14 @@ summary.tl__row { cursor: pointer; }
 }
 .tl__type {
   font-family: inherit;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--electric);
   overflow-wrap: anywhere;
 }
-.tl__sep { color: var(--line); font-size: 10px; }
+.tl__sep { color: var(--line); font-size: 11px; }
 .tl__meta-note { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .tl__item--server_capture .tl__type,
 .tl__item--server_defended .tl__type { color: var(--win); }
@@ -2207,7 +2255,7 @@ summary.tl__row { cursor: pointer; }
   color: var(--dim);
   display: grid;
   place-items: center;
-  font-size: 10px;
+  font-size: 11px;
   flex: none;
   overflow: hidden;
 }
@@ -2215,7 +2263,7 @@ summary.tl__row { cursor: pointer; }
 .tl__comment-body { flex: 1; min-width: 0; }
 .tl__comment-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
 .tl__comment-nick { font-weight: 700; font-size: 12px; color: var(--text); }
-.tl__comment-time { color: var(--mute); font-size: 10.5px; }
+.tl__comment-time { color: var(--mute); font-size: 11px; }
 .tl__comment-text { color: var(--dim); line-height: 1.5; }
 .tl__comment-del {
   border: 0;

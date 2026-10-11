@@ -110,7 +110,7 @@
   .forum-side .forum-chron__stats { grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 10px; }
   .forum-side .forum-chron__stat { padding: 8px 9px; border-radius: 9px; }
   .forum-side .forum-chron__stat b { font-size: 17px; }
-  .forum-side .forum-chron__stat span { font-size: 9.5px; }
+  .forum-side .forum-chron__stat span { font-size: 11px; }
   .forum-side .forum-chron__feed { gap: 5px; margin-bottom: 10px; }
   .forum-side .forum-chron__item { padding: 4px 9px; font-size: 11.5px; }
   .forum-side .hero::after { display: none; }
@@ -176,22 +176,31 @@
 }
 @media (min-width: 760px) { .hero { padding: 22px 24px; } }
 
-.panel__head { margin-bottom: 12px; }
-.panel__head h2 { font-size: clamp(16px, 2.2vw, 19px); }
+/*
+  ЗАГОЛОВКИ РАЗДЕЛОВ.
+
+  H2 панели держится ступени заголовков раздела (20–36 px), а не кегля
+  заголовка карточки: «Динамика», «Положение», «Хроника» — названия целых
+  разделов, и до переделки они были одного размера с названием карточки,
+  из-за чего страница читалась как один плоский список.
+  Свечение убрано: бриф командного центра запрещает неон и glow.
+*/
+.panel__head { margin-bottom: var(--s-2); }
+.panel__head h2 { font-size: var(--fs-h2); letter-spacing: -.035em; }
 /*
   Название раздела, поднятое с H2 на H1 (рейтинг, Кварт без данных).
   Без этого правила H1 получил бы кегль браузера по умолчанию — 2em, и
   страница заметно перестроилась бы из-за одного только смысла заголовка.
-  Светлая тема снимает свечение так же, как с H2 ниже по файлу.
 */
 .panel__head h1.panel__title {
-  font-size: clamp(16px, 2.2vw, 19px);
-  letter-spacing: -.045em;
-  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 13%, transparent);
+  font-size: var(--fs-h2);
+  letter-spacing: -.04em;
 }
 .eyebrow { font-size: 11px; letter-spacing: .14em; }
 .grid-2 { gap: var(--gap); }
-.muted { font-size: .86em; }
+/* Пол вниз по кеглю: бриф не допускает подписей мельче 11 px, а em-цепочки
+   давали 9,89 px на подсказке внутри раскрывашки. */
+.muted { font-size: max(11px, .86em); }
 
 /* ── Кнопки: один рост на весь сайт ───────────────────────────────────────── */
 .forum-btn {
@@ -219,7 +228,7 @@
 .forum-chron__stats { margin: 12px 0 10px; gap: 8px; }
 .forum-chron__stat { padding: 9px 10px; border-radius: 10px; }
 .forum-chron__stat b { font-size: 18px; }
-.forum-chron__stat span { margin-top: 3px; font-size: 10px; }
+.forum-chron__stat span { margin-top: 3px; font-size: 11px; }
 .forum-chron__feed { margin-bottom: 10px; gap: 6px; }
 .forum-chron__item { padding: 5px 10px; font-size: 11.5px; }
 .forum-chron__more { font-size: 12px; }
@@ -248,7 +257,7 @@
 .forum-lead__rank { width: 20px; font-size: 11.5px; }
 .forum-lead__row .forum-ava { width: 26px; height: 26px; border-radius: 7px; font-size: 11px; }
 .forum-lead__who b { font-size: 12.5px; }
-.forum-lead__who small { font-size: 10.5px; }
+.forum-lead__who small { font-size: 11px; }
 .forum-lead__score b { font-size: 12.5px; }
 .seg--lead .seg__btn { min-height: 26px; padding: 0 9px; font-size: 11px; }
 
@@ -270,9 +279,9 @@
 .forum-me { gap: 9px; }
 .forum-me .forum-ava { width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px; }
 .forum-me__body b { font-size: 13px; }
-.forum-me__body small { font-size: 10.5px; }
+.forum-me__body small { font-size: 11px; }
 .forum-me .forum-btn { min-height: 32px; padding: 5px 11px; font-size: 12px; }
-.forum-bell__badge { top: -6px; right: -6px; min-width: 16px; height: 16px; font-size: 10px; }
+.forum-bell__badge { top: -6px; right: -6px; min-width: 16px; height: 16px; font-size: 11px; }
 
 .forum-notice { padding: 12px 14px; }
 .forum-notice p { font-size: 12.5px; }
@@ -281,7 +290,7 @@
 .forum-notify__link { padding: 7px 8px; }
 .forum-notify__line { font-size: 12.5px; }
 .forum-notify__preview { font-size: 11.5px; }
-.forum-notify__meta { font-size: 10.5px; }
+.forum-notify__meta { font-size: 11px; }
 
 .forum-auth__head { margin-bottom: 8px; }
 .forum-auth__fields { gap: 8px; }
@@ -309,11 +318,11 @@
 .forum-md__row { gap: 3px; }
 .forum-md__btn { min-width: 28px; height: 28px; padding: 0 7px; font-size: 12px; border-radius: 6px; }
 .forum-md__color { width: 16px; height: 16px; }
-.forum-md__capt { font-size: 10px; }
+.forum-md__capt { font-size: 11px; }
 
 .forum-attach { gap: 8px; }
 .forum-attach__btn { min-height: 32px; padding: 5px 10px; font-size: 12px; }
-.forum-attach__hint { font-size: 10.5px; }
+.forum-attach__hint { font-size: 11px; }
 
 .forum-poll-creator { margin: 4px 0 8px; }
 .forum-poll-form { padding: 10px 12px; margin-top: 8px; }
@@ -331,9 +340,9 @@
 .forum-post__head { gap: 9px; margin-bottom: 8px; }
 .forum-post__head .forum-ava { width: 30px; height: 30px; border-radius: 8px; font-size: 12.5px; }
 .forum-post__by b { font-size: 13px; }
-.forum-post__by time { font-size: 10.5px; }
-.forum-post__cat { padding: 3px 8px; font-size: 10px; }
-.forum-post__trail { padding: 2px 8px; font-size: 10px; }
+.forum-post__by time { font-size: 11px; }
+.forum-post__cat { padding: 3px 8px; font-size: 11px; }
+.forum-post__trail { padding: 2px 8px; font-size: 11px; }
 
 .forum-post__title { margin-bottom: 5px; font-size: clamp(15px, 1.9vw, 17.5px); line-height: 1.25; }
 .forum-post__body { font-size: 13px; line-height: 1.58; }
@@ -376,10 +385,10 @@
 .forum-thread__title { margin-bottom: 6px; font-size: 13px; }
 .forum-thread__list { margin-bottom: 10px; }
 .forum-comment { gap: 8px; padding: 8px 0; }
-.forum-comment .forum-ava--sm { width: 24px; height: 24px; border-radius: 6px; font-size: 10.5px; }
+.forum-comment .forum-ava--sm { width: 24px; height: 24px; border-radius: 6px; font-size: 11px; }
 .forum-comment__head { gap: 6px; margin-bottom: 2px; }
 .forum-comment__head b { font-size: 12.5px; }
-.forum-comment__head time { font-size: 10px; }
+.forum-comment__head time { font-size: 11px; }
 .forum-comment__body p { margin-bottom: 4px; font-size: 12.5px; line-height: 1.55; }
 .forum-comment__foot { gap: 4px; margin-top: 4px; }
 .forum-comment__foot .forum-react__btn { min-height: 24px; padding: 2px 7px; font-size: 11px; }
@@ -409,7 +418,7 @@
 .forum-profile__stats { gap: 8px; }
 .forum-profile__stat { padding: 9px 10px; border-radius: 10px; }
 .forum-profile__stat b { font-size: 18px; }
-.forum-profile__stat span { font-size: 10px; }
+.forum-profile__stat span { font-size: 11px; }
 .forum-rank { padding: 12px 14px; }
 .forum-rank__achs { gap: 4px; }
 .forum-rank__ach { padding: 3px 8px; font-size: 11px; }
@@ -428,8 +437,7 @@
 .tiles { gap: 5px; }
 
 .lad__row { min-height: 0; }
-.site-foot { padding: 14px 18px 26px; font-size: 12px; }
-.site-foot p { font-size: 12px; }
+.site-foot { padding: var(--s-2) 0 var(--s-4); }
 
 /* Кнопка меню в шапке — компактнее. */
 .burger { min-height: 36px; padding: 0 11px; }
@@ -619,7 +627,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-size: 13.5px;
   font-weight: 600;
 }
-.chat-item__time { flex: none; color: var(--mute); font-size: 10.5px; }
+.chat-item__time { flex: none; color: var(--mute); font-size: 11px; }
 .chat-item__last {
   min-width: 0;
   overflow: hidden;
@@ -843,7 +851,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: 999px;
   background: rgba(0,0,0,.32);
   color: var(--dim);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -870,7 +878,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 9%, var(--raised));
   color: color-mix(in srgb, var(--accent) 82%, var(--dim));
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -912,7 +920,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: 999px;
   color: var(--gold);
   font-family: Unbounded, sans-serif;
-  font-size: 8.5px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1258,7 +1266,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-size: 12.5px;
   font-weight: 600;
 }
-.chat-attach__size { flex: none; font-size: 10.5px; }
+.chat-attach__size { flex: none; font-size: 11px; }
 
 /* ── Лайтбокс ────────────────────────────────────────────────────────────── */
 
@@ -1300,7 +1308,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .chat-poll__head { display: grid; gap: 2px; }
-.chat-poll__badge { color: var(--accent); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.chat-poll__badge { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .chat-poll__question { font-size: 13px; line-height: 1.4; }
 .chat-poll__options { display: grid; gap: 5px; }
 .chat-poll__opt {
@@ -1398,7 +1406,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* Раньше правило было разорвано на два места файла: здесь оно одно —
    выравнивание по правому краю, тихий цвет и мелкий кегль подписи. */
-.chat-msg__meta { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 1px; color: var(--mute); font-size: 10px; }
+.chat-msg__meta { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 1px; color: var(--mute); font-size: 11px; }
 .chat-msg__reply-btn {
   display: inline-flex;
   align-items: center;
@@ -1484,7 +1492,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
-.chat-reaction-chip b { color: var(--mute); font-size: 10.5px; }
+.chat-reaction-chip b { color: var(--mute); font-size: 11px; }
 .chat-reaction-chip.is-mine b { color: var(--accent); }
 
 /* ── Кнопка «вниз» ──────────────────────────────────────────────────────── */
@@ -1731,7 +1739,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .chat-leaderboard__nick a { color: var(--text); text-decoration: none; }
 .chat-leaderboard__nick a:hover { color: var(--accent); }
-.chat-leaderboard__nick small { display: block; font-size: 10px; }
+.chat-leaderboard__nick small { display: block; font-size: 11px; }
 .chat-leaderboard__count {
   color: var(--accent);
   font-weight: 700;
@@ -2051,8 +2059,6 @@ body:has(.chat-layout) .site-foot { display: none; }
   opacity: .85;
 }
 :root[data-theme="light"] .panel::after { opacity: 0; }
-:root[data-theme="light"] .panel__head h2,
-:root[data-theme="light"] .panel__head h1.panel__title { text-shadow: none; }
 
 /* На телефоне стекло дорого: blur выключаем, карточки не поднимаем —
    жестом листают список, а не наводят на карточки. */
@@ -2080,12 +2086,13 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .hero__num {
   background: linear-gradient(172deg, #25333f 18%, #6b7d8c);
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  text-shadow: none;
 }
 
-:root[data-theme="light"] .lad__row:hover { box-shadow: inset 3px 0 0 var(--accent), 0 10px 22px -18px rgba(31,48,64,.4); }
+/* Hover строки рейтинга в светлой теме — тот же спокойный подкрашенный фон,
+   что и в тёмной. Внутренняя полоса и тень убраны: список читают столбцом,
+   и строка не должна «приподниматься» под курсором. */
+:root[data-theme="light"] .lad__row:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
 :root[data-theme="light"] .tl__img:hover { box-shadow: 0 14px 28px -18px rgba(31,48,64,.35); }
-:root[data-theme="light"] .tl__year { text-shadow: none; }
 :root[data-theme="light"] .adm-publish--top { box-shadow: 0 10px 26px -20px rgba(31,48,64,.35); }
 :root[data-theme="light"] .adm-modal__box { box-shadow: 0 24px 80px -40px rgba(31,48,64,.35); }
 
@@ -2112,8 +2119,6 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: linear-gradient(100deg, rgba(201,138,40,.1), rgba(23,33,43,.02) 58%, rgba(81,96,110,.05));
   box-shadow: inset 3px 0 0 var(--gold), 0 10px 24px -18px rgba(31,48,64,.35);
 }
-:root[data-theme="light"] .leader__crown { filter: none; }
-:root[data-theme="light"] .leader__pts { text-shadow: none; }
 
 /* Кварт-герой живёт внутри тёмного «острова» .quart-page — там правим
    только тень, рамка островная. */
@@ -2147,12 +2152,42 @@ body:has(.chat-layout) .site-foot { display: none; }
   --electric: #a7a3c2;
   --accent: #ff5a36;
   --accent-dk: #d83a32;
+  --accent-ink: #ff5a36;
   --gold:  #e0b34a;
   --win:   #46b87f;
   --loss:  #f2555f;
   --line: #222a36;
   color: #f2f4f7;
 }
+
+/*
+  Остров обязан оставаться тёмным и подложкой, не только чернилами. Светлые
+  правила для .hero и .panel имеют специфичность выше, чем класс самой
+  страницы, и выбивали фон: заголовок героя бота давал 1,05:1 (242,244,247 на
+  244,238,227) при том, что цвета текста остались островными.
+*/
+:root[data-theme="light"] .hero.bot-hero {
+  border-color: color-mix(in srgb, var(--electric) 26%, transparent);
+  background:
+    radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--electric) 14%, transparent), transparent 24%),
+    linear-gradient(135deg, rgba(23, 28, 35, .98), rgba(10, 14, 18, .98));
+  box-shadow: none;
+}
+:root[data-theme="light"] .hero.bot-hero::after { opacity: .34; }
+:root[data-theme="light"] .hero.bot-hero .hero__num {
+  background: linear-gradient(172deg, #eef3f8, #b9c4d2);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+:root[data-theme="light"] .panel.roles-panel,
+:root[data-theme="light"] .quart-page .panel {
+  border-color: var(--line);
+  background: linear-gradient(145deg, rgba(18, 25, 30, .96), rgba(12, 16, 21, .98));
+  box-shadow: none;
+  backdrop-filter: none;
+}
+:root[data-theme="light"] .panel.roles-panel::before,
+:root[data-theme="light"] .quart-page .panel::before { opacity: .45; }
 :root[data-theme="light"] .bot-cta,
 :root[data-theme="light"] .bot-launch__mark {
   border-color: color-mix(in srgb, var(--electric) 55%, #fff);
@@ -2267,14 +2302,15 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .role-badge--server { --role-tone: #34577f; }
 
 /*
-  Размер номера — тот же, что у значка соседних меток (7.5px), а не тот,
-  что у ника. Без этой строки `<b>№33</b>` внутри метки попадает под правило
-  `.forum-post__by b { font-size: 13px }`: селектор тяжелее, чем `.role-badge`,
-  и метка вырастает вдвое против короны и галочки рядом, раздувая строку.
+  Номер читаем: он держит нижнюю кегль-ступень метаданных (var(--fs-meta)),
+  а не мельчает до значка. Прежние 7.5px были размером галочки рядом — и
+  «№33» на телефоне сливался в серое пятно, то есть цифра не несла смысла.
+  При этом номер остаётся меньше ника: правило `.forum-post__by b` с 13px
+  к нему не применяется, строка ленты не раздувается.
 */
-.role-badge--server b { font-size: 7.5px; }
+.role-badge--server b { font-size: var(--fs-meta); }
 .forum-post__by .role-badge--server b,
-.forum-comment__head .role-badge--server b { display: inline; font-size: 7.5px; }
+.forum-comment__head .role-badge--server b { display: inline; font-size: var(--fs-meta); }
 
 /* ── Подтверждение ника и журнал имён (страница участника) ────────────────────
    Панель подтверждения видна только лидеру альянса игрока и модерации,
@@ -2456,7 +2492,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-player__name { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
 .adm-player__who b { font-size:16px; line-height:1.2; }
 .adm-player__who small { margin-top:7px; font-size:11.5px; }
-.adm-player__self { padding:2px 6px; border-radius:999px; color:var(--mute); background:color-mix(in srgb,var(--text) 7%,transparent); font-size:10px; font-weight:700; }
+.adm-player__self { padding:2px 6px; border-radius:999px; color:var(--mute); background:color-mix(in srgb,var(--text) 7%,transparent); font-size:11px; font-weight:700; }
 .adm-player__state { grid-area:state; align-self:start; justify-content:flex-end; flex-wrap:wrap; }
 .adm-player__acts { grid-area:acts; justify-content:space-between; padding-top:11px; border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent); }
 .adm-player__roles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); flex:1; gap:6px; }
@@ -2490,16 +2526,16 @@ body:has(.chat-layout) .site-foot { display: none; }
 .forum-topic-tags input:checked + span, .forum-tag.is-on { border-color:color-mix(in srgb,var(--accent) 62%,var(--line)); background:color-mix(in srgb,var(--accent) 14%,transparent); color:var(--text); }
 .forum-tag-filter { display:flex; flex-wrap:wrap; gap:5px; width:100%; margin-top:8px; }
 .forum-post__tags { display:flex; flex-wrap:wrap; gap:5px; margin:-2px 0 12px; }
-.forum-post__tags .forum-tag { min-height:23px; font-size:10px; }
+.forum-post__tags .forum-tag { min-height:23px; font-size:11px; }
 .forum-alliance-card { display:inline-flex; align-items:center; gap:5px; max-width:190px; margin-left:6px; padding:2px 6px; border:1px solid color-mix(in srgb,var(--ally-color) 45%,var(--line)); border-radius:999px; color:inherit; text-decoration:none; vertical-align:middle; }
 .forum-alliance-card i, .forum-alliance-sub i { width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:var(--ally-color); }
-.forum-alliance-card b { color:var(--gold); font:700 10px/1 Unbounded,sans-serif; }
-.forum-alliance-card small { overflow:hidden; color:var(--mute); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.forum-alliance-card b { color:var(--gold); font:700 11px/1 Unbounded,sans-serif; }
+.forum-alliance-card small { overflow:hidden; color:var(--mute); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
 .forum-alliance-subs header { display:grid; gap:3px; margin-bottom:10px; }
 .forum-alliance-subs header small { color:var(--mute); font-size:11px; }
 .forum-alliance-subs > div { display:grid; gap:5px; }
 .forum-alliance-sub { display:flex; align-items:center; gap:7px; width:100%; min-height:32px; padding:5px 7px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
-.forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:10px; }
+.forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:11px; }
 .forum-alliance-sub.is-on { border-color:color-mix(in srgb,var(--accent) 52%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
 .forum-alliance-sub.is-on span { color:var(--accent); }
 
@@ -2670,4 +2706,115 @@ body:has(.chat-layout) #app { min-height: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .sk__ava, .sk__line { animation: none; }
+}
+
+/* ── ПОПАДАНИЕ ПАЛЬЦЕМ: один рост цели на весь сайт ──────────────────────────
+
+  Десять целей нажатия (реакции, действия под постом, флажок закладки,
+  переключатели, ссылки на комментарии) до этого держали высоту в четырёх
+  файлах и числами 24/28/34/36/38/40. Кто побеждает — решал порядок загрузки,
+  а не смысл: на телефоне строка ленты получала 36 px, а такой же переключатель
+  в другом месте — 40, и ни то ни другое не дотягивало до 44, которые требует
+  дисциплина касаний. Здесь задаётся ОДИН рост для всех перечисленных классов,
+  и список повторяет составные селекторы выше ровно для того, чтобы перебить
+  силой, а не порядком: .forum-comment__foot .forum-react__btn (24 px) и
+  .seg--lead .seg__btn (26 px) сильнее одиночного класса.
+
+  Список дополнен замером, а не рассуждением: харнесс обошёл 16 разделов
+  телефоном с настоящим пальцем (pointer: coarse) и досчитался ещё 17 классов
+  под 44 px — от подписки на альянс (32) и чипа фильтра (27) до ссылки
+  «Читать целиком» (19). «Все теги» взяты как button.forum-tag: тот же класс
+  носят нераскрывающиеся метки темы, и им рост не нужен.
+  Отступы, которые рисуют кнопку, остаются в своих файлах — высота к внешнему
+  виду кнопки не имеет отношения.
+
+  Второй замер того же захода показал, что объявления мало: в mobile.css жили
+  `body .cal-tab` (38 px), `body .evt-actions .evt-btn` (38), `body .evt-remind
+  select` (36) и `body .forum-me .forum-btn` (40), и префикс `body` делал их
+  сильнее местных составных селекторов — порядок загрузки не помогал. Правила
+  высоты оттуда убраны, а не подняты до 44: одна планка живёт в одном месте, и
+  проверка это требует. Поле напоминания класса не имеет вовсе, поэтому оно в
+  списке отдельной строкой.
+
+  Третий замер — уже с починенным пином харнесса — назвал тех, кого список не
+  накрывал вовсе: `a.forum-btn` (40 px: класс есть, но планка знала только
+  вариацию `--sm`), `a.feed-card__source` и `a.forum-chron__more` (18 и 16 px —
+  в списке стояло имя `.upd-card__source`, а источник заметки на ленте носится
+  другим классом) и поле поиска по гайдам (23 px); у него класса нет вовсе,
+  поэтому оно взято по типу. Чипы `button.forum-tag` (41) и `.seg__btn` (39)
+  до планки дотягивают по высоте и не дотягивают по ширине.
+
+  Четвёртый промер — уже после починки галереи — оставил на пальце две цели, и
+  обе без класса в разметке. Заголовок темы на ленте (`.forum-post__title a`,
+  22 px) — главное действие карточки, поэтому взят в планку вместе со списком
+  ссылок-действий. А «Чаты» на странице «О проекте» (43 px по ширине) до планки
+  не дотягивает на один пиксел, потому что ширину задаёт короткое слово, а не
+  CSS: это названо в документе, а не закрыто молча.
+
+  Десктоп судится другой меркой, и её тоже надо назвать: 44 px — планка брифа
+  для пальца, а критерий AA (2.5.8) требует от цели 24 CSS px при любом
+  указателе. Промёр 16 разделов десктопом назвал девять классов-действий тоньше
+  строки — от 18 до 23 px. Стоят они тоньше не из-за высоты шрифта, а потому,
+  что ссылка-действие наследует высоту переноса строки.
+
+  Нативные флажки 16×16 (поле поиска по гайдам и фильтры витрины) в список не
+  входят намеренно: их размер задаёт сам браузер, а критерий такие цели вычитает.
+  Рядом с каждым есть подпись, и именно по неё кликают.
+
+  Все девять имён названы голым классом, без тега перед точкой. Это не косметика:
+  `button.forum-save` сильнее того `.forum-save`, который стоит в тач-планке, и
+  первый же промер после правки вернул флажок закладки 44×33 — то есть ровно ту
+  перебитую планку, из-за которой весь этот блок и появился.
+*/
+.upd-card__source, .feed-card__source, .quart-next__more, .forum-alliance-card,
+.forum-save, .forum-post__expand, .who__more, .live__more, .back {
+  min-height: 24px;
+}
+@media (hover: none) and (pointer: coarse) {
+  .forum-react__btn,
+  .forum-comment__foot .forum-react__btn,
+  .forum-act,
+  .forum-act-menu__list .forum-act,
+  .forum-post__foot .forum-post__comments,
+  .forum-save,
+  .seg__btn,
+  .seg--lead .seg__btn,
+  .cal__btn,
+  .forum-btn--sm,
+  .forum-me .forum-btn,
+  .chat-join .forum-btn,
+  button.forum-tag,
+  .forum-alliance-sub,
+  .pick__btn,
+  .pick__opt,
+  .cal-tab,
+  .guide-chip,
+  .wks__more,
+  .who__summary,
+  .live__more,
+  .back,
+  .quart-next__more,
+  .forum-alliance-card,
+  .forum-post__expand,
+  .upd-card__source,
+  .feed-card__source,
+  .forum-chron__more,
+  .forum-btn,
+  .forum-post__title a,
+  input[type="search"],
+  .forum-field input,
+  .forum-field select,
+  .evt-remind select,
+  .accounts-search input { min-height: 44px; }
+  /* Флажок закладки: высота 44, а ширина оставалась 34 — палец промахивался
+     по горизонтали туда же, откуда его уже выгнали по вертикали. Тот же
+     промер догнал чип тега (41 px) и кнопку переключателя (39): рост по
+     высоте у них в порядке, не хватало ширины. */
+  .forum-save, button.forum-tag, .seg__btn { min-width: 44px; }
+  /* min-height не действует на строчных элементах: ссылки-действия разворачиваем
+     в inline-flex, чтобы рост цели задавало число, а не перенос строки. */
+  .back, .live__more, .quart-next__more, .forum-post__expand, .upd-card__source,
+  .feed-card__source, .forum-chron__more, .forum-btn, .forum-post__title a {
+    display: inline-flex; align-items: center;
+  }
 }

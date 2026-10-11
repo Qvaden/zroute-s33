@@ -98,7 +98,7 @@
   display: block;
   margin: 10px 12px 4px;
   color: var(--mute);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -128,7 +128,7 @@
 }
 .side__note {
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -340,7 +340,7 @@
   border: 1px solid rgba(53,208,127,.28);
   border-radius: 999px;
   color: var(--win);
-  font: 800 8.5px/1 Inter, sans-serif;
+  font: 800 11px/1 Inter, sans-serif;
   letter-spacing: .16em;
 }
 .forum-chron__live i {
@@ -348,12 +348,6 @@
   height: 6px;
   border-radius: 50%;
   background: var(--win);
-  box-shadow: 0 0 10px var(--win);
-  animation: forum-pulse 2s ease-in-out infinite;
-}
-@keyframes forum-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .35; }
 }
 
 .forum-chron__title {
@@ -391,7 +385,7 @@
   display: block;
   margin-top: 4px;
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -415,7 +409,7 @@
 }
 .forum-chron__item--win { border-color: rgba(53,208,127,.24); }
 .forum-chron__item--loss { border-color: rgba(255,71,87,.24); }
-.forum-chron__when { color: var(--mute); font-size: 10.5px; }
+.forum-chron__when { color: var(--mute); font-size: 11px; }
 .forum-chron__item--win .forum-chron__what { color: var(--soft-ok); }
 .forum-chron__item--loss .forum-chron__what { color: var(--soft-bad); }
 
@@ -514,7 +508,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 .forum-notice p { margin: 0 0 8px; color: var(--dim); font-size: 13px; line-height: 1.55; }
 .forum-notice--off { border-color: color-mix(in srgb, var(--gold) 24%, transparent); }
@@ -588,7 +582,7 @@
 }
 .forum-push__head { display: block; }
 .forum-push__head b { display: block; font-size: 12.5px; }
-.forum-push__head small { font-size: 10.5px; }
+.forum-push__head small { font-size: 11px; }
 .forum-push__grid {
   display: grid;
   gap: 4px 16px;
@@ -613,7 +607,7 @@
   flex: none;
   cursor: pointer;
 }
-.forum-push__hint { margin: 5px 0 0; font-size: 10.5px; line-height: 1.45; }
+.forum-push__hint { margin: 5px 0 0; font-size: 11px; line-height: 1.45; }
 .forum-push__quiet {
   display: flex;
   flex-wrap: wrap;
@@ -642,7 +636,7 @@
 }
 .forum-push__quiet-window input:focus { outline: none; border-color: var(--accent); }
 .forum-push__quiet-window input:disabled { opacity: .45; }
-.forum-push__quiet-hint { margin: 2px 0 0; font-size: 10.5px; line-height: 1.45; }
+.forum-push__quiet-hint { margin: 2px 0 0; font-size: 11px; line-height: 1.45; }
 .forum-push__quiet-error { margin: 4px 0 0; font-size: 11.5px; }
 
 /*
@@ -722,7 +716,7 @@
   background: linear-gradient(180deg, var(--surface) 72%, transparent);
   color: var(--mute);
   font-family: Inter, sans-serif;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -1048,7 +1042,7 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 50%;
-  font: 700 10px/1 ui-monospace, SFMono-Regular, monospace;
+  font: 700 11px/1 ui-monospace, SFMono-Regular, monospace;
 }
 .forum-recovery__steps li.is-now { color: var(--text); font-weight: 600; }
 .forum-recovery__steps li.is-now::before { border-color: var(--accent); color: var(--accent); }
@@ -1147,7 +1141,7 @@
 }
 .forum-md__btn:active { transform: scale(.95); }
 .forum-md__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.forum-md__mark { font-size: 9px; vertical-align: sub; }
+.forum-md__mark { font-size: 11px; vertical-align: sub; }
 .forum-md__capt {
   color: var(--mute);
   font-size: 11px;
@@ -1369,7 +1363,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--dim);
-  font-size: 10.5px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .forum-post__pin { font-size: 13px; }
@@ -1380,7 +1374,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--text);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1395,7 +1389,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--electric, var(--accent)) 16%, transparent);
   color: var(--electric, var(--accent));
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1409,7 +1403,7 @@
 .forum-post__body { color: var(--dim); font-size: 13.5px; line-height: 1.62; }
 .forum-post__body p { margin: 0 0 9px; }
 .forum-post__body p:last-child { margin-bottom: 0; }
-.forum-post__body a { color: var(--accent); }
+.forum-post__body a { color: var(--accent-ink); }
 
 .forum-post__expand {
   display: inline-block;
@@ -1635,14 +1629,14 @@
   margin-bottom: 4px;
 }
 .forum-comment__head b { font-size: 13px; }
-.forum-comment__head time { color: var(--mute); font-size: 10.5px; }
+.forum-comment__head time { color: var(--mute); font-size: 11px; }
 .forum-comment__body p {
   margin: 0 0 6px;
   color: var(--dim);
   font-size: 13px;
   line-height: 1.6;
 }
-.forum-comment__body a { color: var(--accent); }
+.forum-comment__body a { color: var(--accent-ink); }
 .forum-comment__foot {
   display: flex;
   align-items: center;
@@ -1742,17 +1736,17 @@
 /* ── Удобство ввода и попадания пальцем ───────────────────────────────────── */
 
 /*
-  Всё, по чему нажимают, обязано быть не меньше 44 пикселов. Ниже — те места,
-  где кнопки мелкие по виду: реакции, действия под постом, вкладки.
-  Размер добирается невидимой областью вокруг, чтобы вид не поехал.
+  Всё, по чему нажимают, обязано быть не меньше 44 пикселов. Рост целей задаёт
+  один блок в конце refine.css («ПОПАДАНИЕ ПАЛЬЦЕМ»): до него те же четыре
+  класса сидели в четырёх файлах с числами 27/36/38/40 и перебивали друг друга
+  за счёт порядка загрузки. Здесь остаются только отступы, которые рисуют
+  кнопку, и то, что нельзя выразить высотой.
 */
 @media (hover: none) and (pointer: coarse) {
-  .forum-react__btn { min-height: 40px; padding: 8px 12px; }
-  .forum-act { min-height: 40px; padding: 8px 11px; }
-  /* Флажок закладки стоит рядом с действиями и должен попадаться пальцем так же. */
-  .forum-save { min-height: 40px; padding: 8px 11px; }
+  .forum-react__btn { padding: 8px 12px; }
+  .forum-act { padding: 8px 11px; }
+  .forum-save { padding: 8px 11px; }
   .forum-emoji__item { min-width: 44px; min-height: 44px; justify-content: center; }
-  .seg__btn { min-height: 40px; }
   .side .nav__link { min-height: 46px; }
   .forum-post__title a { display: inline-block; padding: 2px 0; }
 
@@ -1802,7 +1796,7 @@
 
 /* Подвал и содержимое над полосой жестов. */
 @media (max-width: 1039px) {
-  .site-foot { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .site-foot { padding-bottom: max(var(--s-4), env(safe-area-inset-bottom)); }
 }
 
 /* ── Приветственный баннер ────────────────────────────────────────────────── */
@@ -2023,7 +2017,7 @@
   display: grid;
   grid-template-rows: repeat(7, 1fr);
   gap: 3px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--dim);
   text-align: right;
   line-height: 12px;
@@ -2381,7 +2375,7 @@
 }
 .guide-card a:hover { border-color: var(--accent); transform: translateY(-1px); }
 .guide-card__cat {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -2433,7 +2427,7 @@
 
 .guide-card__marks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .guide-badge {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .04em;
   padding: 2px 7px;
@@ -2538,7 +2532,7 @@
   padding: 1px 7px;
   border: 1px solid currentColor;
   border-radius: 8px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
 }
 .guide-req__sla--soon { color: var(--gold); }
@@ -2575,7 +2569,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--win) 12%, transparent);
   color: var(--win);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2702,7 +2696,7 @@
 }
 .evt-card__when b { font-size: 19px; line-height: 1.1; color: var(--text); }
 .evt-card__when span {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -2801,7 +2795,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--gold) 12%, transparent);
   color: var(--gold);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2846,7 +2840,7 @@
 }
 .forum-barter dt {
   flex: none;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -2873,7 +2867,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2915,7 +2909,7 @@
 }
 .forum-offer dt {
   flex: none;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -2942,7 +2936,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2978,7 +2972,7 @@
   padding: 2px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -3029,7 +3023,7 @@
   gap: 4px 12px;
   font-size: 12px;
 }
-.upd-card__source { color: var(--accent); text-decoration: none; }
+.upd-card__source { color: var(--accent-ink); text-decoration: none; }
 .upd-card__source:hover { text-decoration: underline; }
 .upd-card__source--broken {
   color: var(--mute);
@@ -3209,7 +3203,7 @@
 .feed-card__phase {
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -3464,7 +3458,7 @@
   background: var(--raised);
 }
 .accounts-stat dt {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--mute);
@@ -3801,7 +3795,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }

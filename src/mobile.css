@@ -44,16 +44,19 @@
     вместо того, чтобы переноситься по одному символу.
   */
   .lad__row {
-    grid-template-columns: 38px 1fr auto;
+    grid-template-columns: 52px 1fr auto;
     grid-template-areas:
       "place ident ident"
       "place form  wl"
       "place pts   pts";
-    gap: 2px 8px;
-    padding: 10px 4px;
+    gap: 2px var(--s-1);
+    padding: var(--s-1) var(--s-1);
   }
   .lad__pts { text-align: left; }
-  .lad__place b { font-size: 14px; }
+  .lad__place b { font-size: var(--fs-body); }
+  /* Цифра места и стрелка смены: на узком экране колонка одна, и в 44px
+     помещает их только плотный зазор между ними. */
+  .lad__place { gap: 4px; }
 
   /*
     Строка недели в карточке альянса: пять колонок на 360px невозможны.
@@ -237,7 +240,7 @@ html {
     добирается отступами, вид не меняется.
   */
   .nav__link { min-height: 46px; }
-  .seg__btn, .cal__btn { min-height: 40px; padding: 9px 13px; }
+  .seg__btn, .cal__btn { padding: 9px 13px; }
   .wk { min-height: 44px; }
 
   /*
@@ -260,7 +263,7 @@ html {
     после нажатия и «залипают» до следующего касания в другом месте — строка
     остаётся подсвеченной, и человек думает, что она выбрана.
   */
-  .lad__row:hover { background: none; border-left-color: transparent; }
+  .lad__row:hover { background: none; }
   .lad__row:active { background: color-mix(in srgb, var(--text) 5%, transparent); }
 }
 
@@ -317,7 +320,7 @@ html {
   transition: transform .2s var(--ease);
 }
 .tl__group[open] .tl__group-chev { transform: rotate(180deg); }
-.tl__group[open] .tl__group-name { color: var(--accent); }
+.tl__group[open] .tl__group-name { color: var(--accent-ink); }
 
 .tl--group { list-style: none; margin: 0 0 10px; padding: 0; }
 
@@ -357,7 +360,7 @@ html {
   .tl__group-name { font-size: 12px; }
   .tl__group-head { gap: 8px; }
   /* Уголок ужимаем до одного символа: место нужнее заголовку записи. */
-  .tl__chev { margin-left: 3px; font-size: 10.5px; }
+  .tl__chev { margin-left: 3px; font-size: 11px; }
   .tl__item .tl__title { font-size: 14.5px; }
   .tl__meta { font-size: 11px; }
 }
@@ -448,7 +451,7 @@ html {
   display: block;
   margin-top: 4px;
   color: var(--mute);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 /*
@@ -488,7 +491,7 @@ html {
 .forum-blog__stats span {
   display: inline;
   margin: 0;
-  font-size: 10.5px;
+  font-size: 11px;
 }
 .forum-blog__head .forum-btn { margin-left: auto; }
 
@@ -547,7 +550,7 @@ html {
   .forum-profile__stats { gap: 7px; }
   .forum-profile__stat { padding: 10px 6px; }
   .forum-profile__stat b { font-size: 19px; }
-  .forum-profile__stat span { font-size: 9.5px; }
+  .forum-profile__stat span { font-size: 11px; }
   .forum-profile-edit__ava { flex-direction: column; align-items: flex-start; }
 }
 
@@ -717,11 +720,11 @@ html {
   .president-board__signal {
     width: 7px;
     height: 7px;
-    box-shadow: 0 0 0 3px rgba(167,163,194,.1), 0 0 10px var(--electric);
+    box-shadow: 0 0 0 3px rgba(167,163,194,.1);
   }
   .president-board__label {
     flex: none;
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: .12em;
   }
   .president-board__live {
@@ -729,7 +732,7 @@ html {
     flex: none;
     margin-left: 0;
     padding: 3px 6px;
-    font-size: 6.5px;
+    font-size: 11px;
   }
 
   .president-board__identity {
@@ -753,13 +756,11 @@ html {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-shadow: none;
   }
   .president-board__alliance {
     flex: none;
     font-size: 13px;
     line-height: 1.1;
-    text-shadow: none;
   }
   /*
     Подпись («Данные обновляются вручную») в строку не влезает и была
@@ -869,9 +870,11 @@ html {
   на соседние кнопки. Теперь слово осталось только там, где места много
   (шапка, профиль), а у постов и комментариев — один значок.
 
-  Метка обязана читаться, но не первой. Поэтому она мельче ника почти втрое,
-  а слово прячется в подсказку (title) — заметно, что роль есть, и ясно,
-  что главное — ник.
+  Метка обязана читаться, но не первой. Нижняя граница кегля в проекте — 11 px
+  (ступень подписей): на 6.5 px слово «владелец» переставало быть словом и
+  превращалось в серую полоску, то есть метка не выполняла свою работу. Держать
+  её ниже ника теперь значит не размер втрое, а лёгкий вес, разрядка и цвет:
+  ник остаётся главным, а роль — прочитанной.
 */
 .role-badge {
   display: inline-flex;
@@ -885,14 +888,14 @@ html {
   color: var(--role-tone);
   /* Не наследует полужирность родителя: метка не должна спорить с ником. */
   font-family: Inter, sans-serif;
-  font-size: 6.5px;
-  font-weight: 700;
-  letter-spacing: .04em;
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: .06em;
   text-transform: uppercase;
   white-space: nowrap;
   vertical-align: 1px;
 }
-.role-badge i { font-size: 7.5px; font-style: normal; line-height: 1; }
+.role-badge i { font-size: 1em; font-style: normal; line-height: 1; }
 .role-badge b { font-weight: 700; }
 
 /*
@@ -935,7 +938,6 @@ html {
   border-color: var(--role-tone);
   background: color-mix(in srgb, var(--role-tone) 20%, transparent);
 }
-.role-badge--blogger i { font-size: 7.5px; }
 
 /* В шапке форума метка стоит одна, без ника рядом — отступ слева не нужен. */
 .forum-me__body .role-badge { margin-left: 0; }
@@ -943,10 +945,9 @@ html {
 /* На странице профиля метка крупнее: там она часть представления человека. */
 .forum-profile__meta .role-badge {
   margin-left: 0;
-  padding: 2px 7px;
-  font-size: 8px;
+  padding: 2px var(--s-1);
+  font-size: var(--fs-meta);
 }
-.forum-profile__meta .role-badge i { font-size: 9px; }
 
 /* ── Отступы на узком экране ───────────────────────────────────────────────── */
 
@@ -999,7 +1000,7 @@ html {
 */
 @media (max-width: 760px) {
   .forum-feed > :last-child { margin-bottom: 6px; }
-  .site-foot { margin-top: 8px; }
+  .site-foot { margin-top: var(--s-1); }
 }
 
 /* ── Безопасные края ──────────────────────────────────────────────────────── */
@@ -1139,7 +1140,7 @@ html {
 .pick__cap {
   flex: none;
   color: var(--mute);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .09em;
   text-transform: uppercase;
@@ -1365,23 +1366,23 @@ body { min-height: 100svh; }
 @media (max-width: 480px) {
   body .forum-post__by time,
   body .forum-comment__head time { font-size: 11px; }
-  .forum-post__head .forum-post__cat { font-size: 10.5px; }
+  .forum-post__head .forum-post__cat { font-size: 11px; }
   body .chat-item__time { font-size: 11px; }
 }
 
 /*
-  Реакции и действия поста — тач-цель. Остальные кнопки уже 40–46px,
-  а эти оставались 24–32px: палец промахивался. min-height добирает высоту
-  отступами, вид не меняется. Усиление против refine.css — тот задаёт
-  min-height 28px для реакций и грузится после.
+  Реакции, действия под постом, флажок закладки и переключатели получили один
+  рост в конце refine.css («ПОПАДАНИЕ ПАЛЬЦЕМ»): раньше этот блок выигрывал у
+  него силой селектора и оставлял на телефоне 36 px там, где стандарт — 44.
+  Правил высоты здесь больше нет: два числа на один класс — это и был тот
+  разнобой, что решался порядком загрузки файлов.
+  Замер пальцем на 390 px поймал, что чистка была неполной: здесь оставалось
+  40 px для кнопки «Мои темы», а в блоке календаря — 38 и 36 px для вкладок,
+  ответа на приглашение и выбора напоминания. Все три убраны, рост задаёт
+  только refine.css; отступы, которые рисуют кнопку, остаются свои.
 */
 @media (hover: none) and (pointer: coarse) {
-  body .forum-post__foot .forum-react__btn,
-  body .forum-comment__foot .forum-react__btn,
-  body .forum-post__foot .forum-post__comments,
-  body .forum-post__acts .forum-act,
-  body .forum-act-menu__list .forum-act { min-height: 36px; }
-  body .forum-me .forum-btn { min-height: 40px; padding: 8px 12px; }
+  body .forum-me .forum-btn { padding: 8px 12px; }
 }
 
 /*
@@ -1402,10 +1403,13 @@ body { min-height: 100svh; }
     тянется на 15–17px, и промах по нему на телефоне означает «ничего не
     произошло». Ссылка становится строкой в 44px; текст карточки под ней не
     двигается, поэтому список остаётся той же плотности, что и на десктопе.
+
+    Ширина — вторая сторона той же цели: промер поймал карточку «Чаты» на 43,2 px,
+    где высоты хватает, а короткое слово не дотягивает до планки по горизонтали.
   */
   body .about-card h3 a {
     display: inline-flex; align-items: center;
-    min-height: 44px;
+    min-height: 44px; min-width: 44px;
   }
 }
 
@@ -1432,9 +1436,3 @@ body { min-height: 100svh; }
   .cal-day__head { top: 0; }
 }
 
-/* Кнопки ответа и вкладки календаря — те же тач-цели, что у действий поста. */
-@media (hover: none) and (pointer: coarse) {
-  body .evt-actions .evt-btn,
-  body .cal-tab { min-height: 38px; }
-  body .evt-remind select { min-height: 36px; }
-}
