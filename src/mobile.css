@@ -34,7 +34,7 @@
   .wrap { padding-left: 12px; padding-right: 12px; }
   .site-head__inner { padding-left: 12px; padding-right: 12px; }
 
-  .panel, .hero { padding-left: 13px; padding-right: 13px; border-radius: 13px; }
+  .panel, .hero { padding-left: 13px; padding-right: 13px; border-radius: var(--r); }
 
   /*
     РЕЙТИНГ: три колонки вместо четырёх.
@@ -424,7 +424,7 @@ html {
 .forum-ava--lg {
   width: 88px;
   height: 88px;
-  border-radius: 20px;
+  border-radius: var(--r-2xl);
   font-size: 34px;
 }
 .forum-ava--img {
@@ -441,7 +441,7 @@ html {
 .forum-profile__stat {
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 2%, transparent);
   text-align: center;
 }
@@ -550,7 +550,7 @@ html {
   */
   .forum-profile__top { flex-direction: column; gap: 12px; }
   .forum-profile__edit { width: 100%; }
-  .forum-ava--lg { width: 72px; height: 72px; border-radius: 18px; font-size: 28px; }
+  .forum-ava--lg { width: 72px; height: 72px; border-radius: var(--r-xl); font-size: 28px; }
   .forum-profile__stats { gap: 7px; }
   .forum-profile__stat { padding: 10px 6px; }
   .forum-profile__stat b { font-size: 19px; }
@@ -620,7 +620,7 @@ html {
   width: 62px;
   height: 62px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   overflow: hidden;
 }
 .forum-attach__item img { width: 100%; height: 100%; object-fit: cover; }
@@ -1214,7 +1214,7 @@ html {
     left: 16%;
     right: 16%;
     height: 2px;
-    border-radius: 0 0 2px 2px;
+    border-radius: 0 0 var(--r-hair) var(--r-hair);
     background: var(--accent);
   }
 
@@ -1370,7 +1370,7 @@ html {
   min-height: 40px;
   padding: 8px 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   background: none;
   color: var(--dim);
   font: inherit;
@@ -1482,7 +1482,7 @@ body { min-height: 100svh; }
   для старых узких корпусов.
 */
 @media (max-width: 480px) {
-  .panel, .hero, div.forum-post { padding-left: 13px; padding-right: 13px; border-radius: 13px; }
+  .panel, .hero, div.forum-post { padding-left: 13px; padding-right: 13px; border-radius: var(--r); }
 
   /* Один шаг воздуха между карточками: панель и лента не должны спорить. */
   .panel, .hero { margin-bottom: 10px; }

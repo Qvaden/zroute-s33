@@ -12903,8 +12903,8 @@ console.log('\nAN. Доска аккаунтов');
     /getComputedStyle\(el\)\.maxHeight/.test(chatLogicSrc)
       && !/Math\.min\(el\.scrollHeight, 160\)/.test(chatLogicSrc));
   check('угол поля — скругление, а не таблетка: радиус 999px резал первую и последнюю строки',
-    /\.chat-compose__input \{[^}]*border-radius: 20px;/.test(cssSrc)
-      && !/\.chat-compose__input \{[^}]*border-radius: 999px/.test(cssSrc));
+    /\.chat-compose__input \{[^}]*border-radius: var\(--r-2xl\);/.test(cssSrc)
+      && !/\.chat-compose__input \{[^}]*border-radius: (999px|var\(--r-pill\))/.test(cssSrc));
   check('плейсхолдер живёт в одну строку и упирается в многоточие, а не в столбик',
     /\.chat-compose__input\.is-empty::before \{[\s\S]{0,400}?white-space: nowrap;[\s\S]{0,120}?text-overflow: ellipsis;/.test(cssSrc));
   check('на сенсоре плейсхолдер короче: длинный текст про скриншот там не нужен',
@@ -14246,7 +14246,7 @@ console.log('\nAN. Доска аккаунтов');
     мимо. Оболочка и кегль выровнены по соседним действиям.
   */
   check('«ответить» в ленте — кнопка, а не подпись: оболочка и кегль',
-    /\.forum-post__comments \{[\s\S]{0,300}display: inline-flex;[\s\S]{0,300}border-radius: 8px;[\s\S]{0,300}font-size: 13\.5px;/.test(forumCss));
+    /\.forum-post__comments \{[\s\S]{0,300}display: inline-flex;[\s\S]{0,300}border-radius: var\(--r-sm\);[\s\S]{0,300}font-size: 13\.5px;/.test(forumCss));
 
   /*
     Высоту цели нажатия задаёт ОДИН блок в конце refine.css — файла, который
@@ -16527,6 +16527,60 @@ console.log('\nAX. Полоса разделов и подвал');
       && /\.site-foot__nav \{\s*flex: 1 1 100%/.test(v8));
   check('под пальцем ссылки подвала стоят под общей планкой',
     /\.site-foot__nav a \{ min-height: 44px; min-width: 44px; \}/.test(refine));
+}
+
+/* ── AY. Скругления: ряд объявлен один раз и чисел вне ряда не осталось ─────
+
+   Бриф §28 просит шкалы вместо разбросанных чисел. Заход 16 сделал ряд единым
+   источником, заход 17 забрал в него остаток — 132 правила с литералом. Что
+   может сломаться молча:
+
+   Литерал, появившийся после захода. Проверка по файлам глазами не ловится:
+   строк `border-radius` в шести рабочих файлах больше трёхсот, и `11px` в
+   новой правке утонет в них. Здесь значение каждого скругления обязано быть
+   токеном ряда — кроме нуля, круга `50%` и `inherit`, которые рядом не
+   скругление угла, а его отсутствие, перенос формы или окружность.
+
+   Тихий дубль. Ровно так заход 16 обнаружил, что жёсткая геометрия захода 11
+   никогда не действовала: `refine.css` объявлял те же имена `--r-sm/--r/--r-lg`
+   другими числами и грузился позже. Поэтому ряд ищется во всех шести файлах и
+   обязан быть объявлен ровно один раз.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAY. Скругления: ряд в одном источнике, чисел вне ряда нет');
+{
+  const { readFile } = await import('node:fs/promises');
+  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const src = {};
+  for (const name of LIVE) src[name] = await readFile(`src/${name}.css`, 'utf8');
+
+  const okValue = (val) => /^0$/.test(val) || /^50%$/.test(val) || /^inherit$/.test(val)
+    || /^calc\(/.test(val)
+    || val.split(/\s+/).every((part) => /^var\(--r(-[a-z0-9]+)?\)$/.test(part)
+      || /^var\(--surface-radius\)$/.test(part) || part === '0');
+  const stray = [];
+  for (const name of LIVE) {
+    for (const m of src[name].matchAll(/border-radius:\s*([^;}]+)/g)) {
+      if (!okValue(m[1].trim())) stray.push(`${name}.css: ${m[1].trim()}`);
+    }
+  }
+  check('ни одного скругления вне ряда в шести рабочих файлах', stray.length === 0,
+    stray.slice(0, 6).join(' | '));
+
+  const declared = [];
+  for (const name of LIVE) {
+    for (const m of src[name].matchAll(/^\s*(--r(?:-(?:hair|xs|sm|lg|xl|2xl|pill))?|(--surface-radius)):\s*([^;]+);/gm)) {
+      declared.push(`${name}.css ${m[1]}`);
+    }
+  }
+  const dup = declared.filter((x, i) => declared.indexOf(x) !== i);
+  check('ряд скруглений объявлен ровно один раз и только в styles-v8.css',
+    dup.length === 0 && declared.every((x) => x.startsWith('styles-v8.css')),
+    dup.length ? dup.join(', ') : declared.join(', '));
+
+  const row = [...src['styles-v8'].matchAll(/^\s*--r(?:-(hair|xs|sm|lg|xl|2xl|pill))?[:\s]+(\d+)px/gm)]
+    .map((m) => Number(m[2]));
+  check('ступени ряда идут от метки к капсуле и не путают порядок',
+    row.join('/') === '2/4/6/10/14/16/24/999', row.join('/'));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

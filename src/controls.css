@@ -235,7 +235,7 @@
   height: 40px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   background: none;
   cursor: pointer;
 }
