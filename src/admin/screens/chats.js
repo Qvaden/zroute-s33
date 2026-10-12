@@ -127,7 +127,7 @@ function renderChatDetail(c, forum) {
               ${m.role !== 'owner' ? `<button type="button" class="adm-btn adm-btn--sm" data-chat-kick="${esc(m.userId)}">Выгнать</button>` : ''}
             </li>`).join('')}
         </ul>
-        <p class="muted" style="margin:8px 0 0;font-size:11.5px">Код приглашения: <code class="adm-mono">${esc(c.inviteCode)}</code></p>
+        <p class="muted" style="margin-top:var(--s-1);font-size:11.5px">Код приглашения: <code class="adm-mono">${esc(c.inviteCode)}</code></p>
       </div>
       <div class="adm-chat__messages">
         <span class="eyebrow">Последние сообщения · ${esc(String(forum.chatMessages.length))}</span>

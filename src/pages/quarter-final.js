@@ -178,7 +178,7 @@ function quartCard(r, byId) {
        data-form="${formScore}"
        data-place="${r.place}"
        data-active="${a.active ? 1 : 0}">
-      <span class="quart-card__top" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;width:100%;gap:5px"><span class="quart-card__rank" style="justify-self:start">${String(r.place).padStart(2, '0')}</span><span class="quart-card__tag" style="justify-self:center;margin:0;text-align:center">${esc(a.tag)}</span><span class="quart-card__streak-slot" style="justify-self:end;display:inline-flex;align-items:center;justify-content:flex-end;min-width:30px;min-height:16px">${streak}</span></span>
+      <span class="quart-card__top"><span class="quart-card__rank">${String(r.place).padStart(2, '0')}</span><span class="quart-card__tag">${esc(a.tag)}</span><span class="quart-card__streak-slot">${streak}</span></span>
       <b class="quart-card__name">${esc(a.name)}</b>
       <span class="quart-card__bottom"><span class="quart-card__form">${formDots(r.form)}</span><strong>${score}<small> ОЧКИ</small></strong></span>
     </a>`;

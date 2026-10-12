@@ -12894,7 +12894,7 @@ console.log('\nAN. Доска аккаунтов');
   /* ── Стили: пузырь сообщения и панель над вводом ── */
   check('разметка сообщения плотнее форумной: пузырь не должен быть выше реплики',
     cssSrc.includes('.chat-msg__body blockquote') && cssSrc.includes('.chat-msg__body pre')
-      && /margin: 0 0 4px/.test(cssSrc));
+      && /margin: 0 0 var\(--s-fine\)/.test(cssSrc));
   check('панель получила свой слой: .forum-md рассчитан стоять под полем, а не над ним',
     cssSrc.includes('.chat-format .forum-md'));
   check('поле ввода растёт и прокручивается, а не распирает композер',
@@ -16096,7 +16096,7 @@ console.log('\nAV. Честная пустота и контур командн�
       && /body \.hero--lead \{\s*min-height: min\(78vh, 820px\);/.test(v8Src)
       && !/body \.hero--lead \{\s*height:/.test(v8Src));
   check('полоса не наезжает на буквы: верхний отступ героя растёт ровно на меру кадра',
-    /body \.hero--media \{\s*padding-top: calc\(var\(--hero-art-h\) \+ 16px\);/.test(v8Src));
+    /body \.hero--media \{\s*padding-top: calc\(var\(--hero-art-h\) \+ var\(--s-3\)\);/.test(v8Src));
   check('кадр лежит под содержимым героя, а не за его фоном и не поверх цифр',
     /\.hero__media \{[\s\S]{0,200}?z-index: -2;/.test(v8Src)
       && /^\.hero \{[^}]*isolation: isolate;/m.test(v8Src));
@@ -16152,7 +16152,7 @@ console.log('\nAV. Честная пустота и контур командн�
     /\.sk__side \{[\s\S]{0,200}?min-height: 162px;/.test(refineSrc)
       && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk__side \{\s*min-height: 176px;/.test(refineSrc));
   check('колонки контура повторяют сетку героя, а не растягиваются по высоте',
-    /\.sk__card--ops \{\s*display: grid; gap: 24px; align-items: start; align-content: center/.test(refineSrc)
+    /\.sk__card--ops \{\s*display: grid; gap: var\(--s-4\); align-items: start; align-content: center/.test(refineSrc)
       && /@media \(min-width: 900px\) \{[\s\S]{0,400}?\.sk__card--ops \{\s*grid-template-columns: minmax\(0, 1fr\) minmax\(250px, 330px\);/.test(refineSrc));
 
   /* ── Зоны нажатия на экране аварии ── */
@@ -16269,9 +16269,12 @@ console.log('\nAW. AA у токенов обеих тем');
     `#080a0f на ${dark ? dark['--accent'] : '—'} — ${dark ? ratio(dark['--bg'], dark['--accent']).toFixed(2) : '—'}:1`);
 
   /* ── Шкалы редизайна ── */
-  const steps = [...v8.matchAll(/--s-([1-8]):\s*(\d+)px/g)].map((m) => [+m[1], +m[2]]);
-  check('лестница отступов — ровно восемь ступеней 8/12/16/24/32/48/64/96, и больше ничего',
-    steps.length === 8 && steps.map((s) => s[1]).join('/') === '8/12/16/24/32/48/64/96');
+  const steps = [...v8.matchAll(/--s-(?:([1-8])|(hair|fine)):\s*(\d+)px/g)]
+    .map((m) => [m[1] ? Number(m[1]) : (m[2] === 'hair' ? 0 : 0.5), Number(m[3])])
+    .sort((a, b) => a[0] - b[0])
+    .map((s) => s[1]);
+  check('лестница отступов — восемь ступеней ряда 8/12/16/24/32/48/64/96 плюс две микроступени 2 и 4, и больше ничего',
+    steps.join('/') === '2/4/8/12/16/24/32/48/64/96', steps.join('/'));
 
   const band = (name) => {
     const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(v8);
@@ -16581,6 +16584,116 @@ console.log('\nAY. Скругления: ряд в одном источнике
     .map((m) => Number(m[2]));
   check('ступени ряда идут от метки к капсуле и не путают порядок',
     row.join('/') === '2/4/6/10/14/16/24/999', row.join('/'));
+}
+
+/* ── AZ. Отступы: ряд в одном источнике, чисел вне ряда не осталось ────────
+
+   Бриф §8 задаёт ряд 8/12/16/24/32/48/64/96 и просит whitespace как часть
+   дизайна; §28 просит шкалы вместо разбросанных чисел. До захода 18 в шести
+   рабочих файлах жило 1900 чисел отступов, из них 1379 вне ряда, а три верхние
+   ступени (48/64/96) не были востребованы ни разу — ряд был написан, но не
+   работал. Проверки держат четыре вещи:
+
+   Числа вне ряда. Их больше нет, и следующий литерал (`padding: 13px`) упадёт
+   здесь, а не потеряется среди полутора тысяч строк. Исключения названы: ноль,
+   `0px` внутри env() как запасной вариант и отрицательные отступы — те сдвигают
+   наложение слоёв, а не задают расстояние между блоками, поэтому ряду не
+   подчиняются.
+
+   Один источник. Ровно на этом заход 16 поймал скругления: `refine.css` молча
+   переобъявлял те же имена другими числами и грузился позже.
+
+   Порядок ступеней и две микроступени (2 и 4) — они часть системы, а не то, что
+   в систему не попало: микрозазор между клетками ряда победы/поражения не может
+   стать 8 px, потому что полоса разделов на телефоне перестаёт влезать.
+
+   Востребованность верха ряда: если 48/64/96 снова станут не нужны, «воздух
+   между разделами» снова превратится в 22 px, и это надо увидеть в тесте.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nAZ. Отступы: ряд в одном источнике, чисел вне ряда нет');
+{
+  const { readFile } = await import('node:fs/promises');
+  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const src = {};
+  for (const name of LIVE) src[name] = await readFile(`src/${name}.css`, 'utf8');
+
+  const declRe = /(^|[;{}[\s])((?:padding|margin|gap|row-gap|column-gap)(?:-[a-z-]+)?)\s*:\s*([^;}]+)/g;
+  const stray = [];
+  let checked = 0;
+  for (const name of LIVE) {
+    for (const m of src[name].matchAll(declRe)) {
+      checked++;
+      const value = m[3];
+      for (const px of value.matchAll(/(-?)(\d+(?:\.\d+)?)px/g)) {
+        const num = Number(px[2]);
+        if (num === 0 || px[1] === '-') continue;
+        stray.push(`${name}.css ${m[2]}: ${value.trim().slice(0, 46)}`);
+        break;
+      }
+    }
+  }
+  check('ни одного положительного отступа вне ряда в шести рабочих файлах',
+    stray.length === 0, `${checked} правил проверено, чужих: ${stray.slice(0, 5).join(' | ')}`);
+
+  const declared = [];
+  for (const name of LIVE) {
+    for (const m of src[name].matchAll(/(^|[{;\s])--s-([a-z0-9]+)\s*:/g)) {
+      declared.push(`${name}.css --s-${m[2]}`);
+    }
+  }
+  const dup = declared.filter((x, i) => declared.indexOf(x) !== i);
+  check('ряд отступов объявлен ровно один раз и только в styles-v8.css',
+    dup.length === 0 && declared.every((x) => x.startsWith('styles-v8.css')),
+    dup.length ? dup.join(', ') : declared.length + ' объявлений');
+
+  const row = [...src['styles-v8'].matchAll(/--s-(hair|fine|[1-8])\s*:\s*(\d+)px/g)]
+    .map((m) => [m[1] === 'hair' ? 0 : m[1] === 'fine' ? 0.5 : Number(m[1]), Number(m[2])])
+    .sort((a, b) => a[0] - b[0])
+    .map((s) => s[1]);
+  check('ступени идут от микрозазора к воздуху и не путают порядок',
+    row.join('/') === '2/4/8/12/16/24/32/48/64/96', row.join('/'));
+
+  const used = (token) => LIVE.reduce((n, name) => n + (src[name].match(new RegExp(`var\\(--s-${token}\\)`, 'g')) || []).length, 0);
+  const top = ['6', '7', '8'].map((t) => `${t}:${used(t)}`).join(' ');
+  check('три верхние ступени ряда востребованы: воздух между разделами существует',
+    used('6') > 0 && used('7') > 0 && used('8') > 0, top);
+
+  const micro = ['hair', 'fine'].map((t) => `${t}:${used(t)}`).join(' ');
+  check('микроступени названы токенами, а не всплывают литералом',
+    used('hair') > 0 && used('fine') > 0, micro);
+
+  /*
+    Дыра, которую нашёл сам заход 18. Охрана смотрит в шесть CSS-файлов, а
+    карточка Кварта жила по своим правилам: в JS-шаблоне стоял инлайн
+    `style="...gap:5px"`, и он перебивал класс из styles-v8.css — ни ряд, ни
+    проверки его не видели. Таких инлайн-отступов нашлось пять. Три убраны
+    как дубли: класс делал ровно то же, только число брал из ряда. Два
+    переведены на var(), потому что в шаблоне нет причины писать пиксель там,
+    где есть ступень. Проверка держит форму, а не значение: «8px» в разметке —
+    тоже число вне единственного источника, даже если оно совпало со ступенью.
+  */
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const jsFiles = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const p = `${dir}/${e.name}`;
+      e.isDirectory() ? walk(p) : /\.js$/.test(e.name) && jsFiles.push(p);
+    }
+  };
+  walk('src');
+  const inline = [];
+  let inlineChecked = 0;
+  for (const f of jsFiles) {
+    const text = readFileSync(f, 'utf8');
+    for (const m of text.matchAll(/(?:padding|margin|gap|row-gap|column-gap)(?:-[a-z-]+)?\s*:\s*[^;"'`}]*/g)) {
+      if (!m[0].includes('px')) continue;
+      inlineChecked++;
+      inline.push(`${f}: ${m[0].trim().slice(0, 42)}`);
+    }
+  }
+  check('в JS-разметке нет пиксельных отступов: числа приходят только из ряда',
+    inline.length === 0, `${inlineChecked} инлайн-объявлений проверено, чужих: ${inline.slice(0, 4).join(' | ')}`);
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

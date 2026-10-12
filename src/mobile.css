@@ -31,10 +31,10 @@
     Отступы по краям: 18px с каждой стороны от 360 — это 10% ширины экрана
     в никуда. Ужимаем до 12, содержимому нужнее.
   */
-  .wrap { padding-left: 12px; padding-right: 12px; }
-  .site-head__inner { padding-left: 12px; padding-right: 12px; }
+  .wrap { padding-left: var(--s-2); padding-right: var(--s-2); }
+  .site-head__inner { padding-left: var(--s-2); padding-right: var(--s-2); }
 
-  .panel, .hero { padding-left: 13px; padding-right: 13px; border-radius: var(--r); }
+  .panel, .hero { padding-left: var(--s-2); padding-right: var(--s-2); border-radius: var(--r); }
 
   /*
     РЕЙТИНГ: три колонки вместо четырёх.
@@ -49,14 +49,14 @@
       "place ident ident"
       "place form  wl"
       "place pts   pts";
-    gap: 2px var(--s-1);
+    gap: var(--s-hair) var(--s-1);
     padding: var(--s-1) var(--s-1);
   }
   .lad__pts { text-align: left; }
   .lad__place b { font-size: var(--fs-body); }
   /* Цифра места и стрелка смены: на узком экране колонка одна, и в 44px
      помещает их только плотный зазор между ними. */
-  .lad__place { gap: 4px; }
+  .lad__place { gap: var(--s-fine); }
 
   /*
     Строка недели в карточке альянса: пять колонок на 360px невозможны.
@@ -84,7 +84,7 @@
     а для программ кнопка уже названа aria-label.
   */
   .forum-bell__label { display: none; }
-  .forum-bell { padding-left: 10px; padding-right: 10px; }
+  .forum-bell { padding-left: var(--s-2); padding-right: var(--s-2); }
 }
 
 /* ── Ничего не должно вылезать за край ────────────────────────────────────── */
@@ -127,7 +127,7 @@
   img, svg, video { max-width: 100%; height: auto; }
 
   /* Таблица очков в гайде: даём прокрутку внутри, а не всей странице. */
-  .proof__row { grid-template-columns: 74px 1fr auto; gap: 7px; }
+  .proof__row { grid-template-columns: 74px 1fr auto; gap: var(--s-1); }
 }
 
 /* ── Шапка поста и подвал комментария ─────────────────────────────────────── */
@@ -245,7 +245,7 @@ html {
     добирается отступами, вид не меняется.
   */
   .nav__link { min-height: 46px; }
-  .seg__btn, .cal__btn { padding: 9px 13px; }
+  .seg__btn, .cal__btn { padding: var(--s-1) var(--s-2); }
   .wk { min-height: 44px; }
 
   /*
@@ -261,7 +261,7 @@ html {
   .tl__details summary { min-height: 44px; display: flex; align-items: center; }
 
   /* Ссылка на карточку альянса: попасть по строке, а не по имени. */
-  .lad__row a { display: block; padding: 2px 0; }
+  .lad__row a { display: block; padding: var(--s-hair) 0; }
 
   /*
     Наведения на телефоне не существует. Правила :hover при этом срабатывают
@@ -288,10 +288,10 @@ html {
 .tl__group-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   /* Папку открывают пальцем — цель должна быть высотой в палец. */
   min-height: 46px;
-  padding: 4px 2px;
+  padding: var(--s-fine) var(--s-hair);
   cursor: pointer;
   list-style: none;
   -webkit-tap-highlight-color: transparent;
@@ -313,7 +313,7 @@ html {
   папка с одной записью и папка с двадцатью выглядят иначе.
 */
 .tl__group-count {
-  padding: 2px 8px;
+  padding: var(--s-hair) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--mute);
@@ -327,7 +327,7 @@ html {
 .tl__group[open] .tl__group-chev { transform: rotate(180deg); }
 .tl__group[open] .tl__group-name { color: var(--accent-ink); }
 
-.tl--group { list-style: none; margin: 0 0 10px; padding: 0; }
+.tl--group { list-style: none; margin: 0 0 var(--s-2); padding: 0; }
 
 /*
   ЗАПИСЬ СТАЛА КОМПАКТНЕЕ.
@@ -339,7 +339,7 @@ html {
 .tl__row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--s-2);
   cursor: pointer;
   list-style: none;
   -webkit-tap-highlight-color: transparent;
@@ -353,7 +353,7 @@ html {
 .tl__chev {
   flex: none;
   align-self: center;
-  margin: 0 1px 0 5px;
+  margin: 0 var(--s-hair) 0 var(--s-fine);
   color: var(--mute);
   font-size: 11px;
   line-height: 1;
@@ -363,9 +363,9 @@ html {
 
 @media (max-width: 420px) {
   .tl__group-name { font-size: 12px; }
-  .tl__group-head { gap: 8px; }
+  .tl__group-head { gap: var(--s-1); }
   /* Уголок ужимаем до одного символа: место нужнее заголовку записи. */
-  .tl__chev { margin-left: 3px; font-size: 11px; }
+  .tl__chev { margin-left: var(--s-fine); font-size: 11px; }
   .tl__meta { font-size: 11px; }
 }
 
@@ -374,7 +374,7 @@ html {
 .forum-profile__top {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--s-3);
 }
 .forum-profile__ident { flex: 1; min-width: 0; }
 .forum-profile__nick {
@@ -386,20 +386,20 @@ html {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px 10px;
-  margin-top: 6px;
+  gap: var(--s-1) var(--s-2);
+  margin-top: var(--s-1);
   font-size: 12px;
 }
 .forum-profile__role { color: var(--dim); }
 /* Метка «Блогер» на странице участника — свой цвет, как и роль-бейдж в ленте. */
 .forum-profile__role--blogger {
-  padding: 2px 8px;
+  padding: var(--s-hair) var(--s-1);
   border: 1px solid rgba(49,197,181,.4);
   border-radius: var(--r-pill);
   color: #31c5b5;
 }
 .forum-profile__ally {
-  padding: 2px 8px;
+  padding: var(--s-hair) var(--s-1);
   border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
   border-radius: var(--r-pill);
   color: var(--gold);
@@ -408,7 +408,7 @@ html {
   font-weight: 700;
 }
 .forum-profile__about {
-  margin: 10px 0 0;
+  margin: var(--s-2) 0 0;
   color: var(--dim);
   font-size: 13.5px;
   line-height: 1.55;
@@ -435,11 +435,11 @@ html {
 .forum-profile__stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 18px;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
 }
 .forum-profile__stat {
-  padding: 12px;
+  padding: var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 2%, transparent);
@@ -453,7 +453,7 @@ html {
 }
 .forum-profile__stat span {
   display: block;
-  margin-top: 4px;
+  margin-top: var(--s-fine);
   color: var(--mute);
   font-size: 11px;
 }
@@ -463,15 +463,15 @@ html {
   Строка stats повторяет layout статистики профиля, но в одну линию — сбоку
   от неё кнопка перехода к ленте блогов.
 */
-.forum-blog { margin-bottom: 18px; padding: 14px 16px; }
+.forum-blog { margin-bottom: var(--s-3); padding: var(--s-3) var(--s-3); }
 .forum-blog__head {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px 14px;
+  gap: var(--s-2) var(--s-3);
 }
 .forum-blog__badge {
-  padding: 3px 10px;
+  padding: var(--s-fine) var(--s-2);
   border: 1px solid rgba(49,197,181,.4);
   border-radius: var(--r-pill);
   background: rgba(49,197,181,.08);
@@ -481,13 +481,13 @@ html {
 }
 .forum-blog__stats {
   display: flex;
-  gap: 18px;
+  gap: var(--s-3);
 }
 .forum-blog__stats .forum-profile__stat {
   display: flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 4px 0;
+  gap: var(--s-fine);
+  padding: var(--s-fine) 0;
   border: none;
   background: none;
 }
@@ -501,7 +501,7 @@ html {
 
 .forum-profile__posts { margin: 0; padding: 0; list-style: none; }
 .forum-profile__posts li {
-  padding: 11px 0;
+  padding: var(--s-2) 0;
   border-bottom: 1px solid var(--line-soft);
 }
 .forum-profile__posts li:last-child { border-bottom: none; }
@@ -515,20 +515,20 @@ html {
 .forum-profile__posts a:hover { color: var(--accent-ink); }
 .forum-profile__post-meta {
   display: flex;
-  gap: 10px;
-  margin-top: 3px;
+  gap: var(--s-2);
+  margin-top: var(--s-fine);
   font-size: 11px;
 }
-.forum-profile__post-text { margin: 5px 0 0; font-size: 12.5px; line-height: 1.5; }
+.forum-profile__post-text { margin: var(--s-fine) 0 0; font-size: 12.5px; line-height: 1.5; }
 
 /* Правка профиля. */
 .forum-profile-edit__ava {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
 }
-.forum-profile-edit__ava-acts { display: grid; gap: 8px; justify-items: start; }
+.forum-profile-edit__ava-acts { display: grid; gap: var(--s-1); justify-items: start; }
 .forum-profile-edit__ava-acts small { font-size: 11px; line-height: 1.45; max-width: 34ch; }
 
 /*
@@ -541,18 +541,18 @@ html {
   opacity: .55;
   cursor: not-allowed;
 }
-.forum-field small { display: block; margin-top: 5px; font-size: 11px; line-height: 1.45; }
+.forum-field small { display: block; margin-top: var(--s-fine); font-size: 11px; line-height: 1.45; }
 
 @media (max-width: 520px) {
   /*
     На телефоне карточка складывается в столбик: аватарка 88px и ник рядом
     оставляют имени полосу шириной в два слова.
   */
-  .forum-profile__top { flex-direction: column; gap: 12px; }
+  .forum-profile__top { flex-direction: column; gap: var(--s-2); }
   .forum-profile__edit { width: 100%; }
   .forum-ava--lg { width: 72px; height: 72px; border-radius: var(--r-xl); font-size: 28px; }
-  .forum-profile__stats { gap: 7px; }
-  .forum-profile__stat { padding: 10px 6px; }
+  .forum-profile__stats { gap: var(--s-1); }
+  .forum-profile__stat { padding: var(--s-2) var(--s-1); }
   .forum-profile__stat b { font-size: 19px; }
   .forum-profile__stat span { font-size: 11px; }
   .forum-profile-edit__ava { flex-direction: column; align-items: flex-start; }
@@ -567,8 +567,8 @@ html {
 */
 .forum-shots {
   display: grid;
-  gap: 6px;
-  margin-top: 11px;
+  gap: var(--s-1);
+  margin-top: var(--s-2);
 }
 .forum-shots--multi { grid-template-columns: 1fr 1fr; }
 
@@ -596,15 +596,15 @@ html {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 4px 0 12px;
+  gap: var(--s-1);
+  margin: var(--s-fine) 0 var(--s-2);
 }
 .forum-attach__btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--s-1);
   min-height: 40px;
-  padding: 8px 13px;
+  padding: var(--s-1) var(--s-2);
   border: 1px dashed var(--line);
   border-radius: var(--r);
   color: var(--dim);
@@ -614,7 +614,7 @@ html {
 }
 .forum-attach__btn:hover { border-color: var(--accent); color: var(--text); }
 
-.forum-attach__list { display: flex; flex-wrap: wrap; gap: 7px; }
+.forum-attach__list { display: flex; flex-wrap: wrap; gap: var(--s-1); }
 .forum-attach__item {
   position: relative;
   width: 62px;
@@ -656,8 +656,8 @@ html {
 
 /* Тег альянса рядом с ником в ленте: мелко и сдержанно. */
 .forum-post__ally {
-  margin-left: 6px;
-  padding: 1px 6px;
+  margin-left: var(--s-1);
+  padding: var(--s-hair) var(--s-1);
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
   border-radius: var(--r-pill);
   color: var(--gold);
@@ -669,7 +669,7 @@ html {
 
 @media (max-width: 600px) {
   .forum-alliance-card small { max-width: 70px; }
-  .forum-tag-filter { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 3px; }
+  .forum-tag-filter { overflow-x: auto; flex-wrap: nowrap; padding-bottom: var(--s-fine); }
   .forum-tag-filter .forum-tag { flex: 0 0 auto; }
 }
 
@@ -700,11 +700,11 @@ html {
   .president-board {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--s-2);
     /* Прижимаем к правому краю шапки: слева марка, справа статус. */
     margin: 0 0 0 auto;
     max-width: 420px;
-    padding: 7px 12px;
+    padding: var(--s-1) var(--s-2);
     border-radius: var(--r-pill);
     border-width: 1px;
     /*
@@ -735,7 +735,7 @@ html {
     order: 5;
     flex: none;
     margin-left: 0;
-    padding: 3px 6px;
+    padding: var(--s-fine) var(--s-1);
     font-size: 11px;
   }
 
@@ -743,7 +743,7 @@ html {
     display: flex;
     align-items: baseline;
     justify-content: flex-start;
-    gap: 8px;
+    gap: var(--s-1);
     flex: 1;
     min-width: 0;
     padding-left: 0;
@@ -830,10 +830,10 @@ html {
 
     Ужимаем: доска и есть всё её содержимое.
   */
-  .site-head__inner { padding-top: 6px; padding-bottom: 6px; min-height: 0; }
+  .site-head__inner { padding-top: var(--s-1); padding-bottom: var(--s-1); min-height: 0; }
 
   /* Отступ содержимого от шапки был рассчитан на более высокую шапку. */
-  #app { padding-top: 18px; }
+  #app { padding-top: var(--s-3); }
 }
 
 /*
@@ -844,7 +844,7 @@ html {
   то, ради чего сайт существует, и видеть её целиком важнее, чем просторно.
 */
 @media (min-width: 1040px) {
-  .lad__row { padding-top: 8px; padding-bottom: 8px; }
+  .lad__row { padding-top: var(--s-1); padding-bottom: var(--s-1); }
   .lad__wl { font-size: 12px; }
 }
 
@@ -881,9 +881,9 @@ html {
 .role-badge {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-left: 5px;
-  padding: 0 4px;
+  gap: var(--s-hair);
+  margin-left: var(--s-fine);
+  padding: 0 var(--s-fine);
   border: 1px solid color-mix(in srgb, var(--role-tone) 30%, transparent);
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--role-tone) 10%, transparent);
@@ -908,7 +908,7 @@ html {
 .forum-post__by .role-badge b,
 .forum-comment__head .role-badge b { display: none; }
 .forum-post__by .role-badge,
-.forum-comment__head .role-badge { padding: 1px 3px; }
+.forum-comment__head .role-badge { padding: var(--s-hair) var(--s-fine); }
 
 /*
   Владелец. Единственная метка с заметным свечением — и это осознанно:
@@ -947,7 +947,7 @@ html {
 /* На странице профиля метка крупнее: там она часть представления человека. */
 .forum-profile__meta .role-badge {
   margin-left: 0;
-  padding: 2px var(--s-1);
+  padding: var(--s-hair) var(--s-1);
   font-size: var(--fs-meta);
 }
 
@@ -966,31 +966,31 @@ html {
 @media (max-width: 420px) {
   /* Раскрывающиеся блоки форума: правила и форма поста. */
   .forum-rules__summary,
-  .forum-composer__summary { padding: 13px; gap: 10px; }
-  .forum-rules__list { padding: 0 13px 4px 32px; }
-  .forum-rules__sanctions { margin: 4px 13px 0; padding: 12px 13px; }
-  .forum-rules__note { margin: 11px 13px 14px; }
-  .forum-composer form { padding: 0 13px 14px; }
+  .forum-composer__summary { padding: var(--s-2); gap: var(--s-2); }
+  .forum-rules__list { padding: 0 var(--s-2) var(--s-fine) var(--s-5); }
+  .forum-rules__sanctions { margin: var(--s-fine) var(--s-2) 0; padding: var(--s-2) var(--s-2); }
+  .forum-rules__note { margin: var(--s-2) var(--s-2) var(--s-3); }
+  .forum-composer form { padding: 0 var(--s-2) var(--s-3); }
 
   /* Окна: 20 пикселов по кругу на узком экране съедали строку текста. */
-  .forum-modal { padding: 12px; }
-  .forum-modal__box { padding: 16px; }
-  .forum-modal__rule { padding: 10px; }
+  .forum-modal { padding: var(--s-2); }
+  .forum-modal__box { padding: var(--s-3); }
+  .forum-modal__rule { padding: var(--s-2); }
 
   /* Сводка сервера на форуме. */
-  .forum-chron { padding-bottom: 14px; }
-  .forum-chron__stats { margin: 14px 0 12px; }
+  .forum-chron { padding-bottom: var(--s-3); }
+  .forum-chron__stats { margin: var(--s-3) 0 var(--s-2); }
 
   /*
     Карточка поста. Заголовок и подпись автора отступали от края на 13,
     а нижняя полоса с реакциями — на 14: строка выглядела съехавшей.
   */
-  .forum-post__foot { margin-top: 12px; padding-top: 11px; gap: 8px; }
-  .forum-post__head { gap: 9px; margin-bottom: 10px; }
+  .forum-post__foot { margin-top: var(--s-2); padding-top: var(--s-2); gap: var(--s-1); }
+  .forum-post__head { gap: var(--s-1); margin-bottom: var(--s-2); }
 
   /* Обсуждение под постом. */
-  .forum-thread { margin-top: 14px; padding-top: 13px; }
-  .forum-comment { padding: 10px 0; gap: 9px; }
+  .forum-thread { margin-top: var(--s-3); padding-top: var(--s-2); }
+  .forum-comment { padding: var(--s-2) 0; gap: var(--s-1); }
 }
 
 /*
@@ -1001,7 +1001,7 @@ html {
   кончилась лента или не догрузилась.
 */
 @media (max-width: 760px) {
-  .forum-feed > :last-child { margin-bottom: 6px; }
+  .forum-feed > :last-child { margin-bottom: var(--s-1); }
   .site-foot { margin-top: var(--s-1); }
 }
 
@@ -1014,15 +1014,15 @@ html {
 @supports (padding: env(safe-area-inset-left)) {
   @media (max-width: 1039px) {
     .wrap {
-      padding-left: max(12px, env(safe-area-inset-left));
-      padding-right: max(12px, env(safe-area-inset-right));
+      padding-left: max(var(--s-2), env(safe-area-inset-left));
+      padding-right: max(var(--s-2), env(safe-area-inset-right));
     }
     .site-head__inner {
-      padding-left: max(12px, env(safe-area-inset-left));
-      padding-right: max(12px, env(safe-area-inset-right));
+      padding-left: max(var(--s-2), env(safe-area-inset-left));
+      padding-right: max(var(--s-2), env(safe-area-inset-right));
     }
     /* Последний блок страницы не должен упираться в полосу жестов. */
-    #app { padding-bottom: max(48px, calc(env(safe-area-inset-bottom) + 32px)); }
+    #app { padding-bottom: max(var(--s-6), calc(env(safe-area-inset-bottom) + var(--s-5))); }
   }
 }
 
@@ -1054,7 +1054,7 @@ html {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--s-2);
   }
   /*
     Порядок детей явный: в styles-v8.css на узком экране .brand получил
@@ -1166,12 +1166,12 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: var(--s-fine);
     /* 56 px вместо планки в 44: полоса одна на весь экран, и попадать в неё
        пальцем должны без прицеливания, но и содержимое страницы она не должна
        отъедать — 56 это ровно одна строка меню с полями. */
     min-height: var(--tabbar-h);
-    padding: 0 4px;
+    padding: 0 var(--s-fine);
     border: 0;
     background: none;
     color: var(--dim);
@@ -1272,10 +1272,10 @@ html {
 .pick__btn {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--s-1);
   width: 100%;
   min-height: 37px;
-  padding: 0 34px 0 14px;
+  padding: 0 var(--s-5) 0 var(--s-3);
   background: var(--raised);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
@@ -1343,7 +1343,7 @@ html {
   max-height: 196px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 5px;
+  padding: var(--s-fine);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--raised-2);
@@ -1368,7 +1368,7 @@ html {
   align-items: center;
   width: 100%;
   min-height: 40px;
-  padding: 8px 12px;
+  padding: var(--s-1) var(--s-2);
   border: 0;
   border-radius: var(--r-sm);
   background: none;
@@ -1407,8 +1407,8 @@ html {
 /* Сегменты, которые остались на телефоне, становятся плотнее: «Свежее /
    Лучшее / Обсуждаемое» в одну строку вместо трёх. */
 @media (max-width: 480px) {
-  .seg { gap: 1px; padding: 2px; }
-  .seg__btn { padding: 6px 9px; font-size: 12px; }
+  .seg { gap: var(--s-hair); padding: var(--s-hair); }
+  .seg__btn { padding: var(--s-1) var(--s-1); font-size: 12px; }
 }
 
 /*
@@ -1452,7 +1452,7 @@ body { min-height: 100svh; }
 @media (max-width: 480px) {
   .forum-welcome { align-items: flex-start; flex-wrap: wrap; }
   .forum-welcome .forum-btn { margin-left: 0; width: 100%; }
-  .forum-hot__item a { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .forum-hot__item a { flex-direction: column; align-items: flex-start; gap: var(--s-hair); }
 }
 
 /* ── Чаты: кнопка «К новым» на телефоне ──────────────────────────────────────
@@ -1468,7 +1468,7 @@ body { min-height: 100svh; }
 }
 
 @media (max-width: 380px) {
-  .chat-go-new { padding: 6px 10px; }
+  .chat-go-new { padding: var(--s-1) var(--s-2); }
   .chat-go-new span { min-width: 16px; }
 }
 
@@ -1482,11 +1482,11 @@ body { min-height: 100svh; }
   для старых узких корпусов.
 */
 @media (max-width: 480px) {
-  .panel, .hero, div.forum-post { padding-left: 13px; padding-right: 13px; border-radius: var(--r); }
+  .panel, .hero, div.forum-post { padding-left: var(--s-2); padding-right: var(--s-2); border-radius: var(--r); }
 
   /* Один шаг воздуха между карточками: панель и лента не должны спорить. */
-  .panel, .hero { margin-bottom: 10px; }
-  div.forum-feed { gap: 10px; }
+  .panel, .hero { margin-bottom: var(--s-2); }
+  div.forum-feed { gap: var(--s-2); }
 
   /*
     Категория поста («Новости сервера») — no-wrap. На узком экране длинное
@@ -1509,9 +1509,9 @@ body { min-height: 100svh; }
   при равной силе перебил бы это правило.
 */
 @media (max-width: 420px) {
-  .panel { padding-top: 14px; padding-bottom: 14px; }
-  .hero  { padding-top: 16px; padding-bottom: 16px; }
-  div.forum-post { padding: 13px 14px; }
+  .panel { padding-top: var(--s-3); padding-bottom: var(--s-3); }
+  .hero  { padding-top: var(--s-3); padding-bottom: var(--s-3); }
+  div.forum-post { padding: var(--s-2) var(--s-3); }
 }
 
 /*
@@ -1538,7 +1538,7 @@ body { min-height: 100svh; }
   только refine.css; отступы, которые рисуют кнопку, остаются свои.
 */
 @media (hover: none) and (pointer: coarse) {
-  body .forum-me .forum-btn { padding: 8px 12px; }
+  body .forum-me .forum-btn { padding: var(--s-1) var(--s-2); }
 }
 
 /*
@@ -1551,7 +1551,7 @@ body { min-height: 100svh; }
   body .who__more,
   body .live__more {
     display: inline-flex; align-items: center;
-    min-height: 44px; padding: 10px 8px;
+    min-height: 44px; padding: var(--s-2) var(--s-1);
   }
 
   /*
@@ -1577,15 +1577,15 @@ body { min-height: 100svh; }
 @media (max-width: 560px) {
   .evt-card {
     grid-template-columns: 54px minmax(0, 1fr);
-    gap: 10px;
-    padding: 11px 12px;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-2);
   }
   .evt-card__side {
     grid-column: 1 / -1;
     justify-items: stretch;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--s-1);
   }
   .evt-card__side .evt-link { flex: 1 1 auto; text-align: center; }
   .evt-card__when b { font-size: 17px; }

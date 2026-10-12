@@ -51,7 +51,7 @@ import { forum } from '../forum/index.js';
   function renderEventComments(box, eventId, list) {
     if (!box) return;
     if (!Array.isArray(list) || !list.length) {
-      box.innerHTML = '<p class="muted" style="margin:4px 0;font-size:11px">Комментариев нет. Будь первым!</p>' +
+      box.innerHTML = '<p class="muted" style="margin:var(--s-fine) 0;font-size:11px">Комментариев нет. Будь первым!</p>' +
         '<form class="tl__comment-form" data-tl-comment-form="' + box.dataset.tlCommentsFor + '">' +
           '<input name="body" placeholder="Напишите комментарий…" maxlength="2000" required>' +
           '<button type="submit">Отправить</button>' +
@@ -394,11 +394,11 @@ import { forum } from '../forum/index.js';
         return;
       }
       box.classList.add('is-loaded');
-      box.innerHTML = '<p class="muted" style="margin:4px 0;font-size:11px">Загружаем…</p>';
+      box.innerHTML = '<p class="muted" style="margin:var(--s-fine) 0;font-size:11px">Загружаем…</p>';
       forum.listEventComments(eventId).then(function (list) {
         renderEventComments(box, eventId, list);
       }).catch(function () {
-        box.innerHTML = '<p class="muted" style="margin:4px 0;font-size:11px">Не удалось загрузить.</p>';
+        box.innerHTML = '<p class="muted" style="margin:var(--s-fine) 0;font-size:11px">Не удалось загрузить.</p>';
       });
       return;
     }
