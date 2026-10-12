@@ -16696,6 +16696,79 @@ console.log('\nAZ. Отступы: ряд в одном источнике, чи
     inline.length === 0, `${inlineChecked} инлайн-объявлений проверено, чужих: ${inline.slice(0, 4).join(' | ')}`);
 }
 
+/* ── BA. Границы ширины: один ряд и ни одного числа с двух сторон ────────────
+
+   Бриф §28 просит централизованные breakpoints. У @media число переменной не
+   читается, поэтому рядом со шкалами отступов и скруглений в styles-v8.css
+   лежит ряд границ: строка «760 min» означает, что с 760 px начинается
+   большая полоса, а телефоном считается всё до 759 px. Что может сломаться
+   молча:
+
+   Число вне ряда. Кто-нибудь напишет @media (max-width: 780px), и у страницы
+   появится третья неучтённая полоса, которую никто не размечал. Допустимые
+   числа берутся из того же комментария, а не из отдельного списка теста:
+   правка ряда и правка проверки — одно действие, а не два файла.
+
+   Пара с двух сторон. Пока для одного B существовали и max-width: B, и
+   min-width: B, ровно на ширине B действовали и телефонные, и большие
+   правила: на 760 px навигация была уже десктопной, а плотный слой и боковая
+   колонка — ещё телефонными. Нижняя полоса обязана останавливаться на B-1, и
+   это тоже выводится из ряда, а не записано вторым списком.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBA. Границы ширины: ряд в одном источнике, дублей с двух сторон нет');
+{
+  const { readFile } = await import('node:fs/promises');
+  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+
+  const row = await readFile('src/styles-v8.css', 'utf8');
+  const bounds = [];
+  for (const m of row.matchAll(/^ {6}(\d{3,4}) (max|min)\s/gm)) {
+    bounds.push({ n: Number(m[1]), side: m[2] });
+  }
+  check('ряд границ объявлен в styles-v8.css', bounds.length >= 20,
+    `строк в ряду: ${bounds.length}`);
+
+  const openHigh = new Set(bounds.filter((b) => b.side === 'min').map((b) => b.n));
+  const stopLow = new Set(bounds.filter((b) => b.side === 'max').map((b) => b.n));
+  const allowedMin = openHigh;
+  const allowedMax = new Set([...openHigh].map((n) => n - 1).concat([...stopLow]));
+
+  const stray = [];
+  const seenMin = new Set();
+  const seenMax = new Set();
+  let conditions = 0;
+  for (const name of LIVE) {
+    const css = await readFile(`src/${name}.css`, 'utf8');
+    for (const line of css.split(/\r\n|\n|\r/)) {
+      if (!/^\s*@media/.test(line)) continue;
+      for (const m of line.matchAll(/\((min|max)-width:\s*([0-9.]+)px/g)) {
+        const n = Number(m[2]);
+        conditions++;
+        if (m[1] === 'min') seenMin.add(n); else seenMax.add(n);
+        const ok = m[1] === 'min' ? allowedMin.has(n) : allowedMax.has(n);
+        if (!ok) stray.push(`${name}.css: ${m[1]}-width ${n}px`);
+      }
+    }
+  }
+  check('каждое условие ширины берёт число из ряда границ', stray.length === 0,
+    `${conditions} условий проверено, вне ряда: ${stray.slice(0, 6).join(' | ')}`);
+
+  const doubled = [...seenMin].filter((n) => seenMax.has(n)).sort((a, b) => a - b);
+  check('ни одного числа с двух сторон сразу', doubled.length === 0,
+    doubled.length ? `и max, и min: ${doubled.join(', ')}`
+      : 'границы дополняют друг друга: до B-1 и от B');
+
+  /*
+    Телефон и десктоп расходятся ровно на одной границе. Если её сдвинут,
+    не сказав никому, плотный слой refine.css и полоса разделов mobile.css
+    перестанут стыковаться, а проверка выше это пропустит: оба числа будут
+    стоять в ряду, просто разные.
+  */
+  check('главная граница телефона и десктопа — одна на весь сайт, 760 px',
+    seenMin.has(760) && seenMax.has(759) && !seenMin.has(761) && !seenMax.has(760),
+    `min-границы вокруг: ${[...seenMin].filter((n) => n > 700 && n < 800).sort((a, b) => a - b).join(', ') || 'нет'}`);
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

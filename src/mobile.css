@@ -100,7 +100,7 @@
   родителя, а тот — всю сетку. Перенос в любом месте некрасив, но читаемый
   текст с переносом посреди слова лучше недостижимой половины экрана.
 */
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   .lad__name, .lad__ident,
   .podium__name, .leader__name,
   .tile, .tag,
@@ -163,7 +163,7 @@
   каждую перенесённую строку, а на первой не действует: там блок автора
   тянется на всё свободное место, и свободных концов просто нет.
 */
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   .forum-post__head { flex-wrap: wrap; justify-content: center; }
   .forum-post__by { flex: 1 1 140px; }
 
@@ -226,7 +226,7 @@ html {
 .forum-modal { height: 100vh; height: 100dvh; }
 .adm-modal { height: 100vh; height: 100dvh; }
 
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   /*
     Поле ввода не должно быть выше половины экрана: иначе с открытой
     клавиатурой не видно ни того, что пишешь, ни кнопки.
@@ -543,7 +543,7 @@ html {
 }
 .forum-field small { display: block; margin-top: var(--s-fine); font-size: 11px; line-height: 1.45; }
 
-@media (max-width: 520px) {
+@media (max-width: 519px) {
   /*
     На телефоне карточка складывается в столбик: аватарка 88px и ник рядом
     оставляют имени полосу шириной в два слова.
@@ -1000,7 +1000,7 @@ html {
   под полосой жестов. Выглядело как обрезанная страница, и было непонятно,
   кончилась лента или не догрузилась.
 */
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   .forum-feed > :last-child { margin-bottom: var(--s-1); }
   .site-foot { margin-top: var(--s-1); }
 }
@@ -1574,7 +1574,7 @@ body { min-height: 100svh; }
   сжимают заголовок темы до двух слов, а ссылка «В мой календарь» ломает
   перенос. Колонку ссылок уводим под тело: дата и заголовок остаются читаемыми.
 */
-@media (max-width: 560px) {
+@media (max-width: 559px) {
   .evt-card {
     grid-template-columns: 54px minmax(0, 1fr);
     gap: var(--s-2);

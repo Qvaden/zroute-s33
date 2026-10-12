@@ -421,7 +421,7 @@
 }
 .forum-chron__more:hover { text-decoration: underline; }
 
-@media (max-width: 520px) {
+@media (max-width: 519px) {
   .forum-chron__stats { grid-template-columns: 1fr 1fr; }
   .forum-chron__stat:last-child { grid-column: span 2; }
 }
@@ -876,7 +876,7 @@
 }
 .forum-notify__empty-icon svg { width: 19px; height: 19px; }
 
-@media (max-width: 560px) {
+@media (max-width: 559px) {
   .forum-notify__link { gap: var(--s-1); padding: var(--s-1); }
   /* На телефоне строка читается одной фразой: цитата в одну строку,
      а «Открыть» вообще не участвует в раскладке — касание и так по всей строке. */
@@ -1301,7 +1301,7 @@
 }
 .ctl--forum .seg { flex-wrap: wrap; }
 .seg--sort { margin-left: auto; }
-@media (max-width: 620px) {
+@media (max-width: 619px) {
   .seg--sort { margin-left: 0; }
 }
 
@@ -1592,7 +1592,7 @@
 .forum-emoji__item b { font-size: 11px; }
 
 /* У правого края списка не хватает места — открываем влево. */
-@media (max-width: 520px) {
+@media (max-width: 519px) {
   .forum-emoji__pop { left: auto; right: 0; }
 }
 
@@ -1848,7 +1848,7 @@
 .forum-starter__go:hover { border-color: var(--accent); }
 .forum-starter__foot { margin: var(--s-2) 0 0; font-size: 12px; }
 
-@media (max-width: 560px) {
+@media (max-width: 559px) {
   .forum-starter__item { align-items: flex-start; }
   /* Палец мимо 26 пикселей мажет, а это единственная кнопка во всём блоке. */
   .forum-starter__go { width: 38px; height: 38px; margin-left: auto; }
@@ -2204,7 +2204,7 @@
 }
 .forum-lead__icon { font-size: 15px; line-height: 1; }
 .forum-lead .seg--lead { margin-left: auto; }
-@media (max-width: 620px) {
+@media (max-width: 619px) {
   .forum-lead__head { flex-wrap: wrap; }
   .forum-lead .seg--lead { margin-left: 0; }
 }
@@ -3140,7 +3140,7 @@
 .upd-page__foot p { margin: 0; font-size: 12px; line-height: 1.55; }
 .upd-note { margin-top: var(--s-1) !important; color: var(--gold); }
 
-@media (max-width: 560px) {
+@media (max-width: 559px) {
   /* Кнопка архива — единственная в карточке, и мимо 24 пикселей мажет. */
   .upd-card__action {
     margin-left: 0;

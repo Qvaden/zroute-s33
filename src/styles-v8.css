@@ -168,6 +168,57 @@
   */
 
   /*
+    РЯД ГРАНИЦ ШИРИНЫ.
+
+    §28 требует единые точки перелома. У @media число переменной не
+    читается, поэтому граница живёт здесь не токеном, а списком: каждое
+    число ниже — единственное своё имя, и в шести файлах стилей оно стоит
+    ровно в одном виде. Секция BA в тестах проверяет именно это: ни одного
+    числа вне списка и ни одного числа с двух сторон сразу.
+
+    Порядок для пары один: граница относится к верхней полосе и пишется
+    как min-width: B, нижняя останавливается на шаг раньше — max-width:
+    B-1. Одно и то же число с двух сторон не пишется никогда: ровно на
+    ширине B к странице применялись бы и телефонные, и большие правила.
+    Так и было у 760 px — плашка навигации уже десктопная, а плотный слой
+    и боковая колонка ещё телефонные.
+
+      359 max   подпись бургера не влезает
+      380 max   кнопка нового чата сжимается
+      390 max   плашка президента переносится в две строки
+      420 max   узкий телефон: переключатели, летопись в две клетки, чат
+      430 max   карточка игрока в панели становится столбиком
+      480 max   переключатели в ряд на всю ширину
+      520 min   «кто двигается» — две колонки
+      560 min   сетка пушей форума в две клетки
+      600 max   панель публикации и фильтры тегов уходят под строку
+      620 min   «прямо сейчас», статистика альянса, дуэль, подиум в ряд
+      640 max   кнопки подтверждения — на всю ширину и 44 px
+      700 max   плашка президента и витрина аккаунтов в одну колонку
+      720 min   раздел-сплит и карточки практики в две колонки
+      760 min   главная граница: телефон и десктоп. Выше неё — плотный
+                слой из refine.css, постоянная боковая колонка и
+                горизонтальная навигация; до 759 — mobile.css и шторка
+                по тапу.
+      800 max   фишки бота в одну колонку
+      860 min   grid-2 — две колонки
+      880 min   таблица достижений в одну строку и двухпанельный чат
+      900 min   статистика альянса, «доказательства» и верх героя;
+                до 899 — карточки ролей в две колонки
+      920 min   сетка Кварта в четыре колонки
+      1024 min  герой-лиз и карточка операций, но только с высотой 720 px
+      1040 min  боковая колонка форума постоянная; до 1039 — шторка
+      1180 min  форум получает правую колонку хроники
+      1240 min  плашка президента разворачивается целиком
+      1440 min  правая колонка форума становится шире
+
+    Одинарные границы (вниз: 359, 380, 390, 420, 430, 480, 600, 640, 700,
+    800; вверх: 720, 860, 880, 920, 1180, 1240, 1440) пары не имеют
+    нарочно: там правило только снимает тесноту, а напротив него ничего не
+    переключается, так что дублировать число второй стороной не от чего.
+  */
+
+  /*
     Фактура командного центра: сетка, уголки и свечение. Подобрана так, чтобы
     она читалась краем глаза: цифры рейтинга важнее атмосферы.
   */
@@ -1611,7 +1662,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   .quart-hero { padding: var(--s-5) var(--s-5) var(--s-4); }
   .quart-board { padding: var(--s-4) var(--s-4) var(--s-4); }
 }
-@media (max-width: 520px) {
+@media (max-width: 519px) {
   .quart-hero__top { display: block; }
   .quart-dial { align-items: flex-start; margin-top: var(--s-4); text-align: left; }
   .quart-dial b { font-size: 42px; }
@@ -1832,7 +1883,7 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 }
 .data-notice[hidden] { display: none; }
 .data-notice .forum-btn { margin-left: var(--s-2); }
-@media (max-width: 560px) {
+@media (max-width: 559px) {
   .data-notice { font-size: 13px; }
   .data-notice .forum-btn { display: block; margin: var(--s-2) 0 0; width: 100%; }
 }
@@ -1952,7 +2003,7 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, color-mix(in s
   .nav { margin-top: var(--s-hair); padding-top: var(--s-fine); }
   .hero { min-height: 285px; padding-top: var(--s-4); }
 }
-@media (max-width: 520px) {
+@media (max-width: 519px) {
   .hero { min-height: 270px; }
 }
 
@@ -2058,7 +2109,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .bot-final { display: grid; justify-items: center; padding: var(--s-7) var(--s-4) var(--s-5); text-align: center; } .bot-final h2 { margin: var(--s-2) 0 var(--s-hair); font-size: clamp(26px, 5vw, 46px); } .bot-final em { color: var(--electric); font-style: normal; }
 .bot-cta--large { margin-top: var(--s-4); padding: var(--s-3) var(--s-3); }
 @media (max-width: 800px) { .bot-feature-grid { grid-template-columns: repeat(2, 1fr); } .bot-launch { grid-template-columns: auto 1fr; } .bot-launch__handle { grid-column: 2; } }
-@media (max-width: 560px) { .bot-hero { min-height: 0; padding-bottom: var(--s-4); } .bot-hero__top { display: block; } .bot-hero__signal { position: absolute; top: 5px; right: 0; min-width: 62px; } .bot-hero__bottom { position: relative; right: auto; bottom: auto; left: auto; grid-template-columns: 1fr; width: 100%; margin-top: var(--s-5); } .bot-launch { grid-template-columns: 1fr; gap: var(--s-3); } .bot-launch__handle { grid-column: auto; } .bot-feature-grid { grid-template-columns: 1fr; } .bot-feature { min-height: 0; } .bot-promise { grid-template-columns: 1fr; gap: var(--s-3); } .bot-promise__line { position: relative; width: 70px; height: 2px; } }
+@media (max-width: 559px) { .bot-hero { min-height: 0; padding-bottom: var(--s-4); } .bot-hero__top { display: block; } .bot-hero__signal { position: absolute; top: 5px; right: 0; min-width: 62px; } .bot-hero__bottom { position: relative; right: auto; bottom: auto; left: auto; grid-template-columns: 1fr; width: 100%; margin-top: var(--s-5); } .bot-launch { grid-template-columns: 1fr; gap: var(--s-3); } .bot-launch__handle { grid-column: auto; } .bot-feature-grid { grid-template-columns: 1fr; } .bot-feature { min-height: 0; } .bot-promise { grid-template-columns: 1fr; gap: var(--s-3); } .bot-promise__line { position: relative; width: 70px; height: 2px; } }
 
 /* ── Руководство по составу альянса                                        */
 .roles-panel { margin-top: var(--s-4); border-color: color-mix(in srgb, var(--electric) 24%, transparent); background: linear-gradient(145deg, rgba(18,25,30,.96), rgba(12,16,21,.98)); }
@@ -2075,8 +2126,8 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .roles-notice { display: grid; grid-template-columns: 44px 1fr; gap: var(--s-3); align-items: start; margin-top: var(--s-2); border-color: color-mix(in srgb, var(--gold) 34%, transparent); background: linear-gradient(110deg, color-mix(in srgb, var(--gold) 9%, transparent), color-mix(in srgb, var(--text) 2.5%, transparent)); }
 .roles-notice__mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; color: #18130a; background: var(--gold); font: 900 20px/1 Unbounded, sans-serif; }
 .roles-notice h3 { margin: var(--s-fine) 0 var(--s-1); color: var(--gold); font-size: 18px; } .roles-notice p { max-width: 900px; margin: var(--s-1) 0 0; color: var(--dim); font-size: 13px; line-height: 1.55; }
-@media (max-width: 900px) { .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
+@media (max-width: 899px) { .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 559px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
 
 .roles-credit { margin: var(--s-3) 0 0; color: var(--mute); font-size: 11px; line-height: 1.4; letter-spacing: .02em; text-align: center; opacity: .78; }
 
@@ -2085,7 +2136,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .guide-extra-card { padding: var(--s-4); border: 1px solid var(--line); border-top: 2px solid var(--electric); border-radius: var(--r); background: linear-gradient(145deg, rgba(24,29,38,.92), rgba(14,17,22,.96)); animation: s33-rise .7s var(--ease-out) both; animation-delay: calc(var(--i) * 80ms); }
 .guide-extra-card h2 { margin: var(--s-1) 0 var(--s-2); font-size: clamp(19px, 3vw, 26px); } .guide-extra-card .prose { color: var(--dim); line-height: 1.65; }
 .guide-extra-card--gold { border-top-color: var(--gold); } .guide-extra-card--orange { border-top-color: var(--accent); } .guide-extra-card--violet { border-top-color: #c7a6ff; } .guide-extra-card--red { border-top-color: #ff7f7f; }
-@media (max-width: 560px) { .guide-extra-grid { grid-template-columns: 1fr; gap: var(--s-2); } .guide-extra-card { padding: var(--s-3); } }
+@media (max-width: 559px) { .guide-extra-grid { grid-template-columns: 1fr; gap: var(--s-2); } .guide-extra-card { padding: var(--s-3); } }
 
 /* Свой цвет, который выбрал человек в полном редакторе руководства.
    Цвет держит рамку и чернила значка; свечение вокруг карточки убрано. */
@@ -2098,7 +2149,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 /* Тонкий акцент у строки об авторстве */
 .roles-credit{position:relative;display:block;max-width:fit-content;margin:var(--s-4) auto 0;padding:var(--s-1) var(--s-3) var(--s-1);color:color-mix(in srgb,var(--text) 72%,var(--mute));font-size:11px;line-height:1.45;letter-spacing:.035em;text-align:center;opacity:.9;border-top:1px solid color-mix(in srgb,var(--electric) 42%,transparent);border-bottom:1px solid color-mix(in srgb,var(--electric) 18%,transparent)}
 .roles-credit::before,.roles-credit::after{content:"✦";display:inline-block;margin:0 var(--s-1);color:var(--electric);font-size:11px;vertical-align:1px;opacity:.75}
-@media (max-width:560px){.roles-credit{max-width:92%;padding:var(--s-1) var(--s-2);font-size:11px}.roles-credit::before,.roles-credit::after{margin:0 var(--s-fine)}}
+@media (max-width: 559px){.roles-credit{max-width:92%;padding:var(--s-1) var(--s-2);font-size:11px}.roles-credit::before,.roles-credit::after{margin:0 var(--s-fine)}}
 
 /* Спокойная атмосфера карточки: тонкая светлая линия по верхнему краю. */
 .role-card::after{right:auto;bottom:auto;left:0;top:0;width:100%;height:1px;border:0;border-radius:0;background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.22}
