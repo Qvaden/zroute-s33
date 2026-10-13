@@ -19,6 +19,7 @@
  */
 import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
+import { toast } from '../ui/toast.js';
 import { renderChats, renderScrollArea, renderChatList, renderMessage, dayLabel } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
 import { excerpt, sanitizeHtml, textOf } from './format.js';
@@ -412,15 +413,6 @@ function autosize(el) {
   el.style.height = `${Math.min(el.scrollHeight, cap)}px`;
 }
 
-function notice(text) {
-  document.querySelector('.forum-toast')?.remove();
-  const t = document.createElement('div');
-  t.className = 'forum-toast';
-  t.textContent = text;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2600);
-}
-
 /* ── Вложения ───────────────────────────────────────────────────────────── */
 
 function addFiles(fileList) {
@@ -428,7 +420,7 @@ function addFiles(fileList) {
   const files = [...fileList].slice(0, room);
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) {
-      notice(`«${file.name}» больше 25 МБ — не влезет`);
+      toast(`«${file.name}» больше 25 МБ — не влезет`);
       continue;
     }
     state.pendingFiles.push({
@@ -833,7 +825,7 @@ async function send(form) {
     paintComposerMeta();
     paintGoNew();
   } catch (err) {
-    notice(String(err?.message ?? err));
+    toast(String(err?.message ?? err));
   } finally {
     state.sending = false;
     if (btn?.isConnected) btn.disabled = false;
@@ -925,7 +917,7 @@ async function withBusy(btn, label, fn) {
   try {
     await fn();
   } catch (err) {
-    notice(String(err?.message ?? err));
+    toast(String(err?.message ?? err));
   } finally {
     if (btn.isConnected) { btn.disabled = false; btn.textContent = was; }
   }
@@ -964,7 +956,7 @@ function wire() {
         const id = await forum.joinChat(code);
         await loadList();
         location.hash = `#/chats/${id}`;
-        notice('Вы в чате');
+        toast('Вы в чате');
       });
       return;
     }
@@ -1002,7 +994,7 @@ function wire() {
         state.dmOpen = false;
         await loadList();
         location.hash = `#/chats/${id}`;
-        notice('ЛС открыт');
+        toast('ЛС открыт');
       });
     }
     return;
@@ -1099,9 +1091,9 @@ function wire() {
     if (copy) {
       try {
         await navigator.clipboard.writeText(copy.dataset.chatCopy);
-        notice('Ссылка скопирована');
+        toast('Ссылка скопирована');
       } catch {
-        notice(`Код: ${state.open?.inviteCode ?? ''}`);
+        toast(`Код: ${state.open?.inviteCode ?? ''}`);
       }
       return;
     }
@@ -1111,7 +1103,7 @@ function wire() {
         const code = await forum.rotateChatCode(state.openId);
         if (state.open) state.open.inviteCode = code;
         paint();
-        notice('Код сменён — старый больше не работает');
+        toast('Код сменён — старый больше не работает');
       });
       return;
     }
@@ -1139,7 +1131,7 @@ function wire() {
         await forum.deleteChat(state.openId);
         await loadList();
         location.hash = '#/chats';
-        notice('Чат удалён навсегда');
+        toast('Чат удалён навсегда');
       });
       return;
     }
@@ -1302,7 +1294,7 @@ function wire() {
         .map((el) => String(el.value ?? '').trim())
         .filter(Boolean);
       if (q.length < 3 || options.length < 2) {
-        notice('Нужен вопрос и хотя бы два варианта');
+        toast('Нужен вопрос и хотя бы два варианта');
         return;
       }
       const multiple = Boolean(box?.querySelector('[name="pollMultiple"]')?.checked);
@@ -1403,7 +1395,7 @@ function wire() {
       a.download = `chat-${state.open?.title || state.openId}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      notice('История экспортирована');
+      toast('История экспортирована');
       return;
     }
 
@@ -1427,7 +1419,7 @@ function wire() {
         await forum.unpinChatMessage?.(state.openId);
         await loadList();
         await openChat(state.openId);
-        notice('Откреплено');
+        toast('Откреплено');
       });
       return;
     }
@@ -1440,7 +1432,7 @@ function wire() {
         await forum.pinChatMessage?.(state.openId, msgId);
         await loadList();
         await openChat(state.openId);
-        notice('Сообщение закреплено');
+        toast('Сообщение закреплено');
       });
       return;
     }
@@ -1472,8 +1464,8 @@ function wire() {
       host.querySelector('.chat-menu__pop')?.remove();
       host.querySelector('[data-chat-menu-toggle]')?.setAttribute('aria-expanded', 'false');
       try {
-        if (!('Notification' in window)) { notice('Браузер не поддерживает уведомления'); return; }
-        if (!('serviceWorker' in navigator)) { notice('Service Worker не поддерживается'); return; }
+        if (!('Notification' in window)) { toast('Браузер не поддерживает уведомления'); return; }
+        if (!('serviceWorker' in navigator)) { toast('Service Worker не поддерживается'); return; }
 
         const reg = await navigator.serviceWorker.ready;
         const existing = await reg.pushManager.getSubscription();
@@ -1483,32 +1475,32 @@ function wire() {
           await existing.unsubscribe();
           await forum.removePushSubscription?.(existing.endpoint).catch(() => {});
           state.pushSubscribed = false;
-          notice('🔕 Push-уведомления отключены');
+          toast('🔕 Push-уведомления отключены');
           paintFull();
           return;
         }
 
         // Не подписан — подписываемся.
         const perm = await Notification.requestPermission();
-        if (perm !== 'granted') { notice('Разрешение на уведомления не выдано'); return; }
+        if (perm !== 'granted') { toast('Разрешение на уведомления не выдано'); return; }
 
         const vapidPublicKey = (document.querySelector('meta[name="vapid-public-key"]')?.content) || '';
         const vapidBytes = vapidPublicKey ? urlBase64ToUint8Array(vapidPublicKey) : null;
-        if (!vapidBytes) { notice('Push-ключ не настроен. Установите мету vapid-public-key.'); return; }
+        if (!vapidBytes) { toast('Push-ключ не настроен. Установите мету vapid-public-key.'); return; }
         let sub;
         try {
           sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes });
         } catch {
-          notice('Не удалось подписаться на push. Попробуйте позже.');
+          toast('Не удалось подписаться на push. Попробуйте позже.');
           return;
         }
         const keys = sub.keys || {};
         await forum.savePushSubscription?.(sub.endpoint, keys);
         state.pushSubscribed = true;
-        notice('🔔 Push-уведомления включены');
+        toast('🔔 Push-уведомления включены');
         paintFull();
       } catch (err) {
-        notice(String(err?.message ?? err));
+        toast(String(err?.message ?? err));
       }
       return;
     }
@@ -1707,7 +1699,7 @@ export async function mountChats(container, param = null) {
       return;
     } catch (err) {
       state.error = String(err?.message ?? err);
-      notice(state.error);
+      toast(state.error);
       param = null;
     }
   }

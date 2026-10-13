@@ -86,11 +86,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=107">
+  <link rel="modulepreload" href="./src/main.js?v=108">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css?v=13">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=14">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -99,7 +99,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=52">
+  <link rel="stylesheet" href="./src/forum.css?v=53">
   <!--
     Телефон — последним слоем.
 
@@ -108,7 +108,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=36">
+  <link rel="stylesheet" href="./src/mobile.css?v=37">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -121,12 +121,12 @@
     Один файл на сайт и панель: правила для select уже лежали в четырёх местах
     admin.css и спорили друг с другом.
   -->
-  <link rel="stylesheet" href="./src/controls.css?v=7">
+  <link rel="stylesheet" href="./src/controls.css?v=8">
   <!--
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=40">
+  <link rel="stylesheet" href="./src/refine.css?v=41">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -134,7 +134,7 @@
     последним: картинки и подписи в гайдах игры важнее общей плотности, и
     правило «подпись под картинкой» не должно перебиваться соседним слоем.
   -->
-  <link rel="stylesheet" href="./src/handbook.css?v=7">
+  <link rel="stylesheet" href="./src/handbook.css?v=8">
   <script>
     try {
       if (localStorage.getItem('s33-loader-seen') === '1') {
@@ -368,7 +368,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=107"></script>
+  <script type="module" src="./src/main.js?v=108"></script>
 
   <script>
     /*

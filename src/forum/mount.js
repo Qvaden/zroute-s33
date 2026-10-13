@@ -20,6 +20,7 @@
  * от document этой проблемы не знает — тот же приём, что в ui/*-controls.js.
  */
 import { forum } from './index.js';
+import { toast } from '../ui/toast.js';
 import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY } from '../pages/forum.js';
 import { renderUserPage } from '../pages/user.js';
 import {
@@ -1599,7 +1600,7 @@ async function sendAppeal(form, submitter) {
       } catch {
         /* список останется прошлым: заявка принята, и это уже видно */
       }
-      notice(`Апелляция отправлена модерации. Запрет на время разбора остаётся. ${slaPromiseLine()}`);
+      toast(`Апелляция отправлена модерации. Запрет на время разбора остаётся. ${slaPromiseLine()}`);
     } catch (err) {
       // Отказ говорит сам за себя: в нём и причина, и граница. Своего текста
       // у страницы нет, чтобы два объяснения не разошлись.
@@ -1871,9 +1872,9 @@ function wire() {
       } else if (act === 'copy') {
         try {
           await navigator.clipboard.writeText(r.key);
-          notice('Ключ скопирован');
+          toast('Ключ скопирован');
         } catch {
-          notice(`Ключ: ${formatRecoveryKey(r.key)}`);
+          toast(`Ключ: ${formatRecoveryKey(r.key)}`);
         }
       }
       return;
@@ -1887,7 +1888,7 @@ function wire() {
         subscribe.dataset.forumSubscribed = subscribed ? '' : '1';
         subscribe.textContent = subscribed ? 'Подписаться' : 'Отписаться';
       } catch (err) {
-        notice(String(err?.message ?? err));
+        toast(String(err?.message ?? err));
       }
       return;
     }
@@ -1923,7 +1924,7 @@ function wire() {
         */
         console.error('закладка не сохранена:', err?.message ?? err);
         await loadFeed();
-        notice(String(err?.message ?? err));
+        toast(String(err?.message ?? err));
       }
       return;
     }
@@ -1938,7 +1939,7 @@ function wire() {
         subscribed ? state.allianceSubscriptions.delete(id) : state.allianceSubscriptions.add(id);
         if (!subscribed) closeStarterStep('ally');
         paint();
-      } catch (err) { notice(String(err?.message ?? err)); }
+      } catch (err) { toast(String(err?.message ?? err)); }
       return;
     }
 
@@ -2053,7 +2054,7 @@ function wire() {
         if (iconEl) iconEl.textContent = res.liked ? '♥' : '♡';
         if (res.liked) { likeBtn.classList.add('is-liked'); } else { likeBtn.classList.remove('is-liked'); }
       } catch (err) {
-        notice(String(err?.message ?? err));
+        toast(String(err?.message ?? err));
       }
       return;
     }
@@ -2075,10 +2076,10 @@ function wire() {
       verifyBtn.textContent = was ? 'Снимаем…' : 'Подтверждаем…';
       try {
         await forum.setVerified(verifyBtn.dataset.profileVerify, !was);
-        notice(was ? 'Подтверждение снято.' : 'Ник подтверждён.');
+        toast(was ? 'Подтверждение снято.' : 'Ник подтверждён.');
         await loadProfile(profileState.nick);
       } catch (err) {
-        notice(String(err?.message ?? err));
+        toast(String(err?.message ?? err));
         if (verifyBtn.isConnected) {
           verifyBtn.disabled = false;
           verifyBtn.textContent = was ? 'Снять подтверждение' : 'Подтвердить ник';
@@ -2391,7 +2392,7 @@ function wire() {
           слова он увидел бы только вернувшуюся кнопку.
         */
         console.error('благодарность не сохранена:', err?.message ?? err);
-        notice(err?.message || 'База не приняла благодарность');
+        toast(err?.message || 'База не приняла благодарность');
         await refreshOne(targetType, targetId);
       }
       return;
@@ -2510,7 +2511,7 @@ function wire() {
         }
         paint();
       } catch (err) {
-        notice(String(err?.message ?? err));
+        toast(String(err?.message ?? err));
         extendBtn.disabled = false;
       }
       return;
@@ -2540,7 +2541,7 @@ function wire() {
         }
         paint();
       } catch (err) {
-        notice(`${String(err?.message ?? err)}
+        toast(`${String(err?.message ?? err)}
 Если база ещё не обновлена, прогоните supabase/applied/20260926-barter-board.sql.`.trim());
         barterBtn.disabled = false;
       }
@@ -2566,7 +2567,7 @@ function wire() {
         }
         paint();
       } catch (err) {
-        notice(`${String(err?.message ?? err)}
+        toast(`${String(err?.message ?? err)}
 Если база ещё не обновлена, прогоните supabase/applied/20261006-account-board.sql.`.trim());
         accountBtn.disabled = false;
       }
@@ -2998,7 +2999,7 @@ function wire() {
           // Сразу открываем созданное: человек должен увидеть результат,
           // а не искать свой пост в ленте.
           location.hash = `#/forum/${created.id}`;
-          if (shotError) notice(shotError);
+          if (shotError) toast(shotError);
         } catch (err) {
           showError('[data-forum-new-error]', String(err?.message ?? err));
         }
@@ -3029,7 +3030,7 @@ function wire() {
 
           resetForm(commentForm);
           await loadThread(postId);
-          if (shotError) notice(shotError);
+          if (shotError) toast(shotError);
         } catch (err) {
           showError('[data-forum-comment-error]', String(err?.message ?? err));
         }
@@ -3062,7 +3063,7 @@ function wire() {
           // После правки — туда же, где человек был: тред или лента.
           if (state.openPostId === id) await loadThread(id);
           else await loadFeed();
-          if (shotError) notice(shotError);
+          if (shotError) toast(shotError);
         } catch (err) {
           showError('[data-forum-edit-error]', String(err?.message ?? err));
         }
@@ -3145,7 +3146,7 @@ function wire() {
           note: form.note.value,
         });
         closeModal('[data-forum-report-modal]');
-        notice(`Жалоба отправлена. ${slaPromiseLine()}`);
+        toast(`Жалоба отправлена. ${slaPromiseLine()}`);
       } catch (err) {
         showError('[data-forum-report-error]', String(err?.message ?? err));
       }
@@ -3292,20 +3293,6 @@ function openDeleteModal() {
   const firstFocusable = [...modal.querySelectorAll('button, input, textarea, select')]
     .find((el) => el.offsetParent !== null);
   firstFocusable?.focus({ preventScroll: true });
-}
-
-/**
- * Короткое сообщение об успехе.
- *
- * Отдельная полоса, а не alert: alert останавливает страницу и на телефоне
- * выглядит как ошибка сайта.
- */
-function notice(text) {
-  const box = document.createElement('div');
-  box.className = 'forum-toast';
-  box.textContent = text;
-  document.body.append(box);
-  window.setTimeout(() => box.remove(), 4000);
 }
 
 /** В именах реакций есть двоеточие, поэтому в селекторе его надо закрыть. */

@@ -71,7 +71,7 @@
   приклеена (`position: sticky`), иначе она утонет под ней.
 */
 .skip-link {
-  position: absolute; top: 8px; left: 8px; z-index: 200;
+  position: absolute; top: 8px; left: 8px; z-index: var(--z-skip);
   transform: translateY(-200%);
   padding: var(--s-2) var(--s-3); border-radius: var(--r-sm);
   background: var(--accent); color: var(--on-accent); font-weight: 600;
@@ -170,9 +170,9 @@
   .forum-side .forum-chron__stats { grid-template-columns: repeat(3, 1fr); gap: var(--s-1); margin: var(--s-2) 0 var(--s-2); }
   .forum-side .forum-chron__stat { padding: var(--s-1) var(--s-1); border-radius: var(--r-sm); }
   .forum-side .forum-chron__stat b { font-size: 17px; }
-  .forum-side .forum-chron__stat span { font-size: 11px; }
+  .forum-side .forum-chron__stat span { font-size: var(--fs-eyebrow); }
   .forum-side .forum-chron__feed { gap: var(--s-fine); margin-bottom: var(--s-2); }
-  .forum-side .forum-chron__item { padding: var(--s-fine) var(--s-1); font-size: 11.5px; }
+  .forum-side .forum-chron__item { padding: var(--s-fine) var(--s-1); font-size: var(--fs-eyebrow); }
   .forum-side .hero::after { display: none; }
 }
 @media (min-width: 1440px) {
@@ -277,7 +277,7 @@ h1.hero__week { font-size: var(--fs-h1); }
 /* Кегль заголовков раздела решён выше — вне слоя плотности. Здесь остаётся
    только вертикальный отступ, и он действительно про плотность. */
 .panel__head { margin-bottom: var(--s-2); }
-.eyebrow { font-size: 11px; letter-spacing: .14em; }
+.eyebrow { font-size: var(--fs-eyebrow); letter-spacing: .14em; }
 .grid-2 { gap: var(--gap); }
 /* Пол вниз по кеглю: бриф не допускает подписей мельче 11 px, а em-цепочки
    давали 9,89 px на подсказке внутри раскрывашки. */
@@ -288,12 +288,12 @@ h1.hero__week { font-size: var(--fs-h1); }
   min-height: 38px;
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-sm);
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .forum-btn--wide { margin: var(--s-hair) 0 var(--gap); }
-.forum-act { padding: var(--s-fine) var(--s-1); font-size: 11px; border-radius: var(--r-sm); }
+.forum-act { padding: var(--s-fine) var(--s-1); font-size: var(--fs-eyebrow); border-radius: var(--r-sm); }
 
-.seg__btn { min-height: 34px; padding: 0 var(--s-2); font-size: 12.5px; }
+.seg__btn { min-height: 34px; padding: 0 var(--s-2); font-size: var(--fs-meta); }
 .pick__btn { min-height: 34px; }
 
 /* ── Боковое меню сайта ───────────────────────────────────────────────────── */
@@ -311,90 +311,90 @@ h1.hero__week { font-size: var(--fs-h1); }
 @media (min-width: 1040px) {
   .side { padding: var(--s-3) var(--s-2) var(--s-2); }
 }
-.side .nav__link { padding: var(--s-1) var(--s-2); font-size: 13px; }
+.side .nav__link { padding: var(--s-1) var(--s-2); font-size: var(--fs-small); }
 
 /* ── ФОРУМ: сводка ─────────────────────────────────────────────────────────── */
 .forum-chron { padding-bottom: var(--s-3); }
 .forum-chron__head { margin-bottom: var(--s-1); }
 /* Кегль заголовка даёт шкала из токенов: плотность окна не должна превращать
    H1 страницы в подпись карточки. */
-.forum-chron__date { margin-top: var(--s-fine); font-size: 12px; }
+.forum-chron__date { margin-top: var(--s-fine); font-size: var(--fs-meta); }
 .forum-chron__stats { margin: var(--s-2) 0 var(--s-2); gap: var(--s-1); }
 .forum-chron__stat { padding: var(--s-1) var(--s-2); border-radius: var(--r); }
 .forum-chron__stat b { font-size: 18px; }
-.forum-chron__stat span { margin-top: var(--s-fine); font-size: 11px; }
+.forum-chron__stat span { margin-top: var(--s-fine); font-size: var(--fs-eyebrow); }
 .forum-chron__feed { margin-bottom: var(--s-2); gap: var(--s-1); }
-.forum-chron__item { padding: var(--s-fine) var(--s-2); font-size: 11.5px; }
-.forum-chron__more { font-size: 12px; }
+.forum-chron__item { padding: var(--s-fine) var(--s-2); font-size: var(--fs-eyebrow); }
+.forum-chron__more { font-size: var(--fs-meta); }
 
 /* ── ФОРУМ: блоки контекста ───────────────────────────────────────────────── */
 .forum-welcome { padding: var(--s-2) var(--s-3); gap: var(--s-2); }
 .forum-welcome__mark { font-size: 20px; }
-.forum-welcome__body b { font-size: 13.5px; }
-.forum-welcome__body p { margin: var(--s-hair) 0 0; font-size: 12.5px; }
+.forum-welcome__body b { font-size: var(--fs-small); }
+.forum-welcome__body p { margin: var(--s-hair) 0 0; font-size: var(--fs-meta); }
 
 .forum-theme { padding: var(--s-2) var(--s-3); }
-.forum-theme__title { font-size: 15px; margin: var(--s-fine) 0 0; }
-.forum-theme__body { font-size: 12.5px; margin-top: var(--s-fine); }
+.forum-theme__title { font-size: var(--fs-body); margin: var(--s-fine) 0 0; }
+.forum-theme__body { font-size: var(--fs-meta); margin-top: var(--s-fine); }
 
 .forum-hot { padding: var(--s-2) var(--s-3); }
-.forum-hot__head { margin-bottom: var(--s-1); font-size: 13px; }
+.forum-hot__head { margin-bottom: var(--s-1); font-size: var(--fs-small); }
 .forum-hot__list { display: grid; gap: var(--s-fine); }
 .forum-hot__item a { padding: var(--s-1) var(--s-1); border-radius: var(--r-sm); }
-.forum-hot__title { font-size: 12.5px; }
-.forum-hot__meta { font-size: 11px; }
+.forum-hot__title { font-size: var(--fs-meta); }
+.forum-hot__meta { font-size: var(--fs-eyebrow); }
 
 .forum-lead { padding: var(--s-2) var(--s-3); }
-.forum-lead__head { margin-bottom: var(--s-1); font-size: 13px; }
+.forum-lead__head { margin-bottom: var(--s-1); font-size: var(--fs-small); }
 .forum-lead__list { gap: var(--s-hair); }
 .forum-lead__row { padding: var(--s-1) var(--s-1); gap: var(--s-1); border-radius: var(--r-sm); }
-.forum-lead__rank { width: 20px; font-size: 11.5px; }
-.forum-lead__row .forum-ava { width: 26px; height: 26px; border-radius: var(--r-sm); font-size: 11px; }
-.forum-lead__who b { font-size: 12.5px; }
-.forum-lead__who small { font-size: 11px; }
-.forum-lead__score b { font-size: 12.5px; }
-.seg--lead .seg__btn { min-height: 26px; padding: 0 var(--s-1); font-size: 11px; }
+.forum-lead__rank { width: 20px; font-size: var(--fs-eyebrow); }
+.forum-lead__row .forum-ava { width: 26px; height: 26px; border-radius: var(--r-sm); font-size: var(--fs-eyebrow); }
+.forum-lead__who b { font-size: var(--fs-meta); }
+.forum-lead__who small { font-size: var(--fs-eyebrow); }
+.forum-lead__score b { font-size: var(--fs-meta); }
+.seg--lead .seg__btn { min-height: 26px; padding: 0 var(--s-1); font-size: var(--fs-eyebrow); }
 
 .forum-rules { padding: 0; }
 .forum-rules__summary { padding: var(--s-2) var(--s-3); gap: var(--s-2); }
-.forum-rules__mark { width: 26px; height: 26px; font-size: 13px; }
-.forum-rules__label b { font-size: 13px; }
-.forum-rules__label small { font-size: 11px; }
+.forum-rules__mark { width: 26px; height: 26px; font-size: var(--fs-small); }
+.forum-rules__label b { font-size: var(--fs-small); }
+.forum-rules__label small { font-size: var(--fs-eyebrow); }
 .forum-rules__list { padding: 0 var(--s-3) var(--s-fine) var(--s-5); }
 .forum-rules__item { margin-bottom: var(--s-1); }
-.forum-rules__item b { font-size: 12.5px; }
-.forum-rules__item p { margin: var(--s-hair) 0 0; font-size: 12px; }
+.forum-rules__item b { font-size: var(--fs-meta); }
+.forum-rules__item p { margin: var(--s-hair) 0 0; font-size: var(--fs-meta); }
 .forum-rules__sanctions { margin: var(--s-1) var(--s-3); padding: var(--s-2) var(--s-2); }
-.forum-rules__sanctions li { font-size: 12px; }
-.forum-rules__note { margin: 0 var(--s-3) var(--s-2); font-size: 11.5px; }
+.forum-rules__sanctions li { font-size: var(--fs-meta); }
+.forum-rules__note { margin: 0 var(--s-3) var(--s-2); font-size: var(--fs-eyebrow); }
 
 /* ── ФОРУМ: аккаунт и уведомления ─────────────────────────────────────────── */
 .forum-account { padding: var(--s-2) var(--s-3); }
 .forum-me { gap: var(--s-1); }
-.forum-me .forum-ava { width: 30px; height: 30px; border-radius: var(--r-sm); font-size: 12.5px; }
-.forum-me__body b { font-size: 13px; }
-.forum-me__body small { font-size: 11px; }
-.forum-me .forum-btn { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: 12px; }
-.forum-bell__badge { top: -6px; right: -6px; min-width: 16px; height: 16px; font-size: 11px; }
+.forum-me .forum-ava { width: 30px; height: 30px; border-radius: var(--r-sm); font-size: var(--fs-meta); }
+.forum-me__body b { font-size: var(--fs-small); }
+.forum-me__body small { font-size: var(--fs-eyebrow); }
+.forum-me .forum-btn { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: var(--fs-meta); }
+.forum-bell__badge { top: -6px; right: -6px; min-width: 16px; height: 16px; font-size: var(--fs-eyebrow); }
 
 .forum-notice { padding: var(--s-2) var(--s-3); }
-.forum-notice p { font-size: 12.5px; }
+.forum-notice p { font-size: var(--fs-meta); }
 
 .forum-notify { padding: var(--s-2) var(--s-3); }
 .forum-notify__link { padding: var(--s-1) var(--s-1); }
-.forum-notify__line { font-size: 12.5px; }
-.forum-notify__preview { font-size: 11.5px; }
-.forum-notify__meta { font-size: 11px; }
+.forum-notify__line { font-size: var(--fs-meta); }
+.forum-notify__preview { font-size: var(--fs-eyebrow); }
+.forum-notify__meta { font-size: var(--fs-eyebrow); }
 
 .forum-auth__fields { gap: var(--s-1); }
 .forum-auth__actions { margin-top: var(--s-2); gap: var(--s-1); }
-.forum-auth__note { margin-top: var(--s-1); font-size: 11.5px; }
-.forum-authbox__sum-name { font-size: 13px; }
-.forum-me__more-sum { font-size: 12.5px; }
+.forum-auth__note { margin-top: var(--s-1); font-size: var(--fs-eyebrow); }
+.forum-authbox__sum-name { font-size: var(--fs-small); }
+.forum-me__more-sum { font-size: var(--fs-meta); }
 
 /* ── ФОРУМ: формы ──────────────────────────────────────────────────────────── */
 .forum-field { margin-bottom: var(--s-1); }
-.forum-field > span { margin-bottom: var(--s-fine); font-size: 11px; }
+.forum-field > span { margin-bottom: var(--s-fine); font-size: var(--fs-eyebrow); }
 .forum-field input,
 .forum-field select,
 .forum-field textarea { padding: var(--s-1) var(--s-2); border-radius: var(--r-sm); }
@@ -404,20 +404,20 @@ h1.hero__week { font-size: var(--fs-h1); }
 .forum-composer { padding: 0; }
 .forum-composer__summary { padding: var(--s-2) var(--s-3); gap: var(--s-2); }
 .forum-composer__plus { width: 26px; height: 26px; font-size: 16px; }
-.forum-composer__summary b { font-size: 13px; }
+.forum-composer__summary b { font-size: var(--fs-small); }
 .forum-composer form { padding: var(--s-fine) var(--s-3) var(--s-3); }
-.forum-composer__rules { margin: var(--s-1) 0; font-size: 11.5px; }
+.forum-composer__rules { margin: var(--s-1) 0; font-size: var(--fs-eyebrow); }
 .forum-composer__actions { gap: var(--s-1); }
 
 .forum-md { padding: var(--s-1); gap: var(--s-fine); margin: var(--s-1) 0 var(--s-1); border-radius: var(--r-sm); }
 .forum-md__row { gap: var(--s-fine); }
-.forum-md__btn { min-width: 28px; height: 28px; padding: 0 var(--s-1); font-size: 12px; border-radius: var(--r-sm); }
+.forum-md__btn { min-width: 28px; height: 28px; padding: 0 var(--s-1); font-size: var(--fs-meta); border-radius: var(--r-sm); }
 .forum-md__color { width: 16px; height: 16px; }
-.forum-md__capt { font-size: 11px; }
+.forum-md__capt { font-size: var(--fs-eyebrow); }
 
 .forum-attach { gap: var(--s-1); }
-.forum-attach__btn { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: 12px; }
-.forum-attach__hint { font-size: 11px; }
+.forum-attach__btn { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: var(--fs-meta); }
+.forum-attach__hint { font-size: var(--fs-eyebrow); }
 
 .forum-poll-creator { margin: var(--s-fine) 0 var(--s-1); }
 .forum-poll-form { padding: var(--s-2) var(--s-2); margin-top: var(--s-1); }
@@ -433,16 +433,16 @@ h1.hero__week { font-size: var(--fs-h1); }
 @media (min-width: 760px) { .forum-post { padding: var(--s-3) var(--s-3); } }
 
 .forum-post__head { gap: var(--s-1); margin-bottom: var(--s-1); }
-.forum-post__head .forum-ava { width: 30px; height: 30px; border-radius: var(--r-sm); font-size: 12.5px; }
-.forum-post__by b { font-size: 13px; }
-.forum-post__by time { font-size: 11px; }
-.forum-post__cat { padding: var(--s-fine) var(--s-1); font-size: 11px; }
-.forum-post__trail { padding: var(--s-hair) var(--s-1); font-size: 11px; }
+.forum-post__head .forum-ava { width: 30px; height: 30px; border-radius: var(--r-sm); font-size: var(--fs-meta); }
+.forum-post__by b { font-size: var(--fs-small); }
+.forum-post__by time { font-size: var(--fs-eyebrow); }
+.forum-post__cat { padding: var(--s-fine) var(--s-1); font-size: var(--fs-eyebrow); }
+.forum-post__trail { padding: var(--s-hair) var(--s-1); font-size: var(--fs-eyebrow); }
 
-.forum-post__title { margin-bottom: var(--s-fine); font-size: clamp(15px, 1.9vw, 17.5px); line-height: 1.25; }
-.forum-post__body { font-size: 13px; line-height: 1.58; }
+.forum-post__title { margin-bottom: var(--s-fine); font-size: clamp(15px, 1.9vw, 18px); line-height: 1.25; }
+.forum-post__body { font-size: var(--fs-small); line-height: 1.58; }
 .forum-post__body p { margin-bottom: var(--s-1); }
-.forum-post__expand { margin-top: var(--s-hair); font-size: 12px; }
+.forum-post__expand { margin-top: var(--s-hair); font-size: var(--fs-meta); }
 
 .forum-shots { margin-top: var(--s-1); gap: var(--s-1); }
 .forum-shots img { border-radius: var(--r-sm); }
@@ -450,81 +450,81 @@ h1.hero__week { font-size: var(--fs-h1); }
 .forum-post__foot { gap: var(--s-1); margin-top: var(--s-1); padding-top: var(--s-1); }
 /* Переход в тему собран в кнопку (forum.css): на плотном экране его кегль
    остаётся на полшага ниже телефона, но не мельчает до подписи. */
-.forum-post__comments, .forum-post__views { font-size: 12.5px; }
+.forum-post__comments, .forum-post__views { font-size: var(--fs-meta); }
 .forum-post__acts { gap: var(--s-hair); }
 
 .forum-react { gap: var(--s-fine); }
-.forum-react__btn { min-height: 28px; padding: var(--s-fine) var(--s-1); font-size: 12px; border-radius: var(--r-sm); }
-.forum-react__btn b { font-size: 11.5px; }
+.forum-react__btn { min-height: 28px; padding: var(--s-fine) var(--s-1); font-size: var(--fs-meta); border-radius: var(--r-sm); }
+.forum-react__btn b { font-size: var(--fs-eyebrow); }
 .forum-emoji__pop { padding: var(--s-fine); gap: var(--s-hair); border-radius: var(--r-sm); }
-.forum-emoji__item { min-width: 30px; height: 30px; font-size: 14px; }
+.forum-emoji__item { min-width: 30px; height: 30px; font-size: var(--fs-text); }
 
 .forum-post--deleted { padding: var(--s-2) var(--s-3); }
 .forum-post__gone { gap: var(--s-1); }
-.forum-post__gone b { font-size: 12.5px; }
-.forum-post__gone p { margin: var(--s-hair) 0 0; font-size: 12px; }
+.forum-post__gone b { font-size: var(--fs-meta); }
+.forum-post__gone p { margin: var(--s-hair) 0 0; font-size: var(--fs-meta); }
 
 /* Опрос */
 .forum-poll { margin-top: var(--s-1); padding: var(--s-2) var(--s-2); border-radius: var(--r-sm); }
 .forum-poll__head { margin-bottom: var(--s-1); }
-.forum-poll__question { font-size: 13px; }
-.forum-poll__total { font-size: 11px; }
+.forum-poll__question { font-size: var(--fs-small); }
+.forum-poll__total { font-size: var(--fs-eyebrow); }
 .forum-poll__options { gap: var(--s-fine); }
 .forum-poll__opt { padding: var(--s-1) var(--s-1); border-radius: var(--r-sm); }
-.forum-poll__text { font-size: 12.5px; }
-.forum-poll__num { font-size: 11px; }
-.forum-poll__hint { margin-top: var(--s-1); font-size: 11px; }
+.forum-poll__text { font-size: var(--fs-meta); }
+.forum-poll__num { font-size: var(--fs-eyebrow); }
+.forum-poll__hint { margin-top: var(--s-1); font-size: var(--fs-eyebrow); }
 
 /* Обсуждение */
 .forum-thread { margin-top: var(--s-2); padding-top: var(--s-2); }
-.forum-thread__title { margin-bottom: var(--s-1); font-size: 13px; }
+.forum-thread__title { margin-bottom: var(--s-1); font-size: var(--fs-small); }
 .forum-thread__list { margin-bottom: var(--s-2); }
 .forum-comment { gap: var(--s-1); padding: var(--s-1) 0; }
-.forum-comment .forum-ava--sm { width: 24px; height: 24px; border-radius: var(--r-sm); font-size: 11px; }
+.forum-comment .forum-ava--sm { width: 24px; height: 24px; border-radius: var(--r-sm); font-size: var(--fs-eyebrow); }
 .forum-comment__head { gap: var(--s-1); margin-bottom: var(--s-hair); }
-.forum-comment__head b { font-size: 12.5px; }
-.forum-comment__head time { font-size: 11px; }
-.forum-comment__body p { margin-bottom: var(--s-fine); font-size: 12.5px; line-height: 1.55; }
+.forum-comment__head b { font-size: var(--fs-meta); }
+.forum-comment__head time { font-size: var(--fs-eyebrow); }
+.forum-comment__body p { margin-bottom: var(--s-fine); font-size: var(--fs-meta); line-height: 1.55; }
 .forum-comment__foot { gap: var(--s-fine); margin-top: var(--s-fine); }
-.forum-comment__foot .forum-react__btn { min-height: 24px; padding: var(--s-hair) var(--s-1); font-size: 11px; }
-.forum-comment--none, .forum-comment--deleted { padding: var(--s-1) 0; font-size: 12px; }
+.forum-comment__foot .forum-react__btn { min-height: 24px; padding: var(--s-hair) var(--s-1); font-size: var(--fs-eyebrow); }
+.forum-comment--none, .forum-comment--deleted { padding: var(--s-1) 0; font-size: var(--fs-meta); }
 .forum-reply__actions { margin-top: var(--s-1); }
 
 .forum-empty { padding: var(--s-4) var(--s-3); text-align: center; }
 .forum-empty h2 { font-size: 17px; margin: var(--s-fine) 0 var(--s-1); }
-.forum-empty p { font-size: 12.5px; }
+.forum-empty p { font-size: var(--fs-meta); }
 
 /* Окна */
 .forum-modal__box { padding: var(--s-3); border-radius: var(--r-lg); }
-.forum-modal__box h3 { font-size: 15px; margin-bottom: var(--s-2); }
+.forum-modal__box h3 { font-size: var(--fs-body); margin-bottom: var(--s-2); }
 .forum-modal__rules { gap: var(--s-fine); }
 .forum-modal__rule { padding: var(--s-1) var(--s-1); border-radius: var(--r-sm); }
-.forum-modal__rule b { font-size: 12.5px; }
-.forum-modal__rule small { font-size: 11px; }
+.forum-modal__rule b { font-size: var(--fs-meta); }
+.forum-modal__rule small { font-size: var(--fs-eyebrow); }
 .forum-modal__actions { gap: var(--s-1); margin-top: var(--s-2); }
 
-.forum-toast { padding: var(--s-1) var(--s-3); font-size: 12.5px; }
+.forum-toast { padding: var(--s-1) var(--s-3); font-size: var(--fs-meta); }
 
 /* ── ФОРУМ: страница участника ────────────────────────────────────────────── */
 .forum-profile__top { gap: var(--s-2); }
 .forum-profile__nick { font-size: clamp(18px, 3vw, 24px); }
-.forum-profile__meta { gap: var(--s-1); font-size: 12px; }
-.forum-profile__about { font-size: 13px; }
+.forum-profile__meta { gap: var(--s-1); font-size: var(--fs-meta); }
+.forum-profile__about { font-size: var(--fs-small); }
 .forum-profile__stats { gap: var(--s-1); }
 .forum-profile__stat { padding: var(--s-1) var(--s-2); border-radius: var(--r); }
 .forum-profile__stat b { font-size: 18px; }
-.forum-profile__stat span { font-size: 11px; }
+.forum-profile__stat span { font-size: var(--fs-eyebrow); }
 .forum-rank { padding: var(--s-2) var(--s-3); }
 .forum-rank__achs { gap: var(--s-fine); }
-.forum-rank__ach { padding: var(--s-fine) var(--s-1); font-size: 11px; }
+.forum-rank__ach { padding: var(--s-fine) var(--s-1); font-size: var(--fs-eyebrow); }
 .forum-profile__posts li { padding: var(--s-1) 0; }
-.forum-profile__posts a { font-size: 13px; }
-.forum-profile__post-meta { font-size: 11px; }
-.forum-profile__post-text { font-size: 12px; margin-top: var(--s-hair); }
+.forum-profile__posts a { font-size: var(--fs-small); }
+.forum-profile__post-meta { font-size: var(--fs-eyebrow); }
+.forum-profile__post-text { font-size: var(--fs-meta); margin-top: var(--s-hair); }
 
 /* ── Остальной сайт: та же плотность ──────────────────────────────────────── */
 .hero__num { font-size: var(--fs-hero); }
-.hero__dates { margin-top: var(--s-1); font-size: 13px; }
+.hero__dates { margin-top: var(--s-1); font-size: var(--fs-small); }
 .leader { margin-top: var(--s-3); padding: var(--s-2) var(--s-2); gap: var(--s-2); }
 .leader__name { font-size: clamp(17px, 4vw, 23px); }
 .leader__pts { font-size: clamp(26px, 7vw, 38px); }
@@ -637,7 +637,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-2) var(--s-2) var(--s-1);
 }
 .chat-list__title { margin: var(--s-hair) 0 0; font-size: 16px; }
-.chat-list__new { min-height: 34px; padding: var(--s-1) var(--s-2); font-size: 12.5px; }
+.chat-list__new { min-height: 34px; padding: var(--s-1) var(--s-2); font-size: var(--fs-meta); }
 
 .chat-join {
   display: flex;
@@ -655,7 +655,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .chat-join__input:focus {
   outline: none;
@@ -666,8 +666,20 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-create { flex: none; padding: 0 var(--s-2) var(--s-2); }
 .chat-create .forum-field { margin-bottom: var(--s-1); }
 .chat-create__row { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--s-1); }
-.chat-create__note { margin: 0 0 var(--s-1); font-size: 11px; line-height: 1.45; }
+.chat-create__note { margin: 0 0 var(--s-1); font-size: var(--fs-eyebrow); line-height: 1.45; }
 .chat-create__acts { display: flex; gap: var(--s-1); }
+
+/* Обёртка нужна точечной перерисовке счётчиков (forum/chats.js paintList), но
+   появилась позже правил `.chat-list__items` и оставила их в блок-родителе:
+   `flex: 1` и скролл внутри панели не применялись, длинный список вылезал за
+   нижний край колонки, а пустота прилипала к шапке. Обёртка принимает роль,
+   ради которой эти правила и писались. */
+.chat-list__area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
 
 .chat-list__items {
   flex: 1;
@@ -679,10 +691,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   overscroll-behavior: contain;
 }
 
-/* Пустой список стоит по середине колонки, а не прилипает к шапке. */
-.chat-list__empty { margin: auto; padding: var(--s-4) var(--s-3); text-align: center; }
-.chat-list__empty b { font-size: 13px; }
-.chat-list__empty p { margin: var(--s-fine) 0 0; }
+/* `margin: auto` держит пустоту по середине колонки только в flex-родителе —
+   потому выше обёртка и стала flex-колонкой. Всё остальное делает оболочка. */
+.chat-list__empty { margin: auto; }
 
 .chat-item {
   display: flex;
@@ -724,7 +735,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--ava, var(--mark-plate));
   color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
-  font-size: 13px;
+  font-size: var(--fs-small);
   font-weight: 700;
 }
 .chat-item__avatar {
@@ -750,17 +761,17 @@ body:has(.chat-layout) .site-foot { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13.5px;
+  font-size: var(--fs-small);
   font-weight: 600;
 }
-.chat-item__time { flex: none; color: var(--mute); font-size: 11px; }
+.chat-item__time { flex: none; color: var(--mute); font-size: var(--fs-eyebrow); }
 .chat-item__last {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--dim);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .chat-item__unread {
   flex: none;
@@ -772,7 +783,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-pill);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   line-height: 1;
 }
@@ -819,7 +830,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--ava, var(--mark-plate));
   color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 700;
 }
 
@@ -829,7 +840,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .chat-room__sub {
   display: block;
@@ -837,7 +848,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-top: var(--s-hair);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
 }
 .chat-room__closed { color: var(--gold); }
 
@@ -862,7 +873,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 .chat-menu__pop {
   position: absolute;
-  z-index: 30;
+  z-index: var(--z-menu);
   top: calc(100% + 6px);
   right: 0;
   min-width: 216px;
@@ -886,7 +897,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: none;
   color: var(--dim);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -895,7 +906,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-menu__item--danger:hover { background: color-mix(in srgb, var(--loss) 12%, transparent); color: var(--soft-bad); }
 .chat-menu__count {
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-variant-numeric: tabular-nums;
 }
 
@@ -911,7 +922,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .chat-member { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-1) var(--s-hair); }
 .chat-member__who { flex: 1; min-width: 0; }
-.chat-member__who a { font-size: 13px; font-weight: 600; }
+.chat-member__who a { font-size: var(--fs-small); font-weight: 600; }
 .chat-member__who small { display: block; margin-top: var(--s-hair); }
 .chat-member__acts { display: flex; gap: var(--s-hair); flex: none; }
 
@@ -924,12 +935,12 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-invite__code { display: flex; align-items: baseline; gap: var(--s-2); }
 .chat-invite__code .num {
   font-family: Unbounded, sans-serif;
-  font-size: 15px;
+  font-size: var(--fs-body);
   letter-spacing: .04em;
   color: var(--gold);
 }
 .chat-invite__acts { display: flex; gap: var(--s-fine); margin-top: var(--s-1); }
-.chat-invite__note { margin: var(--s-1) 0 0; font-size: 11px; line-height: 1.45; }
+.chat-invite__note { margin: var(--s-1) 0 0; font-size: var(--fs-eyebrow); line-height: 1.45; }
 
 /* ── Лента ───────────────────────────────────────────────────────────────── */
 
@@ -966,8 +977,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   text-align: center;
   color: var(--dim);
 }
-.chat-room__blank b { font-size: 14px; }
-.chat-room__blank p { margin: 0; font-size: 12.5px; }
+.chat-room__blank b { font-size: var(--fs-text); }
+.chat-room__blank p { margin: 0; font-size: var(--fs-meta); }
 .chat-room__blank-mark { font-size: 34px; opacity: .65; }
 .chat-room__blank .forum-btn { margin-top: var(--s-1); }
 
@@ -977,7 +988,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--shade) 30%, transparent);
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -1004,7 +1015,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--accent) 9%, var(--raised));
   color: color-mix(in srgb, var(--accent) 82%, var(--dim));
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -1039,18 +1050,18 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-msg.is-grouped.is-mine .chat-msg__bubble { border-radius: var(--r); }
 
 .chat-msg__head { display: flex; align-items: center; gap: var(--s-1); margin-bottom: var(--s-hair); }
-.chat-msg__head .forum-nick { font-size: 12.5px; font-weight: 700; }
+.chat-msg__head .forum-nick { font-size: var(--fs-meta); font-weight: 700; }
 .chat-msg__tag {
   padding: 0 var(--s-fine);
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
   border-radius: var(--r-pill);
   color: var(--gold);
   font-family: Unbounded, sans-serif;
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
 }
 
-.chat-msg__body { font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.chat-msg__body { font-size: var(--fs-small); line-height: 1.5; overflow-wrap: anywhere; }
 .chat-msg__body p { margin: 0 0 var(--s-fine); }
 .chat-msg__body p:last-child { margin-bottom: 0; }
 .chat-msg__body a { color: var(--accent-ink); }
@@ -1082,7 +1093,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--recessed);
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.5;
 }
 .chat-msg__body code {
@@ -1096,7 +1107,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-msg__body ul { padding-left: var(--s-3); list-style: disc; }
 .chat-msg__body ol { padding-left: var(--s-3); list-style: decimal; }
 .chat-msg__body li { margin-bottom: var(--s-hair); }
-.chat-msg__body h3 { font-size: 14px; font-weight: 700; }
+.chat-msg__body h3 { font-size: var(--fs-text); font-weight: 700; }
 
 .chat-msg__del {
   padding: var(--s-hair) var(--s-fine);
@@ -1104,7 +1115,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-sm);
   background: none;
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 .chat-msg__del:hover { background: color-mix(in srgb, var(--loss) 14%, transparent); color: var(--soft-bad); }
@@ -1112,7 +1123,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 /* Удалённое сообщение не занимает пузырь: это сноска, а не реплика. */
 .chat-msg--gone { justify-content: center; }
 .chat-msg--gone.is-mine { flex-direction: row; }
-.chat-msg__gone { color: var(--mute); font-size: 11.5px; font-style: italic; }
+.chat-msg__gone { color: var(--mute); font-size: var(--fs-eyebrow); font-style: italic; }
 
 /* ── Ввод ────────────────────────────────────────────────────────────────── */
 
@@ -1172,7 +1183,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-text);
   line-height: 1.45;
   resize: none;
   /*
@@ -1243,7 +1254,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--recessed);
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .chat-compose__input code {
   padding: var(--s-hair) var(--s-fine);
@@ -1255,7 +1266,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-compose__input pre code { padding: 0; background: none; font-size: 1em; }
 .chat-compose__input ul { padding-left: var(--s-3); list-style: disc; }
 .chat-compose__input ol { padding-left: var(--s-3); list-style: decimal; }
-.chat-compose__input h3 { font-size: 14px; font-weight: 700; }
+.chat-compose__input h3 { font-size: var(--fs-text); font-weight: 700; }
 
 /*
   Панель форматирования — та же разметка .forum-md, что у темы и гайда.
@@ -1271,7 +1282,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   color: var(--accent-ink);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-.chat-compose__btn--format { font-size: 13px; font-weight: 700; letter-spacing: -.5px; }
+.chat-compose__btn--format { font-size: var(--fs-small); font-weight: 700; letter-spacing: -.5px; }
 .chat-compose__send {
   display: grid;
   place-items: center;
@@ -1294,7 +1305,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   margin: 0;
   padding: var(--s-2) var(--s-3) calc(var(--s-2) + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line-soft);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   text-align: center;
 }
 
@@ -1310,7 +1321,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: var(--r);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .chat-pending-poll__drop { border: 0; background: none; color: var(--mute); cursor: pointer; }
 .chat-pending-poll__drop:hover { color: var(--soft-bad); }
@@ -1332,7 +1343,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 3%, transparent);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   max-width: 220px;
 }
 .chat-pending-file img { width: 34px; height: 34px; border-radius: var(--r-sm); object-fit: cover; }
@@ -1389,10 +1400,10 @@ body:has(.chat-layout) .site-foot { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   font-weight: 600;
 }
-.chat-attach__size { flex: none; font-size: 11px; }
+.chat-attach__size { flex: none; font-size: var(--fs-eyebrow); }
 
 /* ── Лайтбокс ────────────────────────────────────────────────────────────── */
 
@@ -1405,7 +1416,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-lightbox);
   display: grid;
   place-items: center;
   background: rgba(0,0,0,.86);
@@ -1440,8 +1451,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .chat-poll__head { display: grid; gap: var(--s-hair); }
-.chat-poll__badge { color: var(--accent-ink); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.chat-poll__question { font-size: 13px; line-height: 1.4; }
+.chat-poll__badge { color: var(--accent-ink); font-size: var(--fs-eyebrow); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.chat-poll__question { font-size: var(--fs-small); line-height: 1.4; }
 .chat-poll__options { display: grid; gap: var(--s-fine); }
 .chat-poll__opt {
   position: relative;
@@ -1455,7 +1466,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: none;
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   text-align: left;
   cursor: pointer;
 }
@@ -1469,9 +1480,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   transition: width .18s ease;
 }
 .chat-poll__text { position: relative; flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.chat-poll__stat { position: relative; flex: none; color: var(--mute); font-size: 11px; }
+.chat-poll__stat { position: relative; flex: none; color: var(--mute); font-size: var(--fs-eyebrow); }
 .chat-poll__opt.is-voted .chat-poll__stat { color: var(--accent-ink); }
-.chat-poll__foot { display: flex; gap: var(--s-1); font-size: 11px; }
+.chat-poll__foot { display: flex; gap: var(--s-1); font-size: var(--fs-eyebrow); }
 
 /* ── Создание опроса ─────────────────────────────────────────────────────── */
 
@@ -1484,8 +1495,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
-.chat-poll-creator__head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
-.chat-poll-creator__close { border: 0; background: none; color: var(--mute); cursor: pointer; font-size: 15px; }
+.chat-poll-creator__head { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-small); }
+.chat-poll-creator__close { border: 0; background: none; color: var(--mute); cursor: pointer; font-size: var(--fs-body); }
 .chat-poll-creator__close:hover { color: var(--soft-bad); }
 .chat-poll-creator__q, .chat-poll-creator__opt {
   width: 100%;
@@ -1495,12 +1506,12 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 2%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .chat-poll-creator__q:focus, .chat-poll-creator__opt:focus { outline: none; border-color: var(--accent); }
 .chat-poll-creator__options { display: grid; gap: var(--s-1); }
 .chat-poll-creator__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
-.chat-poll-creator__multi { display: flex; align-items: center; gap: var(--s-1); font-size: 12px; color: var(--mute); }
+.chat-poll-creator__multi { display: flex; align-items: center; gap: var(--s-1); font-size: var(--fs-meta); color: var(--mute); }
 
 /* ── Ответ на сообщение ──────────────────────────────────────────────────── */
 
@@ -1512,7 +1523,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-left: 3px solid var(--accent);
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--text) 4%, transparent);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 .chat-reply-quote__nick { color: var(--accent-ink); font-weight: 700; }
@@ -1528,9 +1539,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r);
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
-.chat-reply-banner__info { flex: 1; min-width: 0; display: grid; gap: var(--s-hair); font-size: 11.5px; }
+.chat-reply-banner__info { flex: 1; min-width: 0; display: grid; gap: var(--s-hair); font-size: var(--fs-eyebrow); }
 .chat-reply-banner__label b { color: var(--accent-ink); }
-.chat-reply-banner__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.chat-reply-banner__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-eyebrow); }
 .chat-reply-banner__cancel { border: 0; background: none; color: var(--mute); cursor: pointer; }
 .chat-reply-banner__cancel:hover { color: var(--soft-bad); }
 
@@ -1538,7 +1549,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* Раньше правило было разорвано на два места файла: здесь оно одно —
    выравнивание по правому краю, тихий цвет и мелкий кегль подписи. */
-.chat-msg__meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-fine); margin-top: var(--s-hair); color: var(--mute); font-size: 11px; }
+.chat-msg__meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-fine); margin-top: var(--s-hair); color: var(--mute); font-size: var(--fs-eyebrow); }
 .chat-msg__reply-btn {
   display: inline-flex;
   align-items: center;
@@ -1559,10 +1570,10 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent-ink);
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 900;
 }
-.chat-msg__reply-label { font-size: 11px; letter-spacing: .01em; }
+.chat-msg__reply-label { font-size: var(--fs-eyebrow); letter-spacing: .01em; }
 .chat-msg__reply-btn:hover { color: var(--text); border-color: var(--accent); background: var(--accent); }
 .chat-msg__reply-btn:hover .chat-msg__reply-ico { background: color-mix(in srgb, var(--text) 16%, transparent); }
 .chat-msg__react-btn {
@@ -1570,7 +1581,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: none;
   color: var(--mute);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   padding: var(--s-hair) var(--s-fine);
   border-radius: var(--r-sm);
   line-height: 1;
@@ -1589,7 +1600,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-pill);
   background: var(--overlay);
   box-shadow: var(--shadow-1);
-  z-index: 12;
+  z-index: var(--z-bubble);
 }
 .chat-msg__reactions-pop.is-open,
 .chat-msg__react-trigger:hover .chat-msg__reactions-pop { display: flex; }
@@ -1616,7 +1627,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 4%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 .chat-reaction-chip:hover { border-color: var(--accent); }
@@ -1624,7 +1635,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
-.chat-reaction-chip b { color: var(--mute); font-size: 11px; }
+.chat-reaction-chip b { color: var(--mute); font-size: var(--fs-eyebrow); }
 .chat-reaction-chip.is-mine b { color: var(--accent-ink); }
 
 /* ── Кнопка «вниз» ──────────────────────────────────────────────────────── */
@@ -1642,10 +1653,10 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--overlay);
   color: var(--dim);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   box-shadow: var(--shadow-1);
-  z-index: 6;
+  z-index: var(--z-float);
   -webkit-tap-highlight-color: transparent;
 }
 .chat-go-bottom:hover { color: var(--text); border-color: var(--accent); }
@@ -1672,10 +1683,10 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--accent) 16%, var(--overlay));
   color: var(--text);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   box-shadow: var(--shadow-1);
-  z-index: 6;
+  z-index: var(--z-float);
   -webkit-tap-highlight-color: transparent;
   transition: border-color .16s var(--ease), background .16s var(--ease), color .16s var(--ease);
 }
@@ -1705,7 +1716,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .chat-search__input:focus {
   outline: none;
@@ -1717,9 +1728,9 @@ body:has(.chat-layout) .site-foot { display: none; }
    У автора-модератора действий набиралось пять в строку, и на телефоне они
    уезжали за край. Кнопки те же, но сложены за «⋯». */
 #app:has(.forum-modal) { animation: none; }
-#app:has(.forum-modal:not([hidden])) { z-index: 60; }
-.forum-post:has(.forum-act-menu[open]) { z-index: 3; }
-.forum-post > .forum-post__foot:has(.forum-act-menu[open]) { z-index: 3; }
+#app:has(.forum-modal:not([hidden])) { z-index: var(--z-modal); }
+.forum-post:has(.forum-act-menu[open]) { z-index: var(--z-open); }
+.forum-post > .forum-post__foot:has(.forum-act-menu[open]) { z-index: var(--z-open); }
 .forum-act-menu { position: relative; }
 .forum-act-menu > summary {
   list-style: none;
@@ -1731,7 +1742,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  z-index: 30;
+  z-index: var(--z-menu);
   display: grid;
   gap: var(--s-hair);
   min-width: 170px;
@@ -1747,7 +1758,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   text-align: left;
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-sm);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--dim);
 }
 .forum-act-menu__list .forum-act:hover { border-color: transparent; background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
@@ -1794,9 +1805,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-1) var(--s-2);
   border-bottom: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--gold) 4%, transparent);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
-.chat-pinned__badge { font-size: 14px; }
+.chat-pinned__badge { font-size: var(--fs-text); }
 .chat-pinned__text {
   flex: 1;
   min-width: 0;
@@ -1809,7 +1820,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: none;
   color: var(--mute);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .chat-pinned__unpin:hover { color: var(--soft-bad); }
 
@@ -1839,7 +1850,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: none;
   color: var(--mute);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .chat-leaderboard__close:hover { color: var(--soft-bad); }
 .chat-leaderboard__list {
@@ -1859,22 +1870,22 @@ body:has(.chat-layout) .site-foot { display: none; }
   width: 20px;
   text-align: center;
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
 }
 .chat-leaderboard__nick {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
 }
 .chat-leaderboard__nick a { color: var(--text); text-decoration: none; }
 .chat-leaderboard__nick a:hover { color: var(--accent-ink); }
-.chat-leaderboard__nick small { display: block; font-size: 11px; }
+.chat-leaderboard__nick small { display: block; font-size: var(--fs-eyebrow); }
 .chat-leaderboard__count {
   color: var(--accent-ink);
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-small);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1907,7 +1918,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-sm);
   background: none;
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 .chat-msg__pin-btn:hover { color: var(--gold); }
@@ -1917,7 +1928,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-typing {
   padding: var(--s-fine) var(--s-2) 0;
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-style: italic;
 }
 
@@ -1945,7 +1956,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   .chat-menu__pop { right: 2px; }
   .chat-room__scroll { padding: var(--s-1) var(--s-1) var(--s-2); }
   .chat-msg__bubble { max-width: 84%; }
-  .chat-msg__body { font-size: 13px; }
+  .chat-msg__body { font-size: var(--fs-small); }
 
   /*
     Ввод в две строки: поле и отправка — первой строкой на всю ширину, три
@@ -1977,7 +1988,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   }
   .chat-compose__send { grid-area: send; width: 44px; height: 44px; }
   .chat-compose__acts-left { grid-area: acts; gap: var(--s-hair); padding-bottom: 0; }
-  .chat-compose__btn { width: 34px; height: 30px; font-size: 15px; }
+  .chat-compose__btn { width: 34px; height: 30px; font-size: var(--fs-body); }
   /*
     Safari на телефоне масштабирует страницу при фокусе, если шрифт поля
     меньше 16px. Все поля чата — не исключение: форма создания чата и форма
@@ -2016,16 +2027,16 @@ body:has(.chat-layout) .site-foot { display: none; }
 @media (min-width: 760px) {
 /* ── Панель администратора: та же плотность ───────────────────────────────── */
 .adm-top { padding: var(--s-1) var(--s-3); gap: var(--s-1) var(--s-2); }
-.adm-nav__link { padding: var(--s-1) var(--s-2); font-size: 12.5px; }
-.adm-btn { min-height: 36px; padding: var(--s-1) var(--s-2); font-size: 13px; border-radius: var(--r-sm); }
+.adm-nav__link { padding: var(--s-1) var(--s-2); font-size: var(--fs-meta); }
+.adm-btn { min-height: 36px; padding: var(--s-1) var(--s-2); font-size: var(--fs-small); border-radius: var(--r-sm); }
 .adm-main { padding-top: var(--s-3); }
 .adm-hero { margin-bottom: var(--s-3); }
-.adm-lead { font-size: 13.5px; margin-top: var(--s-1); }
+.adm-lead { font-size: var(--fs-small); margin-top: var(--s-1); }
 .adm-stats { gap: var(--s-1); }
 .adm-stat { padding: var(--s-2) var(--s-2); border-radius: var(--r); }
 .adm-grid { gap: var(--gap); }
 .adm-kv { gap: var(--s-1); }
-.adm-chip { min-height: 32px; font-size: 12.5px; }
+.adm-chip { min-height: 32px; font-size: var(--fs-meta); }
 }
 
 /* ── Турниры ─────────────────────────────────────────────────────────────── */
@@ -2042,7 +2053,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--raised);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .tour-gen input {
   padding: var(--s-1) var(--s-2);
@@ -2051,7 +2062,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .tour-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s-2); }
 .tour-card {
@@ -2062,12 +2073,12 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .tour-card.is-finished { opacity: .8; }
 .tour-card__head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-bottom: var(--s-2); }
-.tour-card__head b { font-size: 14px; }
-.tour-card__status { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.tour-card__head b { font-size: var(--fs-text); }
+.tour-card__status { color: var(--mute); font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .04em; }
 .tour-score { display: flex; align-items: center; justify-content: center; gap: var(--s-3); text-align: center; }
 .tour-side { display: grid; justify-items: center; gap: var(--s-fine); min-width: 90px; }
 .tour-side b { font-family: Unbounded, sans-serif; font-size: 26px; line-height: 1; }
-.tour-side small { color: var(--dim); font-size: 11px; }
+.tour-side small { color: var(--dim); font-size: var(--fs-eyebrow); }
 .tour-side.is-win b { color: var(--win); }
 .tour-vs { font-size: 20px; font-weight: 700; color: var(--mute); }
 .tour-mark {
@@ -2079,11 +2090,11 @@ body:has(.chat-layout) .site-foot { display: none; }
   background: var(--ava, var(--mark-plate));
   color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
-  font-size: 13px;
+  font-size: var(--fs-small);
   font-weight: 700;
 }
 .tour-rounds { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-top: var(--s-2); }
-.forum-btn--sm { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: 12px; }
+.forum-btn--sm { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: var(--fs-meta); }
 @media (max-width: 759px) {
   .tour-gen select, .tour-gen input { font-size: 16px; }
   .tour-side { min-width: 64px; }
@@ -2501,7 +2512,7 @@ body:has(.chat-layout) .site-foot { display: none; }
    поэтому держим их в плотности соседних блоков, без отдельного «сцены». */
 .forum-verify { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
 .forum-verify__text b { display: block; margin-bottom: var(--s-fine); }
-.forum-verify__text p { margin: 0; font-size: 13px; line-height: 1.5; }
+.forum-verify__text p { margin: 0; font-size: var(--fs-small); line-height: 1.5; }
 .forum-verify .forum-btn { flex-shrink: 0; }
 .forum-nicklog__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s-1); }
 .forum-nicklog__item {
@@ -2511,7 +2522,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-radius: var(--r-sm);
 }
 .forum-nicklog__item code { color: var(--accent-ink); overflow-wrap: anywhere; }
-.forum-nicklog__item .muted { font-size: 12px; }
+.forum-nicklog__item .muted { font-size: var(--fs-meta); }
 @media (max-width: 640px) {
   .forum-verify .forum-btn { width: 100%; min-height: 44px; }
 }
@@ -2625,7 +2636,7 @@ body:has(.chat-layout) .site-foot { display: none; }
    действиями, которые читаются как состояния, а не как панель приборов. */
 .adm-players__toolbar { display:flex; align-items:center; justify-content:space-between; gap:var(--s-3); margin-top:var(--s-4); }
 .adm-player-search { flex:1 1 280px; max-width:460px; margin:0; }
-.adm-players__stats { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--s-1); color:var(--mute); font-size:11px; }
+.adm-players__stats { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--s-1); color:var(--mute); font-size:var(--fs-eyebrow); }
 .adm-players__stats span { padding:var(--s-fine) var(--s-1); border:1px solid var(--line); border-radius: var(--r-pill); background:color-mix(in srgb,var(--text) 3%,transparent); }
 .adm-players__stats b { color:var(--text); }
 .adm-players { grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:var(--s-2); margin-top:var(--s-3); }
@@ -2634,12 +2645,12 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-player__who { grid-area:who; align-self:start; }
 .adm-player__name { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-fine); }
 .adm-player__who b { font-size:16px; line-height:1.2; }
-.adm-player__who small { margin-top:var(--s-1); font-size:11.5px; }
-.adm-player__self { padding:var(--s-hair) var(--s-1); border-radius: var(--r-pill); color:var(--mute); background:color-mix(in srgb,var(--text) 7%,transparent); font-size:11px; font-weight:700; }
+.adm-player__who small { margin-top:var(--s-1); font-size:var(--fs-eyebrow); }
+.adm-player__self { padding:var(--s-hair) var(--s-1); border-radius: var(--r-pill); color:var(--mute); background:color-mix(in srgb,var(--text) 7%,transparent); font-size:var(--fs-eyebrow); font-weight:700; }
 .adm-player__state { grid-area:state; align-self:start; justify-content:flex-end; flex-wrap:wrap; }
 .adm-player__acts { grid-area:acts; justify-content:space-between; padding-top:var(--s-2); border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent); }
 .adm-player__roles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); flex:1; gap:var(--s-1); }
-.adm-player .adm-pill { min-height:38px; padding:var(--s-1) var(--s-1); border-radius: var(--r); font-size:11px; font-weight:700; }
+.adm-player .adm-pill { min-height:38px; padding:var(--s-1) var(--s-1); border-radius: var(--r); font-size:var(--fs-eyebrow); font-weight:700; }
 .adm-player .adm-toggle.is-on { color:var(--win); border-color:color-mix(in srgb, var(--win) 44%, transparent); background:color-mix(in srgb, var(--win) 14%, transparent); }
 .adm-player .adm-toggle[data-player-moderator].is-on { color:var(--gold); border-color:color-mix(in srgb, var(--gold) 48%, transparent); background:color-mix(in srgb, var(--gold) 15%, transparent); }
 .adm-player .adm-toggle[data-player-blogger].is-on { color:var(--link); border-color:color-mix(in srgb, var(--link) 48%, transparent); background:color-mix(in srgb, var(--link) 15%, transparent); }
@@ -2661,24 +2672,24 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* Форум: метки, карточки альянсов и подписки на рейтинг. */
 .forum-topic-tags { display:flex; flex-wrap:wrap; gap:var(--s-1); margin:var(--s-2) 0; padding:0; border:0; }
-.forum-topic-tags legend { width:100%; margin-bottom:var(--s-hair); color:var(--dim); font-size:13px; }
+.forum-topic-tags legend { width:100%; margin-bottom:var(--s-hair); color:var(--dim); font-size:var(--fs-small); }
 .forum-topic-tags legend small { color:var(--mute); }
 .forum-topic-tags label { cursor:pointer; }
 .forum-topic-tags input { position:absolute; opacity:0; pointer-events:none; }
-.forum-topic-tags span, .forum-tag { display:inline-flex; align-items:center; min-height:27px; padding:var(--s-fine) var(--s-1); border:1px solid var(--line); border-radius: var(--r-pill); background:transparent; color:var(--dim); font:600 11px/1.2 Unbounded,sans-serif; cursor:pointer; }
+.forum-topic-tags span, .forum-tag { display:inline-flex; align-items:center; min-height:27px; padding:var(--s-fine) var(--s-1); border:1px solid var(--line); border-radius: var(--r-pill); background:transparent; color:var(--dim); font:600 var(--fs-eyebrow)/1.2 Unbounded,sans-serif; cursor:pointer; }
 .forum-topic-tags input:checked + span, .forum-tag.is-on { border-color:color-mix(in srgb,var(--accent) 62%,var(--line)); background:color-mix(in srgb,var(--accent) 14%,transparent); color:var(--text); }
 .forum-tag-filter { display:flex; flex-wrap:wrap; gap:var(--s-fine); width:100%; margin-top:var(--s-1); }
 .forum-post__tags { display:flex; flex-wrap:wrap; gap:var(--s-fine); margin:-2px 0 var(--s-2); }
-.forum-post__tags .forum-tag { min-height:23px; font-size:11px; }
+.forum-post__tags .forum-tag { min-height:23px; font-size:var(--fs-eyebrow); }
 .forum-alliance-card { display:inline-flex; align-items:center; gap:var(--s-fine); max-width:190px; margin-left:var(--s-1); padding:var(--s-hair) var(--s-1); border:1px solid color-mix(in srgb,var(--ally-color) 45%,var(--line)); border-radius: var(--r-pill); color:inherit; text-decoration:none; vertical-align:middle; }
 .forum-alliance-card i, .forum-alliance-sub i { width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:var(--ally-color); }
-.forum-alliance-card b { color:var(--gold); font:700 11px/1 Unbounded,sans-serif; }
-.forum-alliance-card small { overflow:hidden; color:var(--mute); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.forum-alliance-card b { color:var(--gold); font:700 var(--fs-eyebrow)/1 Unbounded,sans-serif; }
+.forum-alliance-card small { overflow:hidden; color:var(--mute); font-size:var(--fs-eyebrow); text-overflow:ellipsis; white-space:nowrap; }
 .forum-alliance-subs header { display:grid; gap:var(--s-fine); margin-bottom:var(--s-2); }
-.forum-alliance-subs header small { color:var(--mute); font-size:11px; }
+.forum-alliance-subs header small { color:var(--mute); font-size:var(--fs-eyebrow); }
 .forum-alliance-subs > div { display:grid; gap:var(--s-fine); }
 .forum-alliance-sub { display:flex; align-items:center; gap:var(--s-1); width:100%; min-height:32px; padding:var(--s-fine) var(--s-1); border:1px solid var(--line); border-radius: var(--r-sm); background:transparent; color:var(--text); text-align:left; cursor:pointer; }
-.forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:11px; }
+.forum-alliance-sub span { margin-left:auto; color:var(--mute); font-size:var(--fs-eyebrow); }
 .forum-alliance-sub.is-on { border-color:color-mix(in srgb,var(--accent) 52%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
 .forum-alliance-sub.is-on span { color:var(--accent-ink); }
 
@@ -2839,7 +2850,7 @@ body:has(.chat-layout) #app { min-height: 0; }
   .sk--ops .sk__card--ops { --sk-h: max(min(78vh, 820px), calc(495px + var(--hero-art-h, 0px))); }
 }
 
-.sk__caption { margin: 0 0 var(--s-2); color: var(--dim); font-size: 13px; }
+.sk__caption { margin: 0 0 var(--s-2); color: var(--dim); font-size: var(--fs-small); }
 
 /*
   Одиночный скриншот в ленте. Пока файл не приехал, высоты у картинки нет

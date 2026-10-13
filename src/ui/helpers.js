@@ -242,3 +242,24 @@ export function unavailableNote() {
       запрос, с которого сайт стартует при открытии.
     </p>`;
 }
+
+/**
+ * Строительный блок «пусто» — оболочка для `.empty-state` из styles-v8.css.
+ *
+ * До него семь экранов объясняли отсутствие данных семью способами, и три из
+ * них не говорили, что произошло. Экран пустоты обязан назвать, чего именно
+ * нет (`title`), и объяснить следующий шаг словами (`note`), если шаг есть.
+ *
+ * `attrs` вставляется как есть: в нём живут hook-атрибуты вроде
+ * `data-ladder-empty`, по которым контроллер прячет и показывает состояние.
+ * Текст проходит через `esc`.
+ *
+ * Скрывает состояние не этот помощник, а атрибут `hidden`: контроллеры пишут
+ * `empty.hidden = ...`, поэтому `hidden: true` ставит атрибут сразу.
+ */
+export function emptyState({ title, note = '', cls = '', attrs = '', hidden = false }) {
+  const parts = [`<p class="empty-state__title">${esc(title)}</p>`];
+  if (note) parts.push(`<p class="empty-state__note">${esc(note)}</p>`);
+  const classAttr = `empty-state${cls ? ` ${cls}` : ''}`;
+  return `<div class="${classAttr}"${attrs ? ` ${attrs}` : ''}${hidden ? ' hidden' : ''}>${parts.join('')}</div>`;
+}

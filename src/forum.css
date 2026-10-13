@@ -23,7 +23,7 @@
 
 .side {
   position: fixed;
-  z-index: 45;
+  z-index: var(--z-drawer);
   top: 0;
   bottom: 0;
   left: 0;
@@ -64,7 +64,7 @@
   gap: var(--s-2);
   padding: var(--s-2) var(--s-2);
   border-radius: var(--r);
-  font-size: 14px;
+  font-size: var(--fs-text);
   white-space: nowrap;
 }
 
@@ -98,13 +98,13 @@
   display: block;
   margin: var(--s-2) var(--s-2) var(--s-fine);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
 }
 .nav__group:first-child { margin-top: 0; }
-.side .nav__link--primary { font-weight: 600; font-size: 14.5px; }
+.side .nav__link--primary { font-weight: 600; font-size: var(--fs-text); }
 .nav__badge {
   margin-left: auto;
   min-width: 20px;
@@ -121,7 +121,7 @@
     держит 5,74:1 в ночи и 6,85:1 днём.
   */
   color: var(--on-accent);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   line-height: 1;
 }
@@ -136,7 +136,7 @@
 }
 .side__note {
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.45;
 }
 
@@ -263,7 +263,7 @@
   */
   .side-veil {
     position: fixed;
-    z-index: 44;
+    z-index: var(--z-veil);
     inset: 0;
     display: block;
     background: var(--scrim);
@@ -333,7 +333,7 @@
   padding-left: var(--s-1);
   color: var(--text);
   font-family: Unbounded, sans-serif;
-  font-size: 13px;
+  font-size: var(--fs-small);
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -348,7 +348,7 @@
   background: color-mix(in srgb, var(--text) 5%, transparent);
   color: var(--text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -470,7 +470,7 @@
   border: 1px solid color-mix(in srgb, var(--win) 28%, transparent);
   border-radius: var(--r-pill);
   color: var(--win-ink);
-  font: 800 11px/1 Inter, sans-serif;
+  font: 800 var(--fs-eyebrow)/1 Inter, sans-serif;
   letter-spacing: .16em;
 }
 .forum-chron__live i {
@@ -494,7 +494,7 @@
 .forum-chron__date {
   margin: var(--s-1) 0 0;
   color: var(--dim);
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 
 .forum-chron__stats {
@@ -519,7 +519,7 @@
   display: block;
   margin-top: var(--s-fine);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.35;
 }
 
@@ -539,17 +539,17 @@
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .forum-chron__item--win { border-color: color-mix(in srgb, var(--win) 24%, transparent); }
 .forum-chron__item--loss { border-color: color-mix(in srgb, var(--loss) 24%, transparent); }
-.forum-chron__when { color: var(--mute); font-size: 11px; }
+.forum-chron__when { color: var(--mute); font-size: var(--fs-eyebrow); }
 .forum-chron__item--win .forum-chron__what { color: var(--win-ink); }
 .forum-chron__item--loss .forum-chron__what { color: var(--loss-ink); }
 
 .forum-chron__more {
   color: var(--accent-ink);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   text-decoration: none;
 }
@@ -585,15 +585,15 @@
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-ink);
   font-family: Unbounded, sans-serif;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .forum-rules__label { flex: 1; min-width: 0; }
-.forum-rules__label b { display: block; font-size: 14.5px; }
+.forum-rules__label b { display: block; font-size: var(--fs-text); }
 .forum-rules__label small {
   display: block;
   margin-top: var(--s-hair);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
 }
 .forum-rules__chev { color: var(--mute); transition: transform .2s var(--ease); }
 .forum-rules[open] .forum-rules__chev { transform: rotate(180deg); }
@@ -604,11 +604,11 @@
   counter-reset: rule;
 }
 .forum-rules__item { margin-bottom: var(--s-2); }
-.forum-rules__item b { font-size: 13.5px; }
+.forum-rules__item b { font-size: var(--fs-small); }
 .forum-rules__item p {
   margin: var(--s-fine) 0 0;
   color: var(--dim);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.5;
 }
 
@@ -623,10 +623,10 @@
   margin: var(--s-1) 0 0;
   padding-left: var(--s-3);
   color: var(--dim);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.55;
 }
-.forum-rules__note { margin: var(--s-2) var(--s-3) var(--s-3); font-size: 11.5px; line-height: 1.5; }
+.forum-rules__note { margin: var(--s-2) var(--s-3) var(--s-3); font-size: var(--fs-eyebrow); line-height: 1.5; }
 
 /* ── Состояние форума и аккаунт ───────────────────────────────────────────── */
 
@@ -642,9 +642,9 @@
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
 }
-.forum-notice p { margin: 0 0 var(--s-1); color: var(--dim); font-size: 13px; line-height: 1.55; }
+.forum-notice p { margin: 0 0 var(--s-1); color: var(--dim); font-size: var(--fs-small); line-height: 1.55; }
 .forum-notice--off { border-color: color-mix(in srgb, var(--gold) 24%, transparent); }
 .forum-notice--local { border-color: color-mix(in srgb, var(--electric) 20%, transparent); }
 .forum-notice code {
@@ -672,8 +672,8 @@
   gap: var(--s-1) var(--s-2);
 }
 .forum-me__body { min-width: 0; }
-.forum-me__body b { display: block; font-size: 14px; }
-.forum-me__body small { color: var(--mute); font-size: 11px; }
+.forum-me__body b { display: block; font-size: var(--fs-text); }
+.forum-me__body small { color: var(--mute); font-size: var(--fs-eyebrow); }
 .forum-me__acts {
   display: flex;
   flex-wrap: wrap;
@@ -702,7 +702,7 @@
   padding: var(--s-1) 0;
   cursor: pointer;
   list-style: none;
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .forum-me__more-sum::-webkit-details-marker { display: none; }
 .forum-me__more-arrow {
@@ -724,7 +724,7 @@
   border-radius: var(--r);
   background: color-mix(in srgb, var(--loss) 6%, transparent);
   color: var(--soft-bad);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
 }
 
 /*
@@ -749,7 +749,7 @@
   background: color-mix(in srgb, var(--gold) 8%, transparent);
   color: var(--text);
 }
-.forum-appeal__state { margin: 0; color: var(--mute); font-size: 12px; }
+.forum-appeal__state { margin: 0; color: var(--mute); font-size: var(--fs-meta); }
 .forum-appeal__state--rejected { color: var(--soft-bad); }
 .forum-appeal {
   padding-top: var(--s-1);
@@ -768,8 +768,8 @@
   border-top: 1px solid var(--line-soft);
 }
 .forum-push__head { display: block; }
-.forum-push__head b { display: block; font-size: 12.5px; }
-.forum-push__head small { font-size: 11px; }
+.forum-push__head b { display: block; font-size: var(--fs-meta); }
+.forum-push__head small { font-size: var(--fs-eyebrow); }
 .forum-push__grid {
   display: grid;
   gap: var(--s-fine) var(--s-3);
@@ -784,7 +784,7 @@
   gap: var(--s-1);
   min-height: 30px;
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   -webkit-tap-highlight-color: transparent;
 }
 .forum-push__row input {
@@ -794,7 +794,7 @@
   flex: none;
   cursor: pointer;
 }
-.forum-push__hint { margin: var(--s-fine) 0 0; font-size: 11px; line-height: 1.45; }
+.forum-push__hint { margin: var(--s-fine) 0 0; font-size: var(--fs-eyebrow); line-height: 1.45; }
 .forum-push__quiet {
   display: flex;
   flex-wrap: wrap;
@@ -808,7 +808,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--s-1);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--dim);
 }
 /* 16px как у остальных полей: меньше — и телефон на focus приблизит страницу. */
@@ -823,8 +823,8 @@
 }
 .forum-push__quiet-window input:focus { outline: none; border-color: var(--accent); }
 .forum-push__quiet-window input:disabled { opacity: .45; }
-.forum-push__quiet-hint { margin: var(--s-hair) 0 0; font-size: 11px; line-height: 1.45; }
-.forum-push__quiet-error { margin: var(--s-fine) 0 0; font-size: 11.5px; }
+.forum-push__quiet-hint { margin: var(--s-hair) 0 0; font-size: var(--fs-eyebrow); line-height: 1.45; }
+.forum-push__quiet-error { margin: var(--s-fine) 0 0; font-size: var(--fs-eyebrow); }
 
 /*
   Колокольчик уведомлений. Счётчик — маленький кружок на кнопке, как у мессенджера:
@@ -847,7 +847,7 @@
   border-radius: var(--r-sm);
   background: var(--loss);
   color: var(--on-accent);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   line-height: 1;
 }
@@ -869,7 +869,7 @@
 .forum-notify__count {
   margin-left: auto;
   color: var(--mute);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
 }
 .forum-notify__count.is-new {
   color: var(--accent-ink);
@@ -893,7 +893,7 @@
 .forum-notify__day {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-content);
   display: block;
   padding: var(--s-1) var(--s-hair) var(--s-fine);
   /* Подложка равна фону панели: под прилипшей датой прокрадываются строки
@@ -904,7 +904,7 @@
   background: linear-gradient(180deg, var(--surface) 72%, transparent);
   color: var(--mute);
   font-family: Inter, sans-serif;
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -968,7 +968,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--r-sm);
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .forum-notify__system {
   display: grid;
@@ -1002,7 +1002,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--s-fine);
-  font-size: 13.5px;
+  font-size: var(--fs-small);
 }
 .forum-notify__title {
   color: var(--link);
@@ -1025,7 +1025,7 @@
   padding-left: var(--s-1);
   border-left: 2px solid color-mix(in srgb, var(--tone) 45%, transparent);
   color: var(--text);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   overflow: hidden;
 }
 .forum-notify__meta {
@@ -1034,7 +1034,7 @@
   gap: var(--s-1);
   margin-top: var(--s-fine);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
 }
 .forum-notify__go {
   color: var(--accent-ink);
@@ -1049,7 +1049,7 @@
   gap: var(--s-1);
   padding: var(--s-3) 0 var(--s-fine);
   color: var(--dim);
-  font-size: 13px;
+  font-size: var(--fs-small);
   text-align: center;
 }
 .forum-notify__empty p { margin: 0; }
@@ -1087,10 +1087,10 @@
   background: var(--ava, var(--mark-plate));
   color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 700;
 }
-.forum-ava--sm { width: 28px; height: 28px; border-radius: var(--r-sm); font-size: 12px; }
+.forum-ava--sm { width: 28px; height: 28px; border-radius: var(--r-sm); font-size: var(--fs-meta); }
 
 /* ── Поля и кнопки ────────────────────────────────────────────────────────── */
 
@@ -1099,7 +1099,7 @@
   display: block;
   margin-bottom: var(--s-fine);
   color: var(--dim);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
 }
 .forum-field input,
@@ -1144,7 +1144,7 @@
   background: var(--accent-plate);
   color: var(--on-accent);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: var(--fs-small);
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1187,7 +1187,7 @@
   border-radius: var(--r);
   background: color-mix(in srgb, var(--loss) 7%, transparent);
   color: var(--soft-bad);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
 }
 
 /*
@@ -1206,11 +1206,11 @@
   list-style: none;
 }
 .forum-authbox__sum::-webkit-details-marker { display: none; }
-.forum-authbox__sum-name { display: block; font-size: 14px; }
+.forum-authbox__sum-name { display: block; font-size: var(--fs-text); }
 .forum-authbox__sum small {
   display: block;
   margin-top: var(--s-hair);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.45;
 }
 .forum-authbox__sum::after {
@@ -1238,7 +1238,7 @@
   .forum-auth__fields .forum-field { margin-bottom: 0; }
 }
 .forum-auth__actions { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-top: var(--s-3); }
-.forum-auth__note { margin: var(--s-2) 0 0; font-size: 11.5px; line-height: 1.5; }
+.forum-auth__note { margin: var(--s-2) 0 0; font-size: var(--fs-eyebrow); line-height: 1.5; }
 
 /* ── Самовосстановление доступа ─────────────────────────────────────────────
    Единственный путь назад для того, кто не может войти, поэтому он под
@@ -1265,7 +1265,7 @@
   margin: 0 0 var(--s-2);
   padding: 0;
   list-style: none;
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.4;
   color: var(--dim);
 }
@@ -1279,15 +1279,15 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 50%;
-  font: 700 11px/1 ui-monospace, SFMono-Regular, monospace;
+  font: 700 var(--fs-eyebrow)/1 ui-monospace, SFMono-Regular, monospace;
 }
 .forum-recovery__steps li.is-now { color: var(--text); font-weight: 600; }
 .forum-recovery__steps li.is-now::before { border-color: var(--accent); color: var(--accent-ink); }
 .forum-recovery__steps li.is-done::before { content: '✓'; border-color: var(--accent); color: var(--accent-ink); }
 
-.forum-recovery__nick { font-size: 12.5px; }
+.forum-recovery__nick { font-size: var(--fs-meta); }
 .forum-recovery__status { font-weight: 600; }
-.forum-recovery__keylabel { font-size: 11.5px; }
+.forum-recovery__keylabel { font-size: var(--fs-eyebrow); }
 .forum-recovery__keyrow { display: flex; flex-wrap: wrap; gap: var(--s-1); align-items: center; }
 .forum-recovery__key {
   flex: 1 1 190px;
@@ -1296,13 +1296,13 @@
   border: 1px dashed var(--line);
   border-radius: var(--r);
   background: var(--bg);
-  font: 500 12px/1.6 ui-monospace, SFMono-Regular, monospace;
+  font: 500 var(--fs-meta)/1.6 ui-monospace, SFMono-Regular, monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: all;
 }
 .forum-recovery__actions { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-top: var(--s-2); }
-.forum-recovery__ok { font-size: 13px; line-height: 1.5; }
+.forum-recovery__ok { font-size: var(--fs-small); line-height: 1.5; }
 
 /* ── Написать пост ────────────────────────────────────────────────────────── */
 
@@ -1314,7 +1314,7 @@
   padding: var(--s-3) var(--s-3);
   cursor: pointer;
   list-style: none;
-  font-size: 14.5px;
+  font-size: var(--fs-text);
 }
 .forum-composer__summary::-webkit-details-marker { display: none; }
 .forum-composer__plus {
@@ -1329,7 +1329,7 @@
   line-height: 1;
 }
 .forum-composer form { padding: 0 var(--s-3) var(--s-3); }
-.forum-composer__rules { margin: var(--s-fine) 0 var(--s-3); font-size: 11.5px; line-height: 1.5; }
+.forum-composer__rules { margin: var(--s-fine) 0 var(--s-3); font-size: var(--fs-eyebrow); line-height: 1.5; }
 .forum-composer__actions { display: flex; gap: var(--s-1); }
 
 /*
@@ -1363,7 +1363,7 @@
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--text) 4%, transparent);
   color: var(--text);
-  font: 600 13px/1 Inter, sans-serif;
+  font: 600 var(--fs-small)/1 Inter, sans-serif;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1378,10 +1378,10 @@
 }
 .forum-md__btn:active { transform: scale(.95); }
 .forum-md__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.forum-md__mark { font-size: 11px; vertical-align: sub; }
+.forum-md__mark { font-size: var(--fs-eyebrow); vertical-align: sub; }
 .forum-md__capt {
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   margin-right: var(--s-hair);
 }
 .forum-md__color {
@@ -1495,7 +1495,7 @@
   background: var(--recessed);
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.55;
 }
 .forum-editor code,
@@ -1524,7 +1524,7 @@
 .forum-editor h3,
 .forum-post__body h3,
 .forum-comment__body h3 {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 700;
 }
 
@@ -1563,7 +1563,7 @@
   border-left: 3px solid var(--gold);
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--gold) 7%, transparent);
-  font-size: 13px;
+  font-size: var(--fs-small);
   line-height: 1.45;
   color: var(--dim);
 }
@@ -1576,7 +1576,7 @@
 
 .forum-feed__stale .forum-btn {
   padding: var(--s-hair) var(--s-1);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 
 .forum-post { margin-bottom: 0; }
@@ -1593,17 +1593,17 @@
   margin-bottom: var(--s-2);
 }
 .forum-post__by { flex: 1; min-width: 0; }
-.forum-post__by b { display: block; font-size: 13.5px; }
-.forum-post__by time { color: var(--mute); font-size: 11px; }
+.forum-post__by b { display: block; font-size: var(--fs-small); }
+.forum-post__by time { color: var(--mute); font-size: var(--fs-eyebrow); }
 .forum-post__cat {
   padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   white-space: nowrap;
 }
-.forum-post__pin { font-size: 13px; }
+.forum-post__pin { font-size: var(--fs-small); }
 .forum-post__trail {
   flex: none;
   padding: var(--s-fine) var(--s-1);
@@ -1611,7 +1611,7 @@
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1626,7 +1626,7 @@
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--electric, var(--accent)) 16%, transparent);
   color: var(--electric, var(--accent));
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1637,7 +1637,7 @@
 .forum-post__title a { color: inherit; text-decoration: none; }
 .forum-post__title a:hover { color: var(--accent-ink); }
 
-.forum-post__body { color: var(--dim); font-size: 13.5px; line-height: 1.62; }
+.forum-post__body { color: var(--dim); font-size: var(--fs-small); line-height: 1.62; }
 .forum-post__body p { margin: 0 0 var(--s-1); }
 .forum-post__body p:last-child { margin-bottom: 0; }
 .forum-post__body a { color: var(--accent-ink); }
@@ -1646,7 +1646,7 @@
   display: inline-block;
   margin-top: var(--s-fine);
   color: var(--accent-ink);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   text-decoration: none;
 }
@@ -1673,14 +1673,14 @@
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--dim);
-  font-size: 13.5px;
+  font-size: var(--fs-small);
   font-weight: 600;
   text-decoration: none;
 }
 .forum-post__comments:hover { border-color: var(--line); color: var(--text); }
 .forum-post__views {
   color: var(--dim);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
 }
 .forum-post__acts { display: flex; gap: var(--s-fine); margin-left: auto; }
 
@@ -1697,7 +1697,7 @@
   background: none;
   color: var(--mute);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--fs-text);
   line-height: 1.1;
   cursor: pointer;
   transition: color .15s var(--ease), border-color .15s var(--ease);
@@ -1713,7 +1713,7 @@
   background: none;
   color: var(--mute);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 .forum-act:hover { border-color: var(--line); color: var(--text); }
@@ -1730,10 +1730,10 @@
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--loss) 12%, transparent);
   color: var(--loss-ink);
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
-.forum-post__gone b { font-size: 13.5px; }
-.forum-post__gone p { margin: var(--s-hair) 0 0; font-size: 12px; }
+.forum-post__gone b { font-size: var(--fs-small); }
+.forum-post__gone p { margin: var(--s-hair) 0 0; font-size: var(--fs-meta); }
 
 .forum-empty, .forum-feed__error { text-align: center; }
 .forum-empty h2 { margin: var(--s-1) 0 var(--s-1); }
@@ -1753,13 +1753,13 @@
   background: color-mix(in srgb, var(--text) 2%, transparent);
   color: var(--dim);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
   cursor: pointer;
   transition: border-color .16s var(--ease), background .16s var(--ease), transform .14s var(--ease);
 }
 .forum-react__btn:hover:not(:disabled) { transform: translateY(-1px); border-color: color-mix(in srgb, var(--text) 20%, transparent); }
 .forum-react__btn:disabled { cursor: not-allowed; opacity: .55; }
-.forum-react__btn b { font-size: 12px; }
+.forum-react__btn b { font-size: var(--fs-meta); }
 
 /* Своя реакция подсвечена: иначе непонятно, поставил ты её или нет. */
 .forum-react__btn.is-on {
@@ -1777,7 +1777,7 @@
   background: color-mix(in srgb, var(--gold) 10%, transparent);
   color: var(--soft-warn);
 }
-.forum-react__plus { color: var(--mute); font-size: 13px; }
+.forum-react__plus { color: var(--mute); font-size: var(--fs-small); }
 
 /*
   Благодарность стоит в той же строке, но отделена отсадкой и своим цветом:
@@ -1800,7 +1800,7 @@
 .forum-emoji { position: relative; }
 .forum-emoji__pop {
   position: absolute;
-  z-index: 30;
+  z-index: var(--z-menu);
   bottom: calc(100% + 7px);
   left: 0;
   display: flex;
@@ -1826,7 +1826,7 @@
 }
 .forum-emoji__item:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
 .forum-emoji__item.is-on { border-color: color-mix(in srgb, var(--gold) 40%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent); }
-.forum-emoji__item b { font-size: 11px; }
+.forum-emoji__item b { font-size: var(--fs-eyebrow); }
 
 /* У правого края списка не хватает места — открываем влево. */
 @media (max-width: 519px) {
@@ -1840,7 +1840,7 @@
   padding-top: var(--s-3);
   border-top: 1px solid var(--line);
 }
-.forum-thread__title { margin: 0 0 var(--s-2); font-size: 14px; }
+.forum-thread__title { margin: 0 0 var(--s-2); font-size: var(--fs-text); }
 
 .forum-thread__list { margin: 0 0 var(--s-3); padding: 0; list-style: none; }
 
@@ -1854,7 +1854,7 @@
 .forum-comment--none, .forum-comment--deleted {
   display: block;
   padding: var(--s-2) 0;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
 }
 .forum-comment--deleted p { margin: 0; }
 
@@ -1865,12 +1865,12 @@
   gap: var(--s-1);
   margin-bottom: var(--s-fine);
 }
-.forum-comment__head b { font-size: 13px; }
-.forum-comment__head time { color: var(--mute); font-size: 11px; }
+.forum-comment__head b { font-size: var(--fs-small); }
+.forum-comment__head time { color: var(--mute); font-size: var(--fs-eyebrow); }
 .forum-comment__body p {
   margin: 0 0 var(--s-1);
   color: var(--dim);
-  font-size: 13px;
+  font-size: var(--fs-small);
   line-height: 1.6;
 }
 .forum-comment__body a { color: var(--accent-ink); }
@@ -1880,16 +1880,16 @@
   gap: var(--s-1);
   margin-top: var(--s-1);
 }
-.forum-comment__foot .forum-react__btn { padding: var(--s-fine) var(--s-1); font-size: 12px; }
+.forum-comment__foot .forum-react__btn { padding: var(--s-fine) var(--s-1); font-size: var(--fs-meta); }
 
 .forum-reply__actions { margin-top: var(--s-1); }
-.forum-reply__locked { margin: 0; font-size: 12.5px; }
+.forum-reply__locked { margin: 0; font-size: var(--fs-meta); }
 
 /* ── Окна ─────────────────────────────────────────────────────────────────── */
 
 .forum-modal {
   position: fixed;
-  z-index: 60;
+  z-index: var(--z-modal);
   inset: 0;
   display: grid;
   place-items: center;
@@ -1930,12 +1930,12 @@
 }
 .forum-modal__rule:hover { border-color: color-mix(in srgb, var(--text) 20%, transparent); }
 .forum-modal__rule input { margin-top: var(--s-fine); accent-color: var(--accent); }
-.forum-modal__rule b { display: block; font-size: 13px; }
+.forum-modal__rule b { display: block; font-size: var(--fs-small); }
 .forum-modal__rule small {
   display: block;
   margin-top: var(--s-fine);
   color: var(--mute);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.45;
 }
 .forum-modal__rule:has(input:checked) {
@@ -1950,7 +1950,7 @@
 */
 .forum-toast {
   position: fixed;
-  z-index: 70;
+  z-index: var(--z-toast);
   /* Над полосой жестов, иначе сообщение наполовину под ней. */
   bottom: max(20px, calc(env(safe-area-inset-bottom) + 14px));
   left: 50%;
@@ -1961,7 +1961,7 @@
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--win) 18%, var(--overlay));
   color: var(--soft-ok);
-  font-size: 13px;
+  font-size: var(--fs-small);
   box-shadow: var(--shadow-3);
   animation: forum-toast-in .26s var(--ease) both;
 }
@@ -2049,8 +2049,8 @@
 }
 .forum-welcome__mark { font-size: 22px; line-height: 1; flex: none; }
 .forum-welcome__body { min-width: 0; }
-.forum-welcome__body b { display: block; font-size: 15px; }
-.forum-welcome__body p { margin: var(--s-fine) 0 0; font-size: 13px; }
+.forum-welcome__body b { display: block; font-size: var(--fs-body); }
+.forum-welcome__body p { margin: var(--s-fine) 0 0; font-size: var(--fs-small); }
 .forum-welcome .forum-btn { flex: none; margin-left: auto; white-space: nowrap; }
 
 /*
@@ -2075,7 +2075,7 @@
 */
 .forum-starter { margin: var(--s-3) 0 0; padding: var(--s-3) var(--s-3); }
 .forum-starter__head { display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap; }
-.forum-starter__count { font-size: 12px; color: var(--dim); }
+.forum-starter__count { font-size: var(--fs-meta); color: var(--dim); }
 .forum-starter__list { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: var(--s-1); }
 .forum-starter__item {
   display: flex;
@@ -2086,8 +2086,8 @@
   border-radius: var(--r-sm);
 }
 .forum-starter__text { display: grid; gap: var(--s-hair); min-width: 0; }
-.forum-starter__text b { font-size: 14px; }
-.forum-starter__text span { font-size: 12.5px; }
+.forum-starter__text b { font-size: var(--fs-text); }
+.forum-starter__text span { font-size: var(--fs-meta); }
 .forum-starter__go {
   flex: none;
   border: 1px solid var(--line);
@@ -2097,10 +2097,10 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-sm);
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .forum-starter__go:hover { border-color: var(--accent); }
-.forum-starter__foot { margin: var(--s-2) 0 0; font-size: 12px; }
+.forum-starter__foot { margin: var(--s-2) 0 0; font-size: var(--fs-meta); }
 
 @media (max-width: 559px) {
   .forum-starter__item { align-items: flex-start; }
@@ -2129,7 +2129,7 @@
   gap: var(--s-1);
   margin-bottom: var(--s-1);
 }
-.forum-theme__mark { font-size: 15px; line-height: 1; }
+.forum-theme__mark { font-size: var(--fs-body); line-height: 1; }
 .forum-theme__title {
   position: relative;
   margin: 0;
@@ -2139,7 +2139,7 @@
 .forum-theme__body {
   position: relative;
   margin: var(--s-1) 0 0;
-  font-size: 13.5px;
+  font-size: var(--fs-small);
   line-height: 1.62;
   color: var(--dim);
 }
@@ -2156,10 +2156,10 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  font-size: 13px;
+  font-size: var(--fs-small);
   letter-spacing: .02em;
 }
-.forum-hot__fire { font-size: 15px; line-height: 1; }
+.forum-hot__fire { font-size: var(--fs-body); line-height: 1; }
 .forum-hot__list { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: var(--s-fine); }
 .forum-hot__item a {
   display: flex;
@@ -2171,8 +2171,8 @@
   text-decoration: none;
 }
 .forum-hot__item a:hover { background: color-mix(in srgb, var(--text) 3.5%, transparent); }
-.forum-hot__title { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.forum-hot__meta { font-size: 11.5px; flex: none; }
+.forum-hot__title { font-size: var(--fs-text); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.forum-hot__meta { font-size: var(--fs-eyebrow); flex: none; }
 
 /* ── Уровень и достижения на странице участника ───────────────────────────── */
 .forum-rank { margin-top: var(--s-3); }
@@ -2182,7 +2182,7 @@
   justify-content: space-between;
   gap: var(--s-2);
 }
-.forum-rank__level { font-size: 12.5px; color: var(--dim); }
+.forum-rank__level { font-size: var(--fs-meta); color: var(--dim); }
 .forum-rank__level b { color: var(--accent-ink); font-weight: 800; letter-spacing: .02em; }
 .forum-rank__bar {
   position: relative;
@@ -2199,7 +2199,7 @@
   background: linear-gradient(90deg, var(--accent), var(--accent-plate-line));
   border-radius: var(--r-pill);
 }
-.forum-rank__label { display: block; margin: var(--s-1) 0 0; font-size: 12px; color: var(--mute); }
+.forum-rank__label { display: block; margin: var(--s-1) 0 0; font-size: var(--fs-meta); color: var(--mute); }
 .forum-rank__label--top { margin-top: var(--s-2); }
 .forum-rank__achs {
   display: flex;
@@ -2212,7 +2212,7 @@
   background: var(--raised);
   border: 1px dashed var(--line);
   border-radius: var(--r-pill);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--dim);
   cursor: default;
@@ -2223,7 +2223,7 @@
   border-style: solid;
   color: var(--text);
 }
-.forum-rank__sum { margin: var(--s-2) 0 0; font-size: 12px; }
+.forum-rank__sum { margin: var(--s-2) 0 0; font-size: var(--fs-meta); }
 
 /*
   Репутация — отдельным числом под полосой активности: это разные лестницы,
@@ -2237,12 +2237,12 @@
   letter-spacing: -.01em;
   color: var(--accent-ink);
 }
-.forum-rep__label { font-size: 12.5px; color: var(--dim); }
-.forum-rep__hint { margin: var(--s-fine) 0 0; font-size: 11.5px; }
+.forum-rep__label { font-size: var(--fs-meta); color: var(--dim); }
+.forum-rep__hint { margin: var(--s-fine) 0 0; font-size: var(--fs-eyebrow); }
 .forum-rep__sources {
   margin: var(--s-1) 0 0;
   padding: 0 0 0 var(--s-3);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--dim);
 }
 .forum-rep__sources li { margin-top: var(--s-hair); }
@@ -2259,7 +2259,7 @@
 
 .forum-ghlog { margin-top: var(--s-3); }
 .forum-ghlog .panel__head { align-items: baseline; }
-.forum-ghlog__chats { margin-left: auto; font-size: 12px; color: var(--dim); }
+.forum-ghlog__chats { margin-left: auto; font-size: var(--fs-meta); color: var(--dim); }
 .forum-ghlog__wrap {
   display: flex;
   gap: var(--s-1);
@@ -2271,7 +2271,7 @@
   display: grid;
   grid-template-rows: repeat(7, 1fr);
   gap: var(--s-fine);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   color: var(--dim);
   text-align: right;
   line-height: 12px;
@@ -2315,10 +2315,10 @@
 }
 .forum-poll__question {
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .forum-poll__total {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--mute);
 }
 .forum-poll__options {
@@ -2387,14 +2387,14 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   color: var(--bg);
   transform: translate(-50%, -50%);
 }
 .forum-poll__text {
   flex: 1;
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .forum-poll__bar {
   position: absolute;
@@ -2409,13 +2409,13 @@
 .forum-poll__opt.is-on .forum-poll__bar,
 .forum-poll__opt:hover .forum-poll__bar { opacity: 1; }
 .forum-poll__num {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--mute);
   white-space: nowrap;
 }
 .forum-poll__hint {
   margin: var(--s-1) 0 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 
 .forum-poll-creator {
@@ -2433,7 +2433,7 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  font-size: 13px;
+  font-size: var(--fs-small);
 }
 .forum-field--inline input[type="checkbox"] {
   width: auto;
@@ -2453,10 +2453,10 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  font-size: 13px;
+  font-size: var(--fs-small);
   letter-spacing: .02em;
 }
-.forum-lead__icon { font-size: 15px; line-height: 1; }
+.forum-lead__icon { font-size: var(--fs-body); line-height: 1; }
 .forum-lead .seg--lead { margin-left: auto; }
 @media (max-width: 619px) {
   .forum-lead__head { flex-wrap: wrap; }
@@ -2484,7 +2484,7 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-sm);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 700;
   color: var(--mute);
   background: var(--raised);
@@ -2503,16 +2503,16 @@
   flex-direction: column;
   gap: var(--s-hair);
 }
-.forum-lead__who b { font-size: 13.5px; overflow-wrap: anywhere; }
+.forum-lead__who b { font-size: var(--fs-small); overflow-wrap: anywhere; }
 .forum-lead__who .forum-nick { color: var(--text); }
-.forum-lead__who small { font-size: 11.5px; color: var(--mute); }
+.forum-lead__who small { font-size: var(--fs-eyebrow); color: var(--mute); }
 .forum-lead__score {
   flex: none;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--dim);
 }
-.forum-lead__score .num { font-size: 13px; color: var(--text); }
-.forum-lead__empty { margin: var(--s-2) 0 var(--s-hair); font-size: 13px; }
+.forum-lead__score .num { font-size: var(--fs-small); color: var(--text); }
+.forum-lead__empty { margin: var(--s-2) 0 var(--s-hair); padding: var(--s-2) var(--s-1); }
 
 
 /* ── Гайды (вики) ─────────────────────────────────────────────────────────── */
@@ -2529,7 +2529,7 @@
 .guide-chip {
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-pill);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--mute);
   background: var(--raised);
@@ -2548,7 +2548,7 @@
   что кнопка меняет только видимость списка, а не раздел.
 */
 .guide-chip--mine { border-style: dashed; margin-left: auto; }
-.guides-page__signin { margin: 0 0 var(--s-2); font-size: 12.5px; }
+.guides-page__signin { margin: 0 0 var(--s-2); font-size: var(--fs-meta); }
 .guides-page__signin a { color: var(--accent-ink); }
 
 .guide-search {
@@ -2580,7 +2580,7 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 13.5px;
+  font-size: var(--fs-small);
 }
 .guide-search input::placeholder { color: var(--mute); }
 .guide-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
@@ -2589,12 +2589,12 @@
 .quart-next { display: grid; gap: var(--s-1); }
 .quart-next .quart-timer { justify-content: space-between; margin-top: 0; }
 .quart-next__more {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--accent-ink);
   text-decoration: none;
 }
-.quart-next__more b { font-size: 13px; }
+.quart-next__more b { font-size: var(--fs-small); }
 .quart-next__more:hover { text-decoration: underline; }
 
 .quart-banner {
@@ -2605,8 +2605,8 @@
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
     var(--raised);
 }
-.quart-banner__title { font-size: 15px; line-height: 1.3; }
-.quart-banner p { margin: 0; font-size: 12px; line-height: 1.5; }
+.quart-banner__title { font-size: var(--fs-body); line-height: 1.3; }
+.quart-banner p { margin: 0; font-size: var(--fs-meta); line-height: 1.5; }
 .quart-banner__acts {
   display: flex;
   flex-wrap: wrap;
@@ -2629,14 +2629,14 @@
 }
 .guide-card a:hover { border-color: var(--accent); transform: translateY(-1px); }
 .guide-card__cat {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--accent-ink);
 }
-.guide-card__title { font-size: 15px; line-height: 1.35; }
-.guide-card__by { font-size: 11.5px; }
+.guide-card__title { font-size: var(--fs-body); line-height: 1.35; }
+.guide-card__by { font-size: var(--fs-eyebrow); }
 .guide-list-wrap { margin-top: var(--s-3); }
 
 .guide-composer {
@@ -2655,7 +2655,7 @@
 .guide-detail .back { display: inline-block; margin-bottom: var(--s-2); }
 .guide-detail h1 { font-size: var(--fs-h1); margin: var(--s-1) 0 var(--s-hair); }
 .guide-detail .guide-card__cat { display: inline-block; margin-top: var(--s-2); }
-.guide-content { margin-top: var(--s-3); font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.guide-content { margin-top: var(--s-3); font-size: var(--fs-body); line-height: 1.6; overflow-wrap: anywhere; }
 .guide-content p { margin: 0 0 var(--s-2); }
 .guide-content blockquote {
   margin: 0 0 var(--s-2);
@@ -2663,7 +2663,7 @@
   border-left: 3px solid var(--accent);
   background: var(--raised);
   border-radius: var(--r-sm);
-  font-size: 14px;
+  font-size: var(--fs-text);
 }
 .guide-content pre {
   padding: var(--s-2) var(--s-2);
@@ -2671,17 +2671,17 @@
   background: var(--raised);
   border: 1px solid var(--line);
   overflow-x: auto;
-  font-size: 13px;
+  font-size: var(--fs-small);
   line-height: 1.5;
 }
-.guide-content code { font-family: var(--mono, monospace); font-size: 13px; }
+.guide-content code { font-family: var(--mono, monospace); font-size: var(--fs-small); }
 .guide-detail__acts { margin-top: var(--s-4); }
 
 /* ── Отметка модерации и сигналы об устаревании ───────────────────────────── */
 
 .guide-card__marks { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-top: var(--s-fine); }
 .guide-badge {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .04em;
   padding: var(--s-hair) var(--s-1);
@@ -2711,9 +2711,9 @@
 }
 .guide-review--verified { border-left-color: var(--win); }
 .guide-review--outdated { border-left-color: var(--gold); }
-.guide-review__title { margin: 0; font-size: 13px; font-weight: 700; }
-.guide-review__note { margin: var(--s-1) 0 0; font-size: 13.5px; line-height: 1.5; }
-.guide-review__why { margin: var(--s-1) 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
+.guide-review__title { margin: 0; font-size: var(--fs-small); font-weight: 700; }
+.guide-review__note { margin: var(--s-1) 0 0; font-size: var(--fs-small); line-height: 1.5; }
+.guide-review__why { margin: var(--s-1) 0 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--dim); }
 
 .guide-review-box {
   margin-top: var(--s-3);
@@ -2722,15 +2722,15 @@
   display: grid;
   gap: var(--s-2);
 }
-.guide-review__rule { margin: 0; font-size: 12px; line-height: 1.5; color: var(--mute); }
-.guide-review__own { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.guide-review__rule { margin: 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--mute); }
+.guide-review__own { margin: 0; font-size: var(--fs-meta); line-height: 1.6; color: var(--dim); }
 .guide-review__own button { margin-left: var(--s-1); }
-.guide-review__queue { margin: 0; padding-left: var(--s-3); font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.guide-review__queue { margin: 0; padding-left: var(--s-3); font-size: var(--fs-meta); line-height: 1.6; color: var(--dim); }
 .guide-review__acts { display: flex; flex-wrap: wrap; gap: var(--s-1); }
 .guide-review__stale textarea,
 .guide-review__staff input { width: 100%; }
 .guide-review__stale .forum-field,
-.guide-review__staff .forum-field { display: grid; gap: var(--s-fine); font-size: 12.5px; }
+.guide-review__staff .forum-field { display: grid; gap: var(--s-fine); font-size: var(--fs-meta); }
 
 /* ── Заявки на гайды ────────────────────────────────────────────────────────
    Блок живёт под списком гайдов и не похож на него нарочно: заявки — это
@@ -2745,13 +2745,13 @@
 }
 .guide-requests__sub {
   margin: var(--s-1) 0 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--dim);
 }
-.guide-requests__note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--dim); }
+.guide-requests__note { margin: 0; font-size: var(--fs-meta); line-height: 1.55; color: var(--dim); }
 .guide-requests__error { margin: 0; }
 
 .guide-req-form {
@@ -2764,7 +2764,7 @@
 }
 .guide-req-form .forum-composer__actions { display: flex; gap: var(--s-1); }
 .guide-req-form textarea { min-height: 56px; resize: vertical; }
-.guide-req-form small { font-size: 11.5px; line-height: 1.5; }
+.guide-req-form small { font-size: var(--fs-eyebrow); line-height: 1.5; }
 
 .guide-req-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
 .guide-req {
@@ -2778,27 +2778,27 @@
   background: var(--raised);
 }
 .guide-req--mine { border-left-color: var(--accent); }
-.guide-req__title { font-size: 14px; line-height: 1.35; }
-.guide-req__by { font-size: 11.5px; }
+.guide-req__title { font-size: var(--fs-text); line-height: 1.35; }
+.guide-req__by { font-size: var(--fs-eyebrow); }
 /* Метка ожидания — та же, что в панели; классы свои, цвета общие. */
 .guide-req__sla {
   align-self: flex-start;
   padding: var(--s-hair) var(--s-1);
   border: 1px solid currentColor;
   border-radius: var(--r-sm);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
 }
 .guide-req__sla--soon { color: var(--gold); }
 .guide-req__sla--late { color: var(--loss-ink); }
-.guide-req__details { margin: var(--s-hair) 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
-.guide-req__outcome { margin: var(--s-fine) 0 0; font-size: 12.5px; line-height: 1.5; }
+.guide-req__details { margin: var(--s-hair) 0 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--dim); }
+.guide-req__outcome { margin: var(--s-fine) 0 0; font-size: var(--fs-meta); line-height: 1.5; }
 .guide-req__outcome a { color: var(--accent-ink); }
 .guide-req__answer {
   margin: var(--s-fine) 0 0;
   padding-left: var(--s-1);
   border-left: 2px solid var(--line);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--dim);
 }
@@ -2807,7 +2807,7 @@
    поэтому лежат внутри неё, а не в общей форме над списком. */
 .guide-req-list--staff .guide-req { border-left-color: var(--gold); }
 .guide-req__acts { display: grid; gap: var(--s-1); margin-top: var(--s-1); }
-.guide-req__acts .forum-field { display: grid; gap: var(--s-fine); font-size: 12px; color: var(--dim); }
+.guide-req__acts .forum-field { display: grid; gap: var(--s-fine); font-size: var(--fs-meta); color: var(--dim); }
 .guide-req__acts input,
 .guide-req__acts select { width: 100%; }
 .guide-req__btns { display: flex; flex-wrap: wrap; gap: var(--s-1); }
@@ -2823,7 +2823,7 @@
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--win) 12%, transparent);
   color: var(--win-ink);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2847,7 +2847,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-1);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
 }
 .forum-expiry__state { font-weight: 700; color: var(--text); }
 .forum-expiry__state--over { color: var(--loss-ink); }
@@ -2862,10 +2862,10 @@
 
 .cal-page .panel__head { margin-bottom: var(--s-2); }
 .cal-page .panel__head h1 { font-size: var(--fs-h1); margin: var(--s-fine) 0 0; }
-.cal-page .panel__head p { margin: var(--s-1) 0 0; font-size: 13px; line-height: 1.5; }
+.cal-page .panel__head p { margin: var(--s-1) 0 0; font-size: var(--fs-small); line-height: 1.5; }
 
 .cal-new { margin: var(--s-3) 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
-.cal-new small { font-size: 11.5px; }
+.cal-new small { font-size: var(--fs-eyebrow); }
 
 .cal-tabs {
   display: flex;
@@ -2879,7 +2879,7 @@
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-pill);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--mute);
   background: var(--raised);
@@ -2900,10 +2900,10 @@
 .cal-day__head {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-shell);
   margin: 0 0 var(--s-1);
   padding: var(--s-1) var(--s-2);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -2917,7 +2917,7 @@
 .cal-none {
   margin: 0;
   padding: var(--s-3) var(--s-fine);
-  font-size: 13px;
+  font-size: var(--fs-small);
   line-height: 1.5;
   color: var(--mute);
 }
@@ -2950,16 +2950,16 @@
 }
 .evt-card__when b { font-size: 19px; line-height: 1.1; color: var(--text); }
 .evt-card__when span {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--accent-ink);
 }
-.evt-card__when i { font-size: 11.5px; font-style: normal; color: var(--dim); }
+.evt-card__when i { font-size: var(--fs-eyebrow); font-style: normal; color: var(--dim); }
 
 .evt-card__body { display: grid; gap: var(--s-1); min-width: 0; }
-.evt-card__title { margin: 0; font-size: 15px; line-height: 1.35; }
+.evt-card__title { margin: 0; font-size: var(--fs-body); line-height: 1.35; }
 .evt-card__title a { color: var(--text); text-decoration: none; }
 .evt-card__title a:hover { color: var(--accent-ink); }
 .evt-card__meta {
@@ -2967,21 +2967,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-fine) var(--s-2);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   color: var(--mute);
 }
 .evt-card__cat { color: var(--dim); font-weight: 600; }
 
 /* Наружу уходят только количества: список имён читался бы как состав альянса,
    а представление страницы кому идёт — это не публичная информация. */
-.evt-seats { font-size: 12px; color: var(--dim); }
+.evt-seats { font-size: var(--fs-meta); color: var(--dim); }
 .evt-seats b { color: var(--text); }
 .evt-seats em { font-style: normal; color: var(--loss-ink); }
 .evt-seats--full { font-weight: 700; }
 
 .evt-card__side { display: grid; gap: var(--s-1); justify-items: end; }
 .evt-link {
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
   color: var(--accent-ink);
   text-decoration: none;
@@ -3017,12 +3017,12 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--dim);
 }
-.evt-remind select { font-size: 12.5px; }
+.evt-remind select { font-size: var(--fs-meta); }
 
-.evt-login { margin: 0; font-size: 12.5px; }
+.evt-login { margin: 0; font-size: var(--fs-meta); }
 
 /* Перенос прячем под <details>: поле с датой в каждой открытой теме — это
    второй редактор на странице, куда человек пришёл читать анонс. */
@@ -3049,7 +3049,7 @@
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--gold) 12%, transparent);
   color: var(--gold);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -3069,7 +3069,7 @@
   border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
 }
 .forum-event-fields .forum-field { flex: 1 1 160px; }
-.forum-event-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
+.forum-event-fields small { flex: 1 1 100%; font-size: var(--fs-eyebrow); line-height: 1.45; }
 
 /*
   Бартер-доска. Две стороны обмена — это не подписи к тексту, а главная строка
@@ -3094,13 +3094,13 @@
 }
 .forum-barter dt {
   flex: none;
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--mute);
 }
-.forum-barter dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.forum-barter dd { margin: 0; font-size: var(--fs-small); overflow-wrap: anywhere; }
 /* Снятое объявление читается, но не зовёт: тот же смысл, что у знака «срок вышел». */
 .forum-barter--closed > div {
   border-color: var(--line);
@@ -3114,14 +3114,14 @@
   gap: var(--s-2);
   margin-top: var(--s-2);
 }
-.forum-barter__foot .muted { font-size: 11.5px; }
+.forum-barter__foot .muted { font-size: var(--fs-eyebrow); }
 .forum-post__barter-closed {
   flex: none;
   padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -3138,7 +3138,7 @@
   border: 1px solid color-mix(in srgb, var(--win) 26%, var(--line));
 }
 .forum-barter-fields .forum-field { flex: 1 1 220px; }
-.forum-barter-fields small { flex: 1 1 100%; font-size: 11.5px; line-height: 1.45; }
+.forum-barter-fields small { flex: 1 1 100%; font-size: var(--fs-eyebrow); line-height: 1.45; }
 
 /*
   Объявление в теме. Те же две строки, что у бартерной доски, но цвет
@@ -3163,13 +3163,13 @@
 }
 .forum-offer dt {
   flex: none;
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--mute);
 }
-.forum-offer dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.forum-offer dd { margin: 0; font-size: var(--fs-small); overflow-wrap: anywhere; }
 /* Снятое объявление читается, но не зовёт — тот же смысл, что у бартерной доски. */
 .forum-offer--sold > div {
   border-color: var(--line);
@@ -3183,14 +3183,14 @@
   gap: var(--s-2);
   margin-top: var(--s-2);
 }
-.forum-offer__foot .muted { font-size: 11.5px; }
+.forum-offer__foot .muted { font-size: var(--fs-eyebrow); }
 .forum-post__offer-sold {
   flex: none;
   padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -3202,7 +3202,7 @@
 
 .upd-page .panel__head { margin-bottom: var(--s-3); }
 .upd-page .panel__head h1 { font-size: var(--fs-h1); margin: var(--s-fine) 0 0; }
-.upd-page .panel__head p { margin: var(--s-1) 0 0; font-size: 13px; line-height: 1.5; }
+.upd-page .panel__head p { margin: var(--s-1) 0 0; font-size: var(--fs-small); line-height: 1.5; }
 
 .upd-new { margin: 0 0 var(--s-3); }
 
@@ -3226,7 +3226,7 @@
   padding: var(--s-hair) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -3248,20 +3248,20 @@
   background: color-mix(in srgb, var(--loss) 10%, transparent);
 }
 
-.upd-card__date { font-size: 12px; color: var(--dim); }
+.upd-card__date { font-size: var(--fs-meta); color: var(--dim); }
 .upd-card__version {
   margin-left: auto;
   padding: var(--s-hair) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   color: var(--mute);
 }
 
 .upd-card__title { margin: var(--s-1) 0 0; font-size: var(--fs-card); line-height: 1.35; }
 .upd-card__text {
   margin: var(--s-1) 0 0;
-  font-size: 13.5px;
+  font-size: var(--fs-small);
   line-height: 1.55;
   /* Модератор переносит строки сам, и они значимы: список патчей читается
      построчно, а не абзацем. */
@@ -3275,7 +3275,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-fine) var(--s-2);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .upd-card__source { color: var(--accent-ink); text-decoration: none; }
 .upd-card__source:hover { text-decoration: underline; }
@@ -3294,7 +3294,7 @@
   background: transparent;
   color: var(--dim);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 /*
@@ -3306,7 +3306,7 @@
 
 .upd-card__error {
   margin: var(--s-1) 0 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: var(--loss-ink);
 }
@@ -3322,17 +3322,17 @@
   border-radius: var(--r);
   background: color-mix(in srgb, var(--accent) 6%, var(--raised));
 }
-.upd-form__lead { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dim); }
+.upd-form__lead { margin: 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--dim); }
 
 .upd-field { display: grid; gap: var(--s-fine); }
-.upd-field > span { font-size: 12px; font-weight: 700; color: var(--dim); }
+.upd-field > span { font-size: var(--fs-meta); font-weight: 700; color: var(--dim); }
 .upd-field input,
 .upd-field textarea,
 .upd-field select {
   width: 100%;
   padding: var(--s-1) var(--s-2);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-text);
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--line);
@@ -3342,7 +3342,7 @@
 .upd-field textarea:focus,
 .upd-field select:focus { outline: none; border-color: var(--accent); }
 .upd-field textarea { min-height: 78px; resize: vertical; }
-.upd-field small { font-size: 11.5px; line-height: 1.45; }
+.upd-field small { font-size: var(--fs-eyebrow); line-height: 1.45; }
 
 .upd-field-row { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .upd-field-row .upd-field { flex: 1 1 180px; }
@@ -3362,7 +3362,7 @@
   border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
   background: color-mix(in srgb, var(--accent) 7%, transparent);
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
 }
 
@@ -3373,7 +3373,7 @@
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--loss) 12%, transparent);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: var(--loss-ink);
 }
@@ -3381,7 +3381,7 @@
 .upd-none {
   margin: 0;
   padding: var(--s-3) var(--s-fine);
-  font-size: 13px;
+  font-size: var(--fs-small);
   line-height: 1.55;
   color: var(--mute);
 }
@@ -3391,7 +3391,7 @@
   padding-top: var(--s-2);
   border-top: 1px solid var(--line-soft);
 }
-.upd-page__foot p { margin: 0; font-size: 12px; line-height: 1.55; }
+.upd-page__foot p { margin: 0; font-size: var(--fs-meta); line-height: 1.55; }
 .upd-note { margin-top: var(--s-1) !important; color: var(--gold); }
 
 @media (max-width: 559px) {
@@ -3400,7 +3400,7 @@
     margin-left: 0;
     min-height: 38px;
     padding: var(--s-1) var(--s-3);
-    font-size: 12.5px;
+    font-size: var(--fs-meta);
   }
   .upd-card__version { margin-left: 0; }
   .upd-field-row .upd-field { flex: 1 1 100%; }
@@ -3426,13 +3426,13 @@
 
 .feed__head {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-small);
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
 
-.feed__hint { margin: var(--s-fine) 0 var(--s-2); font-size: 12px; line-height: 1.5; color: var(--mute); }
+.feed__hint { margin: var(--s-fine) 0 var(--s-2); font-size: var(--fs-meta); line-height: 1.5; color: var(--mute); }
 .feed__hint a { color: var(--accent-ink); text-decoration: none; }
 
 .feed-list { list-style: none; margin: 0; padding: 0; }
@@ -3465,7 +3465,7 @@
 .feed-card__phase {
   padding: var(--s-hair) var(--s-1);
   border-radius: var(--r-pill);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -3487,19 +3487,19 @@
   color: var(--mute);
 }
 
-.feed-card__title { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
-.feed-card__when { font-size: 12px; color: var(--dim); }
-.feed-card__left { font-size: 11.5px; color: var(--mute); }
+.feed-card__title { font-size: var(--fs-small); font-weight: 600; line-height: 1.35; }
+.feed-card__when { font-size: var(--fs-meta); color: var(--dim); }
+.feed-card__left { font-size: var(--fs-eyebrow); color: var(--mute); }
 .feed-card__text {
   flex: 1 1 100%;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: var(--dim);
 }
 
 /* Ссылка на страницу события в магазине: пересказ можно проверить. */
-.feed-card__source { font-size: 11.5px; color: var(--accent-ink); text-decoration: none; }
+.feed-card__source { font-size: var(--fs-eyebrow); color: var(--accent-ink); text-decoration: none; }
 .feed-card__source:hover { text-decoration: underline; }
 
 .feed-card__action {
@@ -3510,7 +3510,7 @@
   background: none;
   color: var(--mute);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   cursor: pointer;
 }
 .feed-card__action:hover { color: var(--text); border-color: var(--accent); }
@@ -3519,7 +3519,7 @@
 .feed-card__error {
   flex: 1 1 100%;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: var(--loss-ink);
 }
@@ -3527,7 +3527,7 @@
 .feed-none {
   margin: 0;
   padding: var(--s-2) var(--s-hair);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--mute);
 }
@@ -3537,14 +3537,14 @@
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--loss) 12%, transparent);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: var(--loss-ink);
 }
 
 .feed__run {
   margin: var(--s-2) 0 0;
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.45;
   color: var(--mute);
 }
@@ -3697,7 +3697,7 @@
   border: 1px solid var(--shop-line);
   border-radius: var(--r-pill);
   background: var(--shop-soft);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -3717,7 +3717,7 @@
   line-height: 1.12;
   letter-spacing: -.015em;
 }
-.accounts-hero p { margin: var(--s-1) 0 0; max-width: 46ch; font-size: 13px; line-height: 1.55; }
+.accounts-hero p { margin: var(--s-1) 0 0; max-width: 46ch; font-size: var(--fs-small); line-height: 1.55; }
 .accounts-hero__aside {
   display: flex;
   flex-direction: column;
@@ -3737,12 +3737,12 @@
   background: var(--raised);
 }
 .accounts-stat dt {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--mute);
 }
-.accounts-stat dd { margin: var(--s-hair) 0 0; font-size: 13.5px; font-weight: 800; color: var(--text); }
+.accounts-stat dd { margin: var(--s-hair) 0 0; font-size: var(--fs-small); font-weight: 800; color: var(--text); }
 .accounts-stat--screen {
   border-color: var(--shop-line);
   background: var(--shop-soft);
@@ -3781,7 +3781,7 @@
   border-left: 3px solid var(--gold);
   border-radius: var(--r);
   background: linear-gradient(100deg, var(--shop-soft), color-mix(in srgb, var(--gold) 6%, var(--raised-2)));
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.55;
   color: var(--mute);
 }
@@ -3800,8 +3800,8 @@
   box-shadow: var(--shadow);
 }
 .accounts-composer__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-fine) var(--s-2); margin-bottom: var(--s-2); }
-.accounts-composer__head b { font-size: 15px; }
-.accounts-composer__head span { font-size: 12px; line-height: 1.45; }
+.accounts-composer__head b { font-size: var(--fs-body); }
+.accounts-composer__head span { font-size: var(--fs-meta); line-height: 1.45; }
 /* Поля — сеткой: на широком экране состав и цена стоят рядом, и объявление
    набирают, не скрывая половину формы под прокрутку. */
 .accounts-fields {
@@ -3829,7 +3829,7 @@
 */
 .accounts-attach__note {
   margin: -6px 0 var(--s-2);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
 }
 
@@ -3845,7 +3845,7 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--mute);
   cursor: pointer;
 }
@@ -3862,7 +3862,7 @@
   background: var(--raised);
   color: var(--text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-small);
   transition: border-color .16s var(--ease), box-shadow .18s var(--ease);
 }
 .accounts-search input:hover { border-color: color-mix(in srgb, var(--shop) 44%, var(--line)); }
@@ -3877,7 +3877,7 @@
   padding: var(--s-1) var(--s-3);
   min-height: 40px;
   border-radius: var(--r-pill);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--mute);
   background: var(--raised);
@@ -3953,7 +3953,7 @@
   border-color: color-mix(in srgb, var(--shop) 30%, var(--line));
 }
 .accounts-card:hover::before { opacity: 1; }
-.accounts-card__title { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.accounts-card__title { margin: 0; font-size: var(--fs-body); line-height: 1.3; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .accounts-card__title a { color: var(--text); text-decoration: none; }
 .accounts-card__title a:hover { color: var(--shop); }
 /*
@@ -4014,7 +4014,7 @@
   border: 1px dashed var(--line);
   border-radius: var(--r-sm);
   color: var(--mute);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   text-decoration: none;
   transition: color .15s, border-color .15s;
@@ -4033,7 +4033,7 @@
   border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--line));
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--gold) 14%, var(--raised));
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 800;
   color: var(--gold);
   overflow-wrap: anywhere;
@@ -4054,7 +4054,7 @@
 }
 .accounts-card__offer {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--dim);
   overflow-wrap: anywhere;
@@ -4074,7 +4074,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -4110,7 +4110,7 @@
   margin-top: auto;
   padding-top: var(--s-1);
   border-top: 1px solid var(--line-soft);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   color: var(--dim);
 }
 .accounts-card__nick { color: var(--link); font-weight: 600; text-decoration: none; }
@@ -4134,7 +4134,7 @@
   background: color-mix(in srgb, var(--text) 4%, transparent);
   color: var(--dim);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   cursor: pointer;
   transition: color .15s, border-color .15s, background .15s;
@@ -4179,7 +4179,7 @@
   border-radius: var(--r);
   background: color-mix(in srgb, var(--loss) 7%, transparent);
   color: var(--soft-bad);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
 }
 
@@ -4187,11 +4187,11 @@
   padding: var(--s-3) var(--s-3);
   border: 1px dashed var(--line);
   border-radius: var(--r);
-  font-size: 13px;
+  font-size: var(--fs-small);
   line-height: 1.55;
 }
 .accounts-empty p { margin: 0 0 var(--s-1); }
-.accounts-empty p:last-child { margin: 0; font-size: 12px; }
+.accounts-empty p:last-child { margin: 0; font-size: var(--fs-meta); }
 /* Пустая доска зовёт выставить первое объявление той же бирюзой, что и шапка:
    на пустой витрине это единственная кнопка, и она должна выглядеть началом
    торговли, а не переходом в форум. */

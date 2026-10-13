@@ -1,4 +1,4 @@
-import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavailableNote } from '../ui/helpers.js';
+import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavailableNote, emptyState } from '../ui/helpers.js';
 
 /**
  * Общий рейтинг — главная ценность сайта.
@@ -91,7 +91,13 @@ export function renderLadder({
 
       <div class="lad" data-ladder-list>${rows}</div>
 
-      <p class="lad__empty" data-ladder-empty hidden>Ничего не нашлось. Проверьте написание.</p>
+      ${emptyState({
+        title: 'Ничего не нашлось',
+        note: 'Проверьте написание.',
+        attrs: 'data-ladder-empty',
+        hidden: true,
+      })}
+
       <p class="lad__count muted" data-ladder-count role="status" aria-live="polite">
         ${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} из ${list.length}
       </p>

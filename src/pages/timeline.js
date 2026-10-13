@@ -1,4 +1,4 @@
-import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl, unavailableNote } from '../ui/helpers.js';
+import { esc, fmtDate, fmtDateFull, plural, pluralWord, safeUrl, unavailableNote, emptyState } from '../ui/helpers.js';
 import { EVENT_TYPE, EVENT_TYPE_ORDER, verdictText, pillText } from '../logic/event-types.js';
 
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -81,7 +81,13 @@ export function renderTimeline({ events, loadError = '' } = {}) {
     ${trophies}
     ${renderFilters(sorted)}
     ${renderFeed(sorted)}
-    <p class="tl__empty" data-tl-empty hidden>Событий такого типа пока нет.</p>`;
+    ${emptyState({
+      title: 'Событий такого типа пока нет',
+      note: 'Снимите фильтр по типу, месяцу или неделе — он скрыл все записи.',
+      cls: 'tl__empty',
+      attrs: 'data-tl-empty',
+      hidden: true,
+    })}`;
 }
 
 /** «2026-09» — ключ месяца, по которому фильтрует скрипт. */
@@ -199,7 +205,13 @@ function renderServerSection(list) {
 
       <ul class="wks">${pills}</ul>
       ${moreBtn}
-      <p class="wks__empty" data-tl-noweeks hidden>В этом месяце записей нет.</p>
+      ${emptyState({
+        title: 'В этом месяце записей нет',
+        note: 'Снимите выбор года или месяца в строке «Найти запись».',
+        cls: 'wks__empty',
+        attrs: 'data-tl-noweeks',
+        hidden: true,
+      })}
     </section>`;
 }
 

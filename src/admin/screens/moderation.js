@@ -1,4 +1,4 @@
-import { esc, plural } from '../../ui/helpers.js';
+import { esc, plural, emptyState } from '../../ui/helpers.js';
 import { RULES, categoryLabel } from '../../forum/rules.js';
 import { postBody } from '../../forum/format.js';
 import { slaLevel, SLA_LABELS } from '../../forum/sla.js';
@@ -199,7 +199,10 @@ function renderAppeals(appeals) {
 
       ${open.length
         ? open.map(renderAppealCard).join('')
-        : '<p class="adm-appeals__empty">Открытых апелляций нет.</p>'}
+        : emptyState({
+            title: 'Открытых апелляций нет',
+            cls: 'adm-appeals__empty',
+          })}
 
       ${decided.length ? `
         <details class="adm-appeals__done">

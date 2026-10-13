@@ -19,7 +19,7 @@
  * поведение — в src/forum/mount.js. Разделение то же, что у остальных
  * страниц, и по той же причине: чистую разметку можно проверить без браузера.
  */
-import { esc, plural, pluralWord, sparkline } from '../ui/helpers.js';
+import { esc, plural, pluralWord, sparkline, emptyState } from '../ui/helpers.js';
 import { skWithCaption } from '../ui/skeleton.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, FORUM_TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
@@ -644,9 +644,11 @@ function renderLeaderboard(s) {
           )
           .join('')}
       </ol>
-      ` : `
-      <p class="muted forum-lead__empty">За эту неделю ещё никто ничего не написал — станьте первым.</p>
-      `}
+      ` : emptyState({
+        title: 'За эту неделю ещё никто ничего не написал',
+        note: 'Станьте первым.',
+        cls: 'forum-lead__empty',
+      })}
     </section>`;
 }
 

@@ -140,7 +140,7 @@
     высоты: отступы ужимаем.
   */
   .adm-publish--top { padding: 10px 12px; gap: 8px; }
-  .adm-publish__state { font-size: 12px; }
+  .adm-publish__state { font-size: var(--fs-meta); }
 }
 
 /* ── Окна ─────────────────────────────────────────────────────────────────── */

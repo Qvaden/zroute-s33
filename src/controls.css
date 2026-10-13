@@ -264,7 +264,7 @@
   display: block;
   margin-bottom: var(--s-fine);
   color: var(--dim);
-  font-size: 11.5px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
 }
 
@@ -274,7 +274,7 @@
   display: block;
   margin-top: var(--s-fine);
   color: var(--mute);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   line-height: 1.45;
 }
 

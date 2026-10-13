@@ -1,4 +1,4 @@
-import { esc, formDots, plural, standingsRowLabel, unavailableNote } from '../ui/helpers.js';
+import { esc, formDots, plural, standingsRowLabel, unavailableNote, emptyState } from '../ui/helpers.js';
 import { formatQuarterLeft } from '../ui/quarter-timer.js';
 
 /**
@@ -124,7 +124,13 @@ export function renderQuarter({ standings, quarter, loadError = '' } = {}) {
         </div>
 
         <div class="quart-grid" data-ladder-list>${cards}</div>
-        <p class="quart-empty" data-ladder-empty hidden>Пока никого не нашли. Попробуйте другой тег.</p>
+        ${emptyState({
+          title: 'Пока никого не нашли',
+          note: 'Попробуйте другой тег.',
+          cls: 'quart-empty',
+          attrs: 'data-ladder-empty',
+          hidden: true,
+        })}
         <p class="quart-count" data-ladder-count role="status" aria-live="polite">${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} в гонке</p>
       </section>
     </section>`;

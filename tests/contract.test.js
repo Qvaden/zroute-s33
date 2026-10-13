@@ -2906,11 +2906,11 @@ console.log('\nQ. Форум');
   check('окна форума не привязаны к анимированному контейнеру страницы',
     /#app:has\(\.forum-modal\)\s*\{\s*animation:\s*none;\s*\}/.test(forumOverlayStyles));
   check('открытое окно форума выше шапки и бокового меню',
-    /#app:has\(\.forum-modal:not\(\[hidden\]\)\)\s*\{\s*z-index:\s*60;\s*\}/.test(forumOverlayStyles));
+    /#app:has\(\.forum-modal:not\(\[hidden\]\)\)\s*\{\s*z-index:\s*var\(--z-modal\);\s*\}/.test(forumOverlayStyles));
   check('карточка с открытым меню выше соседних карточек',
-    /\.forum-post:has\(\.forum-act-menu\[open\]\)\s*\{\s*z-index:\s*3;\s*\}/.test(forumOverlayStyles));
+    /\.forum-post:has\(\.forum-act-menu\[open\]\)\s*\{\s*z-index:\s*var\(--z-open\);\s*\}/.test(forumOverlayStyles));
   check('редактор ответа не перекрывает меню действий поста',
-    /\.forum-post\s*>\s*\.forum-post__foot:has\(\.forum-act-menu\[open\]\)\s*\{\s*z-index:\s*3;\s*\}/.test(forumOverlayStyles));
+    /\.forum-post\s*>\s*\.forum-post__foot:has\(\.forum-act-menu\[open\]\)\s*\{\s*z-index:\s*var\(--z-open\);\s*\}/.test(forumOverlayStyles));
   const forumPagesSource = await readFile('src/pages/forum.js', 'utf8');
   check('кнопка закрепления есть в карточке поста',
     /data-forum-pin/.test(forumPagesSource) && /Закрепить/.test(forumPagesSource) && /Открепить/.test(forumPagesSource));
@@ -4712,7 +4712,9 @@ console.log('\nS. Чистые функции');
 
   const leadWeekEmpty = renderForum({ events: [] }, { lead: { week: [], all: board.all }, leadPeriod: 'week' });
   check('лидерборд: пустая неделя — приглашение написать первым',
-    /data-forum-lead/.test(leadWeekEmpty) && /станьте первым/.test(leadWeekEmpty));
+    /data-forum-lead/.test(leadWeekEmpty)
+      && /ещё никто ничего не написал/.test(leadWeekEmpty)
+      && /станьте первым/i.test(leadWeekEmpty));
 
   const leadNone = renderForum({ events: [] }, { lead: { week: [], all: [] }, leadPeriod: 'all' });
   check('лидерборд: пустой ряд — нет панели', !/data-forum-lead/.test(leadNone));
@@ -6434,7 +6436,10 @@ console.log('\nW. Оспаривание запрета писать и тиши
     !/data-appeal-review="a2:/.test(screen([row({ id: 'a2', status: 'upheld', answer: 'Запрет снят.', decidedAt: new Date(), decidedByNick: 'Властелин' })]))
       && screen([row({ id: 'a2', status: 'upheld', answer: 'Запрет снят.', decidedAt: new Date(), decidedByNick: 'Властелин' })]).includes('Разобрано недавно'));
   check('пустая очередь говорит об этом прямо',
-    screen([]).includes('Открытых апелляций нет.'));
+    screen([]).includes('Открытых апелляций нет'));
+  check('пустая очередь собрана оболочкой «пусто», а не отдельной разметкой',
+    screen([]).includes('class="empty-state adm-appeals__empty"')
+      && screen([]).includes('empty-state__title'));
   check('очередь стоит выше жалоб: ответа человек ждёт больше',
     screen([row()]).indexOf('data-appeal-card') < screen([row()]).indexOf('Разбирать нечего'));
   check('ответ панели уходит тем же rpc и перечитывает очередь',
@@ -7438,7 +7443,7 @@ console.log('\nZ. Благодарности автора и репутация'
   check('повторное нажатие не отправляет ничего: благодарность не отзывают',
     /if \(!item \|\| item\.iThanked\) return;/.test(mountSrc));
   check('отказ базы человек слышит словами базы, а не молчанием',
-    /notice\(err\?\.message \|\| 'База не приняла благодарность'\)/.test(mountSrc)
+    /toast\(err\?\.message \|\| 'База не приняла благодарность'\)/.test(mountSrc)
       && /await refreshOne\(targetType, targetId\);/.test(mountSrc));
 
   /* ── Панель владельца ── */
@@ -14593,7 +14598,7 @@ console.log('\nAN. Доска аккаунтов');
     мимо. Оболочка и кегль выровнены по соседним действиям.
   */
   check('«ответить» в ленте — кнопка, а не подпись: оболочка и кегль',
-    /\.forum-post__comments \{[\s\S]{0,300}display: inline-flex;[\s\S]{0,300}border-radius: var\(--r-sm\);[\s\S]{0,300}font-size: 13\.5px;/.test(forumCss));
+    /\.forum-post__comments \{[\s\S]{0,300}display: inline-flex;[\s\S]{0,300}border-radius: var\(--r-sm\);[\s\S]{0,300}font-size: var\(--fs-small\);/.test(forumCss));
 
   /*
     Высоту цели нажатия задаёт ОДИН блок в конце refine.css — файла, который
@@ -14857,8 +14862,8 @@ console.log('\nAO. Раздел — страница');
   const refine = await readFile('src/refine.css', 'utf8');
   const mobile = await readFile('src/mobile.css', 'utf8');
   check('подписи плиток статистики читаются (не 10px)',
-    /\.stat__label \{ font-size: var\(--fs-eyebrow\)/.test(v8) && /\.server-stat span \{[^}]*font-size: 12px/.test(v8));
-  check('шапка разделов читается (не 10px)', /\.eyebrow \{ font-size: 11px/.test(refine));
+    /\.stat__label \{ font-size: var\(--fs-eyebrow\)/.test(v8) && /\.server-stat span \{[^}]*font-size: var\(--fs-meta\)/.test(v8));
+  check('шапка разделов читается (не 10px)', /\.eyebrow \{ font-size: var\(--fs-eyebrow\)/.test(refine));
   check('на телефоне ссылки-переходы не ниже 44px',
     /@media \(hover: none\) and \(pointer: coarse\)[\s\S]{0,400}\.who__more[\s\S]{0,200}min-height: 44px/.test(mobile)
       && /body \.about-card h3 a \{[^}]*min-height: 44px/.test(mobile));
@@ -16518,7 +16523,7 @@ console.log('\nAV. Честная пустота и контур командн�
   check('полоса не наезжает на буквы: верхний отступ героя растёт ровно на меру кадра',
     /body \.hero--media \{\s*padding-top: calc\(var\(--hero-art-h\) \+ var\(--s-3\)\);/.test(v8Src));
   check('кадр лежит под содержимым героя, а не за его фоном и не поверх цифр',
-    /\.hero__media \{[\s\S]{0,200}?z-index: -2;/.test(v8Src)
+    /\.hero__media \{[\s\S]{0,200}?z-index: var\(--z-art\);/.test(v8Src)
       && /^\.hero \{[^}]*isolation: isolate;/m.test(v8Src));
   check('кадр растворяется в поверхности, а не обрезается линией',
     /mask-image: linear-gradient\(180deg, #000 0 58%, transparent 100%\);/.test(v8Src)
@@ -17192,12 +17197,16 @@ console.log('\nAX. Полоса разделов и подвал');
 
   /*
     Слои. Полоса обязана лежать над содержимым, но уходить под затемнение
-    ящика, модальное окно и короткое сообщение.
+    ящика, модальное окно и короткое сообщение. Числа теперь живут в ряду
+    токенов --z-* в styles-v8.css, поэтому проверка берёт номер из токена:
+    правило обязано ссылаться на ступень, а дубля буквальных чисел быть не может.
   */
+  const zTokens = new Map([...v8.matchAll(/(--z-[a-z0-9-]+):\s*(-?\d+)\s*;/g)].map((m) => [m[1], Number(m[2])]));
   const zIndexOf = (src, sel) => {
-    const re = new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{[^}]*?z-index: (\\d+)`);
+    const re = new RegExp(`${sel.replace(/[.]/g, '\\.')} \\{[^}]*?z-index: (-?\\d+|var\\(--z-[a-z0-9-]+\\))`);
     const m = re.exec(src);
-    return m ? Number(m[1]) : null;
+    if (!m) return null;
+    return m[1].startsWith('var(') ? zTokens.get(m[1].slice(4, -1)) ?? null : Number(m[1]);
   };
   const layers = {
     'шапка': zIndexOf(v8, '.site-head'),
@@ -17590,6 +17599,297 @@ console.log('\nBB. Тёмные острова дневной темы зерк�
     check(`${isl.name}: остров объявляет свою цветовую схему — системные контролы внутри него ночные`,
       /color-scheme:\s*dark/.test(body));
   }
+}
+
+/* ── BC. Слои и кегль: числа живут в ряду, а не в правилах ──────────────────
+
+   Бриф §43 просит десять семей токенов. Восемь закрыли раньше, две
+   оставались числами на месте, и это самые тихие из шкал: их молчание
+   ничего не стоит ровно до того момента, пока окно не окажется под шторкой
+   или строка не станет мыльной.
+
+   Слои. 57 правил спорили за внимание буквальными -2, 1, 3, 40, 60, 999.
+   Тому, кому не хватит 60, достаточно написать 61 — и окно форума уйдёт под
+   шторку разделов. Порядок ступеней проверяется тоже: он повторяет порядок
+   залегания слоёв на странице, и переворот означает, что кто-то вставил
+   прослойку между двумя уже договорившимися.
+
+   Кегль. 724 правила писали 10–15 px с половинками. Половина пиксела — не
+   точность: экран без retina дробит букву пополам. Замер девяти живых
+   маршрутов на двух ширинах дал 373 отрисованных полутоновых кегля в этом
+   ряду и ноль после перевода; каждый элемент сверен попарно, и ни одна
+   буква не выросла больше чем на полпиксела. Ровно поэтому перевод считается
+   наведением порядка, а не редизайном.
+
+   Две дыры, которые нашёл сам шаг. Панель администратора жила вне перевода:
+   три правила стояли в 9 и 9,5 px, то есть ниже края, который этот же шаг
+   и объявил, — поэтому проверки смотрят на восемь файлов, а не на шесть
+   файлов сайта. И кегль писался числом не только в `font-size`, но и внутри
+   шорта `font:` (24 правила, от заголовка президентской плашки до шестнадцатеричного
+   поля студии цвета): пока проверка смотрела только на `font-size`, ряд
+   существовал, а половина букв бралась мимо него.
+
+   Чего проверки держат осознанно: em и rem дают дробный результат по своей
+   природе (заголовок чатов считается 1.5em и рисуется 22,5 px), поэтому
+   полутоновый запрет смотрит на литералы в значениях, а не на вычисленный
+   результат. Числа внутри clamp(), max() и min() — границы текучести, а не
+   ступени ряда: они остаются пикселями, но обязаны быть целыми. Литералы
+   от 16 px живут своими числами: значок, цифра или заголовок, которому
+   ступень ряда не подходит по макету, — это решение названо в styles-v8.css.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBC. Слои и кегль: числа живут в ряду, а не в правилах');
+{
+  const { readFile } = await import('node:fs/promises');
+  const LIVE = ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css',
+    'src/refine.css', 'src/handbook.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css'];
+  const src = {};
+  for (const f of LIVE) src[f] = stripCss(await readFile(f, 'utf8'));
+  const all = LIVE.map((f) => src[f]).join('\n');
+  const root = src['src/styles-v8.css'];
+  /* Текучие границы — не ступени ряда: clamp/max/min/calc остаются пиксельными. */
+  const noFn = (v) => {
+    let s = v;
+    while (/\b[a-z-]+\([^()]*\)/i.test(s)) s = s.replace(/\b[a-z-]+\([^()]*\)/gi, '');
+    return s;
+  };
+
+  const strayZ = [];
+  let zRules = 0;
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/[{;]\s*z-index:\s*([^;}]*)/g)) {
+      zRules++;
+      const v = m[1].trim();
+      /*
+        `auto` — не число и не ступень: это отказ участвовать в споре за слой
+        (строка хронологии возвращает себе position: static). Ряд держит тех,
+        кто в спор вступает.
+      */
+      if (v !== 'auto' && !/^var\(--z-[a-z0-9-]+\)$/.test(v)) strayZ.push(`${f}: ${v.slice(0, 26)}`);
+    }
+  }
+  check('ни одного числа в слоях: z-index берётся только из ряда --z-*', strayZ.length === 0,
+    `${zRules} правил, вне ряда: ${strayZ.slice(0, 5).join(' | ')}`);
+
+  const zDecls = [];
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/[{;\s](--z-[a-z0-9-]+)\s*:/g)) zDecls.push({ f, name: m[1] });
+  }
+  const zDup = zDecls.filter((d, i) => zDecls.some((o, j) => j < i && o.name === d.name));
+  check('ряд слоёв объявлен ровно один раз и только в styles-v8.css',
+    zDup.length === 0 && zDecls.every((d) => d.f === 'src/styles-v8.css'),
+    zDup.length ? zDup.map((d) => d.name).join(', ') : `${zDecls.length} объявлений`);
+
+  const ladder = [...root.matchAll(/(--z-[a-z0-9-]+)\s*:\s*(-?\d+)\s*;/g)]
+    .map((m) => ({ name: m[1], z: Number(m[2]) }));
+  check('ступени идут снизу вверх и порядок совпадает с объявлением',
+    ladder.length === 20 && ladder.every((s, i) => i === 0 || ladder[i - 1].z < s.z),
+    ladder.map((s) => s.z).join('/'));
+  const zIdle = ladder.filter((s) => !all.includes(`var(${s.name})`)).map((s) => s.name);
+  check('каждая ступень ряда слоёв востребована: токенов-украшений нет (§64)',
+    zIdle.length === 0, zIdle.join(', ') || `${ladder.length} ступеней, все используются`);
+
+  const half = [];
+  const literal = [];
+  const floor = [];
+  let fsRules = 0;
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/[{;]\s*font(?:-size)?:\s*([^;}]*)/g)) {
+      fsRules++;
+      const v = m[1].trim();
+      if (/\d+\.5px/.test(v)) half.push(`${f}: ${v.slice(0, 40)}`);
+      for (const px of noFn(v).matchAll(/(\d+(?:\.\d+)?)px/g)) {
+        const n = Number(px[1]);
+        if (n < 11) floor.push(`${f}: ${px[1]}px`);
+        else if (n < 16) literal.push(`${f}: ${px[1]}px ${v.slice(0, 30)}`);
+      }
+    }
+  }
+  check('ни одного полутонового кегля в литералах восьми рабочих файлов',
+    half.length === 0, half.slice(0, 5).join(' | '));
+  check('малые ступени (11–15 px) берутся из ряда: чисел вне него нет',
+    literal.length === 0, `${fsRules} правил шрифта проверено, чужих: ${literal.slice(0, 5).join(' | ')}`);
+  check('ни одного кегля ниже 11 px — нижний край читаемости держится',
+    floor.length === 0, floor.slice(0, 5).join(' | '));
+
+  const fsDecls = [];
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/[{;\s](--fs-[a-z0-9-]+)\s*:/g)) fsDecls.push({ f, name: m[1] });
+  }
+  const fsDup = fsDecls.filter((d, i) => fsDecls.some((o, j) => j < i && o.name === d.name));
+  check('ряд кегля объявлен ровно один раз и только в styles-v8.css',
+    fsDup.length === 0 && fsDecls.every((d) => d.f === 'src/styles-v8.css'),
+    fsDup.length ? fsDup.map((d) => d.name).join(', ') : `${fsDecls.length} объявлений`);
+  const fsIdle = [...root.matchAll(/(--fs-[a-z0-9-]+)\s*:/g)]
+    .map((m) => m[1]).filter((name) => !all.includes(`var(${name})`));
+  check('каждая ступень ряда кегля востребована: от подписи до героя',
+    fsIdle.length === 0, fsIdle.join(', ') || `${fsDecls.length} ступеней, все используются`);
+}
+
+/* ── BD. Строительный блок «пусто»: одна оболочка на семь состояний ──────────
+
+   §42 просит общие блоки, §68 — чтобы пустой экран называл, чего именно нет,
+   §64 — не раздувать систему. Пустота как раз тот случай, где раздувание
+   началось бы само: состояний «ничего не нашлось» на сайте четырнадцать, и
+   семь из них — одна и та же строчка по центру, только написанная семью
+   способами. Три не говорили вовсе, что произошло, а только молчали серым.
+
+   Проверок девять, и каждая держит конкретную границу:
+   — оболочка объявлена один раз, её части используются (мёртвый слот под
+     кнопку здесь запрещён: из семи состояний ни одно ни к чему не зовёт);
+   — локальные классы оставили только макет строки, а не цвет, выравнивание
+     и кегль — это и есть §67 на уровне одного состояния;
+   — семь вызовов помощника, семь разных заголовков, ни одного дежурного
+     «нет данных»: §68 требует контекст, а не шаблон;
+   — контроллеры по-прежнему прячут состояние по `data-*`, потому что
+     разметка переехала из `<p>` в `<div>` и хук мог потеряться;
+   — атрибут `hidden` стоит на четырёх состояниях, которые показываются
+     после фильтра, — ровно там, где их прятал старый `<p hidden>`;
+   — `margin: auto` колонки чатов имеет где разворачиваться: обёртка списка
+     появилась позже этого правила и в блок-родителе превращала пустоту в
+     прилипшую к шапке строку, а заодно и скролл внутри панели. */
+console.log('\nBD. Оболочка «пусто»: семь состояний говорят одним голосом');
+{
+  const { readFile } = await import('node:fs/promises');
+  const CSS = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const PAGES = ['src/pages/ladder.js', 'src/pages/quarter-final.js', 'src/pages/timeline.js',
+    'src/pages/forum.js', 'src/pages/chats.js', 'src/admin/screens/moderation.js'];
+
+  const css = {};
+  for (const n of CSS) css[`src/${n}.css`] = stripCss(await readFile(`src/${n}.css`, 'utf8'));
+  css['src/admin/admin.css'] = stripCss(await readFile('src/admin/admin.css', 'utf8'));
+  css['src/admin/admin-mobile.css'] = stripCss(await readFile('src/admin/admin-mobile.css', 'utf8'));
+
+  const shellDecls = [];
+  const partNames = new Set();
+  for (const [f, text] of Object.entries(css)) {
+    for (const m of text.matchAll(/(^|[,}\s])(\.empty-state(?:__[a-z-]+)?)(?=[\s,{:])/g)) {
+      shellDecls.push({ f, cls: m[2] });
+      partNames.add(m[2]);
+    }
+  }
+  const shellRules = shellDecls.filter((d) => d.cls === '.empty-state');
+  check('оболочка «пусто» объявлена один раз и в базовом файле',
+    shellRules.length === 1 && shellRules[0].f === 'src/styles-v8.css',
+    shellDecls.map((d) => `${d.f} ${d.cls}`).join(' | '));
+
+  const js = {};
+  for (const f of PAGES) js[f] = await readFile(f, 'utf8');
+  const jsAll = Object.values(js).join('\n');
+  const partsBlob = jsAll + await readFile('src/ui/helpers.js', 'utf8');
+  const idleParts = [...partNames].filter((c) => !partsBlob.includes(c.slice(1)));
+  check('каждая часть оболочки востребована: мёртвых слотов под кнопку нет (§64)',
+    idleParts.length === 0,
+    idleParts.join(', ') || `${partNames.size} класса, все собираются помощником`);
+
+  /* Локальные классы семи состояний: макет — да, цвет и кегль оболочки — нет. */
+  const LOCAL = ['lad__empty', 'tl__empty', 'wks__empty', 'quart-empty',
+    'forum-lead__empty', 'chat-list__empty', 'adm-appeals__empty'];
+  const restated = [];
+  for (const [f, text] of Object.entries(css)) {
+    for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sel = m[1].trim();
+      if (!LOCAL.some((c) => sel.includes(`.${c}`))) continue;
+      if (/text-align|font-size/.test(m[2])) restated.push(`${f}: ${sel} — ${m[2].trim().slice(0, 40)}`);
+      if (/color:/.test(m[2]) && !sel.includes('quart-empty')) restated.push(`${f}: ${sel} — цвет`);
+    }
+  }
+  check('локальные правила оставили только макет строки: выравнивание, кегль и цвет живут в оболочке',
+    restated.length === 0, restated.slice(0, 4).join(' | '));
+  check('остров Кварта по-прежнему красит свою пустоту сам',
+    /\.quart-empty\s*\{[^}]*color:\s*#789078/.test(css['src/styles-v8.css'])
+      && /\.quart-empty \.empty-state__title\s*\{\s*color:\s*inherit/.test(css['src/styles-v8.css']));
+
+  const notWired = [];
+  let callCount = 0;
+  for (const f of PAGES) {
+    const n = (js[f].match(/\bemptyState\(\{/g) || []).length;
+    callCount += n;
+    if (!n) notWired.push(`${f}: ни одного состояния`);
+    if (!/^import \{[^}]*\bemptyState\b[^}]*\} from '[^']*ui\/helpers\.js';/m.test(js[f])) {
+      notWired.push(`${f}: помощник не импортирован`);
+    }
+  }
+  check('пустые состояния собираются одним помощником, а не разметкой на месте',
+    notWired.length === 0 && callCount === 7, notWired.join(' | ') || `вызовов: ${callCount}`);
+
+  const titles = [...jsAll.matchAll(/emptyState\(\{\s*title:\s*'([^']+)'/g)].map((m) => m[1]);
+  const generic = titles.filter((t) => /нет данных|информации нет|^пусто|no data/i.test(t));
+  check('каждое пустое состояние называет отсутствующее по-своему, без дежурного «нет данных» (§68)',
+    titles.length === 7 && generic.length === 0 && new Set(titles).size === titles.length,
+    `заголовков: ${titles.length}, разных: ${new Set(titles).size}, шаблонных: ${generic.join(', ') || 'нет'}`);
+
+  /* Разметка переехала из <p hidden> в <div hidden>: хук обязан остаться живым. */
+  const hooks = [['ladder-empty', 'src/ui/ladder-controls.js'],
+    ['tl-empty', 'src/ui/timeline-controls.js'], ['tl-noweeks', 'src/ui/timeline-controls.js']];
+  const lostHook = [];
+  for (const [name, ctrl] of hooks) {
+    if (!jsAll.includes(`attrs: 'data-${name}'`)) lostHook.push(`${name}: нет в разметке`);
+    if (!(await readFile(ctrl, 'utf8')).includes(`[data-${name}]`)) lostHook.push(`${name}: потерян контроллер`);
+  }
+  check('фильтрованные состояния прячутся тем же атрибутом, что и раньше: хук на месте',
+    lostHook.length === 0, lostHook.join(' | '));
+  const hiddenCount = (jsAll.match(/hidden: true/g) || []).length;
+  check('атрибут hidden стоит ровно на четырёх состояниях, которые показывает фильтр',
+    hiddenCount === 4, `скрытых состояний: ${hiddenCount}`);
+
+  /* Пустота колонки чатов центрируется `margin: auto`, а он разворачивается
+     только в flex-родителе. Обёртка `[data-chat-list-area]` пришла позже и
+     лежала в блок-контейнере: правило молчало, строка липла к шапке, а
+     `flex: 1` со скроллом у самого списка не работал. */
+  const area = /\.chat-list__area\s*\{([^}]*)\}/.exec(css['src/refine.css']);
+  check('обёртка списка чатов — flex-колонка: пустота центрируется, а не липнет к шапке',
+    !!area && /display:\s*flex/.test(area[1]) && /flex-direction:\s*column/.test(area[1])
+      && /flex:\s*1/.test(area[1]) && /min-height:\s*0/.test(area[1]),
+    area ? `обёртка: ${area[1].trim().slice(0, 60)}` : 'правила `.chat-list__area` нет');
+}
+
+/* ── BE. Короткое сообщение: одна полоса вместо двух копий ─────────────────
+
+   §42 ставит полосу в один ряд с остальными строительными блоками, §64
+   разрешает новый модуль только там, где блок реально повторяется. Здесь он
+   повторялся дважды: чат и лента форума печатали её своими шестью строками,
+   и за время такого дублирования копии успели разойтись в двух местах, оба
+   из которых видны пользователю.
+
+   — чат прятал прежнюю полосу перед показом новой, лента нет. Обе позиции
+     fixed и встают в одну точку, так что два сообщения из ленты печатались
+     друг на друге, а не следом;
+   — 2600 мс против 4000 мс. Никто этот разрыв не решал: его породили два
+     разных автора, и он до сих пор не позволяет ответить на вопрос, сколько
+     живёт полоса сайта.
+
+   Проверок шесть: модуль один и создание полосы одно, оба модуля зовут блок
+   по имени, прежняя полоса снимается, цифра времени жизни осталась одна,
+   красит по-прежнему одно правило из forum.css, и в двух модулях больше нет
+   старого имени. Перенос поведения не должен незаметно унести и стили. */
+console.log('\nBE. Короткое сообщение собрано в один блок');
+{
+  const { readFile } = await import('node:fs/promises');
+  const TOAST = await readFile('src/ui/toast.js', 'utf8');
+  const CHATS = await readFile('src/forum/chats.js', 'utf8');
+  const MOUNT = await readFile('src/forum/mount.js', 'utf8');
+  const FORUM_CSS = await readFile('src/forum.css', 'utf8');
+
+  const made = (src) => (src.match(/className = 'forum-toast'/g) || []).length;
+  check('полосу собирает один модуль, а не два копии-помощника',
+    /export function toast\(/.test(TOAST) && made(CHATS) === 0 && made(MOUNT) === 0 && made(TOAST) === 1,
+    `созданий: чат ${made(CHATS)}, лента ${made(MOUNT)}, модуль ${made(TOAST)}`);
+
+  const calls = (src) => (src.match(/\btoast\(/g) || []).length;
+  const imports = (src) => /import \{ toast \} from '\.\.\/ui\/toast\.js';/.test(src);
+  check('оба форума-модуля импортируют общий блок и зовут его',
+    imports(CHATS) && imports(MOUNT) && calls(CHATS) > 1 && calls(MOUNT) > 1,
+    `вызовов: чат ${calls(CHATS)}, лента ${calls(MOUNT)}`);
+
+  check('прежняя полоса снимается перед новой: два сообщения не налагаются друг на друга',
+    /querySelector\('\.forum-toast'\)\?\.remove\(\)/.test(TOAST));
+  check('время жизни полосы выводится из длины текста, а не хранит вторую цифру',
+    /Math\.min\(5000, Math\.max\(2600,/.test(TOAST) && !/\b2600\b/.test(CHATS + MOUNT),
+    `2600 в вызывающих: ${/\b2600\b/.test(CHATS + MOUNT) ? 'есть' : 'нет'}`);
+  check('красит по-прежнему одно правило из forum.css с порядком из токена',
+    /\.forum-toast\s*\{[^}]*z-index:\s*var\(--z-toast\)/.test(FORUM_CSS));
+  check('слово «notice» не осталось ни в одном из двух модулей',
+    !/\bnotice\b/.test(CHATS + MOUNT), /\bnotice\b/.exec(CHATS + MOUNT)?.[0] || 'чисто');
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

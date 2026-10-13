@@ -8,7 +8,7 @@
  *   #/chats            — список моих чатов (+ вступить по коду, + создать).
  *   #/chats/<id>       — сам чат: лента снизу вверх, липкий ввод, вложения, опросы.
  */
-import { esc, plural } from '../ui/helpers.js';
+import { esc, plural, emptyState } from '../ui/helpers.js';
 import { postBody, timeAgo, fullTime, nickColor, nickInitial, avatarHtml, excerpt } from '../forum/format.js';
 import { roleBadge, verifiedBadge, serverBadge } from '../forum/roles.js';
 import { renderMdBar } from './forum.js';
@@ -217,14 +217,14 @@ export function renderDMForm(s) {
 
 export function renderChatList(s) {
   if (s.loading && !s.chats.length) {
-    return '<div class="chat-list__empty muted">Загружаем…</div>';
+    return '<div class="empty-state chat-list__empty">Загружаем…</div>';
   }
   if (!s.chats.length) {
-    return `
-      <div class="chat-list__empty">
-        <b>Пока ни одного чата</b>
-        <p class="muted">Попросите код у лидера альянса${s.me?.isLeader ? ' или создайте свой' : ''}.</p>
-      </div>`;
+    return emptyState({
+      title: 'Пока ни одного чата',
+      note: `Попросите код у лидера альянса${s.me?.isLeader ? ' или создайте свой' : ''}.`,
+      cls: 'chat-list__empty',
+    });
   }
   return `
     <ul class="chat-list__items">

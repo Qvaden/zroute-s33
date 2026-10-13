@@ -15,7 +15,11 @@ from PIL import Image, ImageDraw, ImageFont
 OUT = "public"
 FONT_BOLD = "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf"
 
-# Те же цвета, что в src/styles.css
+# Не «те же цвета, что на сайте»: живой ряд красок живёт в токенах
+# `src/styles-v8.css` (--bg #0a0e15, --accent #ff5a36, --text #f2f4f7), а здесь
+# нарисован прошлый янтарный акцент (#ffa04a → #ff6a2b). Пока public/*.png
+# пересобирались вручную, картинка телефона и превью ссылки отстают от сайта на
+# один оттенок. Скрипт не запускался с той правки и перезаписать их сам не может.
 BG_DARK = (10, 11, 13)
 ACCENT_FROM = (255, 160, 74)   # #ffa04a
 ACCENT_TO = (255, 106, 43)     # #ff6a2b
