@@ -33,6 +33,52 @@ function equal(label, actual, expected) {
 }
 
 /*
+  Арифметика контраста и чтение токенов темы.
+
+  Нужно это трём секциям — AL (подписи и приз), AU (бирюза доски) и AW (вся
+  палитра обеих тем), — и всем считать одно и то же по одной формуле WCAG.
+  Блоки тем при этом сначала чистятся от комментариев: иначе гекс, написанный
+  в пояснении к правилу, попадал бы в замер как настоящий токен.
+*/
+const stripCss = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '');
+const relLum = (hex) => {
+  const c = hex.slice(1);
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(c.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => (Math.max(relLum(a), relLum(b)) + 0.05) / (Math.min(relLum(a), relLum(b)) + 0.05);
+const hexTokens = (body) => {
+  const out = {};
+  for (const m of body.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
+    if (!(m[1] in out)) out[m[1]] = m[2].toLowerCase();
+  }
+  return out;
+};
+/* Оба блока темы из styles-v8.css: ночной на голом :root, дневной на атрибуте. */
+const themeTokens = (v8Src) => {
+  const css = stripCss(v8Src);
+  const dark = /^:root \{([\s\S]*?)\n\}/m.exec(css);
+  const light = /\n\[data-theme="light"\] \{([\s\S]*?)\n\}/m.exec(css);
+  return {
+    dark: dark ? hexTokens(dark[1]) : null,
+    light: light ? hexTokens(light[1]) : null,
+    darkRaw: dark ? dark[1] : '',
+    lightRaw: light ? light[1] : '',
+  };
+};
+/*
+  Шесть ступеней поверхности, общие имена для обеих тем: провал, страница,
+  карточка, вложенная плашка, приподнятая плашка, слой окна. Порядок по
+  светлоте у тем РАЗНЫЙ — это и есть проверка на то, что дневная тема не
+  переворот ночной, — поэтому здесь список имён, а не отсортированный ряд.
+*/
+const SURFACES = ['--recessed', '--bg', '--surface', '--raised', '--raised-2', '--overlay'];
+const INKS = ['--text', '--dim', '--mute', '--link'];
+
+/*
   Тесты обязаны работать с фиксированными данными, а не с тем, на что указывает
   боевой конфиг. Иначе они начинают падать при каждом изменении реальной
   таблицы — и падают не потому, что код сломался, а потому что данные другие.
@@ -3814,8 +3860,22 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
 
   const indexHtml = await readFile('index.html', 'utf8');
   check('боковое меню есть в разметке', /<aside[^>]+id="side"/.test(indexHtml));
-  check('кнопка меню подписана для незрячих', /aria-label="Открыть меню/.test(indexHtml));
+  /*
+    ДВЕРЬ В МЕНЮ ОДНА. Кнопка в шапке ушла: на телефоне рядом лежали
+    «Меню» и «Ещё», обе раскрывали один и тот же ящик, и человек читал это
+    как два разных меню. Осталась кнопка в нижнем ряду, поэтому проверка
+    перестала искать подпись шапочной кнопки и начала искать подпись рядом
+    с разделами — плюс запрет на возвращение второй двери.
+
+    Название доступно незрячим начинается с видимого слова «Ещё»: иначе
+    голосовой помощник называет кнопку одно, а глаз видит другое.
+  */
+  check('кнопка «Ещё» подписана для незрячих и начинается с видимого слова',
+    /class="tabbar__more"[^>]*aria-label="Ещё[^"]*"/.test(indexHtml)
+      || /aria-label="Ещё[^"]*"[^>]*class="tabbar__more"/.test(indexHtml));
   check('кнопка меню сообщает своё состояние', /aria-expanded="false"/.test(indexHtml));
+  check('второй двери в меню в разметке нет',
+    !/side-toggle/.test(indexHtml) && !/burger/.test(indexHtml));
   check('стили форума подключены', indexHtml.includes('forum.css'));
 
   /* ── Мобильная вёрстка и разметка: живой экран ── */
@@ -3838,17 +3898,28 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /\.role-badge \{[^}]*font-size: var\(--fs-eyebrow\)/.test(mobileCss));
 
   /*
-    Шапка на телефоне: кнопка слева, марка прижата к правому краю. Раскладка
-    обязана быть явной строкой: styles-v8.css на узком экране оставил шапке
-    flex-direction: column, и без переопределения кнопка вставала по центру,
-    а марка уезжала влево. Диапазон до 1039px — телефон в альбомной
-    ориентации шире 759px, а шапка всё равно разводит кнопку и марку.
+    Шапка на телефоне: марка слева, служебное справа. Раскладка обязана быть
+    явной строкой: styles-v8.css на узком экране оставил шапке
+    flex-direction: column, и без переопределения марка вставала по центру, а
+    переключатель темы уезжал влево. Диапазон до 1039px — телефон в альбомной
+    ориентации шире 759px, а шапка всё равно разводит марку и служебное.
   */
-  check('на телефоне шапка разводит кнопку и марку по краям',
+  check('на телефоне шапка разводит марку и служебное по краям',
     /@media \(max-width: 1039px\)[\s\S]{0,400}\.site-head__inner \{\s*display: flex;\s*flex-direction: row[\s\S]{0,120}justify-content: space-between/.test(mobileCss));
-  /* Шторка меню уже: на экране 375 она занимает не больше 52% ширины. */
-  check('шторка меню на телефоне уже, чем 232px',
-    /\.side \{[^}]*min\(var\(--side-w\), 52vw\)/.test(mobileCss));
+  /*
+    Шторка меню — нижний лист, а не узкая колонка сбоку. Раньше проверка
+    искала в mobile.css `width: min(--side-w, 52vw)`: на 375 px такая колонка
+    перекрывала ленту, которую человек читал. Теперь лист во всю ширину
+    (потолок 620 px — только для планшета), поэтому проверяем саму геометрию:
+    прижатие к нижнему краю, съезд за экран в закрытом состоянии и ширину
+    авто. Иначе правка «по месту» вернёт колонку, а тест про неё молчит.
+  */
+  check('шторка меню — нижний лист во всю ширину, а не колонка сбоку',
+    /\.side \{[^}]*bottom: 0[^}]*width: auto[^}]*max-width: 620px/.test(forumCss)
+      && /\.side \{[^}]*transform: translateY\(100%\)/.test(forumCss)
+      && !/\.side \{[^}]*width: min\(var\(--side-w\)/.test(mobileCss));
+  check('открытый лист возвращает список на экран и снимает защиту от кликов',
+    /\.is-side-open \.side \{[^}]*translateY\(0\)[^}]*visibility: visible/.test(forumCss));
 
   /*
     Стабильность: на телефоне страница не дёргается. min-height через svh не
@@ -3947,7 +4018,9 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /matchAll\(\/href="\\\.\\\/\(src\\\/\[\^"\?\]\+\\\.css\)/.test(preview) ||
       /indexHtml\.matchAll/.test(preview));
   check('превью показывает боковое меню, как настоящий сайт',
-    /id="side"/.test(preview) && /side-toggle/.test(preview));
+    /id="side"/.test(preview) && /data-side-close/.test(preview));
+  check('превью держит нижний ряд разделов с единственной дверью в меню',
+    /id="tabbar"/.test(preview) && /tabbar-more/.test(preview) && !/side-toggle/.test(preview));
 
   /*
     СПИСОК ОФЛАЙН-КОПИИ БОЛЬШЕ НЕ ПЕРЕЧИСЛЯЕТСЯ ВРУЧНУЮ.
@@ -6595,9 +6668,21 @@ console.log('\nY. Календарь встреч');
   check('намерение из адреса — одно, встреча: не перетирается пустым адресом и гаснет, только когда форма показалась',
     /state\.eventDraft = state\.eventDraft \|\| composeIntentFromSearch\(search\) === 'event';/.test(mountSrc)
       && /if \(host\.querySelector\('\[data-forum-composer\]'\)\) \{[\s\S]{0,400}?state\.eventDraft = false;\s*\}/.test(mountSrc));
+  /*
+    Слушатель один на три раскрытия шапки форума (форма поста, вход гостя,
+    настройки push своего человека), поэтому окно поиска по тексту выросло:
+    проверка держит не длину блока, а то, что каждое раскрытие зеркалится в
+    состоянии именно в захвате, — без этого человек теряет и набранный ник, и
+    щёлкнутый тумблер при первой же пересборке стартового кадра.
+  */
   check('раскрытие формы — тоже состояние, и его снимает только сам человек',
     mountSrc.includes('composerOpen: false') && mountSrc.includes('state.composerOpen = true;')
-      && /addEventListener\('toggle',[\s\S]{0,240}data-forum-composer[\s\S]{0,200}\}, true\)/.test(mountSrc));
+      && /addEventListener\('toggle',[\s\S]{0,420}data-forum-composer[\s\S]{0,400}\}, true\)/.test(mountSrc));
+  check('вход гостя и настройки своего зеркалятся в том же слушателе',
+    mountSrc.includes('authOpen: false') && mountSrc.includes('meMoreOpen: false')
+      && /addEventListener\('toggle',[\s\S]{0,600}data-forum-authbox[\s\S]{0,200}data-forum-me-more[\s\S]{0,200}\}, true\)/
+        .test(mountSrc)
+      && /state\.authOpen = d\.open;/.test(mountSrc) && /state\.meMoreOpen = d\.open;/.test(mountSrc));
   check('уход с форума сбрасывает и намерение, и метки, и раскрытую форму',
     /state\.eventDraft = false;\s*state\.composerTags = \[\];\s*state\.composerOpen = false;/.test(mountSrc));
   check('поля встречи не требуют заполнения молча: required у них нет',
@@ -6695,7 +6780,7 @@ console.log('\nY. Календарь встреч');
   /* ── Проводка страницы ── */
   const previewSrc = await readFile('scripts/build-preview.mjs', 'utf8');
   check('календарь — живая вкладка с собственным монтированием',
-    /id: 'calendar', label: 'Календарь', live: true/.test(mainSrc)
+    /id: 'calendar', label: 'Календарь',[^\n]* live: true/.test(mainSrc)
       && /import \{ mountCalendar, unmountCalendar \} from '\.\/forum\/calendar\.js'/.test(mainSrc)
       && /mountCalendar\(app, search\)/.test(mainSrc));
   /*
@@ -8857,7 +8942,7 @@ console.log('\nAF. Пульс обновлений игры');
 
   /* ── Маршрут ── */
   check('страница стоит в меню и живёт по своему адресу',
-    /\{\s*id: 'updates',\s*label: 'Обновления игры',\s*live: true,/.test(mainSrc)
+    /\{\s*id: 'updates',\s*label: 'Обновления игры',[^\n]*\blive: true,/.test(mainSrc)
       && mainSrc.includes('mountUpdates(app)'));
   check('она ждёт ответа хранилища, как живой раздел',
     mainSrc.includes("id === 'updates' || id === 'accounts' || id === 'handbook' || (id === 'user' && param)"));
@@ -11509,7 +11594,7 @@ console.log('\nAN. Доска аккаунтов');
 
   /* ── Вкладка-витрина подключена, а не лежит рядом ── */
   check('вкладка стоит в меню и живёт по своему адресу',
-    /\{\s*id: 'accounts',\s*label: 'Продажа аккаунтов',\s*live: true,/.test(mainSrc)
+    /\{\s*id: 'accounts',\s*label: 'Продажа аккаунтов',[^\n]*\blive: true,/.test(mainSrc)
       && mainSrc.includes('if (id === \'accounts\') return `accounts:${search}`;'));
   check('она ждёт ответа хранилища, как живой раздел',
     /const liveFirst = [^;]*id === 'accounts'[^;]*;/.test(mainSrc));
@@ -14544,9 +14629,15 @@ console.log('\nAO. Раздел — страница');
     underPlan.join(', '));
   check('поле напоминания в календаре стоит под общей планкой',
     /\.evt-remind select,/.test(refine));
+  /*
+    Кнопка меню в шапке ушла, но её место в этом списке не опустело: планка
+    44 px теперь нужна двум новым целям — «Ещё» в нижней полосе и «Закрыть»
+    у шторки. Проверка ищет их обоими именами, потому что палец не различает,
+    из какого поколения сайта кнопка: цель ниже 44 px одинаково промахивается.
+  */
   check('планка накрывает действия с ленты, заголовок темы, поиск по гайдам и ширину чипов',
-    /\.feed-card__source,\s*\.forum-chron__more,\s*\.forum-btn,\s*\.forum-post__title a,\s*\.burger,\s*input\[type="search"\],/.test(refine)
-      && /\.forum-save, button\.forum-tag, \.seg__btn, \.burger \{ min-width: 44px; \}/.test(refine));
+    /\.feed-card__source,\s*\.forum-chron__more,\s*\.forum-btn,\s*\.forum-post__title a,\s*\.side__close,\s*#tabbar-more,\s*input\[type="search"\],/.test(refine)
+      && /\.forum-save, button\.forum-tag, \.seg__btn, \.side__close \{ min-width: 44px; \}/.test(refine));
 
   /*
     Промер брейкпоинтов (заход 13) добавил к планке цели, которые до этого не
@@ -14624,17 +14715,34 @@ console.log('\nAO. Раздел — страница');
     `правила: ${loops.join(' ;; ')}`);
 
   /*
-    Второстепенный текст обязан дотягивать до порога AA (4.5:1) в обеих темах.
-    Значения подобраны по самой светлой панели своей темы, а не по фону «в
-    среднем»: именно на панельных карточках контраст был хуже всего. В тёмной
-    теме самой светлой подложкой оказалась не --raised-2, а бирюзовая плашка
-    витрины (--shop-soft → #1c2526) и полоса летописи (#21242c): на них
-    #808a9a давал 4,45:1, поэтому подпись поднята до #8c95a3 (≥5,1:1).
+    Второстепенный текст обязан дотягивать до порога AA (4.5:1) в обеих темах,
+    и считать это надо по всей лестнице поверхностей, а не по «фону в среднем».
+    Худшая поверхность в каждой теме своя: в ночной это верхний слой окна
+    (--overlay), в дневной — провал под полями ввода (--recessed), и именно на
+    них подпись падает ниже всех. Прежняя проверка держала это числом-гаданием
+    (`--mute: #8c95a3`), и первый же шаг редизайна, поднявший лестницу с четырёх
+    ступеней до шести, сломал бы её не затем, что стало нечитаемо, а затем, что
+    стало другое число. Порог не меняется — значит проверяем порог, а не номер.
+
+    Тёмные «острова» внутри дневной темы — отдельный случай: они сидят на
+    светлой странице, но чернила у них ночные, и сверку острова с ночной темой
+    держит секция BB.
   */
-  check('тёмная тема: --mute не ниже AA', /--mute:\s*#8c95a3/.test(v8));
-  check('светлая тема: --mute не ниже AA', /--mute:\s*#645e52/.test(v8));
-  check('тёмные острова в светлой теме используют тот же --mute',
-    /--mute:\s*#8c95a3/.test(refine));
+  {
+    const th = themeTokens(v8);
+    const worst = (t, ink) => SURFACES.reduce(
+      (a, s) => (contrast(t[ink], t[s]) < a.c ? { s, c: contrast(t[ink], t[s]) } : a),
+      { s: SURFACES[0], c: Infinity },
+    );
+    for (const [name, t] of [['тёмная', th.dark], ['светлая', th.light]]) {
+      const w = t ? worst(t, '--mute') : { s: '—', c: 0 };
+      check(`${name} тема: --mute дотягивает до AA на каждой из шести поверхностей`,
+        Boolean(t) && SURFACES.every((s) => contrast(t[s], t['--mute']) >= 4.5),
+        `худшая ${w.s} — ${w.c.toFixed(2)}:1`);
+    }
+    check('--mute объявлен и на тёмных островах дневной темы',
+      /--mute:\s*#[0-9a-f]{6}\s*;/.test(refine));
+  }
 
   /*
     Цвет альянса не может быть и плашкой, и подписью.
@@ -14705,12 +14813,24 @@ console.log('\nAO. Раздел — страница');
 
   /*
     Приз — и плашка, и подпись. Светлое золото красит бордюр награды, номер
-    места №1 и слово «Лидер сезона»; последнее — 11 px, то есть обычный текст,
-    и ему нужен полный порог. Замер пикселом назвал худшей поверхностью не
-    панель `--raised-2`, а тёплую плашку главной на 320 px: на ней #835a1a
-    давал 4,44:1.
+    места №1 и слово «Лидер сезона»; последнее — мелкий кегль, то есть обычный
+    текст, и ему нужен полный порог. Порог считаем по всей лестнице, а не по
+    одной панели: в дневной теме самым тёмным слоем оказался провал под полями,
+    и проверка, привязанная к номеру (#805719), падает на любой правке палитры,
+    которая ничего не ломает.
   */
-  check('светлая тема: --gold как текст не ниже AA', /--gold:\s*#805719/.test(v8));
+  {
+    const th = themeTokens(v8);
+    const pairs = [];
+    for (const [name, t] of [['светлая', th.light], ['тёмная', th.dark]]) {
+      if (!t) continue;
+      for (const s of SURFACES) pairs.push([`${name}: --gold на ${s}`, contrast(t['--gold'], t[s])]);
+    }
+    const w = pairs.reduce((a, b) => (b[1] < a[1] ? b : a), ['—', Infinity]);
+    check('золото как текст дотягивает до AA на всех поверхностях обеих тем',
+      pairs.length === 12 && pairs.every(([, c]) => c >= 4.5),
+      `худшая ${w[0]} — ${w[1].toFixed(2)}:1`);
+  }
 }
 
 /* ── AP. Доступность: что слышит читатель программы экрана ──────────────
@@ -15810,34 +15930,44 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
     const y = lum(b);
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   };
-  const darkSurface = /:root \{[\s\S]{0,200}?--surface:\s+(#[0-9a-f]{6});/.exec(v8Src);
-  const lightSurface = /\[data-theme="light"\] \{[\s\S]{0,200}?--surface:\s+(#[0-9a-f]{6});/.exec(v8Src);
-  const pairs = darkShop && lightShop && darkSurface && lightSurface
+  /*
+     Бирюза доски — краска и плашка одновременно, поэтому пар считаем столько,
+     сколько слоёв в теме: подпись альянса живёт и на провале, и на слое окна.
+     Прежний замер брал одну поверхность регуляркой «первые 200 знаков блока»,
+     и первый же шаг редизайна, вставивший в начало ступени лестницы, перестал
+     находить токен — проверка упала не затем, что контраст сломался, а затем,
+     что номер сдвинулся. Читаем токены темы целиком.
+  */
+  const th = themeTokens(v8Src);
+  const pairs = darkShop && lightShop && th.dark && th.light
     ? [
-      ['тёмная: бирюза на поверхности', ratio(darkShop[1], darkSurface[1])],
-      ['светлая: бирюза на поверхности', ratio(lightShop[1], lightSurface[1])],
+      ...SURFACES.map((s) => [`тёмная: бирюза на ${s}`, ratio(darkShop[1], th.dark[s])]),
+      ...SURFACES.map((s) => [`светлая: бирюза на ${s}`, ratio(lightShop[1], th.light[s])]),
       ['тёмная: чернила на бирюзе', ratio(darkShop[2], darkShop[1])],
       ['светлая: чернила на бирюзе', ratio(lightShop[2], lightShop[1])],
     ]
     : [];
-  check('все четыре пары красок доски дотягивают до AA для обычного текста',
-    pairs.length === 4 && pairs.every(([, c]) => c >= 4.5),
-    pairs.map((p) => `${p[0]} — ${p[1].toFixed(2)}:1`).join(', '));
+  check('бирюза доски как текст и её чернила дотягивают до AA на всех поверхностях обеих тем',
+    pairs.length === 14 && pairs.every(([, c]) => c >= 4.5),
+    pairs.slice().sort((a, b) => a[1] - b[1]).slice(0, 3)
+      .map((p) => `${p[0]} — ${p[1].toFixed(2)}:1`).join('; '));
   check('чернила на залитой плашке в двух темах РАЗНЫЕ, а не один тон на обеих',
     darkShop && lightShop && darkShop[2] !== lightShop[2]);
 
   /* ── Краска в светлой теме держится против чужого каскада ──
      `refine.css` грузится ПОЗЖЕ `forum.css` и перекрашивает всякую `.forum-btn`
-     в янтарь правилом `(0,3,0)`. Равенство специфичности там проиграно заранее,
-     поэтому слой доски обязан быть сильнее — и по числу классов, и по порядку.
-     Слой молча отваливается от любой правки селектора, а глаз видит это как
-     «доска стала оранжевой», то есть как потерю всей идеи раздела. */
+     в сигнальную плашку темы правилом `(0,3,0)`. Равенство специфичности там
+     проиграно заранее, поэтому слой доски обязан быть сильнее — и по числу
+     классов, и по порядку. Слой молча отваливается от любой правки селектора,
+     а глаз видит это как «доска стала оранжевой», то есть как потерю всей идеи
+     раздела. */
   const refineSrc = await readFile('src/refine.css', 'utf8');
   const htmlSrc = await readFile('index.html', 'utf8');
   const cssFlat = cssSrc.replace(/\r\n/g, '\n');
-  const amber = /:root\[data-theme="light"\] \.forum-btn,/.test(refineSrc);
-  check('конфликт жив: refine.css по-прежнему красит все кнопки в янтарь',
-    amber && /:root\[data-theme="light"\] \.forum-btn[\s\S]{0,300}?background: var\(--accent\)/.test(refineSrc));
+  const accentPlate = /:root\[data-theme="light"\] \.forum-btn,/.test(refineSrc);
+  check('конфликт жив: refine.css по-прежнему красит все кнопки в плашку темы',
+    accentPlate
+      && /:root\[data-theme="light"\] \.forum-btn[\s\S]{0,300}?background: var\(--accent-plate\)/.test(refineSrc));
   check('forum.css стоит в списке файлов РАНЬШЕ refine.css, поэтому слой доски сильнее по специфичности',
     htmlSrc.search(/href="\.\/src\/forum\.css/) < htmlSrc.search(/href="\.\/src\/refine\.css/)
       && htmlSrc.includes('href="./src/forum.css') && htmlSrc.includes('href="./src/refine.css'));
@@ -15866,6 +15996,26 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
       && /box-shadow:[\s\S]{0,200}?var\(--shop\)/.test(lightHover[1])
       && !/a94722|121,\s*49,\s*22/i.test(`${lightLayer[1]}${lightHover[1]}`));
 
+  /*
+    Направление смешивания.
+
+    Смесь в CSS пишется именем токена, а гекс у него только в блоке темы,
+    поэтому стоп-цвет градиента нельзя посчитать, не развернув `--shade` и
+    `--tint`. Разворачиваем по объявлению: `--shade: var(--text)` значит «вниз
+    по этой теме к чернилам», и в дневной теме это графит, а не чёрный. Ровно
+    поэтому проверка ниже говорит про светлоту, а не про `#000`: под словом
+    «затемнение» в дневной теме лежит графит.
+  */
+  const tokenVar = (body, name) => {
+    const m = new RegExp(`${name}:\\s*var\\((--[\\w-]+)\\)`).exec(body);
+    return m ? m[1] : null;
+  };
+  const resolveMix = (name) => {
+    const ref = tokenVar(th.lightRaw, name);
+    return ref && th.light[ref] ? th.light[ref] : null;
+  };
+  const mixTarget = { '--shade': resolveMix('--shade'), '--tint': resolveMix('--tint') };
+
   const mixHex = (hex, other, share) => {
     const read = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
     const a = read(hex);
@@ -15873,31 +16023,39 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
     return `#${a.map((v, i) => Math.round(v * share + b[i] * (1 - share))
       .toString(16).padStart(2, '0')).join('')}`;
   };
-  const stopColors = (bgValue, shop, ink) => {
+  const stopColors = (bgValue, shop) => {
     const stops = [];
-    for (const m of bgValue.matchAll(/color-mix\(in srgb, var\(--shop\) (\d+)%, (#[0-9a-f]{3,6})\)|(var\(--shop\))/g)) {
-      if (m[1]) {
-        const tint = m[2].length === 4
-          ? `#${m[2].slice(1).split('').map((c) => c + c).join('')}`
-          : m[2];
-        stops.push(mixHex(shop, tint, Number(m[1]) / 100));
-      } else stops.push(shop);
+    for (const m of bgValue.matchAll(/color-mix\(in srgb, var\(--shop\) (\d+)%, (#[0-9a-f]{3,6}|var\(--[\w-]+\))\)|(var\(--shop\))/g)) {
+      if (!m[1]) { stops.push(shop); continue; }
+      let tint = m[2].startsWith('var(') ? mixTarget[m[2].slice(4, -1)] : m[2];
+      if (!tint) return { stops: [], unmixed: m[2] };
+      if (tint.length === 4) tint = `#${tint.slice(1).split('').map((c) => c + c).join('')}`;
+      stops.push(mixHex(shop, tint, Number(m[1]) / 100));
     }
-    return { stops, ink };
+    return { stops };
   };
   const lightStops = [];
   for (const m of [lightLayer, lightHover]) {
     if (!m) continue;
     const bg = pick(m, 'background');
-    if (bg) lightStops.push(...stopColors(bg[1], lightShop ? lightShop[1] : '#000000', lightShop ? lightShop[2] : '#ffffff').stops);
+    if (bg) lightStops.push(...stopColors(bg[1], lightShop ? lightShop[1] : '#000000').stops);
   }
   const lightInks = lightStops.map((s) => ratio(lightShop ? lightShop[2] : '#ffffff', s));
   check('каждый стоп-цвет светлого градиента кнопок доски читается своими чернилами (AA)',
     lightStops.length >= 3 && lightInks.length >= 3 && lightInks.every((c) => c >= 4.5),
     lightStops.map((s, i) => `${s} — ${lightInks[i].toFixed(2)}:1`).join(', '));
-  check('в светлой теме градиент кнопки уходит в затемнение, а не в белёсый край: белёсый дал бы 3,9 : 1',
-    Boolean(pick(lightLayer || [null, ''], 'background'))
-      && /color-mix\(in srgb, var\(--shop\) \d+%, #000\)/.test((pick(lightLayer, 'background') || [, ''])[1]));
+  /*
+     Состояние покоя обязано уходить ВНИЗ, а не в белёсый край: почти белая
+     подпись на осветлённой бирюзе падает до 3,4:1, то есть на самом видном
+     месте раздела («выставить объявление») текст становится нечитаемым.
+  */
+  const normalBg = pick(lightLayer || [null, ''], 'background');
+  const normalStops = normalBg
+    ? stopColors(normalBg[1], lightShop ? lightShop[1] : '#000000').stops : [];
+  check('в светлой теме градиент кнопки уходит в затемнение, а не в белёсый край',
+    Boolean(lightShop) && normalStops.length >= 2
+      && normalStops.some((s) => lum(s) < lum(lightShop[1])),
+    `стопы: ${normalStops.join(', ')} против плашки ${lightShop ? lightShop[1] : '—'}`);
   check('пункт меню доски красится своей бирюзой, как это уже делает кварт',
     /\.nav__link\[href="#\/accounts"\] \{\s*color: var\(--shop\)/.test(cssSrc));
   check('ни одного цвета, вписанного в разметку: доска берёт краску из токена',
@@ -16167,10 +16325,10 @@ console.log('\nAV. Честная пустота и контур командн�
    контраст по формуле WCAG. Глазом такое не видеть: 4,53 и 4,61 выглядят
    одинаково читаемо, а правка одного канала уводит первую за порог.
 
-   Проверяются три группы.
+   Проверяются четыре группы.
 
    Первая — чернила текста (`--text`, `--dim`, `--mute`, `--link`) против всех
-   четырёх поверхностей обеих тем. Это ядро страницы: подписи плиток, даты,
+   шести поверхностей обеих тем. Это ядро страницы: подписи плиток, даты,
    строки про автомат. Порог — 4.5:1, обычный текст. Заход 1 уже один раз
    ловил `--mute` на 3.07:1, и поймал его не дизайн-ревью, а замер.
 
@@ -16179,7 +16337,13 @@ console.log('\nAV. Честная пустота и контур командн�
    сплошной текст. Всё, что не доходит до 4.5 как обычный текст, не прячется,
    а названо в документе об архитектуре, и проверку этого держим здесь.
 
-   Третья — шкалы, а не числа на месте: лестница отступов, полосы кеглей,
+   Третья — сами лестницы, а не только пары. Шесть ступеней темы обязаны идти
+   по светлоте ровно тем порядком, каким они объявлены, и с заметным шагом:
+   иначе «слоистость» брифа (§25, §27) превращается в шесть цветов, различимых
+   только рамкой. Здесь же держится главное обещание редизайна — что дневная
+   тема НЕ переворот ночной.
+
+   Четвёртая — шкалы, а не числа на месте: лестница отступов, полосы кеглей,
    ширина контента и длительности. Редизайн живёт токенами; если следующая
    правка впишет в блок `padding: 26px`, система перестанет быть системой,
    и проверить это регуляркой дешевле, чем спорить на ревью.
@@ -16190,17 +16354,7 @@ console.log('\nAW. AA у токенов обеих тем');
   const v8 = await readFile('src/styles-v8.css', 'utf8');
   const arch = await readFile('docs/ARCHITECTURE.md', 'utf8');
 
-  const darkBlock = /^:root \{([\s\S]*?)\n\}/m.exec(v8);
-  const lightBlock = /\n\[data-theme="light"\] \{([\s\S]*?)\n\}/m.exec(v8);
-  const readTokens = (body) => {
-    const out = {};
-    for (const m of body.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
-      if (!(m[1] in out)) out[m[1]] = m[2].toLowerCase();
-    }
-    return out;
-  };
-  const dark = darkBlock ? readTokens(darkBlock[1]) : null;
-  const light = lightBlock ? readTokens(lightBlock[1]) : null;
+  const { dark, light, darkRaw, lightRaw } = themeTokens(v8);
 
   const lum = (hex) => {
     const c = hex.slice(1);
@@ -16216,9 +16370,9 @@ console.log('\nAW. AA у токенов обеих тем');
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   };
 
-  const surfaces = ['--bg', '--surface', '--raised', '--raised-2'];
-  const inks = ['--text', '--dim', '--mute', '--link'];
-  check('обе темы собраны токенами: четыре поверхности и четыре чернила есть и там и там',
+  const surfaces = SURFACES;
+  const inks = INKS;
+  check('обе темы собраны токенами: шесть поверхностей и четыре чернила есть и там и там',
     Boolean(dark) && Boolean(light)
       && surfaces.every((s) => s in dark && s in light)
       && inks.every((i) => i in dark && i in light));
@@ -16230,22 +16384,25 @@ console.log('\nAW. AA у токенов обеих тем');
       for (const s of surfaces) floors.push([`${theme}: ${ink} на ${s}`, ratio(t[ink], t[s])]);
     }
   }
-  check('все четыре чернила текста на каждой поверхности обеих тем дотягивают до AA (4,5)',
-    floors.length === 32 && floors.every(([, c]) => c >= 4.5),
-    floors.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; '));
+  check('все четыре чернила текста на каждой из шести поверхностей обеих тем дотягивают до AA (4,5)',
+    floors.length === 48 && floors.every(([, c]) => c >= 4.5),
+    floors.filter(([, c]) => c < 4.5).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
+      || `худшая ${floors.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`);
   const floorWorst = floors.reduce((a, b) => (b[1] < a[1] ? b : a));
   check('самая тонкая пара названа числом, а не «в среднем нормально»',
     floorWorst[1] >= 4.5, `${floorWorst[0]} — ${floorWorst[1].toFixed(2)}:1`);
 
   /*
-     Худшая поверхность в каждой теме своя: в тёмной это светлая панель
-     `--raised-2`, в светлой — бежевая `--raised`. Правка одной из них молча
-     уводит вниз сразу четыре краски, поэтому проверяем их по отдельности.
+     Худшая поверхность в каждой теме своя, и это не одна и та же ступень:
+     в ночной теме подписи хуже всего читаются на верхнем слое окна (--overlay,
+     4,76:1), в дневной — в провале под полями ввода (--recessed, 4,69:1).
+     Правка любой из этих двух ступеней молча уводит вниз сразу четыре краски,
+     поэтому они проверяются по отдельности и названы своими местами.
   */
   check('худшая поверхность каждой темы остаётся в AA для подписей и ссылок',
     dark && light
-      && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(dark[i], dark['--raised-2']) >= 4.5)
-      && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(light[i], light['--raised']) >= 4.5));
+      && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(dark[i], dark['--overlay']) >= 4.5)
+      && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(light[i], light['--recessed']) >= 4.5));
 
   const accents = [];
   for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
@@ -16254,19 +16411,197 @@ console.log('\nAW. AA у токенов обеих тем');
       for (const s of surfaces) accents.push([`${theme}: ${ink} на ${s}`, ratio(t[ink], t[s])]);
     }
   }
+  /*
+    КРАСКИ РОЛЕЙ — ЭТО ПОДПИСИ, А НЕ ТОЛЬКО УКРАШЕНИЕ.
+
+    Серебро и бронза пишут места №2 и №3 на подиуме и в лестнице, электрик —
+    надзаголовки панелей, метку типа записи и подпись «президент», блогер —
+    метку роли, фиолет — переключатель «вождь набора». Значит, к ним то же AA,
+    что к обычным чернилам, а не 3:1 «как к крупному тексту».
+
+    Единственная краска, которая этому правилу не могла подчиниться прямо, —
+    фиолет: он же красит и плашку переключателя (15 % собственного тона), и
+    своей же подписью на ней даёт 3,42:1 в ночной теме и 4,28:1 в дневной.
+    Разрешено тем же способом, что и у призов: текст уходит в `--violet-ink`,
+    плашка и кромка остаются краской — роль читается ими.
+  */
+  const ROLE_TEXT = [['--violet', '--violet-ink'], ['--electric', '--electric'],
+    ['--silver', '--silver'], ['--blogger', '--blogger'], ['--bronze', '--bronze']];
+  const roleFail = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    for (const [, text] of ROLE_TEXT) {
+      for (const s of surfaces) {
+        const c = ratio(t[text], t[s]);
+        if (c < 4.5) roleFail.push(`${theme}: ${text} на ${s} — ${c.toFixed(2)}:1`);
+      }
+    }
+  }
+  check('пять красок ролей подписью дотягивают до AA на всех шести ступенях обеих тем',
+    roleFail.length === 0 && dark && light
+      && ROLE_TEXT.every(([, text]) => text in dark && text in light),
+    roleFail.join('; ') || '30 пар, худшая из них названа ниже');
+  const roleWorst = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    for (const [, text] of ROLE_TEXT) {
+      for (const s of surfaces) roleWorst.push([`${theme}: ${text} на ${s}`, ratio(t[text], t[s])]);
+    }
+  }
+  const thinRole = roleWorst.reduce((a, b) => (b[1] < a[1] ? b : a));
+  check('самая тонкая краска роли названа местом, а не «в среднем нормально»',
+    thinRole[1] >= 4.5, `${thinRole[0]} — ${thinRole[1].toFixed(2)}:1`);
+
+  /*
+     Подпись на плашке из собственной краски — отдельный замер: плашка двигается
+     вместе с краской, и AA на голой ступени её не касается. Проценты взяты из
+     правил, а не из головы: 15 % фиолета у переключателя «вождь набора», 8 %
+     бирюзы у плашки «Блогер», 3,5 % фиолета у строки «Кварт» в боковом меню.
+  */
+  const srgbMix = (fg, share, bg) => {
+    const rd = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const a = rd(fg);
+    const b = rd(bg);
+    return `#${a.map((v, i) => Math.round(v * share + b[i] * (1 - share)).toString(16).padStart(2, '0')).join('')}`;
+  };
+  const plateFail = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    for (const [paint, pct] of [['--violet', 0.15], ['--blogger', 0.08], ['--violet', 0.035]]) {
+      const text = paint === '--violet' ? '--violet-ink' : '--blogger';
+      for (const s of surfaces) {
+        const c = ratio(t[text], srgbMix(t[paint], pct, t[s]));
+        if (c < 4.5) plateFail.push(`${theme}: ${text} на ${pct * 100} % ${paint} над ${s} — ${c.toFixed(2)}:1`);
+      }
+    }
+  }
+  check('подпись на плашке из собственной краски не тонет: фиолет 15 %, блогер 8 %, фиолет 3,5 %',
+    plateFail.length === 0, plateFail.join('; ') || '');
+
+  const refineSrc = await readFile('src/refine.css', 'utf8');
+  check('плашка «вождь набора» красит подпись чернилами, а не самой краской',
+    /\.adm-toggle\[data-player-leader\]\.is-on\s*\{[^}]*color:\s*var\(--violet-ink\)/.test(refineSrc),
+    'если подпись снова var(--violet), она вернётся на 3,42:1 в ночи и 4,28:1 днём');
+
+  /*
+     Литерал ночной палитры в правиле, которое работает в обеих темах, — это
+     та же ошибка в другом месте: инвертировать тему по одному числу нельзя.
+     Пункт «Кварт» держал подпись литералом #c6a9df и в дневной теме давал
+     1,77:1 на собственном фоне строки. Проверка по токенам этого не ловит
+     вообще — в токенах всё было в порядке, сломано было правило.
+  */
+  check('строка «Кварт» в меню красится чернилами роли, а не литералом ночной палитры',
+    /\.nav__link\[href="#\/quarter"\]\s*\{[^}]*color:\s*var\(--violet-ink\)/.test(v8)
+      && !/\.nav__link\[href="#\/quarter"\][^}]*color:\s*#/.test(v8),
+    'литерал #c6a9df — это 1,77:1 днём; свип по нарисованным пикселам нашёл его именно так');
+
+  /*
+     Активный пункт заливается фиолетом, и чернила на такой плашке берутся
+     --on-accent: у каждой темы свой конец ряда (ночь светлеет к тёмным
+     чернилам, день темнеет к светлым). Направление смешения читается из
+     самого правила темы, а не предполагается: --tint объявлен ссылкой на
+     ступень, и проверка берёт ту же ступень.
+  */
+  const tintOf = (t, raw) => {
+    const m = /--tint:\s*var\((--[\w-]+)\)\s*;/.exec(raw);
+    return m ? t[m[1]] : null;
+  };
+  const violetPlateFail = [];
+  for (const [theme, t, raw] of [['тёмная', dark, darkRaw], ['светлая', light, lightRaw]]) {
+    const tint = t && tintOf(t, raw);
+    if (!tint) continue;
+    for (const share of [1, 0.85]) {
+      const c = ratio(t['--on-accent'], srgbMix(t['--violet'], share, tint));
+      if (c < 4.5) {
+        violetPlateFail.push(`${theme}: --on-accent на ${Math.round(share * 100)} % фиолета — ${c.toFixed(2)}:1`);
+      }
+    }
+  }
+  check('чернила активны на залитом фиолетом конце ряда в обеих темах',
+    violetPlateFail.length === 0 && dark && light
+      && Boolean(tintOf(dark, darkRaw)) && Boolean(tintOf(light, lightRaw)),
+    violetPlateFail.join('; ') || '');
+
   check('акцентные краски как текст дотягивают до 3:1 — AA для крупного текста',
-    accents.length === 40 && accents.every(([, c]) => c >= 3),
-    accents.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; '));
+    accents.length === 60 && accents.every(([, c]) => c >= 3),
+    accents.filter(([, c]) => c < 3).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ') || '');
   const subNormalAA = accents.filter(([, c]) => c < 4.5);
   check('всё, что не доходит до AA как обычный текст, не спрятано: это названо в документе',
     subNormalAA.length > 0 && arch.includes('цвета альянсов')
       && /AA для крупного текста/.test(arch),
     `${subNormalAA.length} пар: ${subNormalAA.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')}`);
 
-  /* Чернила на залитой плашке: фон кнопки — это сам акцент. */
-  check('чернила на залитой акцентом плашке тёмной темы дотягивают до AA',
-    dark && ratio(dark['--bg'], dark['--accent']) >= 4.5,
-    `#080a0f на ${dark ? dark['--accent'] : '—'} — ${dark ? ratio(dark['--bg'], dark['--accent']).toFixed(2) : '—'}:1`);
+  /* ── Лестницы: порядок, шаг и запрет на переворот ── */
+  const order = (t) => surfaces.slice().sort((a, b) => lum(t[a]) - lum(t[b]));
+  const step = (t) => {
+    const o = order(t);
+    let worst = [`${o[0]}→${o[1]}`, Infinity];
+    for (let i = 1; o.length && i < o.length; i++) {
+      const ratioStep = lum(t[o[i]]) / lum(t[o[i - 1]]);
+      if (ratioStep < worst[1]) worst = [`${o[i - 1]}→${o[i]}`, ratioStep];
+    }
+    return worst;
+  };
+  check('ступени ночной темы идут по светлоте ровно тем порядком, каким объявлены',
+    dark && order(dark).join('/') === '--recessed/--bg/--surface/--raised/--raised-2/--overlay',
+    dark ? order(dark).join('/') : 'нет ночного блока');
+  check('ступени дневной темы идут по светлоте ровно тем порядком, каким объявлены',
+    light && order(light).join('/') === '--recessed/--raised/--bg/--surface/--raised-2/--overlay',
+    light ? order(light).join('/') : 'нет дневного блока');
+  check('шаг между соседними ступенями виден без рамки: светлота растёт минимум в 1,03 раза',
+    dark && light && [step(dark), step(light)].every((s) => s[1] >= 1.03),
+    dark && light
+      ? `ночь ${step(dark)[0]} ×${step(dark)[1].toFixed(3)}, день ${step(light)[0]} ×${step(light)[1].toFixed(3)}`
+      : '');
+
+  /*
+     Главный анти-переворот (§23, §28).
+
+     Собери кто дневную тему инвертированием ночной — порядок имён по светлоте
+     стал бы зеркальным, а ступень `--raised` осталась бы «выше страницы» в
+     обеих. На деле вложенная плашка дня лежит ГЛУБЖЕ страницы: глаз читает
+     углубление затемнением, а подъём — высветлением, поэтому направление одной
+     и той же ступени у тем разное. Это одно числовое различие, по которому
+     проверка и отличает две системы слоёв от одной вывернутой палитры.
+  */
+  check('--raised идёт ВЫШЕ страницы ночью и ГЛУБЖЕ неё днём — темы не зеркальны',
+    dark && light
+      && lum(dark['--raised']) > lum(dark['--bg'])
+      && lum(light['--raised']) < lum(light['--bg']),
+    dark && light
+      ? `ночь ${lum(dark['--raised']).toFixed(4)} против ${lum(dark['--bg']).toFixed(4)}, `
+      + `день ${lum(light['--raised']).toFixed(4)} против ${lum(light['--bg']).toFixed(4)}`
+      : '');
+  check('ни одна тема не упирается в чистое белое или чистое чёрное: потолок и пол названы',
+    dark && light && ![...SURFACES, '--text', '--overlay'].some((k) => dark[k] === '#ffffff' || dark[k] === '#000000'
+      || light[k] === '#ffffff' || light[k] === '#000000'),
+    dark && light ? `ночной пол ${dark['--recessed']}, дневной потолок ${light['--overlay']}` : '');
+
+  /*
+     Чернила на залитой плашке. Фон кнопки — это сам акцент, и ряд у каждой
+     темы свой: ночная плашка светлеет к чернилам, дневная темнеет к
+     --accent-dk, а нажатие кладёт плоский цвет. Поэтому считаем оба конца
+     ряда — иначе самое нажатие делает надпись нечитаемой, а выглядит это как
+     «ничего не сломано».
+  */
+  for (const [name, t] of [['тёмной', dark], ['светлой', light]]) {
+    check(`чернила на залитой акцентом плашке ${name} темы дотягивают до AA на обоих концах ряда`,
+      Boolean(t) && ratio(t['--on-accent'], t['--accent']) >= 4.5
+        && ratio(t['--on-accent'], t['--accent-dk']) >= 4.5,
+      t ? `${t['--on-accent']} на ${t['--accent']} — ${ratio(t['--on-accent'], t['--accent']).toFixed(2)}:1, `
+        + `на ${t['--accent-dk']} — ${ratio(t['--on-accent'], t['--accent-dk']).toFixed(2)}:1`
+        : '');
+  }
+  /*
+     И ровно поэтому чернила плашки в двух темах РАЗНЫЕ. Ночной почти-чёрный
+     тон на дневной плашке даёт 3,66:1: надпись на самой частой кнопке сайта
+     перестала бы читаться, поменяй её одним числом на общей лестнице.
+  */
+  check('чернила плашки не могут быть одни на обе темы: чужой тон не набирает AA',
+    dark && light && ratio(dark['--on-accent'], light['--accent']) < 4.5,
+    dark && light
+      ? `${dark['--on-accent']} на ${light['--accent']} — ${ratio(dark['--on-accent'], light['--accent']).toFixed(2)}:1`
+      : '');
 
   /* ── Шкалы редизайна ── */
   const steps = [...v8.matchAll(/--s-(?:([1-8])|(hair|fine)):\s*(\d+)px/g)]
@@ -16373,6 +16708,7 @@ console.log('\nAX. Полоса разделов и подвал');
   const forum = await readFile('src/forum.css', 'utf8');
   const mobile = await readFile('src/mobile.css', 'utf8');
   const refine = await readFile('src/refine.css', 'utf8');
+  const previewSrc = await readFile('scripts/build-preview.mjs', 'utf8');
 
   /* Разделы, которые человек вообще может выбрать: hidden в список не входит. */
   const routesStart = mainJs.indexOf('const ROUTES = [');
@@ -16408,17 +16744,126 @@ console.log('\nAX. Полоса разделов и подвал');
     «Ещё» не имеет права заводить свой список: два оглавления на одном
     телефоне человек обязан сверять глазами, и одно из них гарантированно
     устаревает.
+
+    ДВЕРЬ В СПИСОК ОДНА. Кнопка «Меню» в шапке вела в тот же ящик и была
+    вторым входом: два управления одним состоянием читаются как два разных
+    меню, и человек проверяет оба. Поэтому здесь считается не «обе кнопки
+    говорят правду», а что управляющих кнопок ровно одна и старой двери
+    в разметке не осталось.
   */
-  check('«Ещё» управляет тем же боковым меню, что и кнопка в шапке',
+  check('«Ещё» управляет тем же боковым меню, а не заводит своё',
     /aria-controls="side"/.test(indexHtml)
       && (indexHtml.match(/<aside id="side"/g) || []).length === 1,
     'в документе не один ящик разделов');
+  check('дверь в список одна: шапка больше никуда его не открывает',
+    (indexHtml.match(/aria-controls="side"/g) || []).length === 1
+      && !/side-toggle/.test(indexHtml)
+      && /aria-label="Ещё[^"]*" aria-controls="side"/.test(indexHtml),
+    `${(indexHtml.match(/aria-controls="side"/g) || []).length} управляющих кнопок`);
   check('у «Ещё» есть обработчик, который двигает общее состояние',
     /tabbarMore\?\.addEventListener\('click', \(\) => \{[\s\S]{0,120}setSideOpen\(!isSideOpen\(\)\)/
       .test(mainJs));
-  check('раскрытое состояние сообщают обе кнопки, а не одна',
+  check('раскрытое состояние сообщает та кнопка, что управляет ящиком',
     /document\.querySelectorAll\('\[aria-controls="side"\]'\)\.forEach\(\(btn\) => \{\s*btn\.setAttribute\('aria-expanded', String\(open\)\)/
       .test(mainJs));
+  /*
+    Закрытие шторки. Кнопка «Закрыть» нужна не для красоты: без неё список
+    недоступен с клавиатуры, а жест и затемнение — только удобство пальца.
+    Проверка требует, чтобы обработчик был у каждого способа закрыть.
+  */
+  check('шторку закрывают кнопка, затемнение, клавиша Escape и переход по разделу',
+    /sideClose\?\.addEventListener\('click', \(\) => setSideOpen\(false\)\)/.test(mainJs)
+      && /sideVeil\?\.addEventListener\('click', \(\) => setSideOpen\(false\)\)/.test(mainJs)
+      && /e\.key === 'Escape' && isSideOpen\(\)\) setSideOpen\(false\)/.test(mainJs)
+      && /if \(e\.target\.closest\('a'\)\) setSideOpen\(false\)/.test(mainJs));
+  check('в разметке шторки есть ручка, заголовок и кнопка закрытия',
+    /class="side__grab"/.test(indexHtml) && /class="side__title"/.test(indexHtml)
+      && /<button type="button" class="side__close" data-side-close>/.test(indexHtml));
+  /*
+    Два падения, пойманные только живым кликом:
+
+    1) Фокус. Открытая шторка перенимала фокус на себя лишь на клавиатуре;
+       после нажатия пальцем курсор оставался на «Ещё», и следующий Tab уходил
+       в подвал, минуя весь список. Причина — видимость ещё не была
+       пересчитана, а скрытому элементу браузер фокус не даёт. Лечится
+       принудительным досчётом (offsetHeight) перед focus() и нулевой
+       длительностью перехода видимости при открытии.
+
+    2) Жест. pointerup слушался на ручке, а палец отпускали ниже — событие
+       прилетало на вкладку списка, и шторка не закрывалась. Теперь событие
+       ловит документ.
+  */
+  check('фокус входит в шторку после досчёта видимости, а не до него',
+    /if \(open\) \{\s*void side\?\.offsetHeight;\s*side\?\.querySelector\('\.nav__link'\)\?\.focus\(\{ preventScroll: true \}\)/.test(mainJs)
+      && /\.is-side-open \.side \{[^}]*visibility: visible;[\s\S]{0,700}?transition: transform \.32s var\(--ease-out\), visibility 0s;/.test(forum),
+    'фокус или переход видимости вернулись к прежнему виду');
+  check('съезд шторки ловится на документе, а не на ручке',
+    /document\.addEventListener\('pointerup', \(e\) => \{[\s\S]{0,200}?moved > 56\) setSideOpen\(false\)/.test(mainJs)
+      && !/sideGrab\?\.addEventListener\('pointerup'/.test(mainJs)
+      && /document\.addEventListener\('pointercancel'/.test(mainJs));
+  check('аварийное превью повторяет те же два решения',
+    /void side\.offsetHeight;/.test(previewSrc)
+      && /document\.addEventListener\('pointerup', function \(e\) \{/.test(previewSrc)
+      && !/grab\.addEventListener\('pointerup'/.test(previewSrc));
+
+  /*
+    ГРУППЫ ОГЛАВЛЕНИЯ.
+
+    Четырнадцать вкладок подряд — это список, а не оглавление: человек должен
+    сначала понять, где здесь разговоры, где цифры, где помощь. Прежних двух
+    подписей на всех не хватило, и «Гайды» с «Ботом» стояли под «Сервером»,
+    которому они не про что.
+
+    Проверка следит за двумя способами разойтись: вкладка без своей группы
+    (её просто некуда ставить, и она исчезает из меню) и группа без вкладок
+    (человек видит заголовок раздела, под которым пусто).
+  */
+  const navTitles = /const NAV_TITLES = \[([^\]]*)\]/.exec(mainJs);
+  const titles = navTitles ? [...navTitles[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : [];
+  const groupOf = (id) => (new RegExp(`id: '${id}'[^}]*?group: '([^']+)'`).exec(routesBlock) || [])[1] || null;
+  const tagOf = (id) => (new RegExp(`id: '${id}'[^}]*?tag: '([^']+)'`).exec(routesBlock) || [])[1] || null;
+  check('у каждой вкладки меню есть своя группа',
+    shown.every((r) => groupOf(r.id)),
+    shown.filter((r) => !groupOf(r.id)).map((r) => r.id).join(', '));
+  check('подписей групп ровно три, и каждая названа один раз',
+    titles.length === 3 && new Set(titles).size === 3, titles.join(', '));
+  check('ни одна группа не пуста, ни одна вкладка не потерялась',
+    titles.every((t) => shown.some((r) => groupOf(r.id) === t))
+      && shown.every((r) => titles.includes(groupOf(r.id))),
+    shown.map((r) => `${r.id}→${groupOf(r.id) ?? 'нет'}`).join(' '));
+  check('меню собирается обходом названий групп, а не одним плоским списком',
+    /nav\.innerHTML = NAV_TITLES\.map\(/.test(mainJs));
+  check('заголовок группы рисуется только вместе со своими вкладками',
+    /NAV_TITLES\.map\([\s\S]{0,260}?class="nav__group">\$\{title\}<\/span>\$\{[\s\S]{0,120}?r\.group === title\)\.map\(link\)/
+      .test(mainJs));
+
+  /*
+    СТРОКА «ГДЕ Я» В ШАПКЕ (desktop, §29: человек обязан понимать, куда попал,
+    не поднимая глаз в оглавление). Активная вкладка уезжает за край длинного
+    списка, поэтому ответ держится в шапке — но только там, где для него есть
+    место: на телефоне ряд разделов и заголовок страницы уже отвечают.
+  */
+  check('строка «где я» стоит в шапке и скрыта от диктора',
+    /<p class="head__where" id="head-where" aria-hidden="true"><\/p>/.test(indexHtml));
+  check('«где я» берёт название и подпись того же раздела, что и меню',
+    /function paintHeadWhere\(activeId\)/.test(mainJs)
+      && /name\.textContent = route\.label/.test(mainJs)
+      && /note\.textContent = route\.tag \|\| ''/.test(mainJs)
+      && /renderNav[\s\S]{0,2400}?paintHeadWhere\(activeId\);/.test(mainJs));
+  check('у каждой вкладки есть подпись, которую шапка показывает рядом с названием',
+    shown.every((r) => tagOf(r.id)),
+    shown.filter((r) => !tagOf(r.id)).map((r) => r.id).join(', '));
+  check('на телефоне строки «где я» нет: места нет, и ответ даёт ряд разделов',
+    /\.head__where \{ display: none; \}/.test(v8)
+      && !/\.head__where \{[^}]*display: ?flex/.test(mobile),
+    'строка видна только на широком экране');
+  /*
+    Возврат второй двери означает два входа в одно состояние. Проверяем не
+    только разметку, но и стили: кнопка, у которой нет хозяина в js, всё равно
+    занимает место в шапке и путает человека.
+  */
+  check('кнопки меню в шапке нет ни в разметке, ни в стилях, ни в коде',
+    !/burger|side-toggle/.test(indexHtml + forum + mobile + v8 + mainJs));
 
   /*
     Активная клетка. Полоса статичная, поэтому её подсветка не наследуется
@@ -16767,6 +17212,122 @@ console.log('\nBA. Границы ширины: ряд в одном источ�
   check('главная граница телефона и десктопа — одна на весь сайт, 760 px',
     seenMin.has(760) && seenMax.has(759) && !seenMin.has(761) && !seenMax.has(760),
     `min-границы вокруг: ${[...seenMin].filter((n) => n > 700 && n < 800).sort((a, b) => a - b).join(', ') || 'нет'}`);
+}
+
+/* ── BB. Тёмные острова дневной темы зеркалят ночную ─────────────────────────
+
+   Остров два. Первый — пять блоков справочника и Кварта (герой, карточка,
+   панель ролей, дополнительная карточка гайда, страница Кварта): они ночные
+   только тогда, когда ночной стала вся страница, поэтому каждый спрятан под
+   признаком темы. Второй — студия подбора своего цвета в панели: она ночная
+   всегда и в базовом правиле, потому что образец оттенка нельзя оценивать на
+   том же фоне, который этот оттенок и заполнит.
+
+   И у того, и у другого опасность одна, и она тихая. Кто-то поднимает в
+   `styles-v8.css` ступень `--raised` на шаг, а на острове остаётся старое
+   число: правый край ленты светлеет, остров нет, и разницу видно на одном
+   экране из двух. Второй сценарий хуже первого: остров перезадаёт девять
+   красок, а композиты и тени докрашивает отдельным правилом ниже по файлу — и
+   тогда любой новый токен темы проходит мимо острова вовсе.
+
+   Поэтому сверка идёт с двух сторон: список имён обязан совпасть со списком
+   дневного блока, а каждое значение — с ночным корнем. Композиты сравниваются
+   по способу объявления, а не по результату: `var()` внутри объявления
+   считается на том элементе, где стоит объявление, и только так плашка острова
+   собирается из ночных ступеней, а не из тех, что посчитал корень.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBB. Тёмные острова дневной темы зеркалят ночную');
+{
+  const { readFile } = await import('node:fs/promises');
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+
+  /*
+     Острова два и они разного типа. Остров справочника прячется под признаком
+     дневной темы: он ночной только когда ночной стала вся страница. Окно
+     подбора своего цвета в панели ночное всегда — человек оценивает оттенок на
+     нейтрально-тёмной студии, и в дневной теме светлая плашка рядом с его же
+     цветом начинает спорить с образцом. Поэтому у него базовое правило без
+     признака темы. Проверка одна для обоих: имена токенов — как у дневного
+     корня, значения — как у ночного.
+  */
+  const ISLANDS = [
+    {
+      name: 'остров справочника',
+      file: 'src/refine.css',
+      marker: ':root[data-theme="light"] .bot-hero,',
+      selectors: ['.bot-hero', '.bot-feature', '.roles-panel', '.guide-extra-card', '.quart-page'],
+      scoped: true,
+    },
+    {
+      name: 'студия выбора цвета в панели',
+      file: 'src/admin/admin.css',
+      marker: '.guide-color-picker,',
+      selectors: ['.guide-color-picker', '.guide-color-modal__dialog'],
+      scoped: false,
+    },
+  ];
+
+  const declared = (body) => [...stripCss(body).matchAll(/(--[\w-]+):/g)].map((m) => m[1]);
+  const values = (body) => {
+    const out = {};
+    for (const m of stripCss(body).matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
+      if (!(m[1] in out)) out[m[1]] = m[2].trim().replace(/\s+/g, ' ');
+    }
+    return out;
+  };
+
+  const { darkRaw, lightRaw } = themeTokens(v8);
+  const dayNames = declared(lightRaw);
+  const night = values(darkRaw);
+  const composites = ['--shade', '--tint', '--accent-plate', '--accent-plate-line', '--danger-plate',
+    '--shimmer', '--plate-grad', '--sheen', '--win-ink', '--loss-ink', '--hud-line'];
+
+  for (const isl of ISLANDS) {
+    const css = await readFile(isl.file, 'utf8');
+    const open = css.indexOf(isl.marker);
+    const brace = open < 0 ? -1 : css.indexOf('{', open);
+    const sel = open < 0 ? '' : css.slice(open, brace);
+    const body = open < 0 ? '' : css.slice(brace + 1, css.indexOf('\n}', brace));
+
+    check(`${isl.name}: селекторов ровно ${isl.selectors.length}, список полон${isl.scoped ? ' и каждый спрятан под признаком темы' : ''}`,
+      sel.split(',').length === isl.selectors.length
+        && isl.selectors.every((s) => sel.includes(s))
+        && (!isl.scoped || isl.selectors.every((s) => sel.includes(`] ${s}`))),
+      sel.replace(/\s+/g, ' ').trim() || 'остров не найден в файле');
+
+    const islNames = declared(body);
+    check(`${isl.name}: остров перезадаёт РОВНО те токены, которые перезадаёт дневная тема`,
+      islNames.length > 0 && islNames.length === dayNames.length
+        && dayNames.every((n) => islNames.includes(n)) && islNames.every((n) => dayNames.includes(n)),
+      `на острове ${islNames.length}, в дне ${dayNames.length}; `
+        + `лишние: ${islNames.filter((n) => !dayNames.includes(n)).join(', ') || 'нет'}, `
+        + `пропущенные: ${dayNames.filter((n) => !islNames.includes(n)).join(', ') || 'нет'}`);
+
+    const island = values(body);
+    const drift = Object.keys(island).filter((k) => !(k in night) || night[k] !== island[k]);
+    check(`${isl.name}: каждая ступень, краска, тень и композит острова равны ночному значению`,
+      Object.keys(island).length > 0 && drift.length === 0,
+      drift.map((k) => `${k}: остров «${island[k]}», ночь «${night[k] ?? 'не объявлено'}»`).join('; ')
+        || `${Object.keys(island).length} токенов совпадают`);
+
+    /*
+       Если остров вместо `var(--recessed)` впишет снятый гекс, проверка значений
+       его сегодня не поймает — число-то то же. Поэтому способ объявления
+       сверяется отдельно: ночной корень считает композит формулой, значит и
+       остров обязан считать его формулой.
+    */
+    check(`${isl.name}: композиты острова объявлены формулой, как в ночном корне, а не снятым значением`,
+      composites.every((k) => k in island && island[k].includes('var(') === (night[k] || '').includes('var(')),
+      composites.filter((k) => !(k in island)).join(', ') || 'все формулой');
+
+    /*
+       У острова свои чернила, и без своей схемы браузер нарисует системные
+       полосы прокрутки, календари и поля ввода светлыми прямо внутри тёмной
+       панели — ровно тот белый прямоугольник, ради которого остров и тёмный.
+    */
+    check(`${isl.name}: остров объявляет свою цветовую схему — системные контролы внутри него ночные`,
+      /color-scheme:\s*dark/.test(body));
+  }
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

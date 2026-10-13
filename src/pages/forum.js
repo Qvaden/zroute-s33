@@ -103,6 +103,14 @@ export function renderForum(view, state = {}) {
     activity: null,
     /** Уведомления: открыта ли панель и что в ней. */
     notifyOpen: false,
+    /**
+     * Раскрыт ли блок входа у гостя и блок настроек у своего. Открытость
+     * живёт в состоянии, а не в экране: `<details>` при первой же перерисовке
+     * сборки вернулась бы к свёрнутому виду, и человек потерял бы и набранное
+     * в полях, и сам раскрытый список.
+     */
+    authOpen: false,
+    meMoreOpen: false,
     notifyList: [],
     notifyUnread: 0,
     /*
@@ -116,17 +124,44 @@ export function renderForum(view, state = {}) {
   };
 
   /*
-    ДВЕ КОЛОНКИ НА ШИРОКОМ ЭКРАНЕ, ОДНА НА ТЕЛЕФОНЕ.
+    ПОРЯДОК БЛОКОВ РЕШАЕТ РАЗМЕТКА, А НЕ СТИЛИ.
 
-    Раньше всё шло одной лентой сверху вниз: сводка, тема недели, горячее,
-    топ игроков, правила — и только потом сама лента. На мониторе до первого
-    поста приходилось прокручивать полтора экрана. Теперь контекст (сводка,
-    горячее, топ, правила) стоит боковой колонкой справа, а лента начинается
-    сразу. На телефоне колонки складываются в прежнем порядке — там боковой
-    колонке места нет, а порядок «сначала контекст» проверен.
+    Три области, в том порядке, в каком их читает телефон: шапка форума со
+    своим блоком человека, потом лента со своими действиями, и только потом
+    всё, что вокруг форума — сводка, горячее, топ, правила. Раньше порядок
+    задавался разметкой «сначала контекст», а на широком экране колонки
+    менялись местами стилем `order`: на телефоне человек скручивал 1711 px
+    сводки, прежде чем видел собственный ник и первую тему, — профиль лежал
+    внизу, хотя вопрос «кто я здесь и что нового» задают первым.
+
+    Компьютер получает ту же разметку, разложенную стилем по двум колонкам:
+    шапка тянется на обе, блок человека садится над правой колонкой, лента
+    занимает левую. Ни одного `order` в этих правилах нет: одно назначение
+    работает на всех ширинах, и телефон не расставляет блоки так, как их
+    придумали для монитора.
+
+    Заголовок H1 переехал в шапку и стал названием раздела. Летопись выше
+    ленты больше его не держит: у неё теперь свой H2, и на странице ровно
+    один главный заголовок — на том месте, где его ждут.
+
+    Чисел в шапке нет специально. Количество тем уже считает приветствие
+    ниже, и повторить его здесь значило бы завести второе число, которое
+    разойдётся с первым на следующей странице ленты.
   */
   return `
     <div class="forum-layout">
+      <header class="forum-head">
+        ${renderForumHead()}
+        ${renderAccountBar(s)}
+      </header>
+      <div class="forum-main">
+        ${renderWelcome(s)}
+        ${renderStarterSteps(s)}
+        ${renderNotifications(s)}
+        ${renderComposer(s)}
+        ${renderFeedControls(s)}
+        ${renderFeed(s)}
+      </div>
       <aside class="forum-side" aria-label="Сводка и правила">
         ${renderChronicleBand(view?.events ?? [])}
         ${renderWeekTheme(view)}
@@ -139,15 +174,22 @@ export function renderForum(view, state = {}) {
         ${renderAllianceSubscriptions(view, s)}
         ${renderRules()}
       </aside>
-      <div class="forum-main">
-        ${renderWelcome(s)}
-        ${renderAccountBar(s)}
-        ${renderStarterSteps(s)}
-        ${renderNotifications(s)}
-        ${renderComposer(s)}
-        ${renderFeedControls(s)}
-        ${renderFeed(s)}
-      </div>
+    </div>`;
+}
+
+/**
+ * Шапка форума: раздел назван, и под названием — одна строка о том, что
+ * здесь обсуждают. Ни чисел, ни кнопок: вход и действия живут в блоке
+ * человека справа, а счёт тем — в приветствии.
+ */
+function renderForumHead() {
+  return `
+    <div class="forum-head__id">
+      <span class="eyebrow">Форум сервера 33</span>
+      <h1 class="forum-head__title">Обсуждения сообщества</h1>
+      <p class="forum-head__note">
+        Новости, разбор VS, летопись захватов, альянсы и свободные темы.
+      </p>
     </div>`;
 }
 
@@ -175,10 +217,10 @@ function renderChronicleBand(events) {
     return `
       <section class="hero forum-chron forum-chron--empty">
         <span class="eyebrow">Сводка сервера</span>
-        <h1 class="forum-chron__title">Сервер 33 · сообщество</h1>
+        <h2 class="forum-chron__title">Сервер 33 · сообщество</h2>
         <p class="muted">
           Хроника появится здесь, как только внесут первую запись.
-          Форум ниже работает независимо от неё.
+          Форум над ней работает независимо от неё.
         </p>
       </section>`;
   }
@@ -209,7 +251,7 @@ function renderChronicleBand(events) {
         </span>
       </div>
 
-      <h1 class="forum-chron__title">${esc(title)}</h1>
+      <h2 class="forum-chron__title">${esc(title)}</h2>
       <p class="forum-chron__date">
         ${last.date.getUTCDate()} ${esc(MONTH_SHORT[last.date.getUTCMonth()])}, ${last.date.getUTCFullYear()}
         ${last.durationDays ? `<span class="hero__sep">·</span> ${esc(plural(last.durationDays, 'день', 'дня', 'дней'))}` : ''}
@@ -1056,7 +1098,20 @@ export function renderSectionMutes(s) {
 }
 
 function renderWhoAmI(s) {
+  /*
+    КОРОТКАЯ ПОЛОСА О СЕБЕ, А НЕ ЭКРАН ПРОФИЛЯ.
+
+    Профиль живёт на своей странице; здесь нужны четыре вещи: кто я, могу ли
+    писать, куда пойти прямо сейчас. Всё остальное — настройки push — уехало
+    под раскрытие: оно не состояние, а выбор, и человек меняет его раз в
+    жизнь, а не при каждом заходе.
+
+    Запреты и тишину по разделам под раскрытие не прячем сознательно: это
+    не настройки, а причина, по которой кнопка «Написать» не работает. Их
+    человек должен видеть, не нажимая ничего.
+  */
   if (s.me) {
+    const prefs = renderPushPrefs(s);
     return `
       <div class="forum-me">
         ${avatarHtml(s.me.nick, s.me.avatarUrl)}
@@ -1064,33 +1119,50 @@ function renderWhoAmI(s) {
           <b>${nickLink(s.me.nick)}</b>
           <small>${roleBadge(s.me) || esc(roleLabel(s.me))}${s.me.isLeader ? leaderBadge() : ''}</small>
         </span>
-        <a class="forum-btn forum-btn--ghost forum-chats-link" href="#/chats">Чаты</a>
-        <button type="button" class="forum-btn forum-btn--ghost forum-bell"
-                data-forum-notify-open aria-label="Уведомления"
-                ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>
+        <span class="forum-me__acts">
+          <a class="forum-btn forum-btn--ghost forum-chats-link" href="#/chats">Чаты</a>
+          <button type="button" class="forum-btn forum-btn--ghost forum-bell"
+                  data-forum-notify-open aria-label="Уведомления"
+                  ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>
 <svg class="forum-bell__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-          <span class="forum-bell__label">Уведомления</span>
-          ${
-            s.notifyUnread > 0
-              ? `<span class="forum-bell__badge" data-forum-notify-badge>${s.notifyUnread}</span>`
-              : ''
-          }
-        </button>
-        <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
-        <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
+            <span class="forum-bell__label">Уведомления</span>
+            ${
+              s.notifyUnread > 0
+                ? `<span class="forum-bell__badge" data-forum-notify-badge>${s.notifyUnread}</span>`
+                : ''
+            }
+          </button>
+          <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
+          <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
+        </span>
       </div>
       ${renderSanctions(s)}
       ${renderSectionMutes(s)}
-${renderPushPrefs(s)}`;
+      ${prefs ? `
+        <details class="forum-me__more" data-forum-me-more${s.meMoreOpen ? ' open' : ''}>
+          <summary class="forum-me__more-sum">
+            <span class="forum-me__more-arrow" aria-hidden="true"></span>
+            <b>Куда писать и когда будить</b>
+          </summary>
+          ${prefs}
+        </details>` : ''}`;
   }
 
+  /*
+    ГОСТЬ. Вход — самое частое действие гостя, но форма на 598 px занимала
+    полэкрана ещё до первой темы. Поэтому в шапке остаётся одна строка с
+    кнопкой, а поля показываются по нажатию и держат раскрытость через
+    состояние: данные ленты приходят асинхронно, и стартовый кадр успевал бы
+    пересобрать блок у человека на глазах.
+  */
   const L = CONFIG.forum.limits;
   return `
-    <form class="forum-auth" data-forum-auth>
-      <div class="forum-auth__head">
-        <span class="eyebrow">Вход и регистрация</span>
+    <details class="forum-authbox" data-forum-authbox${s.authOpen ? ' open' : ''}>
+      <summary class="forum-authbox__sum">
+        <span class="forum-authbox__sum-name"><b>Войти или зарегистрироваться</b></span>
         <small class="muted">Ник и пароль. Почта не нужна.</small>
-      </div>
+      </summary>
+      <form class="forum-auth" data-forum-auth>
       <div class="forum-auth__fields">
         <label class="forum-field">
           <span>Ник</span>
@@ -1126,8 +1198,9 @@ ${renderPushPrefs(s)}`;
         не нужно.
       </p>
       <p class="forum-error" data-forum-auth-error hidden></p>
-    </form>
-    ${renderRecovery(s)}`;
+      </form>
+      ${renderRecovery(s)}
+    </details>`;
 }
 
 /**

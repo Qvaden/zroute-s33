@@ -183,6 +183,14 @@ const state = {
     она молча складывалась бы обратно прямо на глазах у человека.
   */
   composerOpen: false,
+  /*
+    Два раскрытия шапки форума — вход гостя и настройки своего. Держим
+    открытость состоянием по той же причине, что и композер: стартовый кадр
+    пересобирается, когда приезжают данные, и свёрнутый по разметке блок
+    прятал бы уже набранный ник или уже щёлкнутый тумблер.
+  */
+  authOpen: false,
+  meMoreOpen: false,
 };
 
 /**
@@ -1788,7 +1796,8 @@ function wire() {
   wired = true;
 
   /*
-    Запоминаем, открыта ли форма. Событие `toggle` у <details> не всплывает,
+    Запоминаем, открыта ли каждая из трёх раскрывашек шапки форума: форма поста,
+    вход гостя и настройки push. Событие `toggle` у <details> не всплывает,
     поэтому слушаем его на document в фазе захвата — иначе выбор человека
     «свернуть форму» терялся бы при первой же перерисовке.
   */
@@ -1796,6 +1805,12 @@ function wire() {
     const d = e.target;
     if (d instanceof HTMLElement && d.hasAttribute('data-forum-composer')) {
       state.composerOpen = d.open;
+    }
+    if (d instanceof HTMLElement && d.hasAttribute('data-forum-authbox')) {
+      state.authOpen = d.open;
+    }
+    if (d instanceof HTMLElement && d.hasAttribute('data-forum-me-more')) {
+      state.meMoreOpen = d.open;
     }
   }, true);
 
@@ -1948,12 +1963,18 @@ function wire() {
     /* ── Картинки в форме ── */
 
     /*
-      «Войти и начать тему» в приветствии ведёт к форме входа: форма ниже по
-      странице, а на телефоне баннер вообще за экраном. Это переход, а не
-      действие — после него человек сам решает, куда идти.
+      «Войти и начать тему» в приветствии раскрывает форму входа в шапке и
+      ставит курсор в ник. Раньше она была свёрнута только состоянием, и
+      переход по этой кнопке привёл бы к пустому прокручиванию: свёрнутый
+      `<details>` скрывает поля, а не сдвигает их под экран.
     */
     const welcomeAuth = t.closest('[data-forum-welcome-auth]');
     if (welcomeAuth && host.contains(welcomeAuth)) {
+      const box = host.querySelector('[data-forum-authbox]');
+      if (box && !box.open) {
+        box.open = true;
+        state.authOpen = true;
+      }
       const form = host.querySelector('[data-forum-auth]');
       if (form) {
         form.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3551,6 +3572,8 @@ export function unmountForum() {
   state.eventDraft = false;
   state.composerTags = [];
   state.composerOpen = false;
+  state.authOpen = false;
+  state.meMoreOpen = false;
   state.editingPostId = null;
   // Уведомления сбрасываем вместе с остальным состоянием страницы.
   state.notifyOpen = false;

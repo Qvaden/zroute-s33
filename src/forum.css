@@ -33,7 +33,7 @@
   gap: var(--s-3);
   padding: var(--s-3) var(--s-3) var(--s-3);
   border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--bg) 99%, transparent));
+  background: linear-gradient(180deg, var(--surface), var(--bg));
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -76,7 +76,7 @@
 .side .nav__link.is-active {
   position: relative;
   color: var(--on-accent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
+  background: var(--accent-plate);
   box-shadow: 0 8px 22px -14px var(--accent);
 }
 .side .nav__link.is-active::before {
@@ -114,12 +114,20 @@
   place-items: center;
   border-radius: var(--r);
   background: var(--loss);
-  color: #fff;
+  /*
+    Счётчик новых тем — 11 px жирного текста, то есть обычный текст по WCAG, и
+    ему нужен полный порог. Прежний `#fff` на ночном красном #f2555f давал
+    3,37:1 — плашка «не прочитано» была нечитаема сама. Локальная `--on-accent`
+    держит 5,74:1 в ночи и 6,85:1 днём.
+  */
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
-.side .nav__link.is-active .nav__badge { background: #14100c; color: #fff; }
+/* Активная вкладка — залитая плашка, и значок на ней обязан темнеть, а не
+   светлеть: `--shade` в ночи это провал лестницы, днём — графит чернил. */
+.side .nav__link.is-active .nav__badge { background: var(--shade); color: var(--tint); }
 
 .side__foot {
   margin-top: auto;
@@ -138,42 +146,108 @@
 */
 @media (min-width: 1040px) {
   body { padding-left: var(--side-w); }
-  /* Кнопка меню на широком экране не нужна: панель и так видна всегда. */
-  .burger, .side-veil { display: none !important; }
+  /*
+    На широком экране список разделов — постоянная колонка слева, поэтому
+    шторочная отделка (ручка, заголовок, «Закрыть») не нужна: у списка нет
+    состояния «открыт/закрыт», и кнопка закрытия ничего бы не закрывала.
+  */
+  .side-veil, .side__bar { display: none !important; }
 }
 
-/* ── Узкий экран: панель выдвигается ──────────────────────────────────────── */
+/* ── Узкий экран: список разделов поднимается шторкой ─────────────────────── */
 
+/*
+  ПОЧЕМУ ШТОРКА, А НЕ ПАНЕЛЬ СБОКУ.
+
+  Прежняя панель выезжала слева-направо и открывалась двумя кнопками — из
+  шапки и из нижнего ряда. Две двери в один список человек читает как два
+  разных оглавления и обязан проверить оба, поэтому дверь осталась одна:
+  клетка «Ещё» в нижнем ряду.
+
+  Второе: боковая панель перекрывает то, что человек читает, и требует
+  тянуться через весь экран. На телефоне список разделов должен лежать под
+  большим пальцем — это не украшение, а способ попадать в разделы с первого
+  раза. Шторка поднимается и уезжает тем же движением, каким её открывают,
+  и оставляет содержимое страницы видимым по краям, поэтому место, куда
+  человек возвращался, не теряется.
+*/
 @media (max-width: 1039px) {
   .side {
     /*
-      Убираем за левый край, а не прячем display: none. Скрытая панель
+      Сдвигаем за нижний край, а не прячем display: none. Скрытая шторка
       появлялась бы рывком, а сдвинутая — выезжает, и человек видит, откуда
       она взялась.
 
-      visibility нужен вдобавок к сдвигу: панель за краем остаётся в потоке
+      visibility нужен вдобавок к сдвигу: шторка за краем остаётся в потоке
       чтения, и клавиатура с экранным диктором доходили до вкладок, которых
       не видно — человек оказывался в невидимом меню без выхода. Переключается
       скачком, поэтому при открытии панель видна сразу, а при закрытии
       исчезает только после того, как уедет.
 
       ease-out сглаживает выезд сильнее, чем сайтовая кривая: у кривой сайта
-      старт резкий, а панель и без того длинная — движение получается толчком.
+      старт резкий, а шторка высокая — движение получается толчком.
     */
-    transform: translateX(-100%);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: 620px;
+    margin: 0 auto;
+    height: min(78dvh, 660px);
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    transform: translateY(100%);
     visibility: hidden;
-    transition: transform .32s var(--ease-out), visibility .32s var(--ease-out);
-    box-shadow: 24px 0 60px -30px rgba(0,0,0,.9);
+    transition: transform .32s var(--ease-out), visibility 0s .32s;
+    /* Шторка лежит НАД страницей, значит ей принадлежит верхняя ступень
+       лестницы (`--overlay`) и тень отрыва `--shadow-3`, а не колонка боковой
+       панели: в виде колонки она стоит рядом с содержимым, в виде шторки —
+       накрывает его. Разница между этими двумя состояниями и есть смысл
+       слоёв. */
+    background: var(--overlay);
+    box-shadow: var(--shadow-3);
     /*
-      Вырез под фронтальную камеру и полоса жестов: без этого верхние вкладки
-      уезжают под чёрную скобу, а нижняя прижимается к полосе, из-за чего
-      нажатие по ней уводит приложение вместо перехода в раздел.
+      Полоса жестов внизу экрана: без нижнего отступа последняя вкладка
+      списка прижимается к ней, и нажатие по вкладке уводит приложение
+      вместо перехода в раздел. Верхний край шторки — её ручка, ему хватит
+      собственной отделки, поэтому верхний отступ здесь меньше боковых.
     */
-    padding-top: max(var(--s-3), env(safe-area-inset-top));
-    padding-bottom: max(var(--s-3), env(safe-area-inset-bottom));
-    padding-left: max(var(--s-3), env(safe-area-inset-left));
+    padding: var(--s-1) max(var(--s-3), env(safe-area-inset-left))
+             max(var(--s-2), env(safe-area-inset-bottom))
+             max(var(--s-3), env(safe-area-inset-right));
   }
-  .is-side-open .side { transform: translateX(0); visibility: visible; }
+  .is-side-open .side {
+    transform: translateY(0);
+    visibility: visible;
+    /*
+      В сторону открытия видимость переключается НЕМЕДЛЕННО (нулевая
+      длительность), в сторону закрытия — с задержкой в .32 s, см. правило
+      выше. Разница не косметическая: пока видимость «перетекала» те же
+      320 ms, панель в такт раскрытия оставалась посчитанной скрытой, а
+      скрытому элементу браузер фокус не даёт. На живом промере это стоило
+      человеку с клавиатуры первого Tab: меню раскрылось, курсор остался на
+      кнопке «Ещё», и следующий шаг увёл в подвал, минуя весь список.
+    */
+    transition: transform .32s var(--ease-out), visibility 0s;
+  }
+
+  /*
+    Марка в шторке не нужна: она стоит в шапке, которая над шторкой и так
+    видна. Две одинаковые подписи подряд («Сервер 33» дважды) читались бы
+    как две разные половины сайта.
+  */
+  .brand--side { display: none; }
+
+  /*
+    44 px под палец. В постоянной колонке строки меню — плотный список, и
+    там хватает 34: по ним бьёт курсор. В шторке в тот же список тычут
+    пальцем, и промах по строке стоит человеку открытой шторки, которую
+    он только что поднял. Числа здесь, а не в общем правиле, потому что
+    размер цели задаёт способ попадать, а он у двух одежд один список разный.
+  */
+  .side .nav__link { min-height: 44px; }
 
   /*
     Прокрутка страницы под открытым меню — верный способ потерять место.
@@ -192,7 +266,7 @@
     z-index: 44;
     inset: 0;
     display: block;
-    background: rgba(6,7,9,.62);
+    background: var(--scrim);
     backdrop-filter: blur(2px);
     opacity: 0;
     visibility: hidden;
@@ -212,85 +286,84 @@
   .side { transition: none; }
 }
 
-.burger {
+/*
+  ХРОНИК ШТОРКИ: РУЧКА, ЗАГОЛОВОК, ЗАКРЫТИЕ.
+
+  ПОЧЕМУ У ШТОРКИ ЕСТЬ СВОЯ ПОЛОСА, КОГДА РАМКА УЖЕ ЗАКРЫТА.
+  Открытый ящик на телефоне — это чужая страница поверх своей. Без подписи
+  «Все разделы» и без явной кнопки человек не знает, как отсюда вернуться:
+  жест назад есть не в каждом браузере, а догадаться потянуть полосу вверх
+  можно только один раз, и этот раз будет последним для его доверия.
+
+  Ручка (полоска сверху) — не украшение и не единственный выход: она
+  повторяет то, как закрываются все шторки в телефонной системе. Кнопка
+  «Закрыть» стоит рядом именно потому, что ручку надо уметь и нажать,
+  а не только тянуть: одна и та же задача — двумя способами, которые
+  выглядят как одно и то же состояние.
+*/
+.side__bar {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--s-1);
-  /*
-    44 пиксела — не про красоту. Меньше этого палец промахивается, и человек
-    жмёт второй раз, думая, что не нажалось. Это самая частая кнопка на сайте.
-  */
+  gap: var(--s-2);
+  padding: var(--s-5) 0 var(--s-1);
+}
+
+/*
+  44 пиксела — не про красоту, а про попадание пальцем: и у кнопки, и у
+  полосы-ручки.touch-action:none на ручке обязателен, иначе браузер
+  перехватывает вертикальный жест как прокрутку списка, и закрытие не
+  случается никогда.
+*/
+.side__grab {
+  position: absolute;
+  top: var(--s-2);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--dim) 55%, transparent);
+  touch-action: none;
+  cursor: grab;
+}
+
+.side__title {
+  margin: 0;
+  padding-left: var(--s-1);
+  color: var(--text);
+  font-family: Unbounded, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.side__close {
+  margin-left: auto;
   min-height: 44px;
-  flex: none;
-  padding: 0 var(--s-2) 0 var(--s-2);
-  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--line);
   border-radius: var(--r);
-  /*
-    ПОЧЕМУ КНОПКА ЗАМЕТНАЯ, А НЕ ДЕЛИКАТНАЯ.
-
-    Сначала это были три полоски на прозрачном фоне — «как принято».
-    На тёмной шапке рядом с яркой оранжевой маркой их не видно: глаз уходит
-    на марку, а кнопка читается как часть фона. Человек не понимает, где
-    остальные разделы, и решает, что их нет.
-
-    Три полоски вообще узнаёт не каждый. Поэтому рядом стоит слово «Меню»:
-    оно снимает вопрос целиком и стоит десяти пикселов ширины.
-  */
-  background: linear-gradient(145deg, rgba(255,154,74,.16), color-mix(in srgb, var(--accent) 10%, transparent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent), 0 6px 18px -14px var(--accent);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   color: var(--text);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color .18s var(--ease), background .18s var(--ease), transform .16s var(--ease);
+  transition: border-color .18s var(--ease), background .18s var(--ease);
 }
-
-/* Полоски: столбиком внутри своей ячейки, чтобы не спорить с подписью. */
-.burger__lines {
-  display: grid;
-  gap: var(--s-fine);
-  flex: none;
+.side__close:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
-.burger__lines i {
-  display: block;
-  width: 17px;
-  height: 2px;
-  border-radius: var(--r-hair);
-  background: var(--accent);
-  transition: transform .22s var(--ease), opacity .18s var(--ease), background .18s var(--ease);
-}
-
-.burger:hover {
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: linear-gradient(145deg, rgba(255,154,74,.24), color-mix(in srgb, var(--accent) 15%, transparent));
-}
-.burger:active { transform: scale(.97); }
-.burger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* Открытое меню — крестик: та же кнопка закрывает, и это должно быть видно. */
-.is-side-open .burger__lines i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
-.is-side-open .burger__lines i:nth-child(2) { opacity: 0; }
-.is-side-open .burger__lines i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
-.is-side-open .burger {
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: linear-gradient(145deg, rgba(255,154,74,.26), color-mix(in srgb, var(--accent) 17%, transparent));
-}
+.side__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /*
-  Подпись прячем только на самых узких экранах, где каждый пиксел шапки
-  на счету, — и то оставляем полоски заметно окрашенными.
-*/
-@media (max-width: 359px) {
-  .burger__label { display: none; }
-  .burger { padding: 0 var(--s-2); }
-}
-
-/*
-  Шапка: кнопка, марка, статус президента. Правила из styles-v8.css для
-  .site-head__inner переопределяются осознанно — там раскладка была под
-  вкладки в строке, которых здесь больше нет.
+  Шапка: марка, «где я», статус президента, переключатель темы. Правила из
+  styles-v8.css для .site-head__inner переопределяются осознанно — там
+  раскладка была под вкладки в строке, которых здесь больше нет.
 */
 .site-head__inner {
   display: flex;
@@ -311,6 +384,20 @@
   .brand--head { display: none; }
 }
 /*
+  ПРАВОЕ ПОЛЕ ШАПКИ.
+
+  Статус президента и переключатель темы прижаты вправо, а не идут вплотную
+  за маркой: левый край шапки отвечает на «где я», правый — служебное.
+  Вразброс человек собирает шапку по частям и не находит управление.
+
+  Пока доски нет (она скрыта, пока авторизация не ответила), всё свободное
+  место забирает кнопка темы — иначе она встала бы к марке, и шапка
+  выглядела бы надорванной.
+*/
+.site-head__inner .theme-toggle { margin-left: auto; }
+.site-head__inner .president-board:not([hidden]) { margin-left: auto; }
+.site-head__inner .president-board:not([hidden]) + .theme-toggle { margin-left: 0; }
+/*
   Место доски в шапке. Её вид (одна строка вместо блока на 90 пикселов)
   задаётся в mobile.css — там же объяснено, почему.
 */
@@ -318,6 +405,49 @@
   /* На телефоне статус переносится под шапку: в строку он не влезает. */
   .site-head__inner { flex-wrap: wrap; }
   .president-board { flex: 1 0 100%; max-width: none; }
+  /* Своя строка — прижимать направо нечего, а авто-отступ сдвинул бы строку. */
+  .site-head__inner .president-board:not([hidden]) { margin-left: 0; }
+}
+
+/* ── Шапка форума ─────────────────────────────────────────────────────────── */
+
+/*
+  Раздел назван один раз, и под названием — одна строка о том, что здесь
+  обсуждают. Чисел и кнопок в шапке нет нарочно: счёт тем стоит в приветствии
+  над лентой, а вход и действия — в блоке человека, который сетка ставит
+  правее (на телефоне — сразу под названием). Дублировать их в шапке значило
+  бы иметь два числа, из которых одно врёт на второй странице.
+
+  H1 здесь единственный и стоит над лентой. До захода его воровала плашка
+  летописи: на телефоне человек встречал заголовок сообщества раньше, чем
+  заголовок раздела, в который пришёл.
+*/
+.forum-head__id { min-width: 0; margin-bottom: var(--s-2); }
+.forum-head__id .eyebrow { display: block; margin-bottom: var(--s-1); }
+.forum-head__title {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.06;
+  letter-spacing: -.03em;
+}
+.forum-head__note {
+  margin: var(--s-1) 0 0;
+  max-width: 58ch;
+  color: var(--dim);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+}
+
+/*
+  На телефоне шапка идёт первой, но не она главная: под ней — свой человек,
+  быстрые действия и лента. Название ступенью H1 вместе с подписью ступенью
+  текста занимают 255 px — треть экрана до блока человека. Поэтому на узком
+  экране обе ступени берутся ниже из токенов: ряд блоков читается сверху вниз
+  без спора за глаза, а H1 на странице остаётся единственным.
+*/
+@media (max-width: 759px) {
+  .forum-head__title { font-size: var(--fs-h2); }
+  .forum-head__note { font-size: var(--fs-meta); line-height: 1.45; }
 }
 
 /* ── Сводка сервера на форуме ─────────────────────────────────────────────── */
@@ -337,7 +467,7 @@
   align-items: center;
   gap: var(--s-1);
   padding: var(--s-fine) var(--s-1);
-  border: 1px solid rgba(53,208,127,.28);
+  border: 1px solid color-mix(in srgb, var(--win) 28%, transparent);
   border-radius: var(--r-pill);
   color: var(--win-ink);
   font: 800 11px/1 Inter, sans-serif;
@@ -351,7 +481,11 @@
 }
 
 .forum-chron__title {
-  font-size: var(--fs-h1);
+  /* Ступень H2: настоящим заголовком страницы теперь назван сам раздел, а
+     плашка осталась его подписью справа. 19 px вне ряда, которые стояли здесь
+     раньше, заменены токеном — на узкой колонке refine понижает до титула
+     карточки. */
+  font-size: var(--fs-h2);
   line-height: 1.08;
 }
 .forum-chron--loss .forum-chron__title { color: var(--soft-bad); }
@@ -407,8 +541,8 @@
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
   font-size: 12px;
 }
-.forum-chron__item--win { border-color: rgba(53,208,127,.24); }
-.forum-chron__item--loss { border-color: rgba(255,71,87,.24); }
+.forum-chron__item--win { border-color: color-mix(in srgb, var(--win) 24%, transparent); }
+.forum-chron__item--loss { border-color: color-mix(in srgb, var(--loss) 24%, transparent); }
 .forum-chron__when { color: var(--mute); font-size: 11px; }
 .forum-chron__item--win .forum-chron__what { color: var(--win-ink); }
 .forum-chron__item--loss .forum-chron__what { color: var(--loss-ink); }
@@ -481,9 +615,9 @@
 .forum-rules__sanctions {
   margin: var(--s-fine) var(--s-3) 0;
   padding: var(--s-2) var(--s-3);
-  border: 1px solid rgba(255,71,87,.18);
+  border: 1px solid color-mix(in srgb, var(--loss) 18%, transparent);
   border-radius: var(--r);
-  background: rgba(255,71,87,.04);
+  background: color-mix(in srgb, var(--loss) 4%, transparent);
 }
 .forum-rules__sanctions ul {
   margin: var(--s-1) 0 0;
@@ -512,7 +646,7 @@
 }
 .forum-notice p { margin: 0 0 var(--s-1); color: var(--dim); font-size: 13px; line-height: 1.55; }
 .forum-notice--off { border-color: color-mix(in srgb, var(--gold) 24%, transparent); }
-.forum-notice--local { border-color: rgba(167,163,194,.2); }
+.forum-notice--local { border-color: color-mix(in srgb, var(--electric) 20%, transparent); }
 .forum-notice code {
   padding: var(--s-hair) var(--s-fine);
   border-radius: var(--r-xs);
@@ -521,21 +655,74 @@
   font-size: .92em;
 }
 
+/*
+  ПОЛОСА О СЕБЕ, А НЕ ЭКРАН ПРОФИЛЯ.
+
+  Аватар, ник с ролью и четыре действия — всё, что разделу нужно от своего
+  человека: сам профиль живёт на своей странице, а настройки уведомлений под
+  раскрытием ниже. Бриф (§19, §20) требует, чтобы на телефоне это была верхняя
+  часть интерфейса, а не половина экрана: три колонки сетки держат полосу в
+  один ряд, пока хватает места, и переносят кнопки на вторую строку, когда
+  места не хватает, — ник при этом не сжимается в столбик.
+*/
 .forum-me {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--s-2);
+  gap: var(--s-1) var(--s-2);
 }
-.forum-me__body { flex: 1; min-width: 0; }
+.forum-me__body { min-width: 0; }
 .forum-me__body b { display: block; font-size: 14px; }
 .forum-me__body small { color: var(--mute); font-size: 11px; }
+.forum-me__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  justify-content: flex-end;
+}
+
+@media (max-width: 759px) {
+  .forum-me { grid-template-columns: auto minmax(0, 1fr); }
+  .forum-me__acts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/*
+  КУДА ПИСАТЬ И КОГДА БУДИТЬ.
+
+  Тумблеры push человек меняет раз в жизнь, а смотрит на них каждый заход —
+  поэтому они под раскрытием, а полоса о себе остаётся короткой. Обводка
+  сверху отделяет настройки от строки, а не от баннеров запрета: те стоят
+  между полосой и раскрытием и должны оставаться видимыми без нажатия.
+*/
+.forum-me__more { margin-top: var(--s-2); }
+.forum-me__more-sum {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-1) 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+}
+.forum-me__more-sum::-webkit-details-marker { display: none; }
+.forum-me__more-arrow {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-right: 2px solid var(--mute);
+  border-bottom: 2px solid var(--mute);
+  transform: rotate(-45deg);
+  transition: transform .2s var(--ease);
+}
+.forum-me__more[open] > .forum-me__more-sum .forum-me__more-arrow { transform: rotate(45deg); }
+.forum-me__more > .forum-push { margin-top: var(--s-1); padding-top: var(--s-2); border-top: 1px solid var(--line-soft); }
 
 .forum-blocked {
   margin: var(--s-2) 0 0;
   padding: var(--s-1) var(--s-2);
-  border: 1px solid rgba(255,71,87,.28);
+  border: 1px solid color-mix(in srgb, var(--loss) 28%, transparent);
   border-radius: var(--r);
-  background: rgba(255,71,87,.06);
+  background: color-mix(in srgb, var(--loss) 6%, transparent);
   color: var(--soft-bad);
   font-size: 12.5px;
 }
@@ -566,7 +753,7 @@
 .forum-appeal__state--rejected { color: var(--soft-bad); }
 .forum-appeal {
   padding-top: var(--s-1);
-  border-top: 1px dashed rgba(255, 71, 87, .22);
+  border-top: 1px dashed color-mix(in srgb, var(--loss) 22%, transparent);
 }
 .forum-appeal__acts { display: flex; flex-wrap: wrap; gap: var(--s-1); }
 
@@ -659,7 +846,7 @@
   place-items: center;
   border-radius: var(--r-sm);
   background: var(--loss);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -711,8 +898,9 @@
   padding: var(--s-1) var(--s-hair) var(--s-fine);
   /* Подложка равна фону панели: под прилипшей датой прокрадываются строки
      нижней группы, и без плотной заливки они читались бы поверх заголовка.
-     В светлой теме панель — белая, а не цвета --surface, поэтому там своё
-     значение; иначе полоса даты выглядела бы жёлтым пятном на белой карточке. */
+     Ночью карточка садится на `--surface`, днём её верх — почти белое стекло
+     `--overlay`, поэтому там своё значение; иначе полоса даты была бы
+     серой перевесью на светлой карточке. */
   background: linear-gradient(180deg, var(--surface) 72%, transparent);
   color: var(--mute);
   font-family: Inter, sans-serif;
@@ -722,7 +910,7 @@
   text-transform: uppercase;
 }
 :root[data-theme="light"] .forum-notify__day {
-  background: linear-gradient(180deg, #fff 72%, transparent);
+  background: linear-gradient(180deg, var(--overlay) 72%, transparent);
 }
 .forum-notify__list {
   margin: 0;
@@ -896,8 +1084,8 @@
   height: 36px;
   flex: none;
   border-radius: var(--r);
-  background: var(--ava, #7a8494);
-  color: #10131a;
+  background: var(--ava, var(--mark-plate));
+  color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
   font-size: 15px;
   font-weight: 700;
@@ -953,7 +1141,7 @@
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: var(--r);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
+  background: var(--accent-plate);
   color: var(--on-accent);
   font-family: inherit;
   font-size: 13.5px;
@@ -977,24 +1165,73 @@
   color: var(--text);
 }
 .forum-btn--ghost:hover { border-color: color-mix(in srgb, var(--text) 22%, transparent); box-shadow: none; }
+/*
+  Красная плашка живёт тем же токеном, что и сигнальная: в тёмной теме она
+  осветляется, в светлой затемняется, а подпись в обеих — локальная `--on-accent`.
+  Прежний градиент `#ff6b7a → --loss` не был тематическим: в светлой теме его
+  верхний край оставался розовым #ff6b7a, и белый текст давал на нём 2,75:1 —
+  кнопка удаления была единственной, где собственный текст не читался.
+*/
 .forum-btn--danger {
-  background: linear-gradient(135deg, #ff6b7a, var(--loss));
-  color: #fff;
+  background: var(--danger-plate);
+  border-color: var(--danger-plate-line);
+  color: var(--on-accent);
 }
+.forum-btn--danger:hover:not(:disabled) { box-shadow: 0 8px 20px -12px var(--loss); }
 .forum-btn--wide { display: block; width: 100%; margin: var(--s-fine) 0 var(--s-3); }
 
 .forum-error {
   margin: var(--s-2) 0 0;
   padding: var(--s-1) var(--s-2);
-  border: 1px solid rgba(255,71,87,.3);
+  border: 1px solid color-mix(in srgb, var(--loss) 30%, transparent);
   border-radius: var(--r);
-  background: rgba(255,71,87,.07);
+  background: color-mix(in srgb, var(--loss) 7%, transparent);
   color: var(--soft-bad);
   font-size: 12.5px;
 }
 
-.forum-auth__head { margin-bottom: var(--s-2); }
-.forum-auth__head small { display: block; margin-top: var(--s-fine); }
+/*
+  ГОСТЬ: ОДНА СТРОКА ВМЕСТО ПОЛУЭКРАНА.
+
+  Вход — самое частое действие гостя, но форма с тремя полями и восстановлением
+  доступа занимала 598 px и на телефоне вставала перед первой темой. Поэтому
+  в шапке остаётся одна кликабельная строка, а поля показываются по нажатию.
+  Раскрытость держится состоянием, а не экраном: данные ленты приезжают
+  асинхронно, и свёрнутый при пересборке блок прятал бы уже набранный ник.
+*/
+.forum-authbox__sum {
+  position: relative;
+  padding: var(--s-1) var(--s-5) var(--s-1) 0;
+  cursor: pointer;
+  list-style: none;
+}
+.forum-authbox__sum::-webkit-details-marker { display: none; }
+.forum-authbox__sum-name { display: block; font-size: 14px; }
+.forum-authbox__sum small {
+  display: block;
+  margin-top: var(--s-hair);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.forum-authbox__sum::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: var(--s-hair);
+  width: 8px;
+  height: 8px;
+  margin-top: -6px;
+  border-right: 2px solid var(--mute);
+  border-bottom: 2px solid var(--mute);
+  transform: rotate(45deg);
+  transition: transform .2s var(--ease);
+}
+.forum-authbox[open] > .forum-authbox__sum::after { transform: rotate(-135deg); }
+.forum-authbox[open] > .forum-auth {
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line-soft);
+}
+
 .forum-auth__fields { display: grid; gap: var(--s-2); }
 @media (min-width: 620px) {
   .forum-auth__fields { grid-template-columns: 1fr 1fr; }
@@ -1255,7 +1492,7 @@
   padding: var(--s-2) var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: rgba(0,0,0,.32);
+  background: var(--recessed);
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 12.5px;
@@ -1491,7 +1728,7 @@
   height: 28px;
   flex: none;
   border-radius: var(--r-sm);
-  background: rgba(255,71,87,.12);
+  background: color-mix(in srgb, var(--loss) 12%, transparent);
   color: var(--loss-ink);
   font-size: 13px;
 }
@@ -1526,13 +1763,13 @@
 
 /* Своя реакция подсвечена: иначе непонятно, поставил ты её или нет. */
 .forum-react__btn.is-on {
-  border-color: rgba(53,208,127,.42);
-  background: rgba(53,208,127,.1);
+  border-color: color-mix(in srgb, var(--win) 42%, transparent);
+  background: color-mix(in srgb, var(--win) 10%, transparent);
   color: var(--soft-ok);
 }
 .forum-react__btn--down.is-on {
-  border-color: rgba(255,71,87,.42);
-  background: rgba(255,71,87,.1);
+  border-color: color-mix(in srgb, var(--loss) 42%, transparent);
+  background: color-mix(in srgb, var(--loss) 10%, transparent);
   color: var(--soft-bad);
 }
 .forum-react__btn--more.is-on {
@@ -1571,8 +1808,8 @@
   padding: var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  background: var(--raised-2);
-  box-shadow: 0 16px 40px -20px rgba(0,0,0,.95);
+  background: var(--overlay);
+  box-shadow: var(--shadow-3);
 }
 .forum-emoji__item {
   display: inline-flex;
@@ -1657,7 +1894,7 @@
   display: grid;
   place-items: center;
   padding: var(--s-3);
-  background: rgba(6,7,9,.72);
+  background: var(--scrim);
   backdrop-filter: blur(3px);
 }
 .forum-modal[hidden] { display: none; }
@@ -1674,8 +1911,11 @@
   padding: var(--s-4);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: linear-gradient(180deg, var(--raised-2), var(--surface));
-  box-shadow: 0 30px 80px -30px rgba(0,0,0,.95);
+  /* Окно — самый верхний слой страницы, поэтому оно берёт `--overlay` (самую
+     выпуклую ступень лестницы) и тень отрыва `--shadow-3`, а не градиент
+     карточки: под ним и шторка, и всплывающее меню, и вся остальная страница. */
+  background: var(--overlay);
+  box-shadow: var(--shadow-3);
 }
 .forum-modal__box h3 { margin: 0 0 var(--s-3); font-size: 17px; }
 
@@ -1717,12 +1957,12 @@
   transform: translateX(-50%);
   max-width: calc(100% - 36px);
   padding: var(--s-2) var(--s-3);
-  border: 1px solid rgba(53,208,127,.3);
+  border: 1px solid color-mix(in srgb, var(--win) 30%, transparent);
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--win) 16%, var(--surface));
+  background: color-mix(in srgb, var(--win) 18%, var(--overlay));
   color: var(--soft-ok);
   font-size: 13px;
-  box-shadow: 0 18px 44px -22px rgba(0,0,0,.9);
+  box-shadow: var(--shadow-3);
   animation: forum-toast-in .26s var(--ease) both;
 }
 @keyframes forum-toast-in {
@@ -1812,6 +2052,20 @@
 .forum-welcome__body b { display: block; font-size: 15px; }
 .forum-welcome__body p { margin: var(--s-fine) 0 0; font-size: 13px; }
 .forum-welcome .forum-btn { flex: none; margin-left: auto; white-space: nowrap; }
+
+/*
+  На телефоне эти три части стояли в одну строку, а кнопка не переносится:
+  абзац сжимался до колонки в 120 px и набирал 200 px высоты — полэкрана до
+  первой темы. Здесь строка распускается: текст на всю ширину, под ним кнопка
+  на всю ширину (до неё дотягиваться пальцем, а не целиться), а значок-рука
+  убран — он декоративный и aria-hidden, и на его месте текст дышит.
+*/
+@media (max-width: 759px) {
+  .forum-welcome { flex-wrap: wrap; align-items: flex-start; gap: var(--s-2); }
+  .forum-welcome__mark { display: none; }
+  .forum-welcome__body { flex: 1 1 100%; }
+  .forum-welcome .forum-btn { flex: 1 1 100%; margin-left: 0; justify-content: center; }
+}
 
 /* ── Первые шаги новичка ──────────────────────────────────────────────────── */
 /*
@@ -1942,7 +2196,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   max-width: 100%;
-  background: linear-gradient(90deg, var(--accent), #ffa04a);
+  background: linear-gradient(90deg, var(--accent), var(--accent-plate-line));
   border-radius: var(--r-pill);
 }
 .forum-rank__label { display: block; margin: var(--s-1) 0 0; font-size: 12px; color: var(--mute); }
@@ -3334,7 +3588,7 @@
 }
 :root[data-theme="light"] {
   --shop: #0a5f52;
-  --shop-ink: #fbf8f1;
+  --shop-ink: #f4faf8;
   /*
     Подкраска витрины в светлой теме строится на САМОМ СВЕТЛОМ основании
     (`--raised-2`, почти белое стекло), а не на `--raised`. Причина — замер
@@ -3356,33 +3610,35 @@
   доска отличается. Держим краску правилом на класс сильнее, и заодно перебиваем
   янтарный hover.
 
-  Градиент уходит в затемнение, а не в белёсый угол, как в тёмной теме: белёсый
-  край на светлой бирюзе дал бы белым чернилам 3,9 : 1 — не проходит AA для
-  подписи в 13,5px. Затемнённый край держит 7,1 : 1, самый светлый угол hover —
-  5,6 : 1.
+  Градиент уходит в затемнение, а не в белёсый угол, как в тёмной теме: угол,
+  осветлённый на 22 % в сторону белого (#408278), дал бы местным чернилам
+  около 4,0 : 1 — не проходит AA для подписи в 13,5px. Затемнённый край #0d534b
+  держит 8,44 : 1 при 7,17 : 1 на самой бирюзе, а самый светлый угол hover
+  (#226f63) — 5,64 : 1.
 
   Рамку и тень перебиваем тем же правилом, и это не педантизм: `refine.css`
-  кладёт на `.forum-btn` янтарную рамку `#a94722` и brown-тень, а мы до правки
-  возвращали только фон с чернилами. Получалась бирюзовая кнопка в оранжевом
+  кладёт на `.forum-btn` янтарную рамку `--accent-plate-line` и тень в янтаре,
+  а мы до правки возвращали только фон с чернилами. Получалась бирюзовая кнопка
+  в оранжевом
   обводе — то есть доска теряла свою краску ровно там, где её видно первой,
   и глаз считывал это как «обычная кнопка сайта», а не как витрина.
 */
 :root[data-theme="light"] .accounts-hero .accounts-hero__cta,
 :root[data-theme="light"] .accounts-composer .forum-btn--primary,
 :root[data-theme="light"] .accounts-empty .forum-btn {
-  background: linear-gradient(135deg, var(--shop), color-mix(in srgb, var(--shop) 82%, #000));
+  background: linear-gradient(135deg, var(--shop), color-mix(in srgb, var(--shop) 82%, var(--shade)));
   color: var(--shop-ink);
-  border-color: color-mix(in srgb, var(--shop) 72%, #000);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
+  border-color: color-mix(in srgb, var(--shop) 72%, var(--shade));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tint) 18%, transparent),
     0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
 }
 :root[data-theme="light"] .accounts-hero .accounts-hero__cta:hover:not(:disabled),
 :root[data-theme="light"] .accounts-composer .forum-btn--primary:hover:not(:disabled),
 :root[data-theme="light"] .accounts-empty .forum-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--shop) 90%, #fff), var(--shop));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shop) 90%, var(--tint)), var(--shop));
   color: var(--shop-ink);
-  border-color: color-mix(in srgb, var(--shop) 80%, #000);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent),
+  border-color: color-mix(in srgb, var(--shop) 80%, var(--shade));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tint) 22%, transparent),
     0 12px 26px -12px color-mix(in srgb, var(--shop) 80%, transparent);
 }
 
@@ -3506,7 +3762,7 @@
 .accounts-hero .accounts-hero__cta {
   border-radius: var(--r-pill);
   padding: var(--s-2) var(--s-4);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, #fff), var(--shop));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, var(--tint)), var(--shop));
   color: var(--shop-ink);
   box-shadow: 0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
 }
@@ -3562,7 +3818,7 @@
   форум, а не началом торговли.
 */
 .accounts-composer .forum-btn--primary {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, #fff), var(--shop));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, var(--tint)), var(--shop));
   color: var(--shop-ink);
 }
 /*
@@ -3789,7 +4045,7 @@
   width: 24%;
   pointer-events: none;
   opacity: 0;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, #fff 34%, transparent), transparent);
+  background: linear-gradient(90deg, transparent, var(--shimmer), transparent);
   transform: translateX(-140%) skewX(-18deg);
 }
 .accounts-card:hover .accounts-card__price::after {
@@ -3919,9 +4175,9 @@
 .accounts-error {
   margin: 0 0 var(--s-2);
   padding: var(--s-1) var(--s-2);
-  border: 1px solid rgba(255,71,87,.3);
+  border: 1px solid color-mix(in srgb, var(--loss) 30%, transparent);
   border-radius: var(--r);
-  background: rgba(255,71,87,.07);
+  background: color-mix(in srgb, var(--loss) 7%, transparent);
   color: var(--soft-bad);
   font-size: 12.5px;
   line-height: 1.45;
@@ -3940,7 +4196,7 @@
    на пустой витрине это единственная кнопка, и она должна выглядеть началом
    торговли, а не переходом в форум. */
 .accounts-empty .forum-btn {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, #fff), var(--shop));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, var(--tint)), var(--shop));
   color: var(--shop-ink);
 }
 

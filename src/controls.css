@@ -47,7 +47,13 @@
   padding: var(--s-2) var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+  /*
+    Поле — это яма, а не карточка: `--recessed` самая нижняя ступень лестницы
+    поверхностей в обеих темах. Раньше фон считался подмешиванием текста в
+    прозрачность, и на разных карточках одна и та же яма получалась разной
+    глубины — на панели она была темнее, чем в ответе форума.
+  */
+  background: var(--recessed);
   color: var(--text);
   font-family: inherit;
   /*
@@ -84,8 +90,14 @@
 .adm-field select:focus {
   outline: none;
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.14);
+  /*
+    Фокус поднимает яму на ступень вверх (`--recessed` → `--surface`) и
+    обводит её акцентом. Кольцо мешается из `--accent`, а не берётся янтарной
+    цифрой: в светлой теме акцент теперь #b8481a, и прежнее literal-кольцо
+    #ff6a2b рисовало бы на холодном фоне чужую, тёплую краску.
+  */
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 /*
@@ -99,7 +111,10 @@
 .adm-field select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  background: color-mix(in srgb, var(--text) 1.2%, transparent);
+  /* Тот же провал, что и у рабочего поля, только граница уходит в мягкую:
+     поле не «другое по цвету», а «то же, но неживое». */
+  background: var(--recessed);
+  border-color: var(--line-soft);
 }
 
 .forum-field textarea,

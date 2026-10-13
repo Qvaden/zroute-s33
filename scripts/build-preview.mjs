@@ -77,27 +77,47 @@ const quarterStandings = computeStandings(
   Форум в превью показывается без ленты: постов в файле нет и быть не может,
   они лежат в базе. Зато видна сводка сервера и правила — то, что и так
   часть страницы.
+
+  ГРУППЫ И ПОДПИСИ ЗДЕСЬ — ТЕ ЖЕ, ЧТО В src/main.js. Превью обязано
+  показывать тот же оглавление, что и сайт: два списка с разными заголовками
+  групп расходятся незаметно и расходятся именно в тот день, когда файл
+  становится единственным способом посмотреть сайт.
 */
 const NAV = [
-  { id: 'forum', label: 'Форум', html: renderForum(view, { ready: false, loading: false }) },
-  { id: 'chats', label: 'Чаты', html: renderChats({ ready: false, loading: false, error: '', me: null, chats: [] }) },
-  { id: 'tournaments', label: 'Турниры', html: renderTournaments({ me: null, alliances: view.alliances, tournaments: [] }) },
-  { id: 'guides', label: 'Гайды', html: renderGuides({ me: null, guides: [], category: 'all' }) },
-  { id: 'calendar', label: 'Календарь', html: renderCalendar({ ready: false, shared: false, sourceName: 'без базы', me: null, events: [], loading: false, error: '', view: 'next' }) },
-  { id: 'updates', label: 'Обновления игры', html: renderUpdates({ ready: false, shared: false, sourceName: 'без базы', me: null, canManage: false, notes: [], loading: false, error: '', composing: false }) },
+  { id: 'forum', label: 'Форум', group: 'Общение', tag: 'обсуждения сервера', html: renderForum(view, { ready: false, loading: false }) },
+  { id: 'chats', label: 'Чаты', group: 'Общение', tag: 'личное и альянсы', html: renderChats({ ready: false, loading: false, error: '', me: null, chats: [] }) },
+  { id: 'tournaments', label: 'Турниры', group: 'Общение', tag: 'матчапы и счёт', html: renderTournaments({ me: null, alliances: view.alliances, tournaments: [] }) },
+  { id: 'guides', label: 'Гайды', group: 'Справка', tag: 'разборы и справочник', html: renderGuides({ me: null, guides: [], category: 'all' }) },
+  { id: 'calendar', label: 'Календарь', group: 'Общение', tag: 'сборы и ответы', html: renderCalendar({ ready: false, shared: false, sourceName: 'без базы', me: null, events: [], loading: false, error: '', view: 'next' }) },
+  { id: 'updates', label: 'Обновления игры', group: 'Сервер', tag: 'что изменилось в игре', html: renderUpdates({ ready: false, shared: false, sourceName: 'без базы', me: null, canManage: false, notes: [], loading: false, error: '', composing: false }) },
   // Витрина продаж — те же темы, что и форум: в статичном файле их быть не
   // может, поэтому страница собирается без объявлений, но с правилами доски.
-  { id: 'accounts', label: 'Продажа аккаунтов', html: renderAccounts({ ready: false, sort: 'fresh', showSold: false, posts: [], total: 0, loading: false, more: false, error: '' }) },
-  { id: 'home', label: 'Итоги недели', html: renderHome(view) },
-  { id: 'quarter', label: 'Кварт', html: renderQuarter({ standings: quarterStandings, quarter }) },
-  { id: 'ladder', label: 'Рейтинг', html: renderLadder(view) },
-  { id: 'timeline', label: 'Хронология', html: renderTimeline(view) },
-  { id: 'guide', label: 'Малым алам', html: renderGuide(view) },
-  { id: 'bot', label: 'Бот в ТГ', html: renderBot() },
-  { id: 'about', label: 'О проекте', html: renderAbout() },
+  { id: 'accounts', label: 'Продажа аккаунтов', group: 'Общение', tag: 'объявления и цены', html: renderAccounts({ ready: false, sort: 'fresh', showSold: false, posts: [], total: 0, loading: false, more: false, error: '' }) },
+  { id: 'home', label: 'Итоги недели', group: 'Сервер', tag: 'неделя: +1 и −1', html: renderHome(view) },
+  { id: 'quarter', label: 'Кварт', group: 'Сервер', tag: 'итоги периода', html: renderQuarter({ standings: quarterStandings, quarter }) },
+  { id: 'ladder', label: 'Рейтинг', group: 'Сервер', tag: 'места и форма', html: renderLadder(view) },
+  { id: 'timeline', label: 'Хронология', group: 'Сервер', tag: 'летопись захватов', html: renderTimeline(view) },
+  { id: 'guide', label: 'Малым алам', group: 'Справка', tag: 'малым альянсам', html: renderGuide(view) },
+  { id: 'bot', label: 'Бот в ТГ', group: 'Справка', tag: 'тексты игры в чате', html: renderBot() },
+  { id: 'about', label: 'О проекте', group: 'Справка', tag: 'как это устроено', html: renderAbout() },
   // На сайте у справочника своей вкладки нет: он живёт внутри «Гайдов».
   // Страницу всё равно рисуем — по ней приходят из чатов и закладок.
-  { id: 'handbook', label: 'Справочник игры', hidden: true, html: renderHandbook({}) },
+  { id: 'handbook', label: 'Справочник игры', group: 'Справка', navAs: 'guides', hidden: true, html: renderHandbook({}) },
+];
+
+/* Заголовки групп в том порядке, в каком они стоят в меню на сайте. */
+const NAV_TITLES = ['Общение', 'Сервер', 'Справка'];
+
+/*
+  НИЖНИЙ РЯД: ЧЕТЫРЕ РАЗДЕЛА И «ЕЩЁ» — Те же, что в index.html, и связаны
+  с меню общей проверкой в тестах: ряд, собранный из другого списка, показал
+  бы в превью навигацию, которой на сайте нет.
+*/
+const TABBAR = [
+  { id: 'forum', label: 'Форум' },
+  { id: 'home', label: 'Итоги' },
+  { id: 'ladder', label: 'Рейтинг' },
+  { id: 'chats', label: 'Чаты' },
 ];
 
 /*
@@ -162,32 +182,48 @@ ${css}
 <header class="site-head">
   <div class="site-head__inner">
     <!--
-      Кнопка меню и боковая панель — как на настоящем сайте. Раньше превью
-      собиралось со вкладками в строке, то есть показывало прошлую версию
-      навигации: аварийный выход давал сайт, похожий на настоящий, но другой.
+      Тот же набор, что в index.html: марка, «где я» и переключатель темы.
+      Кнопки «Меню» здесь больше нет, как нет её на сайте: вход в разделы
+      на телефоне один — нижний ряд, и превью, показывающее прошлую модель
+      навигации, был бы не аварийным выходом, а обманом.
     -->
-    <button type="button" id="side-toggle" class="burger"
-            aria-controls="side" aria-expanded="false" aria-label="Открыть меню разделов">
-      <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
-    </button>
     <a class="brand brand--head" href="#" data-go="forum">
       <span class="brand__num">33</span>
       <span class="brand__text"><b>Сервер 33</b><small>Z Route: Redemption</small></span>
     </a>
+    <p class="head__where" id="head-where" aria-hidden="true"></p>
   </div>
 </header>
 
 <aside id="side" class="side" aria-label="Разделы сайта">
+  <div class="side__bar">
+    <span class="side__grab" aria-hidden="true"></span>
+    <p class="side__title">Все разделы</p>
+    <button type="button" class="side__close" data-side-close>Закрыть</button>
+  </div>
   <a class="brand brand--side" href="#" data-go="forum">
     <span class="brand__num">33</span>
     <span class="brand__text"><b>Сервер 33</b><small>Z Route: Redemption</small></span>
   </a>
   <nav class="nav" id="nav">
-    ${NAV.filter((p) => !p.hidden).map((p) => `<a href="#" class="nav__link${p.id === startNavId ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('\n    ')}
+    ${NAV_TITLES.map((title) => `<span class="nav__group">${title}</span>${
+      NAV.filter((p) => !p.hidden && p.group === title)
+        .map((p) => `<a href="#" class="nav__link${p.id === startNavId ? ' is-active' : ''}" data-go="${p.id}">${p.label}</a>`).join('')
+    }`).join('\n    ')}
   </nav>
   <div class="side__foot"><span class="side__note">Собранная копия сайта</span></div>
 </aside>
 <div class="side-veil" id="side-veil" hidden></div>
+
+<!--
+  Нижняя полоса разделов — те же четыре частых раздела и «Ещё», что на
+  сайте. В файле нет роутера, поэтому active-клетку подставляет тот же
+  мини-роутер, что переключает страницы.
+-->
+<nav id="tabbar" class="tabbar" aria-label="Разделы сервера">
+${TABBAR.map((t) => `  <a class="tabbar__link${t.id === startNavId ? ' is-active' : ''}" href="#" data-go="${t.id}"><span>${t.label}</span></a>`).join('\n')}
+  <button type="button" class="tabbar__more" id="tabbar-more" aria-controls="side" aria-expanded="false"><span>Ещё</span></button>
+</nav>
 
 <main class="wrap" id="app">
   ${PAGES.map((p) => `<div class="page${isStart(p) ? ' is-active' : ''}" id="page-${p.id}">${p.html}</div>`).join('\n  ')}
@@ -201,24 +237,71 @@ ${css}
 <script>
 // Боковое меню: то же поведение, что в src/main.js.
 (function () {
-  var toggle = document.getElementById('side-toggle');
+  var more = document.getElementById('tabbar-more');
+  var close = document.querySelector('[data-side-close]');
+  var grab = document.querySelector('.side__grab');
   var veil = document.getElementById('side-veil');
   var side = document.getElementById('side');
+  var where = document.getElementById('head-where');
+  /* Раздел → зачем он: те же подписи, что в меню, чтобы «где я» и список
+     не говорили о одной странице по-разному. */
+  var TAGS = ${JSON.stringify(Object.fromEntries(NAV.map((p) => [p.navAs || p.id, [p.label, p.tag || '']])))};
+  function setWhere(id) {
+    if (!where) return;
+    var t = TAGS[id];
+    where.textContent = '';
+    if (!t) return;
+    var b = document.createElement('b'); b.textContent = t[0];
+    var s = document.createElement('span'); s.textContent = t[1];
+    where.append(b, s);
+  }
   function setOpen(open) {
     document.documentElement.classList.toggle('is-side-open', open);
-    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    if (more) more.setAttribute('aria-expanded', String(open));
     if (veil) veil.hidden = !open;
+    /*
+      Фокус за панелью и обратно на того, кто её открыл — как на живом сайте.
+      Чтение offsetHeight обязательно: без него браузер ещё не пересчитал
+      видимость, а скрытому элементу фокус не даётся.
+    */
+    if (open) {
+      if (side) void side.offsetHeight;
+      var first = side && side.querySelector('.nav__link');
+      if (first) first.focus({ preventScroll: true });
+    } else if (document.activeElement && side && side.contains(document.activeElement)) {
+      if (more && more.offsetParent !== null) more.focus({ preventScroll: true });
+    }
   }
-  if (toggle) toggle.addEventListener('click', function () {
+  if (more) more.addEventListener('click', function () {
     setOpen(!document.documentElement.classList.contains('is-side-open'));
   });
+  if (close) close.addEventListener('click', function () { setOpen(false); });
   if (veil) veil.addEventListener('click', function () { setOpen(false); });
   if (side) side.addEventListener('click', function (e) {
     if (e.target.closest('a')) setOpen(false);
   });
+  /*
+    Потянуть за полосу вниз — закрыть, как закрываются шторки в телефоне.
+    Отпускание слушает документ: палец уходит за пределы ручки, и событие
+    прилетает уже на вкладку списка.
+  */
+  var startY = null;
+  if (grab) grab.addEventListener('pointerdown', function (e) {
+    startY = e.clientY;
+    if (grab.setPointerCapture) grab.setPointerCapture(e.pointerId);
+  });
+  document.addEventListener('pointerup', function (e) {
+    if (startY === null) return;
+    var moved = e.clientY - startY;
+    startY = null;
+    if (moved > 56) setOpen(false);
+  });
+  document.addEventListener('pointercancel', function () { startY = null; });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') setOpen(false);
   });
+  window.__setWhere = setWhere;
+  setWhere(${JSON.stringify(startNavId)});
 })();
 </script>
 
@@ -248,6 +331,15 @@ document.addEventListener('click', function (e) {
   document.querySelectorAll('.nav__link').forEach(function (a) {
     a.classList.toggle('is-active', a.getAttribute('data-go') === navId);
   });
+  // Нижняя полоса подсвечивает тот же раздел, что и меню: два ответа на
+  // вопрос «где я» обязаны совпадать и здесь, как на настоящем сайте.
+  document.querySelectorAll('#tabbar .tabbar__link').forEach(function (a) {
+    if (a.getAttribute('data-go') === navId) a.classList.add('is-active');
+    else a.classList.remove('is-active');
+    if (a.getAttribute('data-go') === navId) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  if (window.__setWhere) window.__setWhere(navId);
 
   window.scrollTo(0, 0);
 });

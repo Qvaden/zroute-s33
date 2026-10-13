@@ -86,11 +86,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=105">
+  <link rel="modulepreload" href="./src/main.js?v=106">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css?v=10">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=12">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -99,7 +99,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=51">
+  <link rel="stylesheet" href="./src/forum.css?v=52">
   <!--
     Телефон — последним слоем.
 
@@ -108,7 +108,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=34">
+  <link rel="stylesheet" href="./src/mobile.css?v=35">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -121,12 +121,12 @@
     Один файл на сайт и панель: правила для select уже лежали в четырёх местах
     admin.css и спорили друг с другом.
   -->
-  <link rel="stylesheet" href="./src/controls.css?v=6">
+  <link rel="stylesheet" href="./src/controls.css?v=7">
   <!--
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=39">
+  <link rel="stylesheet" href="./src/refine.css?v=40">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -170,24 +170,6 @@
   </div>
   <header class="site-head">
     <div class="site-head__inner">
-      <!--
-        Кнопка меню. На широком экране вкладки стоят слева постоянно,
-        и кнопка не нужна — она скрыта стилями, а не убрана из разметки:
-        размер экрана меняется поворотом телефона, и решать это должен CSS.
-
-        Слово «Меню» рядом с полосками стоит намеренно. Три полоски узнаёт
-        не каждый, а на тёмной шапке рядом с яркой маркой они читались как
-        часть фона: человек не понимал, где остальные разделы, и решал,
-        что их нет.
-      -->
-      <button type="button" id="side-toggle" class="burger"
-              aria-controls="side" aria-expanded="false" aria-label="Открыть меню разделов">
-        <span class="burger__lines" aria-hidden="true">
-          <i></i><i></i><i></i>
-        </span>
-        <span class="burger__label">Меню</span>
-      </button>
-
       <a class="brand brand--head" href="#/forum">
         <span class="brand__num">33</span>
         <span class="brand__text">
@@ -195,6 +177,25 @@
           <small>Z Route: Redemption</small>
         </span>
       </a>
+
+      <!--
+        ГДЕ Я.
+
+        На широком экране оглавление стоит слева, и активной вкладки человек
+        часто не видит: глаза заняты таблицей посередине. Строка в шапке
+        отвечает на «который я раздел» там, куда смотрят, а не там, где меню.
+
+        Это не заголовок страницы: у раздела свой h1, и два голоса подряд
+        программа экрана читала бы как эхо (тот же разбор — у строки
+        #route-announcer ниже). Поэтому здесь aria-hidden: людям строка
+        показывает место, машине его говорит заголовок содержимого.
+
+        Кнопки «Меню» в шапке больше нет. Она вела в тот же список разделов,
+        что и клетка «Ещё» в нижнем ряду, — два входа в одно состояние человек
+        читает как два разных меню и обязан проверить оба. Дверь одна, и лежит
+        она в ряду разделов.
+      -->
+      <p class="head__where" id="head-where" aria-hidden="true"></p>
 
       <div id="president-board" class="president-board" hidden></div>
       <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Переключить тему" title="Тёмная/светлая тема">
@@ -205,17 +206,29 @@
   </header>
 
   <!--
-    БОКОВЫЕ ВКЛАДКИ.
+    РАЗДЕЛЫ САЙТА: ОДИН СПИСОК, ДВЕ ОДЕЖДЫ.
 
-    Раньше разделы стояли строкой в шапке и уже не помещались: на телефоне
-    строка прокручивалась, и последние вкладки не было видно вовсе — человек
-    не знал, что они есть. Слева места хватает на любое их число, и каждая
-    подписана словом, а не обрезана.
+    На широком экране это постоянная колонка слева, на узком — шторка,
+    которая поднимается снизу из клетки «Ещё». Разметка одна: два отдельных
+    списка разделов неизбежно расходятся, и человек обязан сверять их глазами.
 
-    На узком экране панель уезжает за левый край и выдвигается кнопкой:
-    отдавать треть экрана телефона под меню нельзя.
+    Раньше на телефоне список выезжал слева-направо и открывался двумя
+    кнопками — из шапки и из нижнего ряда. Выезжающая сбоку панель на телефоне
+    перекрывает то, что человек читает, и попадает палец в неё тяжело: далеко
+    тянуться. Шторка снизу лежит под большим пальцем и закрывается тем же
+    движением, что открывается.
+
+    На широком экране марка стоит в колонке (в шапке её там не видно),
+    на узком — в шапке (в шторке она только отнимает место у списка).
+    Переключает это CSS, а не js: размер экрана меняется поворотом телефона.
   -->
   <aside id="side" class="side" aria-label="Разделы сайта">
+    <div class="side__bar">
+      <span class="side__grab" aria-hidden="true"></span>
+      <p class="side__title">Все разделы</p>
+      <button type="button" class="side__close" data-side-close>Закрыть</button>
+    </div>
+
     <a class="brand brand--side" href="#/forum">
       <span class="brand__num">33</span>
       <span class="brand__text">
@@ -273,19 +286,26 @@
   <main id="app" class="wrap" tabindex="-1"></main>
 
   <!--
-    РЯД РАЗДЕЛОВ НА ТЕЛЕФОНЕ.
+    РЯД РАЗДЕЛОВ НА ТЕЛЕФОНЕ — ЕДИНСТВЕННЫЙ ВХОД В РАЗДЕЛЫ.
 
-    До этого ряда вся навигация, кроме «Форума», жила за кнопкой «Меню»: чтобы
-    уйти с итогов недели в рейтинг, человек выдвигал панель, искал в списке из
-    пятнадцати строк нужную и нажимал её. Два касания там, где достаточно
-    одного, и каждый раз — список целиком вместо содержимого.
+    До этого ряда вся навигация, кроме «Форума», жила за одной кнопкой в шапке:
+    чтобы уйти с итогов недели в рейтинг, человек выдвигал панель, искал в
+    списке из пятнадцати строк нужную и нажимал её. Два касания там, где
+    достаточно одного.
 
     ЧЕТЫРЕ И «ЕЩЁ». Столько умещается на 320 px без прокрутки ряда и без
     обрезанных слов. Выбраны по частоте: «Форум» — входная дверь сайта,
     «Итоги» — ради чего сюда приходят раз в неделю, «Рейтинг» — таблица,
     «Чаты» — единственное место с живым счётом непрочитанного. Остальное за
-    «Ещё», и это тот же ящик, что открывала кнопка в шапке: два входа в одно
-    состояние, а не два меню.
+    «Ещё», и это единственный вход в полный список: кнопки «Меню» в шапке
+    больше нет.
+
+    ЗНАК ПРИ СЛОВЕ. Шесть одинаковых слов в ряду читаются как список, а ряд,
+    где у каждого входа своя форма, опознается боковым зрением — на телефоне
+    им и пользуются. Подпись остаётся обязательной: знак без слова человек
+    обязан расшифровать, а расшифровка стоит медленнее, чем одно слово. Знак
+    для машины ничего не сообщает, поэтому он aria-hidden, а имя у клетки —
+    подпись.
 
     РЯД СТАТИЧНЫЙ, А НЕ СОБРАННЫЙ ИЗ JS. Полоса видна с первого кадра, до
     ответа базы: человек, которому данные не пришли, всё равно может уйти на
@@ -294,12 +314,27 @@
     поэтому подпись здесь не разъедётся с меню.
   -->
   <nav id="tabbar" class="tabbar" aria-label="Разделы сервера">
-    <a class="tabbar__link" href="#/forum">Форум</a>
-    <a class="tabbar__link" href="#/home" aria-label="Итоги недели">Итоги</a>
-    <a class="tabbar__link" href="#/ladder">Рейтинг</a>
-    <a class="tabbar__link" href="#/chats">Чаты<span class="nav__badge" data-nav-chats-badge hidden></span></a>
+    <a class="tabbar__link" href="#/forum">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4H4v11h3v4l5-4h8z"/><path d="M8 9h8M8 12h4"/></svg>
+      <span>Форум</span>
+    </a>
+    <a class="tabbar__link" href="#/home" aria-label="Итоги недели">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20V4h11l-2 4 2 4H6"/></svg>
+      <span>Итоги</span>
+    </a>
+    <a class="tabbar__link" href="#/ladder">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 20v-6M12 20V5M17 20v-9"/></svg>
+      <span>Рейтинг</span>
+    </a>
+    <a class="tabbar__link" href="#/chats">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18v11H8l-5 3z"/><path d="M7 10h10"/></svg>
+      <span>Чаты</span><span class="nav__badge" data-nav-chats-badge hidden></span>
+    </a>
     <button type="button" class="tabbar__more" id="tabbar-more"
-            aria-controls="side" aria-expanded="false" aria-haspopup="true">Ещё</button>
+            aria-label="Ещё: открыть все разделы" aria-controls="side" aria-expanded="false">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+      <span>Ещё</span>
+    </button>
   </nav>
 
   <!--
@@ -333,7 +368,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=105"></script>
+  <script type="module" src="./src/main.js?v=106"></script>
 
   <script>
     /*

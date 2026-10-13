@@ -28,12 +28,18 @@
   `--r-sm / --r / --r-lg` перебивали числа из styles-v8.css. Из-за этого
   жёсткая геометрия 6 / 10 / 14, заведённая в заходе 11, никогда не действовала —
   нарисованный пиксель давал 7 / 12 / 16. Радиус теперь объявлен в одном месте
-  (styles-v8.css), а здесь живут только отступы, тень и фокус.
+  (styles-v8.css), а здесь живут только отступы и фокус.
+
+  Тень ушла тем же путём, но следствием её ухода была не только двойность
+  чисел. Здесь жил свой `--shadow` на чёрных полупрозрачных слоях, и в тёмной
+  теме он всегда побеждал styles-v8 (тот же вес селектора, но файл грузится
+  позже): нарисованная тень была одна, а написанная в токенах — другая.
+  Светлая тема от этого выигрывала дважды: ступени теней у неё графитовые, и
+  только ряд из styles-v8.css знает, какие именно.
 */
 :root {
   --gap: var(--s-2);
   --pad: 16px;
-  --shadow: 0 1px 0 color-mix(in srgb, var(--text) 3%, transparent) inset, 0 1px 2px rgba(0,0,0,.35), 0 10px 30px -18px rgba(0,0,0,.8);
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
@@ -96,22 +102,71 @@
   }
 }
 
-/* ── ФОРУМ: две колонки ───────────────────────────────────────────────────── */
+/* ── ФОРУМ: шапка над лентой и контекстом ─────────────────────────────────── */
+
+/*
+  ПОРЯДОК БЛОКОВ РЕШАЕТ РАЗМЕТКА, А НЕ СТИЛИ.
+
+  Здесь нет ни одного order: колонки расставляет сама сетка, и телефон читает
+  страницу в том же порядке, в каком её придумали для монитора. Прежний приём
+  («контекст первым в разметке, order переставляет его направо») на 390 px
+  клал сводку ростом 1711 px перед первой темой — человек не доезжал до ленты
+  два экрана, а о собственном профиле узнавал на третьем.
+
+  Шапка тянется на обе колонки и внутри повторяет их ширины (--forum-col):
+  блок человека встаёт ровно над контекстной колонкой, а название раздела —
+  над лентой. Поэтому на широком экране профиль в верхней части интерфейса,
+  как требует бриф (§19, §21), а не в подвале страницы.
+*/
 .forum-layout { display: grid; gap: 0; align-items: start; }
-.forum-side, .forum-main { min-width: 0; }
+.forum-head, .forum-side, .forum-main { min-width: 0; }
 
 @media (min-width: 1180px) {
   .forum-layout {
-    grid-template-columns: minmax(0, 1fr) 320px;
+    --forum-col: 320px;
+    grid-template-columns: minmax(0, 1fr) var(--forum-col);
     gap: var(--s-4);
   }
-  /* Лента — слева, контекст — справа. В разметке контекст стоит первым,
-     чтобы на телефоне он же был первым в потоке. */
-  .forum-side { order: 2; position: sticky; top: 76px; }
-  .forum-main { order: 1; }
+  .forum-head {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--forum-col);
+    gap: var(--s-4);
+    align-items: start;
+  }
+  .forum-side { position: sticky; top: 76px; }
+  /*
+    Полоса о себе в узкой колонке. Три столбца (аватар, имя, четыре кнопки)
+    здесь не помещаются: кнопки по максимуму съедали 259 px из 305, на имя
+    оставалось 46, и ник рассыпался по буквам на шесть строк. В колонке
+    кнопка встаёт под имя — той же раскладкой, что на телефоне, и из §21
+    («профиль + быстрые действия») столбиком, а не в одну строку.
+  */
+  .forum-me { grid-template-columns: auto minmax(0, 1fr); }
+  .forum-me__acts { grid-column: 1 / -1; justify-content: flex-start; }
+  /*
+    Гость — не «профиль», поэтому его вход не обязан стоять в правой колонке.
+    Раскрытая форма в колонке 340 px набирала 440 px высоты, и левая половина
+    шапки под названием пустела на три экрана. Раскрытие на широком экране
+    разворачивается через всю строку шапки: поля встают в три колонки, кнопки
+    — рядом, и пустоты не остаётся.
+  */
+  .forum-head:has(.forum-authbox[open]) { grid-template-columns: minmax(0, 1fr); }
+  .forum-authbox[open] .forum-auth__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+  .forum-authbox[open] .forum-auth__actions { margin-top: var(--s-1); }
+  /*
+    Слово «Уведомления» в колонке лишнее: у кнопки есть aria-label и значок
+    счётчика, а с подписью четыре действия не влезали в одну строку и полоса
+    вырастала до 200 px — столько же, сколько название раздела рядом, и левая
+    половина шапки пустела. Телефон это слово уже прячет, здесь тот же приём.
+  */
+  .forum-me .forum-bell__label { display: none; }
   /* В колонке панели уже: убираем крупные отступы героя. */
   .forum-side .hero, .forum-side .panel { padding: var(--s-3) var(--s-3); }
-  .forum-side .forum-chron__title { font-size: 19px; }
+  /* Заголовок летописи — титул карточки, а не раздела: настоящий H1 страницы
+     теперь над лентой, и два «крупнейших» заголовка на одной странице спорили
+     бы за глаза. Ступень взята из токена, а не подобрана числом. */
+  .forum-side .forum-chron__title { font-size: var(--fs-card); }
   .forum-side .forum-chron__stats { grid-template-columns: repeat(3, 1fr); gap: var(--s-1); margin: var(--s-2) 0 var(--s-2); }
   .forum-side .forum-chron__stat { padding: var(--s-1) var(--s-1); border-radius: var(--r-sm); }
   .forum-side .forum-chron__stat b { font-size: 17px; }
@@ -121,7 +176,9 @@
   .forum-side .hero::after { display: none; }
 }
 @media (min-width: 1440px) {
-  .forum-layout { grid-template-columns: minmax(0, 1fr) 340px; gap: var(--s-4); }
+  /* Одного числа достаточно: и сетка страницы, и внутренняя сетка шапки
+     ссылаются на --forum-col, поэтому колонки не разъедутся. */
+  .forum-layout { --forum-col: 340px; }
 }
 
 /* Боковая колонка выше экрана — пусть прокручивается сама, а не обрезается. */
@@ -241,7 +298,19 @@ h1.hero__week { font-size: var(--fs-h1); }
 
 /* ── Боковое меню сайта ───────────────────────────────────────────────────── */
 :root { --side-w: 220px; }
-.side { gap: var(--s-3); padding: var(--s-3) var(--s-2) var(--s-2); }
+.side { gap: var(--s-3); }
+/*
+  ПОЛЯ СПИСКА — ТОЛЬКО У ПОСТОЯННОЙ КОЛОНКИ.
+
+  На узком экране тот же класс превращается в шторку, и её собственные поля
+  задаёт forum.css: сверху — рука, снизу — полоса жестов телефона
+  (env(safe-area-inset-bottom)). Этот файл грузится позже, поэтому его
+  строка без условия перебивала бы безопасный нижний отступ простым числом,
+  и последняя вкладка шторки вставала ровно под полосу прокрутки приложения.
+*/
+@media (min-width: 1040px) {
+  .side { padding: var(--s-3) var(--s-2) var(--s-2); }
+}
 .side .nav__link { padding: var(--s-1) var(--s-2); font-size: 13px; }
 
 /* ── ФОРУМ: сводка ─────────────────────────────────────────────────────────── */
@@ -317,10 +386,11 @@ h1.hero__week { font-size: var(--fs-h1); }
 .forum-notify__preview { font-size: 11.5px; }
 .forum-notify__meta { font-size: 11px; }
 
-.forum-auth__head { margin-bottom: var(--s-1); }
 .forum-auth__fields { gap: var(--s-1); }
 .forum-auth__actions { margin-top: var(--s-2); gap: var(--s-1); }
 .forum-auth__note { margin-top: var(--s-1); font-size: 11.5px; }
+.forum-authbox__sum-name { font-size: 13px; }
+.forum-me__more-sum { font-size: 12.5px; }
 
 /* ── ФОРУМ: формы ──────────────────────────────────────────────────────────── */
 .forum-field { margin-bottom: var(--s-1); }
@@ -464,9 +534,6 @@ h1.hero__week { font-size: var(--fs-h1); }
 .lad__row { min-height: 0; }
 .site-foot { padding: var(--s-2) 0 var(--s-4); }
 
-/* Кнопка меню в шапке — компактнее. */
-.burger { min-height: 36px; padding: 0 var(--s-2); }
-
 }
 
 /* ── Колокольчик уведомлений ─────────────────────────────────────────────── */
@@ -478,9 +545,9 @@ h1.hero__week { font-size: var(--fs-h1); }
 @media (max-width: 759px) {
   .forum-bell { min-width: 44px; min-height: 44px; padding: 0 var(--s-2); }
   .forum-bell__icon { width: 20px; height: 20px; }
-  /* Строка «аватар · ник · кнопки» переносится, а не давит ник до нуля. */
-  .forum-me { flex-wrap: wrap; gap: var(--s-1) var(--s-2); }
-  .forum-me__body { flex: 1 1 120px; }
+  /* Строка «аватар · ник · кнопки» на телефоне переносится: кнопки уходят на
+     свою строку (сетка и перенос описаны у самой полосы, в forum.css), а ник
+     не давится до нуля. Здесь остаётся только запрет кнопкам тянуться. */
   .forum-me .forum-btn { flex: 0 0 auto; }
 }
 
@@ -555,7 +622,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   min-height: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 92%, #000));
+  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 92%, var(--shade)));
   overflow: hidden;
 }
 
@@ -633,6 +700,20 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* Метка чата — та же цветная клетка, что у аватаров форума: цвет считается
    из названия, и свой чат узнаётся по цвету раньше, чем читается название. */
+/*
+  Бледный ник теряет край: жёлтая плашка отличается от светлой карточки в 1,45
+  раза, и метка превращается в бесформенное пятно. Волосатая линия по внутреннему
+  краю возвращает форму без новой краски — она идёт от тех же чернил метки, что
+  всегда тёмные. Правило одно на четыре метки (форум, список чатов, шапка чата,
+  турнир) и стоит здесь, потому что этот слой перекрывает все три файла.
+*/
+.forum-ava,
+.chat-item__mark,
+.chat-room__mark,
+.tour-mark {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mark-ink) 24%, transparent);
+}
+
 .chat-item__mark {
   display: grid;
   place-items: center;
@@ -640,8 +721,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   width: 42px;
   height: 42px;
   border-radius: var(--r);
-  background: var(--ava, var(--raised-2));
-  color: #10131a;
+  background: var(--ava, var(--mark-plate));
+  color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
   font-size: 13px;
   font-weight: 700;
@@ -735,8 +816,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   width: 36px;
   height: 36px;
   border-radius: var(--r);
-  background: var(--ava, var(--raised-2));
-  color: #10131a;
+  background: var(--ava, var(--mark-plate));
+  color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
   font-size: 12px;
   font-weight: 700;
@@ -788,8 +869,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-fine);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  background: var(--raised-2);
-  box-shadow: 0 18px 44px -18px rgba(0,0,0,.85), 0 4px 18px -10px rgba(0,0,0,.6);
+  background: var(--overlay);
+  box-shadow: var(--shadow-3);
 }
 
 .chat-menu__item {
@@ -811,7 +892,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   -webkit-tap-highlight-color: transparent;
 }
 .chat-menu__item:hover { background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--text); }
-.chat-menu__item--danger:hover { background: rgba(255,71,87,.12); color: var(--soft-bad); }
+.chat-menu__item--danger:hover { background: color-mix(in srgb, var(--loss) 12%, transparent); color: var(--soft-bad); }
 .chat-menu__count {
   color: var(--mute);
   font-size: 11px;
@@ -894,7 +975,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .chat-day span {
   padding: var(--s-fine) var(--s-2);
   border-radius: var(--r-pill);
-  background: rgba(0,0,0,.32);
+  background: color-mix(in srgb, var(--shade) 30%, transparent);
   color: var(--dim);
   font-size: 11px;
   font-weight: 600;
@@ -998,7 +1079,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-1) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: rgba(0,0,0,.32);
+  background: var(--recessed);
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
@@ -1026,7 +1107,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   font-size: 11px;
   cursor: pointer;
 }
-.chat-msg__del:hover { background: rgba(255,71,87,.14); color: var(--soft-bad); }
+.chat-msg__del:hover { background: color-mix(in srgb, var(--loss) 14%, transparent); color: var(--soft-bad); }
 
 /* Удалённое сообщение не занимает пузырь: это сноска, а не реплика. */
 .chat-msg--gone { justify-content: center; }
@@ -1159,7 +1240,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: rgba(0,0,0,.32);
+  background: var(--recessed);
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
@@ -1199,7 +1280,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   height: 42px;
   border: 0;
   border-radius: var(--r-pill);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent));
+  background: var(--accent-plate);
   color: var(--on-accent);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1315,6 +1396,12 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* ── Лайтбокс ────────────────────────────────────────────────────────────── */
 
+/*
+  Просмотр фотографии — сцена, а не страница: затемнение и белая буква крестика
+  одинаковы в обеих темах, как одинакова чёрная рамка вокруг видео выше. Краска
+  `--scrim` для этого не годится: в светлой теме она рассчитана на подложку
+  диалога и даёт 42 % прикрытия, а снимок под таким слоем всё ещё читается.
+*/
 .chat-lightbox {
   position: fixed;
   inset: 0;
@@ -1500,8 +1587,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-fine);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
-  background: var(--raised);
-  box-shadow: 0 8px 24px -12px rgba(0,0,0,.7);
+  background: var(--overlay);
+  box-shadow: var(--shadow-1);
   z-index: 12;
 }
 .chat-msg__reactions-pop.is-open,
@@ -1552,12 +1639,12 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-1) var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
-  background: var(--raised-2);
+  background: var(--overlay);
   color: var(--dim);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: 0 4px 14px -6px rgba(0,0,0,.6);
+  box-shadow: var(--shadow-1);
   z-index: 6;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1582,19 +1669,19 @@ body:has(.chat-layout) .site-foot { display: none; }
   padding: var(--s-1) var(--s-2);
   border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line));
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--accent) 16%, var(--raised-2));
+  background: color-mix(in srgb, var(--accent) 16%, var(--overlay));
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: 0 4px 14px -6px rgba(0,0,0,.6);
+  box-shadow: var(--shadow-1);
   z-index: 6;
   -webkit-tap-highlight-color: transparent;
   transition: border-color .16s var(--ease), background .16s var(--ease), color .16s var(--ease);
 }
 .chat-go-new:hover {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 24%, var(--raised-2));
+  background: color-mix(in srgb, var(--accent) 24%, var(--overlay));
 }
 .chat-go-new:focus-visible {
   outline: 2px solid var(--accent);
@@ -1652,7 +1739,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--raised);
-  box-shadow: 0 16px 40px -18px rgba(0,0,0,.5), inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+  box-shadow: var(--shadow-3), inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
 }
 .forum-act-menu__list .forum-act {
   display: block;
@@ -1670,7 +1757,6 @@ body:has(.chat-layout) .site-foot { display: none; }
   top: auto;
   bottom: calc(100% + 4px);
 }
-:root[data-theme="light"] .forum-act-menu__list { box-shadow: 0 16px 40px -18px rgba(22,32,44,.28), inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent); }
 
 /* ── Упоминания @ник в сообщениях ────────────────────────────────────────── */
 
@@ -1729,7 +1815,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 /* ── Онлайн в шапке ─────────────────────────────────────────────────────── */
 
-.chat-room__online { color: #31c5b5; }
+.chat-room__online { color: var(--win); }
 
 /* ── Лидерборд чатов ─────────────────────────────────────────────────────── */
 
@@ -1990,8 +2076,8 @@ body:has(.chat-layout) .site-foot { display: none; }
   width: 34px;
   height: 34px;
   border-radius: var(--r);
-  background: var(--ava, var(--raised-2));
-  color: #10131a;
+  background: var(--ava, var(--mark-plate));
+  color: var(--mark-ink);
   font-family: Unbounded, sans-serif;
   font-size: 13px;
   font-weight: 700;
@@ -2003,25 +2089,29 @@ body:has(.chat-layout) .site-foot { display: none; }
   .tour-side { min-width: 64px; }
 }
 
-/* ══ Светлая тема: «Arctic Command» — холодный командный центр AAA ═══════ */
+/* ══ Светлая тема: «Daylight Deck» — холодный командный центр AAA ══════════ */
 
 /*
   ФОН: светло-серый с голубым подтоном (не белый!), едва заметный янтарный
   отсвет в правом верхнем углу и техническая сетка с альфой ~0.03. Сетка
   создаёт ощущение приборной панели, но не спорит с текстом.
+
+  Все отсветы и сетка берутся из токенов темы: SIGNAL-краска больше не
+  записана янтарной цифрой, иначе правка `--accent` в `styles-v8.css`
+  оставила бы на новом холодном фоне тёплое пятно старой краски.
 */
 :root[data-theme="light"] body {
   background:
-    radial-gradient(circle at 85% 0%, rgba(217,130,43,.08), transparent 28rem),
-    linear-gradient(rgba(23,33,43,.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23,33,43,.03) 1px, transparent 1px),
+    radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 28rem),
+    linear-gradient(var(--hud-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-grid) 1px, transparent 1px),
     var(--bg);
   background-size: auto, 46px 46px, 46px 46px, auto;
 }
 :root[data-theme="light"] body::before {
   background:
-    radial-gradient(760px 460px at 96% 2%, rgba(217,130,43,.05), transparent 58%),
-    radial-gradient(900px 520px at 8% -8%, rgba(122,152,182,.06), transparent 62%);
+    radial-gradient(760px 460px at 96% 2%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 58%),
+    radial-gradient(900px 520px at 8% -8%, color-mix(in srgb, var(--link) 7%, transparent), transparent 62%);
 }
 
 /*
@@ -2056,46 +2146,51 @@ body:has(.chat-layout) .site-foot { display: none; }
   не знает, а рисовать «в сети» до ответа базы — значит врать человеку.
 */
 :root[data-theme="light"] .site-head {
-  border-bottom-color: rgba(217,130,43,.35);
-  box-shadow: 0 10px 30px -24px rgba(31,48,64,.25);
+  border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: var(--shadow-1);
 }
-:root[data-theme="light"] .site-head:hover { box-shadow: 0 10px 26px -20px rgba(31,48,64,.3); }
+:root[data-theme="light"] .site-head:hover { box-shadow: var(--shadow); }
 
 /*
-  ПЛИТКА «33» — янтарная сигнальная табличка с чернильной цифрой; активная
-  вкладка — та же янтарь, но плоская и строгая.
+  ПЛИТКА «33» и активная вкладка — сигнальная плашка `--accent-plate`.
+
+  В светлой теме её градиент идёт ВНИЗ, к `--accent-dk`: почти белая подпись
+  `--on-accent` на осветлённом янтаре читалась за 3,06:1 (верхний край прежней
+  плашки подмешивал `--overlay`, а это в дневной теме белый), на затемнённом
+  краю держит 7,54:1. Та же формула в тёмной теме смешивает вверх и даёт
+  8,15:1 — направление теперь задаёт тема, а не правило.
 */
 :root[data-theme="light"] .brand__num {
   animation: none;
   color: var(--on-accent);
-  background: linear-gradient(145deg, #e89440, #c8751f);
-  box-shadow: 0 3px 10px -3px rgba(217,130,43,.4);
+  background: var(--accent-plate);
+  box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 :root[data-theme="light"] .nav__link.is-active {
   color: var(--on-accent);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: var(--accent);
-  box-shadow: 0 3px 10px -4px rgba(217,130,43,.5);
+  border-color: var(--accent-plate-line);
+  background: var(--accent-plate);
+  box-shadow: 0 3px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 /*
-  ПАНЕЛИ — белое стекло: полупрозрачный белый, blur, тонкая граница и
-  двухслойная мягкая тень. Наведение поднимает карточку на 2px и подсвечивает
-  границу янтарём. Верхняя линия .panel::before — короткий янтарный штрих
-  слева (сигнальный маркер, не полноширинная полоса).
+  ПАНЕЛИ — ступень лестницы: `--plate-grad` кладёт карточку на `--raised-2`
+  с переходом в `--surface`, тень берётся из общей ступени `--shadow`.
+  Стеклянный blur убран: под карточкой лежит не фотография, а однородный фон,
+  и размытие стоило дорого на телефоне при нулевой пользе. Наведение поднимает
+  карточку на 2px и подсвечивает границу янтарём. Верхняя линия .panel::before
+  — короткий янтарный штрих слева (сигнальный маркер, не полноширинная полоса).
 */
 :root[data-theme="light"] .panel {
-  background: rgba(255,255,255,.86);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: var(--plate-grad);
   border-color: var(--line);
-  box-shadow: 0 2px 5px rgba(31,48,64,.04), 0 12px 30px rgba(31,48,64,.08);
+  box-shadow: var(--shadow);
   transition: transform .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease);
 }
 :root[data-theme="light"] .panel:hover {
   transform: translateY(-2px);
-  border-color: rgba(217,130,43,.45);
-  box-shadow: 0 4px 8px rgba(31,48,64,.05), 0 18px 40px rgba(31,48,64,.12);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: var(--shadow-3);
 }
 :root[data-theme="light"] .panel::before {
   right: auto;
@@ -2105,31 +2200,27 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 :root[data-theme="light"] .panel::after { opacity: 0; }
 
-/* На телефоне стекло дорого: blur выключаем, карточки не поднимаем —
-   жестом листают список, а не наводят на карточки. */
+/* На телефоне карточки не поднимаем: жестом листают список, а не наводят. */
 @media (hover: none) and (pointer: coarse) {
-  :root[data-theme="light"] .panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: #fff; }
-  :root[data-theme="light"] .panel:hover { transform: none; }
+  :root[data-theme="light"] .panel:hover { transform: none; box-shadow: var(--shadow); }
 }
 
 /*
-  ВАУ-ГЕРОЙ: та же белая стеклянная карточка, но крупнее и с HUD-уголком —
-  короткий янтарный уголок сверху справа, дозированный декор командного
-  центра. Диагональная штриховка тёмной темы здесь почти выключена.
+  ВАУ-ГЕРОЙ: та же ступень лестницы, но крупнее и с HUD-уголком — короткий
+  янтарный уголок сверху справа, дозированный декор командного центра.
+  Диагональная штриховка тёмной темы здесь почти выключена.
 */
 :root[data-theme="light"] .hero {
   border-color: var(--line);
   background:
-    radial-gradient(480px 220px at 88% 8%, rgba(122,152,182,.07), transparent 66%),
-    radial-gradient(300px 260px at 2% 100%, rgba(217,130,43,.06), transparent 70%),
-    rgba(255,255,255,.9);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 2px 5px rgba(31,48,64,.04), 0 16px 36px rgba(31,48,64,.1);
+    radial-gradient(480px 220px at 88% 8%, color-mix(in srgb, var(--link) 8%, transparent), transparent 66%),
+    radial-gradient(300px 260px at 2% 100%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    var(--plate-grad);
+  box-shadow: var(--shadow);
 }
 :root[data-theme="light"] .hero::after { opacity: .1; }
 :root[data-theme="light"] .hero__num {
-  background: linear-gradient(172deg, #25333f 18%, #6b7d8c);
+  background: linear-gradient(172deg, var(--text) 18%, color-mix(in srgb, var(--text) 55%, var(--bg)));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
@@ -2137,9 +2228,8 @@ body:has(.chat-layout) .site-foot { display: none; }
    что и в тёмной. Внутренняя полоса и тень убраны: список читают столбцом,
    и строка не должна «приподниматься» под курсором. */
 :root[data-theme="light"] .lad__row:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
-:root[data-theme="light"] .tl__img:hover { box-shadow: 0 14px 28px -18px rgba(31,48,64,.35); }
-:root[data-theme="light"] .adm-publish--top { box-shadow: 0 10px 26px -20px rgba(31,48,64,.35); }
-:root[data-theme="light"] .adm-modal__box { box-shadow: 0 24px 80px -40px rgba(31,48,64,.35); }
+:root[data-theme="light"] .tl__img:hover { box-shadow: var(--shadow-3); }
+:root[data-theme="light"] .adm-publish--top { box-shadow: var(--shadow-1); }
 
 /*
   ПУСТЫЕ СОСТОЯНИЯ: вместо голой белой площади — пунктирная рамка и короткий
@@ -2161,49 +2251,112 @@ body:has(.chat-layout) .site-foot { display: none; }
 /* Лидер: тёплая кромка на белом стекле. */
 :root[data-theme="light"] .leader {
   border-color: color-mix(in srgb, var(--gold) 45%, var(--line));
-  background: linear-gradient(100deg, rgba(201,138,40,.1), rgba(23,33,43,.02) 58%, rgba(81,96,110,.05));
-  box-shadow: inset 3px 0 0 var(--gold), 0 10px 24px -18px rgba(31,48,64,.35);
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--gold) 12%, transparent),
+    color-mix(in srgb, var(--text) 2%, transparent) 58%,
+    color-mix(in srgb, var(--silver) 6%, transparent));
+  box-shadow: inset 3px 0 0 var(--gold), var(--shadow-1);
 }
 
 /* Кварт-герой живёт внутри тёмного «острова» .quart-page — там правим
    только тень, рамка островная. */
-:root[data-theme="light"] .quart-hero { box-shadow: 0 18px 50px -28px rgba(31,48,64,.5); }
+:root[data-theme="light"] .quart-hero { box-shadow: var(--shadow-3); }
 
-/* Поповеры, модалки, тосты: белое стекло над холодным фоном. */
-:root[data-theme="light"] .forum-emoji__pop { box-shadow: 0 16px 40px -18px rgba(31,48,64,.3); }
-:root[data-theme="light"] .forum-modal__box { box-shadow: 0 30px 80px -30px rgba(31,48,64,.35); }
-:root[data-theme="light"] .forum-toast { box-shadow: 0 18px 44px -20px rgba(31,48,64,.3); }
-:root[data-theme="light"] .chat-menu__pop { box-shadow: 0 18px 44px -18px rgba(31,48,64,.3), 0 4px 18px -10px rgba(31,48,64,.18); }
-:root[data-theme="light"] .chat-msg__reactions-pop { box-shadow: 0 8px 24px -12px rgba(31,48,64,.28); }
-:root[data-theme="light"] .chat-go-bottom { box-shadow: 0 4px 14px -6px rgba(31,48,64,.3); }
-:root[data-theme="light"] .chat-go-new { box-shadow: 0 4px 14px -6px rgba(31,48,64,.3); }
+/*
+  Поповеры, модалки, меню и тосты больше не перекрашиваются под светлую тему
+  отдельной тенью: их базовые правила берут `--overlay` и `--shadow-3`, а эти
+  токены уже перезаданы в теме. Слой определяется лестницей, а не файлом,
+  который подключился последним.
+*/
 :root[data-theme="light"] .chat-divider__label {
-  background: color-mix(in srgb, var(--accent) 8%, #fff);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
-:root[data-theme="light"] .pick__menu { box-shadow: 0 18px 44px -18px rgba(31,48,64,.3), 0 4px 18px -10px rgba(31,48,64,.18); }
 
-/* Тёмные «острова» (бот, роли, кварт) остаются тёмными: на холодном светлом
-   фоне они читаются как тактические экраны ночного режима. */
+/*
+  ТЁМНЫЕ ОСТРОВА — ЭТО НОЧНАЯ ТЕМА ЦЕЛИКОМ, А НЕ ВЫКРАШЕННЫЙ КУСОК.
+
+  Остров живёт внутри дневной страницы, поэтому он не может брать ни один
+  токен у темы-хозяина: `--surface`, тень, плашка, направление смешивания и
+  даже блик у него свои. Раньше остров перезадвал девять красок, а остальное
+  докрашивал literals-правилами ниже по файлу, и правка любой ступени в
+  `styles-v8.css` оставляла на острове старое пятно. Теперь перечислено всё,
+  что перезадаёт дневной блок, — ровно тем же списком имён. Секция BB в
+  тестах сверяет каждую строку с ночной темой: разошлись — падает проверка.
+
+  Две вещи здесь нарочно НЕ повторяются:
+  — `--shade` и `--tint` разворачиваются на месте острова, а не наследуются
+    с корня, иначе смешивание пошло бы вверх по дневной лестнице;
+  — композитные токены (`--plate-grad`, `--accent-plate`, `--shimmer`, тени)
+    переписаны формулой, а не значением: `var()` внутри объявления считается
+    на том элементе, где объявление стоит, и только поэтому плашка острова
+    собирается из ночных ступеней, а не из тех, что посчитал корень.
+*/
 :root[data-theme="light"] .bot-hero,
 :root[data-theme="light"] .bot-feature,
 :root[data-theme="light"] .roles-panel,
-:root[data-theme="light"] .role-card,
+:root[data-theme="light"] .guide-extra-card,
 :root[data-theme="light"] .quart-page {
-  --text: #f2f4f7;
-  --dim:  #b4bcc8;
+  --recessed:  #05070c;
+  --bg:        #0a0e15;
+  --surface:   #10161f;
+  --raised:    #171f2b;
+  --raised-2:  #1f2936;
+  --overlay:   #26313f;
+  --line:      #29323f;
+  --line-soft: #1a2331;
+
+  --text:      #f2f4f7;
+  --dim:       #b4bcc8;
   /* Тот же порог AA, что и в основной тёмной теме: #666e7b на тёмном острове
-     был 3.61:1, а #808a9a не вывозил бирюзовые плашки (4,45:1). Остров
+     был 3,61:1, а #808a9a не вывозил бирюзовые плашки (4,45:1). Остров
      остаётся островом — меняется только подпись. */
-  --mute:  #8c95a3;
-  --electric: #a7a3c2;
-  --accent: #ff5a36;
-  --accent-dk: #d83a32;
+  --mute:      #929cad;
+  --silver:    #b3bcc9;
+  --link:      #7fb2ff;
+  --blogger:   #31c5b5;
+
+  --accent:    #ff5a36;
+  --accent-dk: #e0453a;
   --accent-ink: #ff5a36;
-  --gold:  #e0b34a;
-  --win:   #46b87f;
-  --loss:  #f2555f;
-  --line: #222a36;
-  color: #f2f4f7;
+  --on-accent: #0a0e15;
+  --gold:      #d9a94a;
+  --gold-ink:  #d9a94a;
+  --bronze:    #c18c62;
+  --win:       #46b87f;
+  --loss:      #f2555f;
+  --win-ink:  color-mix(in oklab, var(--win) 85%, var(--text));
+  --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
+  --tag-ink-keep: 70%;
+
+  --electric: #a7a3c2;
+  --violet:   #9c7cff;
+  --violet-ink: #b299ff;
+  --electric-ink: #081011;
+  --electric-hi:  #b9fff4;
+  --soft-ok:   #9be9bd;
+  --soft-bad:  #ffb3ba;
+  --soft-warn: #ffe1a3;
+  --hud-grid:    rgba(150,175,210,.055);
+  --hud-line: color-mix(in srgb, var(--electric) 20%, transparent);
+
+  --shade: var(--recessed);
+  --tint:  var(--text);
+
+  --accent-plate: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, var(--tint)), var(--accent));
+  --accent-plate-line: color-mix(in srgb, var(--accent) 70%, var(--tint));
+  --danger-plate: linear-gradient(135deg, color-mix(in srgb, var(--loss) 70%, var(--tint)), var(--loss));
+  --danger-plate-line: color-mix(in srgb, var(--loss) 70%, var(--tint));
+  --shimmer: color-mix(in srgb, var(--tint) 34%, transparent);
+
+  --plate-grad: linear-gradient(168deg, var(--raised-2), var(--surface) 72%);
+  --sheen: inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent);
+  --scrim: rgba(4,7,12,.74);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.45);
+  --shadow:   inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -16px rgba(0,0,0,.72);
+  --shadow-3: 0 34px 78px -30px rgba(0,0,0,.9), 0 6px 18px -10px rgba(0,0,0,.6);
+
+  color-scheme: dark;
+  color: var(--text);
 }
 
 /*
@@ -2224,78 +2377,61 @@ body:has(.chat-layout) .site-foot { display: none; }
 /*
   Остров обязан оставаться тёмным и подложкой, не только чернилами. Светлые
   правила для .hero и .panel имеют специфичность выше, чем класс самой
-  страницы, и выбивали фон: заголовок героя бота давал 1,05:1 (242,244,247 на
-  244,238,227) при том, что цвета текста остались островными.
+  страницы: пока подложка карточки бралась числом, дневный слой выбивал фон
+  острова, и заголовок героя бота давал 1,05:1 (242,244,247 на 244,238,227).
+  С общей лестницей это рассосалось само: `--plate-grad`, `--shadow` и `--line`
+  на острове ночные, поэтому светлое правило `.panel` кладёт ночную плашку.
+
+  От прежних literals-подложек остаётся одна строка — собственная подложка
+  героя бота. Её не даёт ни один токен, потому что это не цвет, а форма:
+  электрик-прожектор вместо сигнального пятна общего героя.
 */
 :root[data-theme="light"] .hero.bot-hero {
   border-color: color-mix(in srgb, var(--electric) 26%, transparent);
   background:
     radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--electric) 14%, transparent), transparent 24%),
-    linear-gradient(135deg, rgba(23, 28, 35, .98), rgba(10, 14, 18, .98));
-  box-shadow: none;
+    var(--plate-grad);
+  box-shadow: var(--shadow);
 }
 :root[data-theme="light"] .hero.bot-hero::after { opacity: .34; }
-:root[data-theme="light"] .hero.bot-hero .hero__num {
-  background: linear-gradient(172deg, #eef3f8, #b9c4d2);
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-:root[data-theme="light"] .panel.roles-panel,
-:root[data-theme="light"] .quart-page .panel {
-  border-color: var(--line);
-  background: linear-gradient(145deg, rgba(18, 25, 30, .96), rgba(12, 16, 21, .98));
-  box-shadow: none;
-  backdrop-filter: none;
-}
 :root[data-theme="light"] .panel.roles-panel::before,
 :root[data-theme="light"] .quart-page .panel::before { opacity: .45; }
-:root[data-theme="light"] .bot-cta,
-:root[data-theme="light"] .bot-launch__mark {
-  border-color: color-mix(in srgb, var(--electric) 55%, #fff);
-  background: linear-gradient(145deg, color-mix(in srgb, var(--electric) 60%, #fff), color-mix(in srgb, var(--electric) 40%, #fff));
-  color: #221f35;
-}
-:root[data-theme="light"] .bot-cta:hover { color: #081011; background: #b9fff4; }
-:root[data-theme="light"] .roles-notice__mark { border-color: #d9b83a; background: linear-gradient(145deg, #ffd968, #f5c44a); color: #4a3a06; }
-:root[data-theme="light"] .quart-controls .search input { color: #e9f3e7; }
 
-/* Переключатель темы: тёмно-графитовая кнопка, hover — янтарный. */
+/*
+  ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ: графитовая плашка с почти белой иконкой.
+
+  Кнопка показывает солнце, то есть «ты в дневном режиме», и её фон обязан
+  принадлежать теме, а не beige-наследию. Чернилами служит `--text` — самая
+  тёмная краска темы, но не чёрный: 13,79:1 до иконки из `--bg` и ноль
+  споры с сигнальным оранжевым. Hover подкрашивает иконку акцентом,
+  подмешанным к `--tint`: в дневной теме это осветляет янтарь до 6,13:1,
+  а в ночной тот же токен дал бы затемнение — направление задаёт тема.
+*/
 :root[data-theme="light"] .theme-toggle {
-  background: #22303e;
-  border-color: #22303e;
-  color: #e8edf2;
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
 }
 :root[data-theme="light"] .theme-toggle:hover {
-  color: #f0b46a;
-  border-color: #2c3d4e;
-  background: #22303e;
+  color: color-mix(in srgb, var(--accent) 62%, var(--tint));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--text));
+  background: var(--text);
 }
 
-/* Бургер: холодный тон шапки вместо оранжевых брызг. */
-:root[data-theme="light"] .burger {
-  background: color-mix(in srgb, #22303e 5%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #22303e 14%, transparent);
-}
-:root[data-theme="light"] .burger__lines i { background: var(--dim); }
-:root[data-theme="light"] .burger:hover,
-:root[data-theme="light"] .is-side-open .burger {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-:root[data-theme="light"] .is-side-open .burger__lines i { background: var(--accent); }
+/*
+  Стрелка селекта — единственная краска, которую токен не достает: она
+  записана внутри data-URI, а тот не умеет читать переменные. Число здесь
+  равно `--accent-dk`, и правка акцента обязана принести её сюда вручную.
 
-/* Мелочи, хардкодящие сигнальный оранжевый: стрелка селекта и кольцо
-   фокуса полей — янтарные, в тон акценту. */
+  Кольцо фокуса больше не перекрашивается: `controls.css` собирает его из
+  `--accent`, а прежняя янтарная цифра (rgba(217,130,43)) была последней,
+  кто переживал смену SIGNAL-краски.
+*/
 :root[data-theme="light"] .forum-field select,
 :root[data-theme="light"] .adm-field select,
 :root[data-theme="light"] .adm-form .adm-field select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%23b06818' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%238e3410' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
-:root[data-theme="light"] .forum-field input:focus,
-:root[data-theme="light"] .forum-field textarea:focus,
-:root[data-theme="light"] .adm-field input:focus,
-:root[data-theme="light"] .adm-field textarea:focus,
-:root[data-theme="light"] .adm-field select:focus { box-shadow: 0 0 0 3px rgba(217,130,43,.18); }
 
 /* ── Проверка ников ──────────────────────────────────────────────────────────
    Две соседних метки: «✓ проверен» (зелёная) и «! не проверен» (серая).
@@ -2380,157 +2516,107 @@ body:has(.chat-layout) .site-foot { display: none; }
   .forum-verify .forum-btn { width: 100%; min-height: 44px; }
 }
 
-/* ── Светлая тема: «пыль, бумага и сталь» ───────────────────────────────── */
-:root[data-theme="light"] body {
-  background:
-    radial-gradient(900px 480px at 100% -8%, rgba(192,90,36,.10), transparent 62%),
-    radial-gradient(720px 420px at -8% 24%, rgba(108,93,67,.08), transparent 66%),
-    linear-gradient(135deg, #ebe7dd 0%, var(--bg) 48%, #e7e1d5 100%);
-}
-:root[data-theme="light"] body::before {
-  opacity: .72;
-  background:
-    repeating-linear-gradient(115deg, rgba(74,59,40,.018) 0 1px, transparent 1px 11px),
-    radial-gradient(760px 400px at 50% -12%, rgba(255,255,255,.68), transparent 70%);
-}
-:root[data-theme="light"] body::after { opacity: .018; mix-blend-mode: multiply; }
-
-:root[data-theme="light"] .site-head {
-  background: rgba(247,244,236,.88);
-  border-bottom-color: rgba(123,101,69,.22);
-  box-shadow: 0 8px 26px -24px rgba(59,43,25,.55);
-  backdrop-filter: blur(18px) saturate(.86);
-}
-:root[data-theme="light"] .site-head::after { background: linear-gradient(90deg, transparent, rgba(192,90,36,.7), transparent); }
-/* Бумажная шапка в прокрутке: плотнее фон, заметнее линия низа. */
-:root[data-theme="light"] .site-head.is-scrolled {
-  background: rgba(247,244,236,.97);
-  border-bottom-color: rgba(123,101,69,.4);
-  box-shadow: 0 12px 30px -26px rgba(59,43,25,.6);
-}
-:root[data-theme="light"] .brand__num {
-  color: #fff7ea;
-  background: linear-gradient(145deg, #c56430, #913c1e);
-  box-shadow: 0 7px 16px -10px rgba(104,43,19,.7);
-}
-:root[data-theme="light"] .nav__link { color: var(--dim); }
-:root[data-theme="light"] .nav__link:hover { background: rgba(114,91,55,.08); color: var(--text); }
-:root[data-theme="light"] .nav__link.is-active {
-  color: #fffaf1;
-  background: #40382e;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 6px 14px -11px rgba(53,42,29,.7);
-}
-:root[data-theme="light"] .theme-toggle {
-  color: #fffaf1;
-  background: #40382e;
-  border-color: #40382e;
-}
-:root[data-theme="light"] .theme-toggle:hover { color: #ffe0bb; background: #51463a; border-color: #51463a; }
-
-:root[data-theme="light"] .panel,
-:root[data-theme="light"] .forum-post,
-:root[data-theme="light"] .forum-hot,
-:root[data-theme="light"] .forum-lead,
-:root[data-theme="light"] .forum-theme,
-:root[data-theme="light"] .forum-welcome {
-  background: linear-gradient(145deg, rgba(251,248,241,.96), rgba(244,239,229,.94));
-  border-color: rgba(116,96,65,.20);
-  box-shadow: 0 1px 0 rgba(255,255,255,.82) inset, 0 16px 36px -32px rgba(69,51,30,.5);
-  backdrop-filter: none;
-}
-:root[data-theme="light"] .panel::before {
-  width: 100%;
-  opacity: 1;
-  background: linear-gradient(90deg, transparent 2%, rgba(192,90,36,.40) 22%, rgba(154,106,36,.24) 52%, transparent 96%);
-}
-@media (hover: hover) {
-  :root[data-theme="light"] .panel:hover {
-    transform: none;
-    border-color: rgba(145,94,52,.34);
-    box-shadow: 0 1px 0 rgba(255,255,255,.84) inset, 0 20px 42px -34px rgba(69,51,30,.58);
-  }
-}
-:root[data-theme="light"] .hero {
-  border-color: rgba(112,88,53,.26);
-  background:
-    linear-gradient(105deg, rgba(46,40,32,.04) 1px, transparent 1px) 0 0 / 20px 20px,
-    radial-gradient(560px 250px at 92% 6%, rgba(192,90,36,.17), transparent 68%),
-    linear-gradient(135deg, #fbf7ef, #e9e0d1);
-  box-shadow: 0 1px 0 rgba(255,255,255,.84) inset, 0 24px 48px -40px rgba(69,51,30,.62);
-  backdrop-filter: none;
-}
-:root[data-theme="light"] .hero::after { opacity: .16; background: repeating-linear-gradient(58deg, rgba(117,76,35,.13) 0 1px, transparent 1px 12px); }
-:root[data-theme="light"] .hero__num { background: linear-gradient(172deg, #44382b, #aa5227); -webkit-background-clip: text; background-clip: text; }
+/* ══ Светлая тема: последний слой «Daylight Deck» ═══════════════════════════ */
 
 /*
-  КНОПКИ: янтарные, тактильные — плоский янтарь с чернильным текстом, hover
-  осветляет плашку. Градиентная «конфета» тут была не украшением, а дефектом:
-  верхний её край #c86231 светлее янтаря, и светлая подпись #fff9ee читалась
-  за 3,8 : 1 — ниже AA. Плоский `--accent` с `--on-accent` даёт 4,7 : 1 на
-  самой тёмной точке кнопки, и той же краской держит 8,1 : 1 на осветлённом
-  hover. Правило одно на весь сайт: раньше их было два, и второе просто
-  побеждало первое по порядку файлов.
+  ПОЧЕМУ ЭТОТ СЛОЙ КОРОТКИЙ.
+
+  Прежняя светлая отделка — «пыль, бумага и сталь» — занимала полторы сотни
+  строк и перекрашивала заново всё: фон, шапку, панели, героя, поля, кнопки и
+  админку. Делала она это числами, которых нет ни в одной лестнице, поэтому
+  правка ступени или SIGNAL-краски в `styles-v8.css` до неё не доходила: файл
+  подключён последним и всегда побеждал. Так и устроена ошибка, которую бриф
+  называет «инверсией вместо темы»: ночная схема лежала в токенах, а дневная
+  жила собственной палитрой в отдельном файле.
+
+  Здесь остались только правила, которых больше нигде нет. Всё остальное
+  светлая тема берёт из своей лестницы слоёв, своих трёх ступеней тени и своих
+  направлений смешивания `--shade` / `--tint` — то есть из той же системы, но
+  собранной в обратную сторону.
+*/
+
+/*
+  ЗЕРНО. На чёрном фоне шум читается как пылинки, на светлом он перемножается
+  с бумагой и желтит всю страницу, поэтому альфа убрана втрое.
+*/
+:root[data-theme="light"] body::after { opacity: .02; mix-blend-mode: multiply; }
+
+/*
+  КНОПКИ — одна сигнальная плашка на весь сайт.
+
+  `--accent-plate` в дневной теме затемняется к `--accent-dk`, и это не вкус, а
+  арифметика: почти белая подпись на осветлённом янтаре давала 3,40:1, на
+  затемнённом держит 7,54:1. Прежний hover осветлял плашку до #e08e39, то есть
+  самое нажатие делало надпись нечитаемой. Нынешний hover уходит в `--accent-dk`
+  плоским цветом: кнопка становится плотнее, а не светлее.
 */
 :root[data-theme="light"] .forum-btn,
 :root[data-theme="light"] .chat-compose__send,
 :root[data-theme="light"] .adm-btn--primary {
   color: var(--on-accent);
-  border-color: var(--accent-dk);
-  background: var(--accent);
-  box-shadow: 0 8px 15px -12px rgba(121,49,22,.7);
+  background: var(--accent-plate);
+  border-color: var(--accent-plate-line);
+  box-shadow: 0 8px 16px -12px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 :root[data-theme="light"] .forum-btn:hover:not(:disabled),
 :root[data-theme="light"] .chat-compose__send:not(:disabled):hover,
 :root[data-theme="light"] .adm-btn--primary:hover {
   color: var(--on-accent);
+  background: var(--accent-dk);
   border-color: var(--accent-dk);
-  background: #e08e39;
-  box-shadow: 0 10px 18px -12px rgba(121,49,22,.75);
+  box-shadow: 0 10px 18px -12px color-mix(in srgb, var(--accent) 78%, transparent);
 }
-:root[data-theme="light"] :where(.forum-field input, .forum-field textarea, .forum-field select, .search input, .adm-field input, .adm-field textarea, .adm-field select) {
-  color: var(--text);
-  background-color: rgba(255,252,246,.78);
-  border-color: rgba(116,96,65,.27);
+
+/*
+  КНОПКА УДАЛЕНИЯ НЕ ДОЛЖНА СТАНОВИТЬСЯ ОРАНЖЕВОЙ.
+
+  Только что написанное правило сильнее всего, что стоит в `forum.css`: у него
+  три разряда, а у `.forum-btn--danger` — один. Без этой строки красная кнопка
+  в дневной теме получала оранжевую плашку, то есть теряла ровно то, зачем она
+  красная: человек не отличал «удалить тему» от «сохранить». Роль возвращена
+  тем же токеном, что и в ночной теме, а направление смешивания здесь местное —
+  вниз, к графиту, а не вверх. Числа: подпись #fff8f2 держит 6,85:1 на `--loss`
+  и 8,21:1 на затемнённом крае #842f31.
+*/
+:root[data-theme="light"] .forum-btn--danger {
+  color: var(--on-accent);
+  background: var(--danger-plate);
+  border-color: var(--danger-plate-line);
+  box-shadow: 0 8px 16px -12px color-mix(in srgb, var(--loss) 70%, transparent);
 }
-:root[data-theme="light"] :where(.forum-field input, .forum-field textarea, .forum-field select, .search input, .adm-field input, .adm-field textarea, .adm-field select):focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(192,90,36,.13);
+:root[data-theme="light"] .forum-btn--danger:hover:not(:disabled) {
+  background: var(--danger-plate-line);
+  border-color: var(--danger-plate-line);
+  box-shadow: 0 10px 18px -12px color-mix(in srgb, var(--loss) 78%, transparent);
 }
-:root[data-theme="light"] a { text-decoration-color: rgba(121,80,43,.34); text-underline-offset: .16em; }
+
+/*
+  ССЫЛКА: подчёркивание бледнее самой краски, чтобы текст в потоке не дробился,
+  и становится полным цветом только под курсором.
+*/
+:root[data-theme="light"] a { text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent); text-underline-offset: .16em; }
 :root[data-theme="light"] a:hover { text-decoration-color: currentColor; }
 
-/* Админка использует те же токены: светлый режим — не «другая программа»,
-   а спокойный рабочий стол с чёткой иерархией данных. */
-:root[data-theme="light"] .adm-top {
-  background: rgba(247,244,236,.92);
-  border-bottom-color: rgba(116,96,65,.24);
-  box-shadow: 0 8px 22px -22px rgba(69,51,30,.54);
-  backdrop-filter: blur(18px) saturate(.86);
-}
+/*
+  ПАНЕЛЬ. Активный раздел и плашка «33» получают те же роли, что шапка сайта,
+  кнопки и поля стоят на общей лестнице. Отдельной «бумажной» подложки,
+  собственного стекла шапки и своей тени у модальных окон панели больше нет:
+  `--overlay` и `--shadow-3` в этой теме уже заданы ступенями, а не файлом.
+*/
 :root[data-theme="light"] .adm-top__brand b {
-  color: #fff8ed;
-  background: linear-gradient(145deg, #c56430, #913c1e);
-  box-shadow: 0 6px 14px -10px rgba(104,43,19,.7);
+  color: var(--on-accent);
+  background: var(--accent-plate);
+  box-shadow: 0 6px 14px -10px color-mix(in srgb, var(--accent) 70%, transparent);
 }
-:root[data-theme="light"] .adm-nav__link:hover { background: rgba(114,91,55,.08); }
+:root[data-theme="light"] .adm-nav__link:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
 :root[data-theme="light"] .adm-nav__link.is-active {
-  color: #fff9ef;
-  background: #40382e;
-  border-color: #40382e;
+  color: var(--on-accent);
+  background: var(--accent-plate);
+  border-color: var(--accent-plate-line);
 }
-:root[data-theme="light"] .adm-btn {
-  color: var(--dim);
-  background: rgba(255,252,246,.72);
-  border-color: rgba(116,96,65,.25);
-  box-shadow: 0 1px 0 rgba(255,255,255,.72) inset;
-}
-:root[data-theme="light"] .adm-btn:hover { color: var(--text); border-color: rgba(145,94,52,.48); background: #fffaf1; }
-:root[data-theme="light"] .adm-theme-toggle { min-width: 76px; }
-:root[data-theme="light"] .adm-modal__box,
-:root[data-theme="light"] .adm-publish--top { background: var(--surface); border-color: rgba(116,96,65,.26); }
 
 /* В тёмной панели те же пропорции и состояния без смены её ночного характера. */
-.adm-top { box-shadow: 0 10px 30px -26px rgba(0,0,0,.86); }
+.adm-top { box-shadow: var(--shadow); }
 .adm-nav__link.is-active { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent); }
 .adm-btn { min-height: 36px; }
 .adm-theme-toggle { min-width: 76px; }
@@ -2543,7 +2629,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-players__stats span { padding:var(--s-fine) var(--s-1); border:1px solid var(--line); border-radius: var(--r-pill); background:color-mix(in srgb,var(--text) 3%,transparent); }
 .adm-players__stats b { color:var(--text); }
 .adm-players { grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:var(--s-2); margin-top:var(--s-3); }
-.adm-player { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"who state" "acts acts"; gap:var(--s-2); min-height:138px; padding:var(--s-3); border:1px solid var(--line); border-radius: var(--r-lg); background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 96%,transparent),color-mix(in srgb,var(--text) 2%,transparent)); box-shadow:0 12px 26px -26px rgba(0,0,0,.9); }
+.adm-player { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"who state" "acts acts"; gap:var(--s-2); min-height:138px; padding:var(--s-3); border:1px solid var(--line); border-radius: var(--r-lg); background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 96%,transparent),color-mix(in srgb,var(--text) 2%,transparent)); box-shadow:var(--shadow); }
 .adm-player:hover { border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); }
 .adm-player__who { grid-area:who; align-self:start; }
 .adm-player__name { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-fine); }
@@ -2554,10 +2640,10 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-player__acts { grid-area:acts; justify-content:space-between; padding-top:var(--s-2); border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent); }
 .adm-player__roles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); flex:1; gap:var(--s-1); }
 .adm-player .adm-pill { min-height:38px; padding:var(--s-1) var(--s-1); border-radius: var(--r); font-size:11px; font-weight:700; }
-.adm-player .adm-toggle.is-on { color:#7ee6a8; border-color:rgba(71,210,130,.44); background:rgba(48,177,103,.14); }
-.adm-player .adm-toggle[data-player-moderator].is-on { color:#ffc06b; border-color:rgba(255,154,51,.48); background:rgba(210,107,23,.15); }
-.adm-player .adm-toggle[data-player-blogger].is-on { color:#8fc7ff; border-color:rgba(91,164,246,.48); background:rgba(62,119,215,.15); }
-.adm-player .adm-toggle[data-player-leader].is-on { color:#d3a9ff; border-color:rgba(167,104,236,.48); background:rgba(132,70,203,.15); }
+.adm-player .adm-toggle.is-on { color:var(--win); border-color:color-mix(in srgb, var(--win) 44%, transparent); background:color-mix(in srgb, var(--win) 14%, transparent); }
+.adm-player .adm-toggle[data-player-moderator].is-on { color:var(--gold); border-color:color-mix(in srgb, var(--gold) 48%, transparent); background:color-mix(in srgb, var(--gold) 15%, transparent); }
+.adm-player .adm-toggle[data-player-blogger].is-on { color:var(--link); border-color:color-mix(in srgb, var(--link) 48%, transparent); background:color-mix(in srgb, var(--link) 15%, transparent); }
+.adm-player .adm-toggle[data-player-leader].is-on { color:var(--violet-ink); border-color:color-mix(in srgb, var(--violet) 48%, transparent); background:color-mix(in srgb, var(--violet) 15%, transparent); }
 .adm-player .adm-menu__btn { width:38px; height:38px; border-radius: var(--r); }
 
 @media (max-width:700px) {
@@ -2890,20 +2976,26 @@ body:has(.chat-layout) #app { min-height: 0; }
   .forum-chron__more,
   .forum-btn,
   .forum-post__title a,
-  .burger,
+  .side__close,
+  #tabbar-more,
   input[type="search"],
   .forum-field input,
   .forum-field select,
   .evt-remind select,
   .accounts-search input,
+  /*
+    Две новые цели шапки форума: строка «Войти или зарегистрироваться» и
+    раскрытие настроек push. Обе стали кликами по тексту на 13 px — без планки
+    палец попадал в поле, а не в раскрытие.
+  */
+  .forum-authbox__sum,
+  .forum-me__more-sum,
   .accounts-chip,
   .accounts-controls__sold { min-height: 44px; }
   /*
-    Шапка: промер пальцем назвал в ней две цели по 36 px — «бургер» и
-    переключатель темы. Планка выше их не накрывала: у «бургера» свои 44 px
-    живут в forum.css, а этот файл перебивает их строкой `.burger { min-height:
-    36px }` — тот же класс, позже по списку. Переключатель же вообще задан
-    фиксированным квадратом 36×36, поэтому ему нужен и рост, и ширина.
+    Шапка: промер пальцем назвал в ней цель 36 px — переключатель темы.
+    Прежде сюда же попадал «бургер», но кнопки меню в шапке больше нет:
+    вход в разделы остался один — нижняя полоса, и она изначально 56 px.
 
     Ширину пришлось закреплять отдельно: промер на 768 px под пальцем дал
     40×44 — высота из этого правила взята, а ширина съехалась. Причина не в
@@ -2911,7 +3003,7 @@ body:has(.chat-layout) #app { min-height: 0; }
     у ребёнка по умолчанию `flex-shrink: 1`, и когда президентская доска
     выедает место, кнопка отдаёт четыре пиксела своих 44. Поэтому здесь стоит
     запрет сжиматься, а не только число: без него ширина равна ровно тогда,
-    когда в шашке пусто.
+    когда в шапке пусто.
   */
   .theme-toggle { width: 44px; height: 44px; border-radius: var(--r); flex-shrink: 0; }
   /*
@@ -2923,10 +3015,9 @@ body:has(.chat-layout) #app { min-height: 0; }
   /* Флажок закладки: высота 44, а ширина оставалась 34 — палец промахивался
      по горизонтали туда же, откуда его уже выгнали по вертикали. Тот же
      промер догнал чип тега (41 px) и кнопку переключателя (39): рост по
-     высоте у них в порядке, не хватало ширины. Третьим оказался «бургер»:
-     ниже 360 px подпись «Меню» гаснет, полоски с полями дают 41 px ширины, и
-     на 320 px самая частая кнопка сайта стала уже своей планки. */
-  .forum-save, button.forum-tag, .seg__btn, .burger { min-width: 44px; }
+     высоте у них в порядке, не хватало ширины. Кнопка «Закрыть» у шторки
+     стоит в углу и без минимума сжималась бы до своего слова на 320 px. */
+  .forum-save, button.forum-tag, .seg__btn, .side__close { min-width: 44px; }
   /* min-height не действует на строчных элементах: ссылки-действия разворачиваем
      в inline-flex, чтобы рост цели задавало число, а не перенос строки. */
   .back, .live__more, .quart-next__more, .forum-post__expand, .upd-card__source,

@@ -25,7 +25,11 @@
   padding: 11px 16px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
+  /* Сигнальная линия под шапкой собрана из `--accent` по той же формуле, что и
+     у шапки сайта: 25 % краски. Прежний литерал rgba(217,130,43) жил только в
+     правилах светлой темы, из-за чего у сайта и у панели под одним и тем же
+     словом «шапка» была разная полоса. */
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .adm-top__brand {
@@ -39,7 +43,7 @@
   font-family: Unbounded, sans-serif;
   font-weight: 800;
   font-size: 14px;
-  color: #0a0b0d;
+  color: var(--on-accent);
   background: var(--accent);
   border-radius: 7px;
   padding: 3px 7px;
@@ -113,12 +117,20 @@
 }
 .adm-btn:hover { color: var(--text); border-color: var(--mute); }
 .adm-btn:disabled { opacity: .55; cursor: default; }
+/*
+  Янтарную, зелёную и красную плашку панели подписывает один и тот же токен
+  темы — `--on-accent`. Это не экономия, а измерение: в ночной теме он держит
+  6,23:1 на янтарной плашке, 7,75:1 на зелёной и 5,74:1 на красной, в дневной —
+  5,02:1, 6,91:1 и 6,85:1. Прежние литералы так не умели: почти чёрная подпись
+  на дневном сигнальном фоне давала 3,73:1, а белая на ночной красной плашке —
+  3,37:1, то есть ровно в момент нажатия текст становился нечитаемым.
+*/
 .adm-btn--primary {
-  color: #0a0b0d;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
-.adm-btn--primary:hover { background: var(--accent-dk); border-color: var(--accent-dk); color: #fff; }
+.adm-btn--primary:hover { background: var(--accent-dk); border-color: var(--accent-dk); color: var(--on-accent); }
 
 /* ── Каркас ───────────────────────────────────────────────────────────────── */
 .adm-main {
@@ -302,7 +314,7 @@
 }
 .adm-chip:hover { color: var(--text); border-color: var(--mute); }
 .adm-chip.is-on {
-  color: #0a0b0d;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -318,7 +330,13 @@
   color: var(--win);
   margin-left: 6px;
 }
-.adm-chip.is-on i { color: #0a0b0d; opacity: .75; }
+/*
+  Слово «сейчас» внутри активной плашки — самая мелкая подпись в панели
+  (9,5 px) и потому не терпит прозрачности: прежняя планка `opacity: .75`
+  смешивала чернила с плашкой и давала 4,50:1 ночью и 3,51:1 днём. Разница
+  с основным словом остаётся за счёт кегля, разрядки и верхнего регистра.
+*/
+.adm-chip.is-on i { color: var(--on-accent); }
 
 .adm-progress {
   height: 5px;
@@ -433,12 +451,12 @@
 .adm-mark:hover:not(:disabled) { color: var(--text); border-color: var(--mute); }
 .adm-mark:disabled { opacity: .4; cursor: default; }
 .adm-mark--win.is-on {
-  color: #0a0b0d;
+  color: var(--on-accent);
   background: var(--win);
   border-color: var(--win);
 }
 .adm-mark--loss.is-on {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--loss);
   border-color: var(--loss);
 }
@@ -537,7 +555,18 @@
 .adm-ally__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-ally__note, .adm-ally__wins, .adm-ally__id { display: none; }
 .adm-ally__state { font-size: 11.5px; color: var(--mute); white-space: nowrap; }
-.adm-ally.is-gone { opacity: .5; }
+/*
+  Распавшийся альянс гасил всю строку через `opacity: .5`. Это ломало сразу
+  три вещи: подпись состояния падала до 2,51:1 ночью и до 2,05:1 днём, сами
+  кнопки «Активировать» при этом оставались рабочими, только выглядели
+  выключенными, и в светлой теме бледнела вся строка целиком, а не только
+  статус. Теперь
+  строка тише за счёт красок (подпись уходит в `--mute`, статус остаётся
+  `--loss`), а приглушается только цветная плашка альянса — она декоративная.
+*/
+.adm-ally.is-gone .adm-ally__tag,
+.adm-ally.is-gone .adm-ally__name { color: var(--mute); }
+.adm-ally.is-gone .adm-ally__color { filter: saturate(.25) opacity(.65); }
 .adm-ally.is-gone .adm-ally__state { color: var(--loss); }
 
 /*
@@ -848,7 +877,7 @@
 .guide-editor__number { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--electric); border-radius: 50%; color: var(--electric); font-weight: 800; }
 .guide-editor__role-grid { display: grid; grid-template-columns: 90px 1.4fr 120px; gap: 10px; } .guide-editor__role .adm-field { margin-bottom: 10px; }
 .guide-editor__check { display: inline-flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; } .guide-editor__check input { accent-color: var(--electric); }
-.adm-btn--danger { color: #ff8b8b; border-color: rgba(255,110,110,.35); }
+.adm-btn--danger { color: var(--loss); border-color: color-mix(in srgb, var(--loss) 35%, transparent); }
 @media (max-width: 640px) { .guide-editor__role-grid { grid-template-columns: 1fr 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: 1 / -1; } .guide-editor__role-head { align-items: flex-start; } }
 @media (max-width: 430px) { .guide-editor__role-grid { grid-template-columns: 1fr; } .guide-editor__role-grid .adm-field:last-child { grid-column: auto; } .guide-editor__role-head { flex-wrap: wrap; } .guide-editor__role-head h3 { min-width: 120px; } }
 
@@ -873,11 +902,90 @@
 }
 
 /* Свой цвет текста в полном редакторе руководства */
-.guide-color-picker{padding:14px 16px;border:1px solid rgba(99,245,229,.2);border-radius:16px;background:linear-gradient(135deg,rgba(19,31,42,.92),rgba(8,14,24,.92));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 5%, transparent),0 10px 28px rgba(0,0,0,.12)}
-.guide-color-picker__head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;color:var(--muted,#9aa7b8);font-size:.82rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.guide-color-picker__head output{display:inline-flex;align-items:center;gap:7px;color:#f5fbff;font:700 .78rem/1 ui-monospace,SFMono-Regular,monospace;text-transform:none}
+/*
+  ОКНО И ПЛАШКА ВЫБОРА СВОЕГО ЦВЕТА — НОЧНОЙ ОСТРОВ В ОБЕИХ ТЕМАХ.
+
+  Фон здесь не следует теме намеренно: человек выбирает цвет своего сервера, и
+  оценивать оттенок ему нужна нейтрально-тёмная студия, иначе янтарь панели
+  спорит с тем самым цветом, который он подбирает. Но раз фон не меняется, то и
+  токены не должны
+  меняться: в дневной теме графитовая подпись `--dim` на ночном диалоге давала
+  1,79:1, а `--text` — 1,06:1, то есть окно становилось глухим. Поэтому остров
+  объявляет ровно тот же список имён, что и светлый корень, ночными значениями,
+  а композиты — формулой, потому что `var()` внутри объявления считается на том
+  элементе, где объявление стоит. Секция BB в тестах сверяет каждую строку с
+  ночным корнем styles-v8.css: разошлись — падает проверка.
+*/
+.guide-color-picker,
+.guide-color-modal__dialog {
+  --recessed:  #05070c;
+  --bg:        #0a0e15;
+  --surface:   #10161f;
+  --raised:    #171f2b;
+  --raised-2:  #1f2936;
+  --overlay:   #26313f;
+  --line:      #29323f;
+  --line-soft: #1a2331;
+
+  --text:      #f2f4f7;
+  --dim:       #b4bcc8;
+  --mute:      #929cad;
+  --silver:    #b3bcc9;
+  --link:      #7fb2ff;
+  --blogger:   #31c5b5;
+
+  --accent:    #ff5a36;
+  --accent-dk: #e0453a;
+  --accent-ink: #ff5a36;
+  --on-accent: #0a0e15;
+  --gold:      #d9a94a;
+  --gold-ink:  #d9a94a;
+  --bronze:    #c18c62;
+  --win:       #46b87f;
+  --loss:      #f2555f;
+  --win-ink:  color-mix(in oklab, var(--win) 85%, var(--text));
+  --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
+  --tag-ink-keep: 70%;
+
+  --electric: #a7a3c2;
+  --violet:   #9c7cff;
+  --violet-ink: #b299ff;
+  --electric-ink: #081011;
+  --electric-hi:  #b9fff4;
+  --soft-ok:   #9be9bd;
+  --soft-bad:  #ffb3ba;
+  --soft-warn: #ffe1a3;
+  --hud-grid:    rgba(150,175,210,.055);
+  --hud-line: color-mix(in srgb, var(--electric) 20%, transparent);
+
+  --shade: var(--recessed);
+  --tint:  var(--text);
+
+  --accent-plate: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, var(--tint)), var(--accent));
+  --accent-plate-line: color-mix(in srgb, var(--accent) 70%, var(--tint));
+  --danger-plate: linear-gradient(135deg, color-mix(in srgb, var(--loss) 70%, var(--tint)), var(--loss));
+  --danger-plate-line: color-mix(in srgb, var(--loss) 70%, var(--tint));
+  --shimmer: color-mix(in srgb, var(--tint) 34%, transparent);
+
+  --plate-grad: linear-gradient(168deg, var(--raised-2), var(--surface) 72%);
+  --sheen: inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent);
+  --scrim: rgba(4,7,12,.74);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.45);
+  --shadow:   inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -16px rgba(0,0,0,.72);
+  --shadow-3: 0 34px 78px -30px rgba(0,0,0,.9), 0 6px 18px -10px rgba(0,0,0,.6);
+
+  color-scheme: dark;
+  color: var(--text);
+}
+/* Плашка палитры собрана из ступеней той же ночной лестницы, что объявлена
+   островом выше: прежние rgba(19,31,42)/rgba(8,14,24) и неоновая рамка
+   rgba(99,245,229) были краской прошлой системы, которая на сайте уже
+   переведена на `--electric`. */
+.guide-color-picker{padding:14px 16px;border:1px solid color-mix(in srgb, var(--electric) 20%, transparent);border-radius:16px;background:linear-gradient(135deg, color-mix(in srgb, var(--raised) 92%, transparent), color-mix(in srgb, var(--bg) 92%, transparent));box-shadow: var(--shadow)}
+.guide-color-picker__head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;color:var(--mute);font-size:.82rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.guide-color-picker__head output{display:inline-flex;align-items:center;gap:7px;color:var(--text);font:700 .78rem/1 ui-monospace,SFMono-Regular,monospace;text-transform:none}
 .guide-color-picker__head output::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--picker-color);box-shadow:0 0 14px var(--picker-color),0 0 0 2px color-mix(in srgb, var(--text) 30%, transparent)}
-.guide-color-picker__hint{display:block;margin-top:9px;color:var(--muted,#9aa7b8);font-size:.75rem}
+.guide-color-picker__hint{display:block;margin-top:9px;color:var(--mute);font-size:.75rem}
 
 /* Окно выбора своего цвета для 33 сервера */
 body.guide-color-modal-open{overflow:hidden}
@@ -885,13 +993,13 @@ body.guide-color-modal-open{overflow:hidden}
 .guide-color-trigger:hover,.guide-color-trigger:focus-visible{transform:translateY(-2px);border-color:var(--picker-color);box-shadow:0 0 24px color-mix(in srgb,var(--picker-color) 22%,transparent);outline:none}
 .guide-color-trigger__dot{width:25px;height:25px;flex:none;border-radius:50%;background:var(--picker-color);box-shadow:0 0 16px var(--picker-color),0 0 0 3px color-mix(in srgb, var(--text) 12%, transparent)}
 .guide-color-trigger b{font-size:12px}.guide-color-trigger__value{margin-left:auto;color:var(--dim);font:700 11px ui-monospace,SFMono-Regular,monospace}.guide-color-trigger__arrow{color:var(--picker-color);font-size:18px}
-.guide-color-modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px}.guide-color-modal[hidden]{display:none}.guide-color-modal__backdrop{position:absolute;inset:0;border:0;background:rgba(3,7,12,.78);backdrop-filter:blur(14px);cursor:pointer}
-.guide-color-modal__dialog{position:relative;width:min(520px,100%);max-height:min(720px,calc(100dvh - 36px));overflow:auto;padding:22px;border:1px solid rgba(99,245,229,.28);border-radius:22px;background:linear-gradient(150deg,#182531 0%,#0b111a 70%);box-shadow:0 24px 80px rgba(0,0,0,.58),0 0 50px rgba(99,245,229,.1);animation:guide-color-modal-in .25s var(--ease) both}
+.guide-color-modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px}.guide-color-modal[hidden]{display:none}.guide-color-modal__backdrop{position:absolute;inset:0;border:0;background:var(--scrim);backdrop-filter:blur(14px);cursor:pointer}
+.guide-color-modal__dialog{position:relative;width:min(520px,100%);max-height:min(720px,calc(100dvh - 36px));overflow:auto;padding:22px;border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius:22px;background:linear-gradient(150deg, var(--raised-2) 0%, var(--bg) 70%);box-shadow: var(--shadow-3), 0 0 50px color-mix(in srgb, var(--electric) 10%, transparent);animation:guide-color-modal-in .25s var(--ease) both}
 @keyframes guide-color-modal-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 .guide-color-modal__head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.guide-color-modal__head h2{margin-top:6px;font-size:clamp(20px,5vw,28px)}.guide-color-modal__close{width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:var(--raised);color:var(--dim);font-size:25px;line-height:1;cursor:pointer}.guide-color-modal__close:hover{color:var(--text);border-color:var(--electric)}
-.guide-color-modal__preview{display:flex;align-items:center;gap:14px;margin:22px 0 18px;padding:16px;border:1px solid color-mix(in srgb,var(--modal-color) 42%,var(--line));border-radius:16px;background:color-mix(in srgb,var(--modal-color) 10%,transparent)}.guide-color-modal__preview>span{width:58px;height:58px;flex:none;border-radius:17px;background:var(--modal-color,#63f5e5);box-shadow:0 0 28px var(--modal-color,#63f5e5),inset 0 1px color-mix(in srgb, var(--text) 45%, transparent)}.guide-color-modal__preview b{display:block;font:800 18px ui-monospace,SFMono-Regular,monospace;color:var(--modal-color,#63f5e5)}.guide-color-modal__preview small{display:block;margin-top:4px;color:var(--dim)}
+.guide-color-modal__preview{display:flex;align-items:center;gap:14px;margin:22px 0 18px;padding:16px;border:1px solid color-mix(in srgb,var(--modal-color) 42%,var(--line));border-radius:16px;background:color-mix(in srgb,var(--modal-color) 10%,transparent)}.guide-color-modal__preview>span{width:58px;height:58px;flex:none;border-radius:17px;background:var(--modal-color,var(--electric));box-shadow:0 0 28px var(--modal-color,var(--electric)),inset 0 1px color-mix(in srgb, var(--text) 45%, transparent)}.guide-color-modal__preview b{display:block;font:800 18px ui-monospace,SFMono-Regular,monospace;color:var(--modal-color,var(--electric))}.guide-color-modal__preview small{display:block;margin-top:4px;color:var(--dim)}
 .guide-color-modal__swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.guide-color-modal__swatch{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb, var(--text) 3.5%, transparent);color:var(--dim);cursor:pointer;text-align:left;transition:transform .18s,border-color .18s,background .18s}.guide-color-modal__swatch:hover,.guide-color-modal__swatch:focus-visible{transform:translateY(-2px);border-color:var(--swatch);background:color-mix(in srgb,var(--swatch) 13%,transparent);outline:none}.guide-color-modal__swatch span{width:25px;height:25px;flex:none;border-radius:8px;background:var(--swatch);box-shadow:0 0 12px color-mix(in srgb,var(--swatch) 55%,transparent)}.guide-color-modal__swatch b{font:700 10px ui-monospace,SFMono-Regular,monospace}
-.guide-color-modal__hex{display:block;margin-top:18px}.guide-color-modal__hex>span{display:block;margin-bottom:7px;color:var(--dim);font-size:12px;font-weight:700}.guide-color-modal__hex input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#080d14;color:var(--text);font:700 15px ui-monospace,SFMono-Regular,monospace;letter-spacing:.08em;text-transform:uppercase}.guide-color-modal__hex input:focus{border-color:var(--electric);outline:0;box-shadow:0 0 0 3px rgba(99,245,229,.12)}.guide-color-modal__error{margin:8px 0 0;color:var(--loss);font-size:12px}.guide-color-modal__actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.guide-color-modal__hex{display:block;margin-top:18px}.guide-color-modal__hex>span{display:block;margin-bottom:7px;color:var(--dim);font-size:12px;font-weight:700}.guide-color-modal__hex input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:var(--recessed);color:var(--text);font:700 15px ui-monospace,SFMono-Regular,monospace;letter-spacing:.08em;text-transform:uppercase}.guide-color-modal__hex input:focus{border-color:var(--electric);outline:0;box-shadow:0 0 0 3px color-mix(in srgb, var(--electric) 12%, transparent)}.guide-color-modal__error{margin:8px 0 0;color:var(--loss);font-size:12px}.guide-color-modal__actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
 @media(max-width:560px){.guide-color-modal__swatches{grid-template-columns:repeat(2,1fr)}.guide-color-modal__actions{display:grid;grid-template-columns:1fr 1.3fr}.guide-color-modal__actions .adm-btn{min-height:46px}}
 @media(prefers-reduced-motion:reduce){.guide-color-modal__dialog,.guide-color-trigger,.guide-color-modal__swatch{animation:none;transition:none}}
 
@@ -905,11 +1013,11 @@ body.guide-color-modal-open{overflow:hidden}
   .guide-color-modal{display:grid;height:100svh;min-height:100svh;overflow:hidden;align-items:center;justify-items:center;padding:10px;}
   .guide-color-modal__dialog{width:100%;height:calc(100svh - 20px);max-height:calc(100svh - 20px);margin:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;touch-action:pan-y;padding:18px;border-radius:20px 20px 14px 14px;}
   .guide-color-modal__backdrop{position:fixed;}
-  .guide-color-modal__head{position:sticky;top:0;z-index:2;padding-bottom:12px;background:linear-gradient(#182531 72%,transparent);}
+  .guide-color-modal__head{position:sticky;top:0;z-index:2;padding-bottom:12px;background:linear-gradient(var(--raised-2) 72%,transparent);}
 }
 
 /* Редактор панели президента */
-.adm-president-editor{max-width:980px}.adm-president-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.adm-field--wide{grid-column:1/-1}.adm-president-preview{display:flex;align-items:center;gap:12px;margin:18px 0;padding:14px 16px;border:1px solid rgba(108,246,230,.3);border-left:3px solid var(--electric);border-radius:12px;background:linear-gradient(110deg,rgba(108,246,230,.1),color-mix(in srgb, var(--text) 2.5%, transparent));color:var(--text)}.adm-president-preview .president-board__signal{width:9px;height:9px;border-radius:50%;background:var(--electric);box-shadow:0 0 14px var(--electric)}.adm-president-preview small{display:block;color:var(--electric);font-size:9px;letter-spacing:.14em;font-weight:800}.adm-president-preview strong{display:block;margin-top:4px;font-size:16px}.adm-president-preview>b{margin-left:auto;color:var(--gold);font-size:14px}.adm-president-toggle{grid-column:1/-1}
+.adm-president-editor{max-width:980px}.adm-president-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.adm-field--wide{grid-column:1/-1}.adm-president-preview{display:flex;align-items:center;gap:12px;margin:18px 0;padding:14px 16px;border:1px solid color-mix(in srgb, var(--electric) 30%, transparent);border-left:3px solid var(--electric);border-radius:12px;background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10%, transparent),color-mix(in srgb, var(--text) 2.5%, transparent));color:var(--text)}.adm-president-preview .president-board__signal{width:9px;height:9px;border-radius:50%;background:var(--electric);box-shadow:0 0 14px var(--electric)}.adm-president-preview small{display:block;color:var(--electric);font-size:9px;letter-spacing:.14em;font-weight:800}.adm-president-preview strong{display:block;margin-top:4px;font-size:16px}.adm-president-preview>b{margin-left:auto;color:var(--gold);font-size:14px}.adm-president-toggle{grid-column:1/-1}
 @media(max-width:600px){.adm-president-grid{grid-template-columns:1fr}.adm-field--wide,.adm-president-toggle{grid-column:auto}.adm-president-preview{align-items:flex-start;flex-wrap:wrap}.adm-president-preview>b{width:100%;margin-left:21px}.adm-president-editor .adm-actions{display:grid;grid-template-columns:1fr}.adm-president-editor .adm-actions .adm-btn{width:100%;min-height:46px}}
 
 /* Компактные строки редактора хронологии */
@@ -928,7 +1036,10 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-quarter-weeks,
 .adm-publish--top {
   background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 96%, var(--accent) 4%), var(--surface));
-  box-shadow: 0 14px 34px rgba(0,0,0,.16), inset 0 1px color-mix(in srgb, var(--text) 3.5%, transparent);
+  /* Ступень карточки: тень и блик приходят из темы целиком. Литеральная
+     чёрная тень rgba(0,0,0,.16) в светлой теме кладёт грязное пятно под
+     светлую же плашку, а верхний блик темы уже содержит `--sheen`. */
+  box-shadow: var(--shadow);
 }
 .adm-form .adm-field input,
 .adm-form .adm-field textarea,
@@ -1091,11 +1202,11 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-leader__tag {
   font: 800 13px/1 ui-monospace, SFMono-Regular, monospace;
   letter-spacing: .08em;
-  color: #5cc8ff;
+  color: var(--link);
   padding: 4px 8px;
   border-radius: 7px;
-  border: 1px solid rgba(92,200,255,.35);
-  background: rgba(92,200,255,.1);
+  border: 1px solid color-mix(in srgb, var(--link) 35%, transparent);
+  background: color-mix(in srgb, var(--link) 10%, transparent);
 }
 .adm-leader__nick { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
 .adm-leader__meta { font-size: 11.5px; }
@@ -1193,7 +1304,7 @@ body.guide-color-modal-open{overflow:hidden}
   border: 1px solid var(--line);
   border-radius: 11px;
   background: var(--raised);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, .5);
+  box-shadow: var(--shadow-3);
 }
 .adm-menu[open] > .adm-menu__list { display: grid; }
 .adm-menu__item {
@@ -1208,8 +1319,13 @@ body.guide-color-modal-open{overflow:hidden}
   cursor: pointer;
 }
 .adm-menu__item:hover { color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); }
-.adm-menu__item--danger { color: #ff8b8b; }
-.adm-menu__item--danger:hover { color: #ff8b8b; background: color-mix(in srgb, var(--loss) 16%, transparent); }
+/*
+  Красный пункт меню остаётся красным и на красной подложке, поэтому подложка
+  hover доведена до 8 %: при прежних 16 % та же краска текстом давала 4,08:1
+  ночью и 4,31:1 днём — ниже порога, ровно в тот момент, когда по пункту бьют.
+*/
+.adm-menu__item--danger { color: var(--loss); }
+.adm-menu__item--danger:hover { color: var(--loss); background: color-mix(in srgb, var(--loss) 8%, transparent); }
 
 /* Средняя ширина: статус уходит на вторую строку, пульт остаётся справа. */
 @media (max-width: 820px) {
@@ -1219,10 +1335,16 @@ body.guide-color-modal-open{overflow:hidden}
   .adm-player__state { grid-area: 2 / 1 / 3 / 3; }
 }
 
+/*
+  Знак «стоп» в списке игроков. Розовый литерал #ff8b8b был рассчитан по ночному
+  фоне и в дневной теме падал до 2,06:1 — ровно у самого короткого текста
+  (11,5 px). Нынешняя краска — тема: 5,53:1 ночью и 5,80:1 днём на карточке,
+  4,98:1 и 4,99:1 на своей же подложке из 10 % той же краски.
+*/
 .adm-badge--stop {
-  color: #ff8b8b;
-  border-color: rgba(255,110,110,.4);
-  background: rgba(255,110,110,.1);
+  color: var(--loss);
+  border-color: color-mix(in srgb, var(--loss) 40%, transparent);
+  background: color-mix(in srgb, var(--loss) 10%, transparent);
 }
 .adm-players__note { margin-top: 16px; font-size: 12px; line-height: 1.55; }
 /* Блок примечаний внизу «Игроков»: раньше класс был без правил вовсе. */
@@ -1274,7 +1396,10 @@ body.guide-color-modal-open{overflow:hidden}
   padding: 11px 13px;
   border-left: 2px solid var(--line);
   border-radius: 0 10px 10px 0;
-  background: rgba(0,0,0,.22);
+  /* Цитата нарушения — то же «проваленное» поле, что и строка ввода: нижняя
+     ступень лестницы, а не чёрная плёнка поверх карточки. В дневной теме
+     прежний rgba(0,0,0,.22) давал грязно-серое пятно, которого в палитре нет. */
+  background: var(--recessed);
 }
 .adm-report__author { color: var(--mute); font-size: 11.5px; }
 .adm-report__title { display: block; margin: 4px 0 6px; font-size: 14px; }
@@ -1314,7 +1439,7 @@ body.guide-color-modal-open{overflow:hidden}
   padding: 8px 11px;
   border-left: 2px solid var(--line);
   border-radius: 0 8px 8px 0;
-  background: rgba(0,0,0,.22);
+  background: var(--recessed);
   color: var(--dim);
   font-size: 12.5px;
 }
@@ -1365,7 +1490,9 @@ body.guide-color-modal-open{overflow:hidden}
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(3,7,12,.78);
+  /* Затемнение берётся из темы, как в окне форума: в дневной теме глухой
+     графит на пол-экрана читался бы как аварийный экран. */
+  background: var(--scrim);
   backdrop-filter: blur(10px);
 }
 .adm-modal[hidden] { display: none; }
@@ -1378,8 +1505,12 @@ body.guide-color-modal-open{overflow:hidden}
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: linear-gradient(150deg, #182531 0%, #0b111a 72%);
-  box-shadow: 0 24px 80px rgba(0,0,0,.6);
+  /* Окно панели — верхняя ступень той же лестницы, что и окно форума: в
+     светлой теме оно обязано быть светлым. Прежний тёмный градиент был
+     запечён в базовое правило, и панель в дневной режиме открывала чёрный
+     прямоугольник посреди белой страницы. */
+  background: var(--overlay);
+  box-shadow: var(--shadow-3);
 }
 .adm-modal__box h3 { margin: 0 0 8px; font-size: 18px; }
 .adm-modal__box h3 b { color: var(--accent); }
@@ -1420,11 +1551,28 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-restrict-presets .adm-btn { min-height: 30px; padding: 4px 9px; font-size: 12px; }
 
 /* ── Чаты ─────────────────────────────────────────────────────────────────── */
-.adm-badge--leader { color: #5cc8ff; border-color: rgba(92,200,255,.35); background: rgba(92,200,255,.1); }
+/*
+  Значок «лидер набора» был написан голубым литералом #5cc8ff: в ночной теме
+  он держал 8,61:1, а в дневной падал до 1,72:1, то есть на светлой карточке
+  пропадал совсем. Теперь это та же краска, что и у ссылки — `--link`
+  (8,61:1 / 6,59:1 на карточке, 7,31:1 / 5,69:1 на своей подложке).
+*/
+.adm-badge--leader {
+  color: var(--link);
+  border-color: color-mix(in srgb, var(--link) 35%, transparent);
+  background: color-mix(in srgb, var(--link) 10%, transparent);
+}
 .adm-chats { display: grid; gap: 8px; }
 .adm-chat { border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--text) 2%, transparent); }
-.adm-chat.is-closed { opacity: .7; }
-.adm-chat.is-open { border-color: rgba(255,106,43,.4); }
+/*
+  Закрытый чат. Прежняя планка `opacity: .7` гасила и строку, и её же кнопки:
+  подпись падала до 3,72:1 ночью и 2,94:1 днём, хотя рядом висит значок
+  «закрыт» — ровно тот же смысл, да ещё и доступный со сменой темы. Состояние
+  держат исчезнувшая подложка и приглушённая рамка, текст остаётся в AA.
+*/
+.adm-chat.is-closed { background: transparent; border-color: var(--line-soft); }
+.adm-chat.is-closed .adm-chat__who b { color: var(--dim); }
+.adm-chat.is-open { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .adm-chat__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; }
 .adm-chat__who { min-width: 0; flex: 1 1 260px; }
 .adm-chat__who b { display: block; font-size: 14.5px; }
@@ -1435,7 +1583,14 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-chat__members ul, .adm-chat__messages ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .adm-chat__members li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 13px; }
 .adm-chat__messages li { padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--text) 3%, transparent); font-size: 13px; }
-.adm-chat__messages li.is-deleted { opacity: .55; }
+/*
+  Удалённое сообщение: модератору нужна сама строчка «удалено: причина», она и
+  есть ответ на вопрос, что тут лежало. Прежняя планка `opacity: .55` гасила её
+  до 5,54:1 ночью и 3,43:1 днём — в светлой теме причина становилась нечитаемой
+  как раз там, где её сверяют. Теперь сообщение уходит в нижнюю ступень
+  лестницы (проваленная плашка) и в краску подписи, обе темы остаются в AA.
+*/
+.adm-chat__messages li.is-deleted { background: var(--recessed); color: var(--mute); }
 .adm-chat__msg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; font-size: 12px; }
 .adm-chat__msg-head time { color: var(--mute); font-size: 11px; }
 .adm-chat__msg-del { margin-left: auto; padding: 0 6px; border: 0; background: none; color: var(--mute); cursor: pointer; }
@@ -1471,8 +1626,23 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-mod-queue p { margin: 6px 0 10px; font-size: 12px; }
 .adm-mod-queue__items { display: flex; flex-wrap: wrap; gap: 7px; }
 .adm-mod-priority { padding: 5px 8px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); }
-.adm-mod-priority--urgent { color: #c77b20; background: rgba(199,123,32,.1); border-color: rgba(199,123,32,.28); }
-.adm-mod-priority--critical { color: #d65252; background: rgba(214,82,82,.1); border-color: rgba(214,82,82,.3); }
+/*
+  Срочность в очереди модератора. Обе краски были заданы литералами под ночной
+  фон: #c77b20 и #d65252 на светлой карточке давали 3,06:1 и 3,70:1, то есть в
+  дневной теме самая важная метка экрана становилась подписью вполнакала. Теперь
+  это сигнальные токены темы — янтарь 8,62:1 / 5,97:1 и красный 5,53:1 / 5,80:1
+  на самой карточке, 7,37:1 / 5,19:1 и 4,98:1 / 4,99:1 на своей подложке.
+*/
+.adm-mod-priority--urgent {
+  color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+  border-color: color-mix(in srgb, var(--gold) 28%, transparent);
+}
+.adm-mod-priority--critical {
+  color: var(--loss);
+  background: color-mix(in srgb, var(--loss) 10%, transparent);
+  border-color: color-mix(in srgb, var(--loss) 30%, transparent);
+}
 .adm-mod-log ul { display: grid; gap: 6px; padding: 0; margin: 10px 0 0; list-style: none; }
 .adm-mod-log li { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; font-size: 13px; }
 .adm-mod-log time { color: var(--mute); font-size: 12px; }
@@ -1535,10 +1705,11 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-section-mute form { display: grid; gap: 10px; margin-top: 12px; }
 
 /* ── Светлая тема «Arctic Command» ──────────────────────────────────────────
-   Фон холодный светлый, панели — белое стекло (токены в styles-v8.css),
-   поэтому шапка, подвал и заголовки экранов работают на дефолтных токенах.
-   Здесь только янтарная сигнальная линия под шапкой — как у сайта. */
-:root[data-theme="light"] .adm-top { border-bottom-color: rgba(217,130,43,.35); }
+   Фон холодный светлый, панели — те же ступени лестницы, что и у сайта
+   (токены в styles-v8.css), поэтому шапка, подвал, окна и заголовки экранов
+   работают на дефолтных правилах без единого дневного исключения. Янтарная
+   линия под шапкой сюда больше не вынесена: она собирается из `--accent`
+   в базовом правиле и в дневной теме сама становится приглушённой. */
 
 .adm-boot {
   display: grid;
@@ -1551,7 +1722,9 @@ body.guide-color-modal-open{overflow:hidden}
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
   border-radius: 18px;
   background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--bg) 82%, transparent));
-  box-shadow: 0 22px 60px -38px rgba(0, 0, 0, .9);
+  /* Тень берётся из темы: в дневной экран загрузки висит над светлой страницей,
+     и почти чёрная плёнка rgba(0,0,0,.9) под ним выглядела провалом. */
+  box-shadow: var(--shadow);
 }
 .adm-boot__mark { position: relative; display: grid; width: 56px; height: 56px; place-items: center; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--accent) 13%, transparent); }
 .adm-boot__mark i { position: absolute; inset: -60%; background: conic-gradient(from 0deg, transparent 0 68%, var(--accent) 79%, transparent 91%); animation: adm-boot-spin 2.1s linear infinite; }
@@ -1561,7 +1734,7 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-boot__copy span { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
 .adm-boot__copy b { color: var(--text); font-size: 15px; }
 .adm-boot__rail { grid-column: 1 / -1; height: 3px; overflow: hidden; border-radius: 3px; background: color-mix(in srgb, var(--text) 7%, transparent); }
-.adm-boot__rail i { display:block; width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, transparent, var(--accent), #ffd36e, transparent); animation:adm-boot-scan 1.45s ease-in-out infinite; }
+.adm-boot__rail i { display:block; width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, transparent, var(--accent), var(--gold), transparent); animation:adm-boot-scan 1.45s ease-in-out infinite; }
 @keyframes adm-boot-spin { to { transform: rotate(1turn); } }
 @keyframes adm-boot-scan { from { transform: translateX(-105%); } to { transform: translateX(245%); } }
 @media (prefers-reduced-motion: reduce) { .adm-boot__mark i, .adm-boot__rail i { animation: none; } .adm-boot__rail i { transform: translateX(70%); } }

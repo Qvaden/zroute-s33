@@ -11,36 +11,65 @@
 
 /* ── Токены: тёмная тема (по умолчанию) ─────────────────────────────────── */
 :root {
-  --bg:        #080a0f;
-  --surface:   #0c0f14;
-  --raised:    #11151c;
-  --raised-2:  #151a21;
-  --line:      #222a36;
-  --line-soft: #161d26;
+  /*
+    ЛЕСТНИЦА ПОВЕРХНОСТЕЙ — шесть ступеней, а не четыре цвета.
+
+    Глубина — это не тень, а различимый шаг светлоты между слоями. До
+    редизайна четыре поверхности темы отличались друг от друга в 1,03–1,13
+    раза: на глаз это одна плоскость, а панель от страницы отличалась только
+    рамкой. Теперь ступени идут снизу вверх так: провал (`--recessed` — поля
+    ввода, желобок таблицы, скелетон), страница (`--bg`), карточка
+    (`--surface`), плашка внутри карточки (`--raised`), выбранная плашка
+    (`--raised-2`), слой окна (`--overlay` — шторка, модалка, всплывающее
+    меню). Соседние ступени различимы без рамки, поэтому граница перестаёт
+    быть единственным признаком слоя.
+
+    Порядок светлоты в тёмной теме — вверх от провала, и это НЕ зеркало
+    светлой: там своя лестница и своё направление для `--raised` (см. блок
+    `[data-theme="light"]`), потому что в светлой теме вложенная плашка
+    читается углублением, а не подъёмом.
+  */
+  --recessed:  #05070c;
+  --bg:        #0a0e15;
+  --surface:   #10161f;
+  --raised:    #171f2b;
+  --raised-2:  #1f2936;
+  --overlay:   #26313f;
+  --line:      #29323f;
+  --line-soft: #1a2331;
 
   --text:      #f2f4f7;
   --dim:       #b4bcc8;
   /*
     Второстепенный текст (подписи плиток, даты, строки про автомат).
     Прежний #666e7b давал 3.07:1 на самой светлой панели — ниже порога AA для
-    обычного текста. #8c95a3 держит ≥5,1:1 и на --surface, и на --raised-2, и на
-    плашках, которые светлее подложки (бирюзовая --shop-soft, полоса летописи).
+    обычного текста. #8c95a3 держал порог, пока самой светлой подложкой была
+    панель: лестница добавила слой окна (#26313f), и на нём прежняя подпись
+    падала до 4,36:1. #929cad — 4,76:1 на окне и ≥5,3:1 на всём, что ниже,
+    и при этом остаётся вдвое темнее `--dim`, то есть ступень иерархии
+    видна, а не съедена.
   */
-  --mute:      #8c95a3;
+  --mute:      #929cad;
 
   --accent:    #ff5a36;
-  --accent-dk: #d83a32;
+  /* Сигнальный красный-в-тени: обводка и низ градиента залитой плашки.
+     Прежний #d83a32 держал 3:1 как текст ровно до тех пор, пока самой
+     светлой поверхностью не стал слой окна: на #26313f он падал до 2,87:1.
+     #e0453a — тот же тон темнее акцента, но 3,19:1 на окне. */
+  --accent-dk: #e0453a;
   /* Чернила signal-оранжевым: подписи и ссылки в тексте. В тёмной теме это
      тот же #ff5a36 (6,0:1 и выше), в светлой — отдельно подобранный тон. */
   --accent-ink: #ff5a36;
   /*
     Чернила НА залитой плашке: фон кнопки — это сам акцент, поэтому подпись
     обязана быть темнее бумаги, а не светлее. В тёмной теме это собственный
-    цвет страницы, в светлой — абсолютный чёрный: #14100c на янтаре #c05a24
-    давал 4,26:1, и ни один тёплый оттенок чёрного порога 4,5 не добирает,
-    потому что янтарь светлой темы темнее своего собрата из тёмной.
+    цвет страницы (и держит 6,38:1 на оранжевом), в светлой — тёплый
+    почти-белый: там краска-акцент сама по себе темная (#b8481a), и чёрный
+    глиф на ней дал бы 5,02:1 лишь ценой вида «белая надпись на кирпиче».
+    Одна и та же роль — и противоположные решения: это и есть две темы, а не
+    инверсия.
   */
-  --on-accent: #080a0f;
+  --on-accent: #0a0e15;
 
   /*
     Призы рейтинга одним рядом: место №1, №2 и №3 красятся отсюда, а не
@@ -49,7 +78,11 @@
   */
   --gold:      #d9a94a;
   --silver:    #b3bcc9;
-  --bronze:    #c08a5f;
+  /* Бронза — подпись мест №2 и №3 на самом верхнем слое окна, и прежний тон
+     давал там 4,42:1, то есть чуть ниже AA. #c18c62 светлее ровно на шаг
+     шкалы: 4,52:1 на `--overlay` и 6,62:1 на странице. Приз не перестал быть
+     бронзой — перестала теряться цифра места. */
+  --bronze:    #c18c62;
   /* Чернила золота: бейдж «Объявление» сидит на своей же подкраске, и там
      #d9a94a как подпись проходит, а в светлой теме золото темнее бумаги и
      требует отдельного тона. В тёмной теме чернила — само золото, здесь они
@@ -73,6 +106,36 @@
     квадратик цвета остаются нетронутыми — принадлежность читается ими.
   */
   --tag-ink-keep: 70%;
+
+  /*
+    ВТОРАЯ КРАСКА КОМАНДНОГО ЦЕНТРА — «электрик» и фиолет.
+
+    Сигнальный оранжевый решает плашки и ошибки, а электрик — служебные
+    подсветки: линия сетки шапки, обводка колец, плашка бота. Он не может быть
+    одним числом в двух темах: в тёмной это светлое серебристо-сиреневое
+    (#a7a3c2), а в светлой — приглушённый стальной (#51606e). Та же роль,
+    противоположная половина палитры.
+
+    `--electric-ink` и `--electric-hi` — чернила и hover на залитой электриком
+    плашке. Направление задаёт тема: там, где плашка светлая, надпись тёмная, и
+    наоборот. Правило пишет только имена, а не цвета.
+  */
+  --electric: #a7a3c2;
+  --violet:   #9c7cff;
+  /*
+    Фиолетовый как подпись — отдельно от фиолетового как краски.
+
+    Переключатель «вождь сервера» в панели красит плашку собой же (15 % тона),
+    и та же краска подписью даёт на такой плашке 3,42:1: надпись тонет в
+    собственном фоне. Это ровно тот же случай, из-за которого существуют
+    --win-ink и --gold-ink, поэтому решение то же — плашку не трогать, а для
+    подписи завести свой тон. #b299ff держит 4,52:1 на фиолетовой плашке и
+    5,58:1 на `--overlay`, оставаясь тем же сиреневым, только светлее.
+  */
+  --violet-ink: #b299ff;
+  --electric-ink: #081011;
+  --electric-hi:  #b9fff4;
+  --hud-line: color-mix(in srgb, var(--electric) 20%, transparent);
 
   /*
     Геометрия жёсткая: 6 / 10 / 14. Прежние 8 / 14 / 20 делали из каждой панели
@@ -123,7 +186,86 @@
   --tabbar-space: calc(var(--tabbar-h) + var(--tabbar-edge) + env(safe-area-inset-bottom, 0px));
 
   --wrap: 1240px;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.7);
+
+  /*
+    ЛЕСТНИЦА ТЕНЕЙ — три ступени по высоте подъёма, а не одна на всё.
+
+    §45 просит тени незаметные, слоистые и осмысленные. Осмысленно это значит
+    так: тень повторяет слой лестницы поверхностей. `--shadow-1` кладут
+    элементы, которые лежат вровень со своей плашкой (чип, переключатель),
+    `--shadow` — карточка, `--shadow-3` — то, что действительно отрывается от
+    страницы и лежит поверх других слоёв: шторка, окно, всплывающее меню.
+    Разница между ступенями не в силе, а в размахе: у окна тень шире и мягче,
+    поэтому он и выглядит дальше от бумаги, чем карточка.
+
+    Внутри `--shadow` живёт и верхний блик: он один и тот же у всех карточек,
+    и держать его отдельным числом в каждом правиле не от чего, кроме как
+    потерять его при следующей правке.
+  */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.45);
+  --shadow:   inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -16px rgba(0,0,0,.72);
+  --shadow-3: 0 34px 78px -30px rgba(0,0,0,.9), 0 6px 18px -10px rgba(0,0,0,.6);
+
+  /* Градиент плашки: верх светлее низа — тот самый «subtle gradient» из §27,
+     который даёт слою объём без второй рамки. */
+  --plate-grad: linear-gradient(168deg, var(--raised-2), var(--surface) 72%);
+  --sheen: inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent);
+
+  /* Занавес под окном и шторкой. В тёмной теме — почти чёрный, в светлой он
+     обязан быть серо-голубым: затемнение #060709 на холодном белом фоне
+     превращает страницу в мёртвую, а окно поверх него теряет связь с темой. */
+  --scrim: rgba(4,7,12,.74);
+
+  /*
+    СМЕШИВАНИЕ — ТОЖЕ ИЗ ЛЕСТНИЦЫ.
+
+    Правилу нужно «чуть темнее карточки» или «чуть светлее акцента» — и раньше
+    оно писало `#000` или `#fff` прямо в color-mix. В светлой теме чёрный
+    смешивался с холодным фоном и давал грязно-серый край, а белый убивал
+    чернила на залитой плашке: янтарь светлой темы с белым краем читался
+    почти-белой подписью за 3,40 : 1, то есть ниже AA. Поэтому направление
+    смешивания названо токеном, а не краской: `--shade` — «ступень вниз»,
+    `--tint` — «ступень вверх».
+
+    Роль у тем разная, и это как раз то, что нужно: тёмная тема уходит вниз к
+    провалу `--recessed`, а вверх — к своим чернилам `--text`. Светлая тема те
+    же имена переставляет: её «вниз» — это графит `--text`, а «вверх» — самый
+    светлый слой `--overlay`. Правило при этом пишет одно и то же имя, поэтому
+    правка акцента в одном месте не оставляет на холодном фоне тёплого пятна
+    старой краски.
+  */
+  --shade: var(--recessed);
+  --tint:  var(--text);
+
+  /*
+    ЗАЛИТАЯ СИГНАЛЬНАЯ ПЛАШКА — фон кнопки, активной вкладки, плитки «33».
+
+    Направление градиента у тем РАЗНОЕ, и это не каприз: тёмная тема может
+    осветлять акцент (её чёрные чернила `--on-accent` на осветлённом оранжевом
+    читается 8,15 : 1), светлая — нет (её чернила почти белые, и тот же приём
+    даёт 3,40 : 1, ниже AA). Светлой теме остаётся второй путь: уходить вниз,
+    к `--accent-dk`, где надпись держит 7,54 : 1 при 5,02 : 1 на основной точке
+    плашки. Числа считает секция AW в тестах, а не глаз.
+
+    «ОПАСНАЯ» ПЛАШКА устроена ровно так же, потому что красная краска в темах
+    перевёрнута: ночью `--loss` яркий (#f2555f) и требует тёмной подписи,
+    днём он глубокий (#9c3232) и требует светлой. Осветление вниз по той же
+    лестнице даёт 5,74 : 1 и 6,85 : 1, а второй край плашки — 7,84 : 1 и
+    8,21 : 1. Отдельный цвет на кнопку удаления не заводят: роль у неё та же,
+    что у `--loss` везде.
+  */
+  --accent-plate: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, var(--tint)), var(--accent));
+  --accent-plate-line: color-mix(in srgb, var(--accent) 70%, var(--tint));
+  --danger-plate: linear-gradient(135deg, color-mix(in srgb, var(--loss) 70%, var(--tint)), var(--loss));
+  --danger-plate-line: color-mix(in srgb, var(--loss) 70%, var(--tint));
+
+  /*
+    БЕГУЩИЙ БЛИК по плашке цены. Полоса раньше была написана белым напрямую,
+    и в дневной теме она не просто бессмысленна — она невидима: белое пятно на
+    почти белой карточке. Поэтому направление взято из лестницы: ночью блик
+    светлее подложки, днём — темнее, и в обеих темах он остаётся заметен.
+  */
+  --shimmer: color-mix(in srgb, var(--tint) 34%, transparent);
 
   --ease: cubic-bezier(.22,.68,.34,1);
 
@@ -159,6 +301,13 @@
   --fs-h1:      clamp(30px, 4.2vw, 46px);
   --fs-hero:    clamp(42px, 8.4vw, 78px);
   --fs-stat:    clamp(32px, 3.2vw, 42px);
+  /*
+    Младшая ступень показателя: числа в HUD-панели главной. Они стоят в плотной
+    сетке, по четыре в ряд, и взрослый --fs-stat (32–42 px) разрывает этот ряд на
+    телефоне. Роль у числа та же, что у обычного показателя, поэтому ступень
+    объявлена рядом с ним, а не вписана числом в правило.
+  */
+  --fs-stat-sm: clamp(21px, 2.6vw, 28px);
   /*
     Нижняя граница каждой пары clamp — это телефон, верхняя — широкий экран.
     Так «отдельная шкала для mobile» (§7) и полоса 42–52 px для заголовка
@@ -233,57 +382,87 @@
   --soft-ok:   #9be9bd;
   --soft-bad:  #ffb3ba;
   --soft-warn: #ffe1a3;
+  /*
+    Бирюза метки «Блогер». Оттенок не декоративный, а подписной: метка
+    красится своим цветом, и в светлой теме прежний #31c5b5 давал на карточке
+    1,96:1 — то есть подпись не читалась совсем. #0f6a60 держит 5,91:1 на
+    карточке и 5,39:1 на странице, оставаясь той же бирюзой.
+  */
+  --blogger:   #31c5b5;
 }
 
 /* ── Токены: светлая тема ──────────────────────────────────────────────── */
-/* «Arctic Command»: холодный командный центр премиальной AAA-игры. База —
-   светло-серый с голубым подтоном (не белый!), панели — белое стекло,
-   текст — графитово-синие чернила, сигнальный акцент — янтарь. Пропорция:
-   ~70% холодных нейтральных, ~20% графит, ~10% янтарь и статусы. */
+/* «Daylight Deck»: светлая тема собрана заново, а не переинвертирована.
+
+   Что было не так. Прежняя палитра жила бежевым: страница #ece9e1, карточка
+   #f7f4ec, плашка #e5e0d5 — три оттенка одной температуры, различимые на
+   1,04–1,24 по светлоте, то есть ровно те «серые коробки», которых бриф
+   требует избегать. Холодным командный центр делал только шрифт.
+
+   Что сделано. Лестница из шести ступеней: провал под полями ввода,
+   страница, карточка, вложенная плашка, подсветка, слой окна. Шаг между
+   соседями виден без рамки, теней стало три ступени вместо одной, а
+   сигнальный янтарь остался единственной тёплой краской на холодном фоне:
+   бренд тот же, атмосфера другая.
+
+   Порядок ступеней здесь НЕ совпадает с тёмной темой: вложенная плашка
+   `--raised` (#dbe1eb) лежит ГЛУБЖЕ страницы (#e6ebf2), а не выше её, как
+   там. Глаз читает углубление затемнением, а подъём — высветлением, поэтому
+   направление одной ступени у тем разное; секция AW в тестах держит обе
+   лестницы по отдельности. */
 [data-theme="light"] {
-  --bg:        #ece9e1;
-  --surface:   #f7f4ec;
-  --raised:    #e5e0d5;
-  --raised-2:  #fbf8f1;
-  --line:      #d4ccbd;
-  --line-soft: #dfd8ca;
+  --recessed:  #ccd4e0;
+  --raised:    #dbe1eb;
+  --bg:        #e6ebf2;
+  --surface:   #f2f5f9;
+  --raised-2:  #f8fafe;
+  --overlay:   #fdfeff;
+  --line:      #b9c4d3;
+  --line-soft: #d3dae5;
 
-  --text:      #2b2822;
-  --dim:       #625d53;
-  /* Тот же порог AA, что и в тёмной теме, но с запасом на подкрашенных
-     панелях: #696357 на тёплой плашке главной давал 4,47:1 — на сотую ниже
-     порога, и поймал это не ревью, а замер пикселом. */
-  --mute:      #645e52;
+  /* Чернила — графит с синим подтоном, а не чёрный: #181f2c на карточке
+     даёт 15,1:1, что уже на грани «слишком высокой контрастности», поэтому
+     основная масса текста идёт `--dim` и `--mute`, а `--text` остаётся
+     заголовкам и цифрам. */
+  --text:      #181f2c;
+  --dim:       #414c5d;
+  /* Порог AA считается по самой тёмной поверхности темы — это провал
+     `--recessed` под полями ввода, а не страница. На нём подпись держит
+     4,69:1; прежний бежевый #645e52 на новом холодном провале падал бы
+     ниже 4,5, и поймал это расчёт, а не глаз. */
+  --mute:      #4e5a6b;
 
-  --accent:    #c05a24;
-  --accent-dk: #943e19;
-  /* Чернила отдельным токеном: #c05a24 как фон кнопки с чёрным текстом даёт
-     6,5:1, а как текст на четырёх светлых поверхностях — только 3,37…4,19.
-     Одна и та же краска не может быть и плашкой, и подписью, поэтому подпись
-     несёт тёмный тон: #943e19 держит на тех же поверхностях 5,39…6,68. */
-  --accent-ink: #943e19;
-  /* Чернила на залитой янтарём плашке. Здесь нужен именно абсолютный чёрный:
-     #14100c на #c05a24 даёт 4,26:1, и ни один тёплый оттенок чёрного порог
-     4,5 не добирает, потому что янтарь светлой темы темнее своего собрата из
-     тёмной. Теплоту надписи глаз на плашке всё равно не читает — она тонет
-     в насыщенном фоне. */
-  --on-accent: #000;
+  /* Единственная тёплая краска холодного светлого фона — сигнальный
+     оранжевый. Он же бренд, он же ошибка, он же плашка кнопки. Тон темнее
+     прежнего янтаря #c05a24, потому что поверхность под ним стала холоднее и
+     светлее: как текст #b8481a держит 3,53:1 на самом тёмном светлом слое, то
+     есть AA для крупного, и ровно поэтому подпись несёт отдельный тон. */
+  --accent:    #b8481a;
+  --accent-dk: #8e3410;
+  /* Одна и та же краска не может быть и плашкой, и подписью: #b8481a как
+     текст на светлых поверхностях — 3,53…4,68, а подпись обязана держать
+     полных 4,5. #8e3410 даёт 5,31…6,94 по всем шести ступеням. */
+  --accent-ink: #8e3410;
+  /* Чернила на залитой плашке — тёплый почти-белый, а не чёрный глиф.
+     Кирпично-оранжевый #b8481a сам по себе тёмный, и белая надпись на нём
+     держит 5,02:1; в тёмной теме та же роль решена противоположно (тамошний
+     акцент светлый, поэтому подпись там чернильная). Это и есть две разные
+     темы, а не инверсия. */
+  --on-accent: #fff8f2;
   /* Золото — и плашка приза, и подпись «Лидер сезона», и номер места у №1.
-     Как текст оно обязано дотягивать до 4,5 на худшей светлой поверхности,
-     а ею оказался не `--raised-2` (#e5e0d5 → 4,63:1), а тёплая плашка
-     главной на 320 px: #835a1a дал на ней 4,44:1. Сдвиг на #805719 —
-     ровно те же 4 сотых, которые глаз не видит, но порог не пропускает. */
-  --gold:      #805719;
-  /* Золото как подпись на своей же подкраске: #805719 на тёплой плашке бейджа
-     дал 4,24 : 1, то есть ровно ту же ошибку, из-за которой уже отделены
-     --win-ink и --loss-ink. Здесь тон темнее на треть, плашка не тронута. */
-  --gold-ink:  #6b4a13;
+     Как текст оно обязано дотягивать до 4,5 на худшей светлой поверхности, а
+     худшей стала не карточка, а провал под полями ввода: #6f5013 держит на
+     нём 4,96:1 и 5,9:1 на странице. */
+  --gold:      #6f5013;
+  /* Золото как подпись на своей же подкраске: то же правило, из-за которого
+     отделены --win-ink и --loss-ink. Плашка не тронута, тон темнее. */
+  --gold-ink:  #604510;
   /* Те же три приза в светлой теме: тёмная половина палитры, иначе серебро
-     и бронза на белом стекле карточки исчезают (проверено: 5,0:1 и 5,3:1). */
-  --silver:    #5f6a7a;
-  --bronze:    #8a5a34;
-  --win:       #28745a;
-  --loss:      #b84b45;
+     и бронза на светлой карточке исчезают. */
+  --silver:    #4f5a6c;
+  --bronze:    #7d4a28;
+  --win:       #1a6249;
+  --loss:      #9c3232;
   /* Те же чернила в светлой теме: цвета альянсов там ярче самой темы, и
      65 % цвета — минимум, при котором худший оттенок бейджа доходит до 5,06:1. */
   --win-ink:  color-mix(in oklab, var(--win) 65%, var(--text));
@@ -292,16 +471,133 @@
      остаётся 1,9:1, а с этим — 5,18:1. */
   --tag-ink-keep: 30%;
 
-  --shadow: 0 1px 0 rgba(255,255,255,.72) inset, 0 12px 32px -24px rgba(69,51,30,.32);
+  /*
+    Тени светлой темы — холодные и в три ступени, как и в тёмной. Прежняя
+    тень была бежевой (rgba(69,51,30)) и одна на все слои, из-за чего карточка
+    и всплывающее окно отбрасывали одинаковую тень, то есть стояли на одной
+    высоте. Цвет тени взят из подтона самой темы, а не из чёрного: чёрная тень
+    на голубоватой бумаге выглядит грязной.
+  */
+  --shadow-1: 0 1px 2px rgba(24,37,56,.10);
+  --shadow:   inset 0 1px 0 rgba(255,255,255,.85), 0 10px 28px -18px rgba(24,37,56,.3);
+  --shadow-3: 0 34px 74px -30px rgba(24,37,56,.34), 0 6px 16px -10px rgba(24,37,56,.2);
+
+  /* Плашка светлой темы идёт от самого светлого слоя к карточке: тот же
+     «subtle gradient», что и в тёмной теме, но направлены они в разные
+     стороны, потому что ступени лестницы там идут вверх, а здесь — вниз. */
+  --plate-grad: linear-gradient(168deg, var(--raised-2), var(--surface) 72%);
+  --sheen: inset 0 1px 0 rgba(255,255,255,.85);
+
+  /* Занавес светлой темы — синий пепел, а не чёрный: при .74 чёрного слоя
+     страница за окном гаснет целиком, и окно перестаёт принадлежать теме. */
+  --scrim: rgba(30,44,64,.42);
+
+  /*
+    Направления смешивания в светлой теме ПЕРЕВЕРНУТЫ, и это не украшение:
+    самый тёмный слой местной лестницы — провал `--recessed` — это светло-серый
+    #ccd4e0, и подмешивать к нему краску значило бы её осветлять. Поэтому
+    «вниз» здесь идёт к графиту чернил, а «вверх» — к почти белому `--overlay`.
+  */
+  --shade: var(--text);
+  --tint:  var(--overlay);
+
+  /*
+    Плашка светлой темы обязана темнеть, а не светлеть, и причина арифметическая.
+    Её подпись — почти белый #fff8f2; на осветлённом акценте она падает до
+    3,40 : 1, а на затемнённом краю держит 7,54 : 1. Поэтому её градиент идёт
+    от `--accent` к `--accent-dk` — в противоположную тёмной теме сторону,
+    оставаясь тем же сигнальным оранжевым.
+  */
+  --accent-plate: linear-gradient(135deg, var(--accent), var(--accent-dk));
+  --accent-plate-line: var(--accent-dk);
+
+  /*
+    Плашка удаления — тот же переворот. Тёмная тема осветляет красный
+    (подпись #0a0e15 держит 5,74:1 на_base и 7,84:1 на осветлённом крае),
+    светлая затемняет: 82 % `--loss` дают #842f31, и почти белый чернила
+    #fff8f2 читаются на 8,21:1. Если бы светлая плашка шла вверх, как в
+    тёмной, подпись падала бы ниже 4,5:1.
+  */
+  --danger-plate: linear-gradient(135deg, var(--loss), color-mix(in srgb, var(--loss) 82%, var(--shade)));
+  --danger-plate-line: color-mix(in srgb, var(--loss) 82%, var(--shade));
+
+  /* Блик дневной темы идёт вниз: белая полоса на почти белой карточке не
+     была бы видна никому. 12 % графита дают заметный, но не грязный проход. */
+  --shimmer: color-mix(in srgb, var(--shade) 12%, transparent);
 
   color-scheme: light;
-  --link:      #79502b;
-  --soft-ok:   #28745a;
-  --soft-bad:  #b84b45;
-  --soft-warn: #835a1a;
+  /* Ссылка — стальной синий, а не тёплый коричневый, как было в бежевой теме:
+     там она спорила с янтарём, а на холодном фоне синий читается отдельной
+     ролью (в тёмной теме ссылка тоже синяя, так что роль совпадает). */
+  --link:      #28517d;
+  --soft-ok:   #1a6249;
+  --soft-bad:  #9c3232;
+  --soft-warn: #6f5013;
+  /* Метка «Блогер» — и рамка, и подпись, и плашка из неё же (8 % тона).
+     #0f6a60 на голом фоне проваливался в провале под полями (4,33:1), а на
+     собственной плашке — 3,93:1. #0d5f56 держит 5,04:1 на худшей ступени и
+     4,54:1 на своей плашке, оставаясь тем же глубоким бирюзовым. */
+  --blogger:   #0d5f56;
+
+  /*
+    Электрик светлой темы — стальной, а не серебристо-сиреневый: на холодном
+    светлом фоне прежнее #a7a3c2 держал как подпись 2,22:1 на карточке и
+    2,02:1 на странице, а как рамка исчезал совсем.
+
+    #4f5d6b, а не #51606e: как подпись электрону не хватало до AA ровно на
+    самой нижней ступени — 4,33:1 в провале под полями ввода при требующихся
+    4,5. Шаг светлоты не виден глазу, но матрица «пять красок × шесть ступеней»
+    закрывается целиком: 4,52:1 в провале, 6,17:1 на карточке.
+
+    Чернила на залитой им плашке перевёрнуты относительно тёмной темы, и
+    другого выхода нет: стальной #4f5d6b сам по себе тёмный, поэтому почти
+    белая надпись держит на нём 6,62:1, а ночные чёрные чернила дали бы там
+    2,85:1. Hover идёт вниз, к `--shade`, и становится только плотнее:
+    #455260 с той же надписью даёт 7,83:1.
+  */
+  --electric: #4f5d6b;
+  /*
+    Фиолетовый — краска роли «лидер набора». В панели она работает и подписью:
+    переключатель `data-player-leader` красит текст именно ею, сидя на плашке
+    из этих же 15 % тона. Прежний стальной #6c7a8c как подпись проваливался:
+    4,00:1 на карточке, 3,33:1 на поднятой плашке и 2,93:1 в провале. Нынешний
+    #5a4590 закрывает голые ступени (5,23:1 в провале, 5,94:1 на поднятой
+    плашке), но на собственной плашке из тех же 15 % тона — только 4,28:1.
+    Поэтому подпись вынесена отдельно в `--violet-ink`: тот же тон, только
+    глубже, — 5,53:1 в провале и 4,53:1 на фиолетовой плашке. Плашка и кромка
+    остаются краской — роль читается ими.
+    Квартовые градиенты правки не касаются: они живут на тёмном острове
+    `.quart-page`, где фиолетовый остаётся ночным.
+  */
+  --violet:     #5a4590;
+  --violet-ink: #56428a;
+  --electric-ink: #fbfdff;
+  --electric-hi:  color-mix(in srgb, var(--electric) 82%, var(--shade));
+  --hud-line: color-mix(in srgb, var(--electric) 30%, transparent);
 
   /* Сетка на светлом фоне — тёмная, иначе исчезает. */
-  --hud-grid: rgba(44,58,74,.07);
+  --hud-grid: rgba(30,44,64,.075);
+}
+
+/*
+  Чернила метки участника — единственная краска, у которой нет светлого
+  варианта, и это не недосмотр.
+
+  Квадратик с буквой красится цветом, посчитанным из ника (nickColor), и этот
+  цвет от темы не зависит: на экране чата один и тот же человек остаётся того
+  же тона, переключи он тему. Значит и подложка, и чернила обязаны быть
+  одинаковыми в обеих темах — иначе в одной из них буква пропадает.
+
+  Тёмные чернила выбраны потому, что светлые хуже. По всей палитре ников
+  (360 оттенков) худшая пара для почти белой буквы — 1,44:1 на жёлтом нике, для
+  тёмной — 5,34:1 на синем. Сама палитра при этом поднята со светлоты 58 % до
+  66 % при насыщенности 48 %: на прежней светлоте часть оттенков не набирала AA
+  (худшее 3,55:1 на синем нике). Запасная подложка #7a8494 держит с этими
+  чернилами 5,05:1.
+*/
+:root {
+  --mark-plate: #7a8494;
+  --mark-ink:   #0b1015;
 }
 
 /* ── Переключатель темы ──────────────────────────────────────────────────── */
@@ -453,7 +749,7 @@ body::before {
   z-index: 0;
   background:
     radial-gradient(900px 520px at 8% -8%,  color-mix(in srgb, var(--accent) 10%, transparent), transparent 62%),
-    radial-gradient(760px 460px at 96% 2%,  rgba(53,208,127,.055), transparent 58%);
+    radial-gradient(760px 460px at 96% 2%,  color-mix(in srgb, var(--win) 6%, transparent), transparent 58%);
 }
 body::after {
   content: '';
@@ -502,12 +798,59 @@ h1,h2,h3,h4 {
   display: grid; place-items: center;
   border-radius: var(--r);
   color: var(--on-accent);
-  background: linear-gradient(145deg, #ffa04a, var(--accent));
+  background: var(--accent-plate);
   box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .brand__text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand__text b { font-family: Unbounded, sans-serif; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
 .brand__text small { color: var(--mute); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; margin-top: var(--s-hair); }
+
+/*
+  «ГДЕ Я» В ШАПКЕ.
+
+  На широком экране колонка разделов стоит постоянно и подсвечивает активный
+  пункт, но она отвечает на вопрос «куда пойти», а не «что открыто»: чтобы
+  понять это, человек должен найти глазами подсветку в списке. Строка в шапке
+  называет раздел и тем же рядом — зачем он, и это единственный ответ,
+  который остаётся, когда колонка уехала в шторку.
+
+  На телефоне её нет намеренно: там ряд разделов внизу подсвечивает активную
+  клетку, а заголовок страницы называет раздел крупно. Третье слово в той же
+  теме ушло бы на цену — при 320 px в строке шапки не остаётся места даже
+  под марку и переключатель темы.
+
+  Это НЕ заголовок: <p>, а не <h*>, и aria-hidden. Заголовок h1 на странице
+  уже есть, и программа экрана прочла бы одно и то же слово дважды подряд —
+  человека это учит не доверять тому, что он слышит.
+*/
+.head__where { display: none; }
+@media (min-width: 1040px) {
+  .head__where {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    min-width: 0;
+    margin: 0;
+    /* Раздел прижат к левому краю, а не центрирован: шапка читается слева
+       направо, и «где я» обязано стоять там, где глаз её начинает. */
+    margin-right: auto;
+  }
+  .head__where b {
+    flex: none;
+    color: var(--text);
+    font-family: Unbounded, sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+  }
+  .head__where span {
+    color: var(--mute);
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 
 .nav { display: flex; gap: var(--s-hair); overflow-x: auto; scrollbar-width: none; padding-bottom: var(--s-1); }
 .nav::-webkit-scrollbar { display: none; }
@@ -529,7 +872,12 @@ h1,h2,h3,h4 {
 #app { padding-top: var(--s-4); padding-bottom: var(--s-6); }
 
 .panel {
-  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 92%, #000));
+  /* Карточка — это плашка лестницы, а не отдельный цвет: `--plate-grad` кладёт
+     её на `--raised-2` с переходом в `--surface`, и направление градиента у тем
+     разное. Прежняя запись подмешивала `#000` в `--surface`, поэтому в светлой
+     теме низ карточки уходил в серый, а верх оставался белёсым — то есть
+     карточка выглядела ямой, а не плашкой. */
+  background: var(--plate-grad);
   border: 1px solid var(--line);
   border-radius: var(--r);
   padding: var(--s-4) var(--s-3);
@@ -570,7 +918,7 @@ h1,h2,h3,h4 {
   border-radius: var(--r-lg);
   background:
     radial-gradient(700px 300px at 80% -30%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
-    linear-gradient(165deg, var(--raised-2), var(--surface) 62%);
+    var(--plate-grad);
   padding: var(--s-4) var(--s-3);
   margin-bottom: var(--s-3);
   box-shadow: var(--shadow);
@@ -608,7 +956,7 @@ h1,h2,h3,h4 {
   font-size: var(--fs-hero);
   line-height: .84;
   letter-spacing: -.05em;
-  background: linear-gradient(172deg, #fff 18%, #7d848f);
+  background: linear-gradient(172deg, var(--text) 18%, color-mix(in srgb, var(--text) 55%, var(--bg)));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .hero__dates { font-size: 13.5px; color: var(--dim); margin-top: var(--s-2); }
@@ -646,7 +994,7 @@ h1,h2,h3,h4 {
 
 .split__col .split__title {
   font-family: Inter, sans-serif;
-  font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
+  font-size: var(--fs-eyebrow); font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
   display: flex; align-items: center; gap: var(--s-1); margin-bottom: var(--s-2);
 }
 .split__col--win .split__title { color: var(--win); }
@@ -841,7 +1189,10 @@ h1,h2,h3,h4 {
   width: 100%;
   font: inherit; font-size: 14px;
   color: var(--text);
-  background: var(--raised);
+  /* Поиск — то же поле, что и в формах: яма лестницы, а не карточка.
+     Раньше он брал `--raised`, и на одной странице строка поиска была
+     светлее соседнего поля ввода — два слоя там, где один смысл. */
+  background: var(--recessed);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   padding: var(--s-1) var(--s-3) var(--s-1) var(--s-5);
@@ -849,9 +1200,11 @@ h1,h2,h3,h4 {
   transition: border-color .16s var(--ease), background .16s var(--ease);
 }
 .search input::placeholder { color: var(--mute); }
+.search input:hover { border-color: color-mix(in srgb, var(--text) 20%, transparent); }
 .search input:focus {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: var(--raised-2);
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .search input::-webkit-search-cancel-button { filter: invert(.6); cursor: pointer; }
 
@@ -1015,7 +1368,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   border-radius: var(--r-lg);
   background:
     radial-gradient(620px 260px at 12% -40%, color-mix(in srgb, var(--tag-color) 18%, transparent), transparent 62%),
-    linear-gradient(165deg, var(--raised-2), var(--surface) 64%);
+    var(--plate-grad);
   padding: var(--s-4) var(--s-3);
   margin-bottom: var(--s-4);
   box-shadow: var(--shadow);
@@ -1940,8 +2293,11 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 }
 
 /* ── WOW redesign: тактический командный центр Server 33 ────────────────── */
-:root { --electric: #a7a3c2; --violet: #9c7cff; --hud-line: color-mix(in srgb, var(--electric) 20%, transparent); }
-:root[data-theme="light"] { --electric: #51606e; --violet: #6c7a8c; --hud-line: color-mix(in srgb, var(--electric) 30%, transparent); }
+/*
+  Электрик и фиолет объявлены в блоках тем наверху: здесь они только
+  используются. Прежнее дублирование внутри этой секции молча перезадирало
+  светлую тему, и правка токена в одном месте ничего не меняла.
+*/
 body {
   background:
     radial-gradient(900px 600px at 50% -18%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 62%),
@@ -1972,23 +2328,26 @@ body::before { background: radial-gradient(560px 260px at 48% 5%, color-mix(in s
 .nav { padding-top: var(--s-fine); }
 .nav__link { border: 1px solid transparent; background: color-mix(in srgb, var(--text) 1.8%, transparent); }
 .nav__link:hover { border-color: var(--hud-line); background: color-mix(in srgb, var(--electric) 7%, transparent); }
-.nav__link.is-active { color: #081010; border-color: color-mix(in srgb, var(--text) 30%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent), 0 8px 24px -14px var(--accent); }
+.nav__link.is-active { color: var(--on-accent); border-color: color-mix(in srgb, var(--text) 30%, transparent); background: var(--accent-plate); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent), 0 8px 24px -14px var(--accent); }
 
 #app { position: relative; }
 .hero {
   min-height: 315px;
   border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  /* Два сигнальных световых пятна поверх общей плашки лестницы: плашку даёт
+     токен, поэтому герой меняет слой вместе со всей темой, а подсветка
+     остаётся фирменной. */
   background:
     radial-gradient(480px 220px at 88% 8%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 66%),
     radial-gradient(300px 260px at 2% 100%, color-mix(in srgb, var(--electric) 10%, transparent), transparent 70%),
-    linear-gradient(145deg, var(--raised-2) 0%, var(--raised) 58%, var(--surface) 100%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent), 0 22px 70px -38px color-mix(in srgb, var(--accent) 85%, transparent), var(--shadow);
+    var(--plate-grad);
+  box-shadow: var(--sheen), 0 22px 70px -38px color-mix(in srgb, var(--accent) 85%, transparent), var(--shadow);
 }
 .hero::after { opacity: .78; background: repeating-linear-gradient(58deg, color-mix(in srgb, var(--accent) 11%, transparent) 0 2px, transparent 2px 12px); }
 .hero__word { color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
 .leader { border-color: color-mix(in srgb, var(--gold) 48%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--gold) 17%, transparent), color-mix(in srgb, var(--text) 3.5%, transparent) 58%, color-mix(in srgb, var(--electric) 5%, transparent)); box-shadow: inset 3px 0 0 var(--gold), 0 14px 34px -26px color-mix(in srgb, var(--gold) 80%, transparent); }
 .leader__crown { display: inline-block; }
-.panel { border-color: color-mix(in srgb, var(--text) 10%, transparent); background: linear-gradient(145deg, color-mix(in srgb, var(--raised) 94%, transparent), color-mix(in srgb, var(--surface) 96%, transparent)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 14px 34px -25px rgba(0,0,0,.9); }
+.panel { border-color: color-mix(in srgb, var(--text) 10%, transparent); background: var(--plate-grad); box-shadow: var(--shadow); }
 .panel::before { background: linear-gradient(90deg, var(--accent), var(--electric), transparent 72%); opacity: .48; }
 .panel__head h2 { letter-spacing: -.045em; }
 .eyebrow { color: var(--electric); }
@@ -2060,7 +2419,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .boot-loader::before { content: ''; position: absolute; inset: 0; background: linear-gradient(color-mix(in srgb, var(--text) 2.5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--text) 2.5%, transparent) 1px, transparent 1px); background-size: 42px 42px; mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%); }
 .boot-loader::after { content: ''; position: absolute; top: 0; left: -30%; width: 24%; height: 100%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--electric) 12%, transparent), transparent); transform: skewX(-15deg); animation: boot-scan 2.6s ease-in-out infinite; }
 .boot-loader__core { position: relative; z-index: 1; display: grid; justify-items: center; min-width: min(310px, 82vw); }
-.boot-loader__mark { position: relative; display: grid; place-items: center; contain: paint; width: 92px; height: 92px; border: 1px solid color-mix(in srgb, var(--accent) 80%, transparent); border-radius: var(--r-2xl); background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); color: #12100d; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 6%, transparent), 0 18px 40px -24px rgba(0,0,0,.75); animation: boot-mark-in .78s var(--ease-spring) both; }
+.boot-loader__mark { position: relative; display: grid; place-items: center; contain: paint; width: 92px; height: 92px; border: 1px solid var(--accent-plate-line); border-radius: var(--r-2xl); background: var(--accent-plate); color: var(--on-accent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 6%, transparent), 0 18px 40px -24px color-mix(in srgb, var(--accent) 55%, transparent); animation: boot-mark-in .78s var(--ease-spring) both; }
 .boot-loader__mark::before, .boot-loader__mark::after { content: ''; position: absolute; inset: -13px; border: 1px solid color-mix(in srgb, var(--electric) 35%, transparent); border-radius: var(--r-2xl); animation: boot-ring 5s linear infinite; }
 .boot-loader__mark::after { inset: -23px; border-color: color-mix(in srgb, var(--accent) 18%, transparent); border-style: dashed; animation-direction: reverse; animation-duration: 8s; }
 .boot-loader__mark span { font: 800 31px/1 Unbounded, sans-serif; letter-spacing: -.08em; }
@@ -2093,11 +2452,11 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .bot-stat { display: grid; gap: var(--s-fine); padding: var(--s-2) var(--s-3); border-left: 2px solid var(--electric); background: color-mix(in srgb, var(--electric) 5.5%, transparent); }
 .bot-stat b { display: block; color: var(--electric); font: 900 clamp(22px, 3vw, 30px)/.95 Unbounded, sans-serif; letter-spacing: -.06em; } .bot-stat span { color: var(--dim); font-size: 12px; font-weight: 600; }
 .bot-launch { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-4); border-color: color-mix(in srgb, var(--electric) 27%, transparent); background: linear-gradient(110deg, color-mix(in srgb, var(--electric) 10%, transparent), color-mix(in srgb, var(--text) 3.5%, transparent) 55%, color-mix(in srgb, var(--accent) 6%, transparent)); }
-.bot-launch__mark { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid var(--electric); border-radius: var(--r-2xl); color: #0b1011; background: var(--electric); font-size: 29px; }
+.bot-launch__mark { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid var(--electric); border-radius: var(--r-2xl); color: var(--electric-ink); background: var(--electric); font-size: 29px; }
 .bot-launch__copy h2 { margin: var(--s-fine) 0 var(--s-2); font-size: clamp(22px, 3vw, 29px); font-weight: 900; } .bot-launch__copy p { max-width: 620px; margin: 0; color: var(--dim); font-size: 16px; line-height: 1.65; }
 .bot-launch__handle { align-self: start; color: var(--electric); font: 700 11px/1 Inter, sans-serif; letter-spacing: .08em; }
-.bot-cta { display: inline-flex; align-items: center; gap: var(--s-3); margin-top: var(--s-3); padding: var(--s-2) var(--s-3); border: 1px solid var(--electric); border-radius: var(--r-sm); color: #081011; background: var(--electric); font-weight: 800; text-decoration: none; transition: transform .22s var(--ease-spring), box-shadow .22s var(--ease-out), background .22s var(--ease-out); }
-.bot-cta b { font-size: 18px; line-height: .8; } .bot-cta:hover { color: #081011; background: #b9fff4; box-shadow: 0 12px 30px -18px var(--electric); transform: translateY(-3px); } .bot-cta:active { transform: scale(.97); }
+.bot-cta { display: inline-flex; align-items: center; gap: var(--s-3); margin-top: var(--s-3); padding: var(--s-2) var(--s-3); border: 1px solid var(--electric); border-radius: var(--r-sm); color: var(--electric-ink); background: var(--electric); font-weight: 800; text-decoration: none; transition: transform .22s var(--ease-spring), box-shadow .22s var(--ease-out), background .22s var(--ease-out); }
+.bot-cta b { font-size: 18px; line-height: .8; } .bot-cta:hover { color: var(--electric-ink); background: var(--electric-hi); box-shadow: 0 12px 30px -18px var(--electric); transform: translateY(-3px); } .bot-cta:active { transform: scale(.97); }
 .bot-section { margin-top: var(--s-4); } .bot-section__head { margin-bottom: var(--s-3); } .bot-section__head p { color: var(--dim); }
 .bot-feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); }
 .bot-feature { position: relative; min-height: 220px; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r); background: linear-gradient(145deg, rgba(24,29,38,.92), rgba(14,17,22,.96)); transition: transform .24s var(--ease-spring), border-color .24s var(--ease-out), box-shadow .24s var(--ease-out); }
@@ -2124,7 +2483,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .role-card ul { display: grid; gap: var(--s-fine); margin: 0; padding: 0 0 0 var(--s-3); color: var(--dim); font-size: 12px; line-height: 1.42; } .role-card li::marker { color: currentColor; }
 .role-card__assistant { display: inline-flex; align-self: flex-start; margin-top: auto; padding-top: var(--s-2); color: currentColor; font-size: 11px; font-weight: 800; }
 .roles-notice { display: grid; grid-template-columns: 44px 1fr; gap: var(--s-3); align-items: start; margin-top: var(--s-2); border-color: color-mix(in srgb, var(--gold) 34%, transparent); background: linear-gradient(110deg, color-mix(in srgb, var(--gold) 9%, transparent), color-mix(in srgb, var(--text) 2.5%, transparent)); }
-.roles-notice__mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; color: #18130a; background: var(--gold); font: 900 20px/1 Unbounded, sans-serif; }
+.roles-notice__mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; color: var(--on-accent); background: var(--gold); font: 900 20px/1 Unbounded, sans-serif; }
 .roles-notice h3 { margin: var(--s-fine) 0 var(--s-1); color: var(--gold); font-size: 18px; } .roles-notice p { max-width: 900px; margin: var(--s-1) 0 0; color: var(--dim); font-size: 13px; line-height: 1.55; }
 @media (max-width: 899px) { .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 559px) { .roles-grid { grid-template-columns: 1fr; } .role-card { min-height: 0; } .role-card__intro { min-height: 0; } .roles-notice { grid-template-columns: 1fr; } .roles-notice__mark { width: 34px; height: 34px; font-size: 16px; } }
@@ -2165,12 +2524,12 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @keyframes timeline-details-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .tl__details-body p{margin:0;line-height:1.65}
 .tl__details-body .tl__gallery{margin-top:var(--s-2)}
-.adm-publish--top{position:sticky;top:10px;z-index:8;margin:0 0 var(--s-3);box-shadow:0 12px 30px -24px rgba(0,0,0,.9);backdrop-filter:blur(12px)}
+.adm-publish--top{position:sticky;top:10px;z-index:8;margin:0 0 var(--s-3);backdrop-filter:blur(12px)}
 @media(max-width:600px){.adm-publish--top{top:6px;display:grid;gap:var(--s-2)}.adm-publish--top .adm-publish__actions{display:grid;grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){.tl__details-body{animation:none}}
 
 /* ── Карточка статуса президента: доведённый вид диспетчерского центра ─────*/
-.president-board{position:relative;display:block;isolation:isolate;overflow:hidden;margin:var(--s-3) 0 0;padding:var(--s-3) var(--s-3) var(--s-3);border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-left:3px solid var(--electric);border-radius: var(--r-xl);background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10.5%, transparent),color-mix(in srgb, var(--text) 2.8%, transparent) 48%,rgba(247,190,72,.055)),linear-gradient(180deg,rgba(16,27,34,.96),rgba(9,14,20,.96));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 8%, transparent),inset 0 -18px 36px rgba(0,0,0,.14),0 14px 34px -24px color-mix(in srgb, var(--electric) 75%, transparent)}
+.president-board{position:relative;display:block;isolation:isolate;overflow:hidden;margin:var(--s-3) 0 0;padding:var(--s-3) var(--s-3) var(--s-3);border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-left:3px solid var(--electric);border-radius: var(--r-xl);background:linear-gradient(110deg,color-mix(in srgb, var(--electric) 10.5%, transparent),color-mix(in srgb, var(--text) 2.8%, transparent) 48%,rgba(247,190,72,.055)),linear-gradient(180deg,rgba(16,27,34,.96),rgba(9,14,20,.96));box-shadow:inset 0 1px color-mix(in srgb, var(--text) 8%, transparent),inset 0 -18px 36px color-mix(in srgb, var(--shade) 14%, transparent),0 14px 34px -24px color-mix(in srgb, var(--electric) 75%, transparent)}
 .president-board__head{display:flex;align-items:center;gap:var(--s-1);min-width:0;margin-bottom:var(--s-2)}.president-board__signal{width:9px;height:9px;flex:none;border-radius:50%;background:var(--electric);box-shadow:0 0 0 4px color-mix(in srgb, var(--electric) 10%, transparent)}.president-board__label{color:var(--electric);font:800 11px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}.president-board__live{margin-left:auto;padding:var(--s-fine) var(--s-1);border:1px solid color-mix(in srgb, var(--electric) 28%, transparent);border-radius: var(--r-pill);color:var(--electric);font:800 11px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;opacity:.82}
 .president-board__identity{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3);min-width:0;padding-left:var(--s-3)}.president-board__name{min-width:0;overflow:hidden;color:var(--text);font-size:clamp(18px,2.2vw,25px);font-weight:800;letter-spacing:-.025em;text-overflow:ellipsis;white-space:nowrap}.president-board__alliance{flex:none;color:var(--gold-ink);font-family:Unbounded,sans-serif;font-size:clamp(16px,1.9vw,22px);font-weight:800;letter-spacing:.07em}.president-board__note{display:block;margin:var(--s-2) 0 0;padding:var(--s-1) 0 0 var(--s-3);border-top:1px solid color-mix(in srgb, var(--electric) 13%, transparent);color:var(--mute);font-size:11px;line-height:1.4}
 @media(max-width:700px){.president-board{margin-top:var(--s-2);padding:var(--s-2) var(--s-2) var(--s-2);border-radius: var(--r-lg)}.president-board__head{margin-bottom:var(--s-2)}.president-board__label{font-size:11px;letter-spacing:.14em}.president-board__live{padding:var(--s-fine) var(--s-1)}.president-board__identity{align-items:flex-start;gap:var(--s-1);padding-left:var(--s-3)}.president-board__name{font-size:16px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}.president-board__alliance{font-size:15px;line-height:1.25;text-align:right}.president-board__note{margin-top:var(--s-1);padding-left:var(--s-3);font-size:11px}}
@@ -2181,14 +2540,20 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @media(max-width:700px){.president-board{margin-bottom:var(--s-3)}}
 @media(max-width:390px){.president-board{margin-bottom:var(--s-3)}}
 
-/* ── Хронология на телефоне: границы и порядок шапки ───────────────────────*/
+/* ── Хронология на телефоне: границы и перенос ширины ───────────────────────*/
+
+/*
+  ПОРЯДОК ШАПКИ ЗДЕСЬ БОЛЬШЕ НЕ ЗАДАЁТСЯ.
+
+  Эти строки ставили шапку в столбик (`flex-direction: column`) и расставляли
+  по порядку марку, доску и полосу вкладок. Вкладки из шапки уехали в боковое
+  меню, а столбик на узком экране остался и молча перебивал горизонтальную
+  раскладку: этот файл грузится раньше остальных, и mobile.css каждый раз
+  должен был перекричивать именно его. Раскладку шапки теперь задают forum.css
+  (поля, правое поле) и mobile.css (строкой на телефоне) — там, где она и
+  живёт, а не в самом старом слое.
+*/
 @media(max-width:759px){
-  .site-head__inner{display:flex;flex-direction:column;align-items:stretch;gap:0}
-  .site-head__inner .brand{order:1}
-  .site-head__inner #president-board{order:2}
-  .site-head__inner .nav{order:3}
-  .site-head__inner .president-board{width:100%}
-  .site-head__inner .nav{width:100%;max-width:100%;min-width:0;overflow-x:auto}
   .tl,.tl__item,.tl__body,.tl__details,.tl__details-body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
   .tl__item{gap:var(--s-2)}
   .tl__body h3,.tl__body p,.tl__summary{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
@@ -2209,7 +2574,6 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
   .president-board__alliance{font-size:12.5px;line-height:1;white-space:nowrap}
   .president-board__note{display:none}
   .site-head__inner .brand{padding-top:var(--s-1);padding-bottom:var(--s-fine)}
-  .site-head__inner .nav{padding-top:var(--s-fine);padding-bottom:var(--s-fine)}
 }
 @media(max-width:390px){
   .president-board{gap:var(--s-1);padding:var(--s-1) var(--s-1);min-height:34px}
@@ -2220,9 +2584,18 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 }
 
 /* ── Вкладка четвертьфинала: заметный, но свой акцент ──────────────────────*/
-.nav__link[href="#/quarter"]{color:#c6a9df;border:1px solid rgba(198,169,223,.16);background:rgba(198,169,223,.035)}
-.nav__link[href="#/quarter"]:hover{color:#eadbfa;background:rgba(198,169,223,.11);border-color:rgba(198,169,223,.34)}
-.nav__link[href="#/quarter"].is-active{color:#17111d;background:linear-gradient(135deg,#d3a6ff,#a987c7);border-color:#d3a6ff;box-shadow:0 5px 18px -9px color-mix(in srgb, var(--violet) 80%, transparent)}
+/*
+  Правило держало ночной фиолет литералом (#c6a9df), и дневная тема подставляла
+  его как есть: живая строка меню давала 1,77:1 на собственном фоне. Замер по
+  CSS этого не видит — фон строки складывается из поверхности и наложенной
+  плашки, поэтому падение нашёл только свип по нарисованным пикселам.
+  Лечение то же, что у остальных красок ролей: плашка и кромка остаются
+  краской, подпись берётся из --violet-ink, а залитый конец ряда кладётся
+  чернилами той темы, где он нарисован.
+*/
+.nav__link[href="#/quarter"]{color:var(--violet-ink);border:1px solid color-mix(in srgb, var(--violet) 16%, transparent);background:color-mix(in srgb, var(--violet) 3.5%, transparent)}
+.nav__link[href="#/quarter"]:hover{background:color-mix(in srgb, var(--violet) 11%, transparent);border-color:color-mix(in srgb, var(--violet) 34%, transparent)}
+.nav__link[href="#/quarter"].is-active{color:var(--on-accent);background:linear-gradient(135deg, color-mix(in srgb, var(--violet) 85%, var(--tint)), var(--violet));border-color:color-mix(in srgb, var(--violet) 70%, var(--tint));box-shadow:0 5px 18px -9px color-mix(in srgb, var(--violet) 80%, transparent)}
 .quart-page{--quart-acid:#d3a6ff;--quart-cyan:#9f86c9}
 
 /* ── Последняя отделка интерфейса: единые поверхности, ритм и границы ─────*/
@@ -2612,15 +2985,16 @@ summary.tl__row { cursor: pointer; }
 }
 
 /*
-   Чернила на залитой кнопке — почти чёрный, и в светлой теме тоже он: янтарь
-   светлой темы (#c05a24) даёт с белым текстом 3,7 : 1, а с этим — 4,9 : 1.
-   Разница между темами не в чернилах, а в самой заливке.
+   Заливку и рамку главной кнопки задаёт тема одним токеном, а не это правило:
+   в тёмной теме плашка осветляется к верхнему краю, в светлой — темнеет.
+   Иначе почти-белая подпись светлой темы ложилась бы на осветлённый янтарь
+   и читалась за 3,40 : 1, а на затемнённом краю держит 7,54 : 1.
 */
 .hero__cta--primary {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent));
-  border-color: color-mix(in srgb, var(--accent) 62%, #fff);
+  background: var(--accent-plate);
+  border-color: var(--accent-plate-line);
   color: var(--on-accent);
-  box-shadow: 0 10px 26px -16px var(--accent);
+  box-shadow: 0 10px 26px -16px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .hero__cta--ghost {
   background: color-mix(in srgb, var(--text) 6%, transparent);
@@ -2700,7 +3074,7 @@ summary.tl__row { cursor: pointer; }
   margin: var(--s-hair) 0 0;
   font-family: Unbounded, sans-serif;
   font-weight: 800;
-  font-size: clamp(21px, 2.6vw, 28px);
+  font-size: var(--fs-stat-sm);
   line-height: 1;
   color: var(--text);
 }

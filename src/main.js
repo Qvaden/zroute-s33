@@ -112,27 +112,27 @@ const ROUTES = [
     видели бы одну и ту же вкладку на всех четырнадцати страницах.
   */
   {
-    id: 'forum', label: 'Форум', live: true, primary: true,
+    id: 'forum', label: 'Форум', group: 'Общение', tag: 'обсуждения сервера', live: true, primary: true,
     title: 'Форум сервера 33 · Z Route: Redemption',
     desc: 'Обсуждения 33 сервера: новости, разбор VS, летопись захватов, альянсы, вопросы по игре и свободные темы.',
   },
   {
-    id: 'chats', label: 'Чаты', live: true, primary: true,
+    id: 'chats', label: 'Чаты', group: 'Общение', tag: 'личное и альянсы', live: true, primary: true,
     title: 'Чаты альянсов · Сервер 33',
     desc: 'Комнаты альянсов на самом сайте: договорённости перед боем и разбор итогов — без внешних мессенджеров.',
   },
   {
-    id: 'tournaments', label: 'Турниры', live: true, primary: true,
+    id: 'tournaments', label: 'Турниры', group: 'Общение', tag: 'матчапы и счёт', live: true, primary: true,
     title: 'Турниры альянсов · Сервер 33',
     desc: 'VS-матчапы двух альянсов со счётом по победам. Раунды засчитываются прямо на странице, победитель определяется сам.',
   },
   {
-    id: 'guides', label: 'Гайды', live: true, primary: true,
+    id: 'guides', label: 'Гайды', group: 'Справка', tag: 'разборы и справочник', live: true, primary: true,
     title: 'Гайды · Сервер 33',
     desc: 'Разборы от участников сервера 33 и официальный справочник игры: тактика, исследования, роли в альянсе.',
   },
   {
-    id: 'calendar', label: 'Календарь', live: true, primary: true,
+    id: 'calendar', label: 'Календарь', group: 'Общение', tag: 'сборы и ответы', live: true, primary: true,
     title: 'Календарь сборов · Сервер 33',
     desc: 'Когда сервер собирается на бои: ближайшие события, ответы «иду / не иду» и моё расписание одной строкой.',
   },
@@ -142,7 +142,7 @@ const ROUTES = [
     «Сервер», рядом с хроникой, а не в меню рядом с форумом.
   */
   {
-    id: 'updates', label: 'Обновления игры', live: true,
+    id: 'updates', label: 'Обновления игры', group: 'Сервер', tag: 'что изменилось в игре', live: true,
     title: 'Обновления игры · Z Route: Redemption',
     desc: 'Что изменилось в игре: сообщения магазина и стены сообщества, собранные автоматом, и заметки участников.',
   },
@@ -154,7 +154,7 @@ const ROUTES = [
     в её ответах, а не на этой странице.
   */
   {
-    id: 'accounts', label: 'Продажа аккаунтов', live: true,
+    id: 'accounts', label: 'Продажа аккаунтов', group: 'Общение', tag: 'объявления и цены', live: true,
     title: 'Продажа аккаунтов · Сервер 33',
     desc: 'Кто отдаёт аккаунт и почём: объявления с описанием, ценой, скриншотами и отметкой «продано».',
   },
@@ -171,37 +171,37 @@ const ROUTES = [
     desc: 'Официальные гайды Z Route: Redemption — текст игры с картинками, поиск по разделам и узлам.',
   },
   {
-    id: 'home', label: 'Итоги недели', render: renderHome,
+    id: 'home', label: 'Итоги недели', group: 'Сервер', tag: 'неделя: +1 и −1', render: renderHome,
     title: 'Итоги недели · Сервер 33',
     desc: 'Как прошла неделя VS на 33 сервере: победа +1, поражение −1, лидеры и движение мест.',
   },
   {
-    id: 'quarter', label: 'Кварт', render: renderQuarter,
+    id: 'quarter', label: 'Кварт', group: 'Сервер', tag: 'итоги периода', render: renderQuarter,
     title: 'Итоги Кварта · Сервер 33',
     desc: 'Расстановка сил по итогам Кварта: пьедестал, очки и трофеи 33 сервера.',
   },
   {
-    id: 'ladder', label: 'Рейтинг', render: renderLadder,
+    id: 'ladder', label: 'Рейтинг', group: 'Сервер', tag: 'места и форма', render: renderLadder,
     title: 'Рейтинг альянсов · Сервер 33',
     desc: 'Таблица 33 сервера: альянсы по победам в VS, форма последних боёв и изменение мест.',
   },
   {
-    id: 'timeline', label: 'Хронология', render: renderTimeline,
+    id: 'timeline', label: 'Хронология', group: 'Сервер', tag: 'летопись захватов', render: renderTimeline,
     title: 'Хроника сервера 33',
     desc: 'Летопись 33 сервера: захваты Столицы, защиты, войны и решения модерации — свежие сверху.',
   },
   {
-    id: 'guide', label: 'Малым алам', render: renderGuide,
+    id: 'guide', label: 'Малым алам', group: 'Справка', tag: 'малым альянсам', render: renderGuide,
     title: 'Малым альянсам · Сервер 33',
     desc: 'Разбор для небольших альянсов: принципы, обязанности руководства и типичные ошибки.',
   },
   {
-    id: 'bot', label: 'Бот в ТГ', render: renderBot,
+    id: 'bot', label: 'Бот в ТГ', group: 'Справка', tag: 'тексты игры в чате', render: renderBot,
     title: 'Бот в Telegram · Z Route',
     desc: 'Telegram-бот со справочником по игре: те же разделы и тексты, что на сайте, только прямо в чате.',
   },
   {
-    id: 'about', label: 'О проекте', render: renderAbout,
+    id: 'about', label: 'О проекте', group: 'Справка', tag: 'как это устроено', render: renderAbout,
     title: 'О проекте · Сервер 33',
     desc: 'Неофициальный сайт сообщества 33 сервера: что здесь есть, как устроены регистрация и приватность чатов.',
   },
@@ -212,10 +212,12 @@ const nav = document.getElementById('nav');
 const presidentBoard = document.getElementById('president-board');
 const bootLoader = document.getElementById('boot-loader');
 const side = document.getElementById('side');
-const sideToggle = document.getElementById('side-toggle');
+const sideClose = document.querySelector('[data-side-close]');
+const sideGrab = document.querySelector('.side__grab');
 const sideVeil = document.getElementById('side-veil');
 const tabbar = document.getElementById('tabbar');
 const tabbarMore = document.getElementById('tabbar-more');
+const headWhere = document.getElementById('head-where');
 const routeAnnouncer = document.getElementById('route-announcer');
 const isFirstVisit = !document.documentElement.classList.contains('s33-loader-seen');
 const bootStartedAt = performance.now();
@@ -333,6 +335,15 @@ function parseHash() {
   return { id: id || 'forum', param: param || null, search: search || '' };
 }
 
+/*
+  Подписи групп в меню — порядок, а не состав: состав берётся из поля
+  `group` у самой записи ROUTES. Раздел без группы в список не попадёт,
+  и за этим следит тест (секция «Оглавление»), а не код страницы: молча
+  потерянная вкладка — худший из возможных исходов для человека, который
+  ищет её и не находит.
+*/
+const NAV_TITLES = ['Общение', 'Сервер', 'Справка'];
+
 function renderNav(activeId) {
   /* Какую вкладку подсветить, когда страница открыта: у раздела без своего
      пункта меню (`hidden`) это чужая вкладка — `navAs`. */
@@ -355,18 +366,49 @@ function renderNav(activeId) {
     как спор двух разделов за место в списке.
   */
   const shown = ROUTES.filter((r) => !r.hidden);
-  const primary = shown.filter((r) => r.primary);
-  const rest = shown.filter((r) => !r.primary);
   /*
-    Две группы с подписью между ними: «Общение» и «Сервер». Меню читается
-    как оглавление, а не как семь равнозначных ссылок, — сразу видно, что
-    на сайте главное.
+    ТРИ ГРУППЫ: «Общение», «Сервер», «Справка». Четырнадцать вкладок без
+    подписей читаются как список, а не как оглавление: человек обязан
+    сначала понять, что здесь разговоры, здесь цифры, а здесь помощь, и
+    только потом искать своё. Две прежние группы вместили не всё — «Гайды», «Малым алам», «Бот»
+    и «О проекте» стояли под подписью «Сервер», которой они не про что.
+
+    Внутри группы порядок тот же, что в ROUTES: частое выше редкого.
   */
-  nav.innerHTML =
-    `<span class="nav__group">Общение</span>${primary.map(link).join('')}` +
-    `<span class="nav__group">Сервер</span>${rest.map(link).join('')}`;
+  nav.innerHTML = NAV_TITLES.map(
+    (title) => `<span class="nav__group">${title}</span>${
+      shown.filter((r) => r.group === title).map(link).join('')}`
+  ).join('');
+  paintHeadWhere(activeId);
   syncTabbar(activeId);
   refreshChatsBadge();
+}
+
+/*
+  СТРОКА «ГДЕ Я» В ШАПКЕ.
+
+  Слово «Форум» в шапке — это ответ на вопрос, который человек задаёт глазами
+  каждые несколько секунд, не отрываясь от чтения. Оглавление слева его тоже
+  отвечает, но взгляд там не бывает: активная вкладка уезжает за край, когда
+  список длинный, и на широком экране её перекрывает таблица.
+
+  Подпись раздела берётся из того же `tag`, что и меню, — две разные формулировки
+  одного и того же раздела («здесь обсуждают» и «обсуждения сервера») человек
+  читал бы как два разных места.
+
+  Строка aria-hidden: называет раздел заголовок содержимого, и два голоса
+  подряд программа экрана слушает как эхо (тот же разбор — у #route-announcer).
+*/
+function paintHeadWhere(activeId) {
+  if (!headWhere) return;
+  const route = ROUTES.find((r) => (r.navAs || r.id) === activeId);
+  headWhere.textContent = '';
+  if (!route) return;
+  const name = document.createElement('b');
+  name.textContent = route.label;
+  const note = document.createElement('span');
+  note.textContent = route.tag || '';
+  headWhere.append(name, note);
 }
 
 /*
@@ -418,16 +460,20 @@ async function refreshChatsBadge() {
 /* ── Боковое меню ─────────────────────────────────────────────────────────── */
 
 /*
-  На узком экране панель выдвигается поверх страницы. Состояние держится
-  классом на <html>, а не на самой панели: затемнение, сдвиг содержимого
-  и запрет прокрутки под меню — это про всю страницу, а не про меню.
+  На узком экране список разделов поднимается шторкой снизу. Состояние
+  держится классом на <html>, а не на самой панели: затемнение, запрет
+  прокрутки под меню и поднятый край содержимого — это про всю страницу,
+  а не про меню.
 */
 function setSideOpen(open) {
   document.documentElement.classList.toggle('is-side-open', open);
   /*
-    «Раскрыто» сообщают все кнопки, которые этим меню управляют: их две —
-    «Меню» в шапке и «Ещё» в полосе разделов. Атрибут повешен на одну из них
-    означал бы, что вторая при закрытом меню выглядит открытой.
+    «Раскрыто» сообщают все кнопки, которые управляют этим списком. Их сейчас
+    одна: клетка «Ещё» в нижнем ряду. Кнопка «Меню» в шапке вела в тот же
+    список и была убрана — два входа в одно состояние человек читает как два
+    разных меню и обязан проверить оба. Запрос по атрибуту, а не по конкретной
+    кнопке, оставлен нарочно: если у списка появится ещё один вход (например,
+    жест), атрибут сами собой подхватит его, и состояние не начнёт врать.
   */
   document.querySelectorAll('[aria-controls="side"]').forEach((btn) => {
     btn.setAttribute('aria-expanded', String(open));
@@ -440,16 +486,24 @@ function setSideOpen(open) {
     уводит его в содержимое страницы — то есть меню открылось, но добраться
     до вкладок нельзя.
 
+    СПЛОШЬ РАСКЛАДКУ ПЕРЕД ФОКУСОМ — НЕ КОСМЕТИКА. Класс на <html> только что
+    снял с панели `visibility: hidden`, но браузер ещё ничего не пересчитал:
+    на живом промере первый Tab после нажатия «Ещё» уходил не в список, а в
+    подвал, потому что focus() отказал элементу, который по несчитанному
+    стилю всё ещё скрыт. Чтение offsetHeight заставляет браузер досчитать
+    стили до попытки фокуса.
+
     Обратно фокус отдаётся тому, кто меню открыл: после «Ещё» возврат в шапку
     унёс бы фокус за десять сантиметров вверх, и следующий Tab начал бы не
     оттуда, где человек остановился. Если же открывающая кнопка исчезла
-    (полоса гаснет на широком экране), отдаётся шапке — она видна всегда,
-    когда меню вообще можно открыть.
+    (полоса гаснет на широком экране), список закрывает его же кнопка
+    «Закрыть» — возврата не требуется, фокус и так внутри.
   */
-  if (open) side?.querySelector('.nav__link')?.focus({ preventScroll: true });
-  else if (document.activeElement && side?.contains(document.activeElement)) {
-    const back = sideOpener && sideOpener.offsetParent !== null ? sideOpener : sideToggle;
-    back?.focus({ preventScroll: true });
+  if (open) {
+    void side?.offsetHeight;
+    side?.querySelector('.nav__link')?.focus({ preventScroll: true });
+  } else if (document.activeElement && side?.contains(document.activeElement)) {
+    if (sideOpener?.offsetParent !== null) sideOpener.focus({ preventScroll: true });
   }
 }
 
@@ -460,23 +514,19 @@ function isSideOpen() {
 /* Кто открыл меню — ему его и закрывать обратно с точки зрения фокуса. */
 let sideOpener = null;
 
-sideToggle?.addEventListener('click', () => {
-  sideOpener = sideToggle;
-  setSideOpen(!isSideOpen());
-});
-
 /*
-  «Ещё» в полосе разделов открывает то же самое боковое меню, а не второе.
+  «Ещё» в полосе разделов — единственный вход в полный список.
   Два отдельных списка разделов на одном телефоне означало бы, что у человека
   есть два оглавления, которые могут разойтись, и он обязан проверить оба,
   чтобы найти нужный раздел. Здесь же полоса держит четыре часто нужных
-  раздела, а всё остальное — за той же дверью, что и всегда.
+  раздела, а всё остальное — за одной дверью.
 */
 tabbarMore?.addEventListener('click', () => {
   sideOpener = tabbarMore;
   setSideOpen(!isSideOpen());
 });
 
+sideClose?.addEventListener('click', () => setSideOpen(false));
 sideVeil?.addEventListener('click', () => setSideOpen(false));
 
 /*
@@ -485,6 +535,42 @@ sideVeil?.addEventListener('click', () => setSideOpen(false));
 */
 side?.addEventListener('click', (e) => {
   if (e.target.closest('a')) setSideOpen(false);
+});
+
+/*
+  СЪЕЗД ШТОРКИ ПАЛЬЦЕМ.
+
+  Раз список открывается движением вверх, закрывать его нажатием кнопки —
+  значит заставлять руку менять захват: большой палец лежит на краю, и
+  потянуть его обратно вниз дешевле, чем целиться в «Закрыть». Кнопка при
+  этом остаётся: без неё список недоступен с клавиатуры и с программой
+  экрана, а жест — только удобство для мыши и пальца.
+
+  Порог в 56 px — это высота строки списка: съезд меньше строки человек
+  делает случайно, когда прокручивает сам список, и закрывать его за такое
+  нельзя. Тащим именно за ручку сверху, а не за любую точку: прокрутка
+  длинного списка жестом не считается.
+
+  ОТПУСКАНИЕ СЛУШАЕТ ДОКУМЕНТ, А НЕ РУЧКА. Ставить захват на ручку
+  (setPointerCapture) мало: на живом промере палец ушёл вниз за её пределы,
+  pointerup ушёл на вкладку списка, и обработчик на ручке его не увидел —
+  шторка осталась открытой. Живой палец на телефоне захват удержал бы, но
+  полагаться на то, что не проверяемо без экрана, нельзя: событие ловится
+  там, где оно реально приходит.
+*/
+let dragStartY = null;
+sideGrab?.addEventListener('pointerdown', (e) => {
+  dragStartY = e.clientY;
+  sideGrab.setPointerCapture?.(e.pointerId);
+});
+document.addEventListener('pointerup', (e) => {
+  if (dragStartY === null) return;
+  const moved = e.clientY - dragStartY;
+  dragStartY = null;
+  if (moved > 56) setSideOpen(false);
+});
+document.addEventListener('pointercancel', () => {
+  dragStartY = null;
 });
 
 document.addEventListener('keydown', (e) => {
