@@ -33,6 +33,7 @@ import { mountCalendar, unmountCalendar } from './forum/calendar.js';
 import { mountUpdates, unmountUpdates } from './forum/updates.js';
 import { mountAccounts, unmountAccounts } from './forum/accounts.js';
 import { forumReady } from './forum/index.js';
+import { mountHomeCommunity } from './pages/home-community.js';
 
 /*
   ДЕРЕВО СПРАВОЧНИКА ПРИХОДИТ НА МАРШРУТЕ, А НЕ НА ВХОДЕ.
@@ -1156,6 +1157,13 @@ function render() {
       }
       // Запуск таймера Кварта, если открыта страница Кварта.
       if (route.id === 'quarter') startQuarterTimer();
+      /*
+        Ряд сообщества на главной догружается отдельно от страницы. Ждать его
+        ответа, чтобы напечатать неделю, нельзя: темы живут в другой базе, и их
+        опоздание задержало бы первый экран. Сам вызов ничего не блокирует:
+        слот нарисован заранее и занимает ровно ту высоту, которую займут темы.
+      */
+      if (route.id === 'home') mountHomeCommunity(app);
       path = `/${route.id}`;
     }
   }

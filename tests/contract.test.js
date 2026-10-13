@@ -5141,6 +5141,268 @@ console.log('\nR2. Главная страница');
     check(`главная: поле «${field}» отдаётся после загрузки`,
       has(loadedBlock, field) || dataFields.includes(field));
   }
+
+  /*
+    ШАГ 7: ГЛАВНАЯ КАК СВОДКА СЕРВЕРА (§29, §32, §35, §40).
+
+    Старая главная была списком четырёх панелей одинаковой ширины: у графика
+    и у движения за неделю был ровно тот же вес, что у вопроса «кто ведёт»,
+    ради которого человек и зашёл. Проверки ниже держат то, что сделало её
+    сводкой: ряд разного веса, летопись рядом с рейтингом, ряд форума,
+    который догружается отдельно, и самая тихая панель — движение.
+
+    Отдельно держит телефон: новые ряды — это строки, в которые попадают
+    пальцем, и 24 px ссылки на них быть не может.
+  */
+  {
+    const played3 = build([w5, w6, w7, w8],
+      [...playedWeek(w5), ...playedWeek(w6), ...playedWeek(w7)]);
+    const chronEvents = [
+      {
+        date: new Date(monday.getTime() - DAY),
+        title: 'Ночью взяли Столицу 74',
+        summary: 'Зашли на Столицу чужого сервера и удержали до рассвета.',
+        body: 'Сбор в 02:40, три волны, к утру Столица за нами.',
+        type: 'server_capture',
+        serverNumber: 74,
+      },
+      {
+        date: new Date(monday.getTime() - 2 * DAY),
+        title: 'Перемирие с 51 сервером',
+        summary: 'Договорились не трогать Столицы до конца недели.',
+        type: 'war',
+        serverNumber: null,
+      },
+      {
+        date: new Date(monday.getTime() - 3 * DAY),
+        title: 'К нам перешёл «Крыло»',
+        summary: '',
+        type: 'other',
+        serverNumber: null,
+      },
+      {
+        date: new Date(monday.getTime() - 4 * DAY),
+        title: 'Этого на главной быть не должно',
+        summary: '',
+        type: 'other',
+        serverNumber: null,
+      },
+    ];
+    const svod = renderHome({ ...played3, events: chronEvents });
+    const v8src = await readFile('src/styles-v8.css', 'utf8');
+    const mobsrc = await readFile('src/mobile.css', 'utf8');
+    const flat = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    /* ── Композиция: вес задаёт ряд, а не содержимое ── */
+    const leadIx = svod.indexOf('home__row--lead');
+    const backIx = svod.indexOf('home__row--back');
+    const utilIx = svod.indexOf('panel--utility');
+    check('сводка: рейтинг стоит выше обсуждений, а движение за неделю — последним',
+      leadIx > 0 && leadIx < backIx && backIx < utilIx);
+    check('сводка: в первом ряду рейтинг и летопись, во втором — форум и график',
+      /home__row--lead">\s*<section class="panel panel--rank"[\s\S]*?class="panel panel--chron"/.test(svod)
+        && /home__row--back">\s*<section class="panel panel--community"[\s\S]*?class="panel panel--race"/.test(svod));
+    check('колонки ряда не равны по весу и зеркальны: 7 против 5, затем 5 против 7',
+      /\.home__row--lead \{ grid-template-columns: minmax\(0, 7fr\) minmax\(0, 5fr\); \}/.test(v8src)
+        && /\.home__row--back \{ grid-template-columns: minmax\(0, 5fr\) minmax\(0, 7fr\); \}/.test(v8src));
+    check('две колонки появляются только на мониторе: на телефоне ряд остаётся одной колонкой',
+      /@media \(min-width: 900px\) \{\s*\.home__row--lead/.test(v8src));
+    check('колонка ряда сжимается содержимым, а не растягивает страницу',
+      /\.home__row > \* \{ min-width: 0; \}/.test(v8src)
+        && /\.home__row--lead \{ grid-template-columns: minmax\(0, 7fr\)/.test(v8src));
+    check('если одного блока ряда нет, второй занимает всю ширину, а не половину',
+      /\.home__row > \*:only-child \{ grid-column: 1 \/ -1; \}/.test(v8src));
+    check('утилитарная панель тише соседних: поле и заголовок уменьшены ей одной',
+      /\.panel--utility \{ padding: var\(--s-3\); \}/.test(v8src)
+        && /\.panel--utility \.panel__head \{ margin-bottom: var\(--s-2\); \}/.test(v8src));
+
+    /* ── Рейтинг: трое крупно, остальные — короткий список (§35) ── */
+    const tops = (svod.match(/class="rank__top /g) || []).length;
+    check('рейтинг на главной: ровно трое впереди крупно', tops === 3, `место в рейке: ${tops}`);
+    check('рейтинг на главной: остальные — строки короткого списка, а не вторая стена',
+      /class="rank__rest"/.test(svod) && (svod.match(/<li style="--tag-color/g) || []).length === 1);
+    check('рейтинг на главной: каждая строка ведёт в карточку альянса и объявляет себя вслух',
+      (svod.match(/href="#\/alliance\/a\d" aria-label="\d-е место/g) || []).length === 4);
+    check('рейтинг на главной: очки ведут себя как очки — у лидера явный плюс',
+      /class="rank__pts num pos">\+3</.test(svod));
+    check('рейтинг на главной: победа и поражение названы словами один раз, дубля цифрами нет',
+      /class="c-win">\d+ побед/.test(svod) && /class="c-loss">\d+ поражени/.test(svod)
+        && !/rank__wl/.test(svod));
+    check('рейтинг на главной: форма и движение строки есть у каждой тройки',
+      (svod.match(/class="rank__form"/g) || []).length === 3);
+    check('рейтинг на главной: ссылка вниз обещает остаток только когда он правда есть',
+      /total > shown[\s\S]{0,240}?Ещё \$\{total - shown\} — в общем рейтинге/.test(homeSrc)
+        && svod.includes('Открыть рейтинг целиком'));
+
+    /* ── Летопись: редакционная колонка, а не три одинаковых карточки (§40) ── */
+    check('летопись: одна запись развёрнута, две короткие под ней, четвёртая не попала',
+      (svod.match(/class="chron__lead"/g) || []).length === 1
+        && (svod.match(/<li data-kind=/g) || []).length === 2
+        && !svod.includes('Этого на главной быть не должно'));
+    check('летопись: дата стоит на своей строке и взята из записи, а не из «сегодня»',
+      svod.includes(`datetime="${chronEvents[0].date.toISOString().slice(0, 10)}"`));
+    check('летопись: плашка исхода есть только у серверных записей, у войны и прочего её нет',
+      (svod.match(/class="chron__verdict"/g) || []).length === 1);
+    check('летопись: рубрика и исход взяты из общего словаря, а не сочинены на месте',
+      /isServerEvent\(e\.type\) \? pillText\(e\.type, e\.serverNumber\)/.test(homeSrc)
+        && svod.includes('Захват Столицы') && svod.includes('взяли 74'));
+    check('летопись: запись можно дочитать, и внутри тот текст, что лежит в базе',
+      /<details class="chron__read">\s*<summary>Читать запись<\/summary>[\s\S]{0,80}?Сбор в 02:40/.test(svod));
+    check('летопись: без тела дочитывать нечего — и ссылки «Читать запись» нет',
+      !renderHome({ ...played3, events: [chronEvents[2]] }).includes('Читать запись'));
+    check('летопись: записей нет — блока нет, пустая рамка не рисуется',
+      !renderHome({ ...played3, events: [] }).includes('panel--chron'));
+    check('летопись: записей ровно столько, сколько в базе, — «первая запись появится» не обещается',
+      !/появится/.test(flat(svod.slice(svod.indexOf('panel--chron'), svod.indexOf('panel--chron') + 2000))));
+
+    /* ── Ни выдуманных полей, ни разметки из чужих строк ── */
+    const evilSvod = renderHome({
+      ...played3,
+      events: chronEvents.map((ev) => ({ ...ev, title: '<i>т</i>', summary: '<i>с</i>', body: '<i>б</i>' })),
+      standings: played3.standings.map((r) => ({ ...r, alliance: { ...r.alliance, name: '<i>х</i>' } })),
+    });
+    check('сводка: заголовки летописи и имена альянсов экранируются',
+      !evilSvod.includes('<i>т</i>') && !evilSvod.includes('<i>с</i>') && !evilSvod.includes('<i>х</i>'));
+    check('сводка: на новых рядах нет выдуманного — ни онлайна, ни рейтинга силы, ни «горячего»',
+      !/онлайн|рейтинг силы|популярност|горяч/i.test(svod));
+
+    /* ── Ряд форума: слот рисуется сразу, содержимое приносит отдельный модуль ── */
+    check('ряд сообщества: слот есть в разметке, а страница про форум не знает ничего',
+      svod.includes('data-home-community-body') && !/forum\/index/.test(homeSrc));
+    check('контур ряда рисует ровно те строки, что напечатает ответ: четыре темы',
+      (svod.match(/class="community__sk-t"/g) || []).length === 4);
+
+    const hcSrc = await readFile('src/pages/home-community.js', 'utf8');
+    check('модуль ряда не ждёт ответа, чтобы напечатать страницу, и не дублирует запрос',
+      /if \(slot\.dataset\.homeCommunity\) return;/.test(hcSrc)
+        && /slot\.dataset\.homeCommunity = 'pending'/.test(hcSrc)
+        && /\.catch\(\(\) => null\)/.test(hcSrc));
+    check('запоздалый ответ не имеет права писать в выброшенный узел',
+      /if \(!body\.isConnected\) return;/.test(hcSrc));
+    check('дневная активность необязательна: без неё ряд остаётся списками тем',
+      /typeof forum\.getServerActivity === 'function'/.test(hcSrc));
+    check('главная зовёт монтаж после отрисовки и только на своём маршруте',
+      /if \(route\.id === 'home'\) mountHomeCommunity\(app\);/.test(mainSrc)
+        && /import \{ mountHomeCommunity \} from '\.\/pages\/home-community\.js';/.test(mainSrc));
+
+    {
+      const { mountHomeCommunity } = await import('../src/pages/home-community.js');
+      const { forum } = await import('../src/forum/index.js');
+      const saved = { ...forum };
+      const mkRoot = () => {
+        const body = { isConnected: true, innerHTML: '' };
+        const slot = { dataset: {}, querySelector: (sel) => (sel.includes('community-body') ? body : null) };
+        return { body, slot, root: { querySelector: () => slot } };
+      };
+      const post = (over) => ({
+        id: 'p1', title: 'Как держать Столицу', body: 'х', category: 'chronicle', tags: [],
+        authorNick: 'Хранитель', createdAt: new Date(), commentCount: 3,
+        pinned: false, deleted: false, serverId: 33, ...over,
+      });
+      let calls = 0;
+      try {
+        forum.listPosts = async () => {
+          calls++;
+          return { posts: [post({})], total: 1 };
+        };
+        forum.getServerActivity = async () => [{ day: '2026-10-13', forumPosts: 2, forumComments: 5, chatMessages: 9 }];
+
+        const a = mkRoot();
+        await mountHomeCommunity(a.root);
+        check('ряд: тема печатается настоящими полями ленты',
+          a.body.innerHTML.includes('Как держать Столицу')
+            && a.body.innerHTML.includes('href="#/forum/p1"')
+            && a.body.innerHTML.includes(`href="#/user/${encodeURIComponent('Хранитель')}"`));
+        check('ряд: у темы названы раздел, срок и счётчик ответов словами',
+          a.body.innerHTML.includes('3 ответа') && /<time class="community__when">[^<]/.test(a.body.innerHTML));
+        check('ряд: раздел темы назван словом из правил форума, а не идентификатором',
+          /class="community__cat">Летопись<\/span>/.test(a.body.innerHTML));
+        check('ряд: цифры дня берутся из активности и названы днём, а не выдуманы',
+          flat(a.body.innerHTML).includes('2 поста и 5 ответов на форуме, 9 сообщений в чатах — за сегодня'));
+        check('ряд: ссылка «весь форум» ведёт на форум',
+          /class="community__all" href="#\/forum"/.test(a.body.innerHTML));
+        check('ряд: слот помечен занятым после ответа',
+          a.slot.dataset.homeCommunity === 'done');
+
+        const seen = calls;
+        await mountHomeCommunity(a.root);
+        check('ряд: повторный вызов на занятом слоте не просит форум второй раз',
+          calls === seen && a.slot.dataset.homeCommunity === 'done');
+
+        const b = mkRoot();
+        b.body.isConnected = false;
+        await mountHomeCommunity(b.root);
+        check('ряд: ответ, пришедший после ухода со страницы, ничего не пишет',
+          b.body.innerHTML === '');
+
+        forum.listPosts = async () => ({ posts: [], total: 0 });
+        const c = mkRoot();
+        await mountHomeCommunity(c.root);
+        check('ряд: пустой форум назван пустотой, а не аварией',
+          c.body.innerHTML.includes('На форуме пока нет ни одной темы')
+            && !c.body.innerHTML.includes('не загрузились'));
+
+        forum.listPosts = async () => {
+          throw new Error('нет сети');
+        };
+        const d = mkRoot();
+        await mountHomeCommunity(d.root);
+        check('ряд: отказ форума честный, короткий и не выдаётся за пустоту',
+          d.body.innerHTML.includes('Обсуждения сейчас не загрузились')
+            && !d.body.innerHTML.includes('пока нет ни одной темы')
+            && d.body.innerHTML.includes('href="#/forum"'));
+
+        forum.listPosts = async () => ({
+          posts: [
+            post({ id: 'x', title: '' }),
+            post({ id: 'y', title: 'Стёртая тема', deleted: true }),
+            post({ id: 'z', title: 'Живая тема', commentCount: 0 }),
+          ],
+          total: 3,
+        });
+        forum.getServerActivity = undefined;
+        const e = mkRoot();
+        await mountHomeCommunity(e.root);
+        check('ряд: стёртые и безымянные темы не печатаются',
+          !e.body.innerHTML.includes('Стёртая тема') && e.body.innerHTML.includes('Живая тема'));
+        check('ряд: ноль ответов сказано словами, а не цифрой',
+          e.body.innerHTML.includes('без ответов') && !/>0</.test(e.body.innerHTML));
+        check('ряд: без дневной активности строки «за сегодня» нет',
+          !/community__pulse/.test(e.body.innerHTML));
+
+        let threw = null;
+        try {
+          await mountHomeCommunity({ querySelector: () => null });
+        } catch (err) {
+          threw = err;
+        }
+        check('ряд: чужая страница без слота — не падение главной', threw === null, threw && threw.message);
+      } finally {
+        for (const key of [...Object.keys(forum)]) delete forum[key];
+        Object.assign(forum, saved);
+      }
+    }
+
+    /* ── Телефон: в новые ряды попадают пальцем ── */
+    const mobSvod = mobsrc.slice(mobsrc.indexOf('Сводка сервера на главной'));
+    check('телефон: 44 px целей новых рядов задаёт mobile.css, и сила селектора их не перебивает',
+      /@media \(hover: none\) and \(pointer: coarse\)/.test(mobSvod)
+        && ['body .rank__head { min-height: 44px; }',
+            'body .rank__rest a { min-height: 44px; }',
+            'body .community__topic { display: block; min-height: 44px; }']
+          .every((rule) => mobSvod.includes(rule)));
+    check('телефон: раскрытие записи летописи — тоже цель, а не подпись',
+      /body \.chron__read summary \{[\s\S]{0,120}?min-height: 44px;/.test(mobSvod));
+    check('телефон: три ссылки «весь раздел» дотянуты до планки одной строкой правил',
+      ['body .rank__all,', 'body .chron__all,', 'body .community__all {'].every((s) => mobSvod.includes(s)));
+    check('телефон: подсветка наведения не залипает на строке рейтинга',
+      /body \.rank__rest a:hover \{ background: none; \}/.test(mobSvod)
+        && /body \.rank__rest a:active \{/.test(mobSvod));
+    check('телефон: ник автора в строке темы получает планку полем с компенсацией, а не блоком',
+      /body \.community__nick \{\s*padding: var\(--s-3\) 0;\s*margin: calc\(-1 \* var\(--s-3\)\) 0;/.test(mobSvod));
+    check('телефон: дата короткой строки летописи уходит над заголовок, а не съедает ширину',
+      /\.chron__rest li \{ grid-template-columns: minmax\(0, 1fr\)/.test(mobsrc));
+  }
 }
 
 console.log(`\n${'─'.repeat(52)}`);

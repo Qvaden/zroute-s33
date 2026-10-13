@@ -1623,5 +1623,68 @@ body { min-height: 100svh; }
   .evt-card__side .evt-link { flex: 1 1 auto; text-align: center; }
   .evt-card__when b { font-size: 17px; }
   .cal-day__head { top: 0; }
+
+  /*
+    Дата в короткой строке летописи стоит отдельной колонкой: на мониторе
+    она держит столбец, и глазами строки выравниваются по дате. На телефоне
+    тот же столбец отнимает у заголовка треть ширины, а выравнять по нему
+    всё равно нечего — колонок рядом нет. Дата уходит над заголовком.
+  */
+  .chron__rest li { grid-template-columns: minmax(0, 1fr); gap: var(--s-hair); }
+}
+
+/* ── Сводка сервера на главной: палец и ширина ────────────────────────────── */
+
+/*
+  Три новых ряда главной (рейтинг-рейка, летопись, живые обсуждения) на
+  компьютере — строки и колонки: ссылка строки рейтинга 42 px, заголовок
+  темы 25 px, служебные ссылки 19 px. Пальцем в такое не попадают, а вся
+  карточка строки выглядит нажимной. Поэтому цель вырастает до планки 44 px,
+  а плотность списка остаётся: лишнее берётся из внутреннего поля, а не из
+  воздуха между строками.
+*/
+@media (hover: none) and (pointer: coarse) {
+  /*
+    Здесь min-height, а не поле: у ссылок этих блоков сетка выровнена по
+    базовой линии, и нижнее поле утащило бы цифру очков вверх относительно
+    имени.
+  */
+  body .rank__head { min-height: 44px; }
+  body .rank__rest a { min-height: 44px; }
+
+  body .rank__all,
+  body .chron__all,
+  body .community__all {
+    display: inline-flex; align-items: center;
+    min-height: 44px; padding: var(--s-2) var(--s-1);
+  }
+
+  /* Раскрытие «Читать запись» — тоже цель, а не подпись. */
+  body .chron__read summary {
+    display: inline-flex; align-items: center;
+    min-height: 44px;
+  }
+
+  body .community__topic { display: block; min-height: 44px; }
+
+  /*
+    Ник автора в строке темы — ссылка, но min-height здесь невозможен:
+    строка меты выровнена по базовой линии, и блок в 44px утащил бы её
+    вниз вместе со всей строкой. Поле с компенсацией отрицательным
+    отступом даёт пальцу те же 44px, не трогая ни одной буквы.
+  */
+  body .community__nick {
+    padding: var(--s-3) 0;
+    margin: calc(-1 * var(--s-3)) 0;
+  }
+
+  /*
+    Залипание наведения: на телефоне :hover включается после касания и
+    держится до следующего. У строк, где подсветка означает «выбрано»,
+    это враньё — поэтому она убрана, а момент нажатия остаётся.
+  */
+  body .rank__rest a:hover { background: none; }
+  body .rank__rest a:active { background: color-mix(in srgb, var(--text) 5%, transparent); }
+  body .community__topic:hover { color: inherit; text-decoration: none; }
 }
 

@@ -1156,6 +1156,268 @@ h1,h2,h3,h4 {
 .podium__name { flex: 1; font-weight: 500; }
 .podium__points { font-family: Unbounded, sans-serif; font-size: 18px; font-weight: 700; color: var(--win); }
 
+/* ── Главная: ряды разной ширины ───────────────────────────────────────────
+   Четыре панели одинаковой ширины подряд — это список, а не сводка. Здесь
+   два ряда 60/40, где второй зеркалит первый, и одна узкая служебная панель
+   внизу: вес блока задаёт ширина колонки, а не попытки перекричать соседа
+   заголовком (§32 просит ровно эту тройку — крупный, средний, маленький).
+
+   minmax(0, Nfr) в обеих колонках обязателен: у fr минимум по умолчанию равен
+   ширине содержимого, и одно длинное слово в названии альянса раздавило бы
+   колонку за край экрана.
+
+   Ниже 900 px ряды схлопываются в одну колонку и остаются в том же порядке:
+   сначала «кто ведёт», потом «чем жил сервер». Если одного из блока нет
+   (летопись пуста, альянсов меньше четырёх), *:only-child растягивает
+   оставшийся на всю ширину — половинки экрана с пустотой не бывает.
+*/
+.home__row { display: grid; gap: var(--s-3); margin-bottom: var(--s-3); }
+.home__row > * { min-width: 0; }
+.home__row > .panel { margin-bottom: 0; }
+.home__row > *:only-child { grid-column: 1 / -1; }
+@media (min-width: 900px) {
+  .home__row--lead { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  .home__row--back { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+}
+
+/* Служебный блок ряда — тот же контур, но тише: меньше воздух и своя
+   подпись. Выдумывать для него отдельный цвет нельзя: поверхность карточки
+   задаёт лестница слоёв, а не роль блока. */
+.panel--utility { padding: var(--s-3); }
+.panel--utility .panel__head { margin-bottom: var(--s-2); }
+
+/* ── Главная: рейка рейтинга ───────────────────────────────────────────────
+   Трое впереди крупно, следующие — сжатый список. Цифры те же, что рисует
+   общий рейтинг: место, очки, победы с поражениями, форма последних боёв и
+   движение за неделю. Ни «рейтинга силы», ни «кто сейчас в игре»: таких
+   чисел сайт не знает, поэтому их на главной нет вовсе.
+
+   Медалью крашено только число места в тройке, и только крупное: цвет
+   альянса уже лежит в плашке-теге, а цветной бордюр строки спорил бы с ним.
+   В коротком списке цифры мелкие, поэтому они остаются --mute: золото
+   12-м кеглем не читается, а 3:1 с мелкого текста никто не снимал.
+
+   Победа и поражение в строке тройки — слова с числом, а не «2/2» и те же
+   самые слова рядом: два способа показать одну пару чисел это дубль, и
+   глазами он читается как два разных показателя.
+*/
+.rank__podium { list-style: none; margin: 0; padding: 0; }
+.rank__top { padding: var(--s-2) 0; border-bottom: 1px solid var(--line-soft); }
+.rank__top:first-child { padding-top: 0; }
+
+.rank__head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-2);
+  color: inherit;
+  text-decoration: none;
+}
+.rank__place {
+  font-family: Unbounded, sans-serif;
+  font-size: var(--fs-stat-sm); font-weight: 800; line-height: 1;
+  color: var(--dim);
+}
+.rank__top--1 .rank__place { color: var(--gold); }
+.rank__top--2 .rank__place { color: var(--silver); }
+.rank__top--3 .rank__place { color: var(--bronze); }
+.rank__name { font-weight: 500; overflow-wrap: anywhere; }
+.rank__pts {
+  font-family: Unbounded, sans-serif;
+  font-size: var(--fs-card); font-weight: 700; text-align: right;
+  color: var(--dim);
+}
+.rank__pts.pos { color: var(--win-ink); }
+.rank__pts.neg { color: var(--loss-ink); }
+
+.rank__facts {
+  display: flex; align-items: center; gap: var(--s-1) var(--s-2); flex-wrap: wrap;
+  margin-top: var(--s-1);
+  font-size: var(--fs-meta); color: var(--dim);
+}
+
+.rank__rest { list-style: none; margin: 0; padding: 0; }
+.rank__rest li + li { border-top: 1px solid var(--line-soft); }
+.rank__rest a {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-2);
+  padding: var(--s-1) 0;
+  color: inherit;
+  text-decoration: none;
+}
+.rank__rest a:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.rank__rest .rank__place { font-size: var(--fs-body); font-weight: 700; color: var(--mute); }
+.rank__rest .rank__pts { font-size: var(--fs-body); }
+.rank__rest .rank__name { font-size: var(--fs-meta); color: var(--dim); }
+
+.rank__all {
+  display: inline-block;
+  margin-top: var(--s-3);
+  font-size: var(--fs-meta); font-weight: 700;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.rank__all:hover { text-decoration: underline; }
+
+/* ── Главная: летопись сервера ─────────────────────────────────────────────
+   Редакционная колонка, а не три одинаковых карточки: одна запись развёрнута
+   (дата, рубрика, вердикт, заголовок, краткое и способ дочитать), две
+   короткие идут списком под ней. Порядок — от самого свежего.
+
+   Рубрика и вердикт берутся из общего словаря типов (src/logic/event-types.js),
+   которым пользуются и страница летописи, и панель: одно событие не может
+   называться по-разному на двух экранах.
+
+   Краска левого канта повторяет исход (взяли / не взяли), но смысл канта
+   вторичен: то же самое словами написано в рубрике. Поэтому требования 3:1
+   к не-тексту здесь не обходят правило — без цвета запись читается целиком.
+*/
+.chron__lead {
+  border-left: 3px solid var(--line);
+  padding-left: var(--s-2);
+}
+.chron__lead[data-kind="win"] { border-left-color: var(--win); }
+.chron__lead[data-kind="loss"] { border-left-color: var(--loss); }
+.chron__lead[data-kind="other"] { border-left-color: var(--accent); }
+
+.chron__meta {
+  display: flex; align-items: baseline; gap: var(--s-1); flex-wrap: wrap;
+  font-size: var(--fs-eyebrow); font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--mute);
+}
+.chron__cat { color: var(--accent-ink); }
+.chron__verdict {
+  padding: var(--s-hair) var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  letter-spacing: .04em;
+  color: var(--text);
+}
+.chron__title {
+  margin: var(--s-1) 0 0;
+  font-family: Unbounded, sans-serif;
+  font-size: var(--fs-card); font-weight: 700; line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.chron__summary { margin: var(--s-1) 0 0; color: var(--dim); line-height: 1.55; overflow-wrap: anywhere; }
+
+.chron__read { margin-top: var(--s-2); }
+.chron__read summary {
+  cursor: pointer;
+  font-size: var(--fs-meta); font-weight: 700;
+  color: var(--accent-ink);
+  list-style: none;
+}
+.chron__read summary::-webkit-details-marker { display: none; }
+.chron__read summary::before { content: '+'; margin-right: var(--s-1); }
+.chron__read[open] summary::before { content: '−'; }
+.chron__read summary:hover { text-decoration: underline; }
+.chron__body {
+  margin-top: var(--s-1);
+  color: var(--dim); line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.chron__rest {
+  list-style: none; margin: var(--s-3) 0 0; padding: var(--s-2) 0 0;
+  border-top: 1px solid var(--line-soft);
+  display: grid; gap: var(--s-2);
+}
+.chron__rest li {
+  display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: var(--s-1) var(--s-2);
+  align-items: baseline;
+}
+.chron__rest .chron__when { color: var(--mute); }
+.chron__rest-body { display: grid; gap: var(--s-hair); min-width: 0; }
+.chron__rest-title { font-weight: 500; overflow-wrap: anywhere; }
+.chron__rest-meta {
+  display: flex; align-items: baseline; gap: var(--s-1); flex-wrap: wrap;
+  font-size: var(--fs-eyebrow); font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--mute);
+}
+.chron__rest-note {
+  letter-spacing: normal; text-transform: none; font-weight: 400;
+  font-size: var(--fs-meta); color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.chron__all {
+  display: inline-block;
+  margin-top: var(--s-3);
+  font-size: var(--fs-meta); font-weight: 700;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.chron__all:hover { text-decoration: underline; }
+
+/* ── Главная: ряд сообщества ───────────────────────────────────────────────
+   Ряд догружается после распечатки страницы (src/pages/home-community.js),
+   поэтому его контур обязан занять место заранее. Строки контура — те же
+   отступы и та же высота, что у настоящих тем, и панель соседнего графика
+   растягивает ряд: момент, когда база отвечает, страница не сдвигает.
+
+   Мигалки нет: тема приходит одна за визит, а пульсирующая полоса звала бы
+   к себе сильнее, чем стоит того ждать.
+*/
+.community__list { list-style: none; margin: 0; padding: 0; }
+.community__item {
+  display: grid; gap: var(--s-hair);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.community__item:first-child { padding-top: 0; }
+.community__topic {
+  font-family: Unbounded, sans-serif;
+  font-size: var(--fs-card); font-weight: 700; line-height: 1.3;
+  color: inherit; text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.community__topic:hover { color: var(--accent-ink); text-decoration: underline; }
+.community__meta {
+  display: flex; align-items: baseline; gap: var(--s-1); flex-wrap: wrap;
+  font-size: var(--fs-meta); color: var(--mute);
+}
+.community__cat { color: var(--accent-ink); font-weight: 700; }
+.community__nick { color: var(--dim); text-decoration: none; }
+.community__nick:hover { text-decoration: underline; }
+
+.community__pulse {
+  margin: var(--s-2) 0 0;
+  font-size: var(--fs-meta); color: var(--dim);
+}
+.community__pulse-day { color: var(--mute); }
+.community__note { margin: 0; font-size: var(--fs-meta); color: var(--dim); }
+.community__note a { color: var(--accent-ink); font-weight: 700; }
+
+.community__all {
+  display: inline-block;
+  margin-top: var(--s-3);
+  font-size: var(--fs-meta); font-weight: 700;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.community__all:hover { text-decoration: underline; }
+
+.community__sk { list-style: none; margin: 0; padding: 0; }
+.community__sk li {
+  display: grid; gap: var(--s-1);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.community__sk li:first-child { padding-top: 0; }
+.community__sk i {
+  display: block;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.community__sk-t { height: 17px; }
+.community__sk-m { height: var(--s-1); width: 60%; }
+
 /* ── График ─────────────────────────────────────────────────────────────── */
 .ch { width: 100%; overflow: hidden; }
 .ch svg { width: 100%; height: auto; display: block; overflow: visible; }
