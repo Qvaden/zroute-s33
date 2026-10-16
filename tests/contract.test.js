@@ -17892,6 +17892,99 @@ console.log('\nBE. Короткое сообщение собрано в оди�
     !/\bnotice\b/.test(CHATS + MOUNT), /\bnotice\b/.exec(CHATS + MOUNT)?.[0] || 'чисто');
 }
 
+/* ── BF. Мера ряда: доли колонки — целые числа из двенадцати ─────────────────
+
+   Бриф (действующий, пункт 8 «новая visual language») просит «precise
+   grids». Числом в брифе это не задано, поэтому мерой выбрано то, чем
+   ряды уже делят место: двенадцать долей. Что может сломаться молча:
+
+   Изобретённая доля. `1.05fr` и `1.4fr` ничему не соответствуют: первое —
+   половина процента против равных половин, второе — те же 7/5, записанные
+   дробью. Пока доля может быть дробной, следующий ряд напишет своё 1.35, и
+   ряды перестанут стыковаться, оставшись визуально правильными.
+
+   Мёртвое имя в описании. Мера перечисляет ряды по классам. Если класс
+   исчезнет или имя будет написано с ошибкой, описание станет правдивым
+   ровно наполовину — и по нему начнут сверять то, чего в CSS нет. Поэтому
+   каждое имя из комментария проверяется на существование, а каждый
+   auto-fit/auto-fill ряд обязан быть в перечне: иначе новый ряд можно
+   перевести на 12 колонок молча, хотя число карточек в нём приходит с
+   сервера и последний ряд встал бы пустыми клетками.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBF. Мера ряда: дробных долей нет, пары складываются в 12');
+{
+  const { readFile } = await import('node:fs/promises');
+  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+
+  const cssAll = {};
+  for (const name of LIVE) cssAll[name] = await readFile(`src/${name}.css`, 'utf8');
+  const ALL = Object.values(cssAll).join('\n');
+
+  /* 1. Дробная доля запрещена целиком. */
+  const fraction = [];
+  const pairs = [];
+  for (const [name, css] of Object.entries(cssAll)) {
+    for (const m of css.matchAll(/grid-template-columns:\s*([^;]+);/g)) {
+      const value = m[1];
+      for (const fr of value.matchAll(/(\d*\.?\d+)fr/g)) {
+        const n = Number(fr[1]);
+        if (!Number.isInteger(n)) fraction.push(`${name}.css: ${value.trim()}`);
+      }
+      const tracks = [...value.matchAll(/(?:^|[\s,(])(\d+(?:\.\d+)?)fr\b/g)].map((t) => Number(t[1]));
+      if (tracks.length === 2) pairs.push({ name, value: value.trim(), tracks });
+    }
+  }
+  check('ни одной дробной доли в grid-template-columns шести живых файлов',
+    fraction.length === 0, `${fraction.length} вне меры: ${fraction.slice(0, 4).join(' | ')}`);
+
+  /* 2. Пара неравных долей обязана складываться в меру. */
+  const odd = pairs.filter((p) => p.tracks[0] !== p.tracks[1] && p.tracks[0] + p.tracks[1] !== 12);
+  check('ряд из двух колонок делится равными долями или парой из двенадцати',
+    odd.length === 0, `${pairs.length} пар проверено, вне меры: ${odd.map((p) => `${p.name}: ${p.value}`).join(' | ')}`);
+
+  const mirrors = pairs.filter((p) => p.tracks[0] + p.tracks[1] === 12 && p.tracks[0] !== p.tracks[1]);
+  check('неравные пары в мере есть, а не только равные половины',
+    mirrors.length >= 2, `пар 7+5 и 5+7 в ряду: ${mirrors.length}`);
+
+  /* 3. Сама мера объявлена в одном месте — рядом с остальными рядами. */
+  const head = cssAll['styles-v8'].search(/МЕРА РЯДА:/);
+  check('мера ряда объявлена комментарием в styles-v8.css', head > 0,
+    head < 0 ? 'заголовка нет' : `строка ${cssAll['styles-v8'].slice(0, head).split('\n').length}`);
+
+  const block = /МЕРА РЯДА:[\s\S]*?\*\// .exec(cssAll['styles-v8'])?.[0] ?? '';
+  const named = [...new Set([...block.matchAll(/`([^`]+)`/g)]
+    .map((m) => m[1].replace(/\s+/g, ' ').trim())
+    .filter((s) => s.startsWith('.')))];
+  check('в описании меры названы ряды', named.length >= 12, `имён в перечне: ${named.length}`);
+
+  const missing = named.filter((sel) => !ALL.includes(sel));
+  check('каждое названное имя действительно встречается в живых файлах',
+    missing.length === 0, `нет в CSS: ${missing.join(', ')}`);
+
+  /* 4. Ряды данных перечислены все: перевести новый на 12 колонок можно
+        только вместе с правкой перечня. */
+  const ownerOf = (css, index) => {
+    const open = css.lastIndexOf('{', index);
+    const head2 = css.lastIndexOf('}', open);
+    return css.slice(head2 + 1, open)
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  const walls = [];
+  for (const [name, css] of Object.entries(cssAll)) {
+    for (const m of css.matchAll(/repeat\((auto-fit|auto-fill)[^)]*\)/g)) {
+      const owner = ownerOf(css, m.index).replace(/:.*$/, '').trim();
+      if (owner.startsWith('.')) walls.push({ name, owner, file: `${name}.css` });
+    }
+  }
+  const unnamed = walls.filter((w) => !named.includes(w.owner));
+  check('каждый ряд, где колонок столько, сколько данных, назван в мере',
+    unnamed.length === 0, `${walls.length} таких рядов, не названо: ${unnamed.map((w) => `${w.file} ${w.owner}`).join(' | ')}`);
+  check('стены данных остаются на auto-fit / auto-fill, а не переводятся в 12 колонок',
+    walls.length >= 8, `рядов на автозаполнении: ${walls.length}`);
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

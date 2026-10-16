@@ -665,7 +665,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 .chat-create { flex: none; padding: 0 var(--s-2) var(--s-2); }
 .chat-create .forum-field { margin-bottom: var(--s-1); }
-.chat-create__row { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--s-1); }
+.chat-create__row { display: grid; grid-template-columns: 7fr 5fr; gap: var(--s-1); }
 .chat-create__note { margin: 0 0 var(--s-1); font-size: var(--fs-eyebrow); line-height: 1.45; }
 .chat-create__acts { display: flex; gap: var(--s-1); }
 

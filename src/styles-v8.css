@@ -332,6 +332,44 @@
   */
 
   /*
+    МЕРА РЯДА: ДОЛЯ КОЛОНКИ — ЦЕЛОЕ ЧИСЛО ИЗ ДВЕНАДЦАТИ.
+
+    Действующий бриф (пункт 8, «новая visual language») просит «precise
+    grids», а не сетку из двенадцати колонок как таковую.
+    Поэтому здесь не второй каркас на страницу, а правило деления: ряд из двух
+    колонок делится только парами одной меры — 6+6, 7+5, 5+7, 8+4, 4+8, 9+3.
+    Два числа, которые так и были записаны, ничего не значат: `1.05fr` —
+    половина процента против равных половин, `1.4fr` — те же 7/5, только
+    записанные дробью. Дробная доля плоха не величиной, а тем, что её нельзя
+    ни назвать, ни повторить: следующий ряд придумывает своё 1.35, и ряды
+    разъезжаются. Проверка BF держит это как запрет: ни одного дробного `fr`
+    и ни одной пары неравных долей, которые не складываются в 12.
+
+    По мере сегодня делят ряд: `.home__row--lead` и `.home__row--back` — 7+5 и
+    5+7, `.chat-create__row` — 7+5, `.split`, `.live__row`, `.movers`,
+    `.grid-2`, `.bot-promise` — равные половины. Ряды вида `1fr 1fr` в `6fr 6fr`
+    не переписывают: доля уже равная, а вторая запись ничего не добавляет.
+
+    Есть ряды, которые делят не пропорцией, а границей. `.forum-layout`
+    отрезает сбоку колонку форума (`--forum-col`, 320/340 px), потому
+    что шапка и лента обязаны стоять на одной границе, а не на одном
+    проценте. `.hero--ops .hero__top` держит правую колонку в 250…330 px:
+    это столбец чисел, и пропорция превращала бы его в пустыню на широком
+    экране.
+
+    Ряды, где число колонок задаёт объём данных, в мере не участвуют и остаются
+    на auto-fit / auto-fill: `.server-stats__grid`, `.trophies`,
+    `.achievement-grid`, `.tl__gallery`, `.accounts-fields`, `.accounts-grid`,
+    `.adm-players`, `.sk--tile`, `.hb-grid`, `.hb-siblings ul`. Их содержимое
+    приходит с сервера, и жёсткие двенадцать колонок оставили бы пустые клетки
+    в последнем ряду, когда карточек, скажем, семь.
+
+    Строки данных с колонками в пикселах (`.lad__row`, `.vs__row`,
+    `.proof__row`) — тоже не ряд макета: там ширина клетки равна ширине значка
+    или числа, а не договорённости о пропорции.
+  */
+
+  /*
     РЯД СЛОЁВ.
 
     Кто кого перекрывает должно читаться по имени, а не по сопоставлению
@@ -2800,7 +2838,7 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 .bot-feature:hover { transform: translateY(-6px); border-color: color-mix(in srgb, var(--electric) 55%, transparent); box-shadow: 0 18px 34px -27px var(--electric); } .bot-feature--accent { border-color: color-mix(in srgb, var(--accent) 42%, transparent); }
 .bot-feature__index { color: var(--mute); font: 800 var(--fs-meta)/1 Inter, sans-serif; letter-spacing: .14em; } .bot-feature__icon { margin: var(--s-5) 0 var(--s-4); color: var(--electric); font: 800 28px/1 Unbounded, sans-serif; } .bot-feature--accent .bot-feature__icon { color: var(--accent); }
 .bot-feature h3 { margin: 0 0 var(--s-2); font-size: clamp(18px, 2vw, 21px); font-weight: 900; letter-spacing: -.02em; } .bot-feature p { margin: 0; color: var(--dim); font-size: 16px; font-weight: 500; line-height: 1.65; }
-.bot-promise { display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--s-5); align-items: center; margin-top: var(--s-4); border-color: color-mix(in srgb, var(--gold) 25%, transparent); background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 9%, transparent), color-mix(in srgb, var(--text) 2.5%, transparent)); }
+.bot-promise { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-5); align-items: center; margin-top: var(--s-4); border-color: color-mix(in srgb, var(--gold) 25%, transparent); background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 9%, transparent), color-mix(in srgb, var(--text) 2.5%, transparent)); }
 .bot-promise__line { position: absolute; width: 2px; height: 74px; background: var(--gold); } .bot-promise h2 { max-width: 540px; margin-top: var(--s-1); } .bot-promise p { margin: 0; color: var(--dim); line-height: 1.75; } .bot-promise strong { color: var(--gold); }
 .bot-final { display: grid; justify-items: center; padding: var(--s-7) var(--s-4) var(--s-5); text-align: center; } .bot-final h2 { margin: var(--s-2) 0 var(--s-hair); font-size: clamp(26px, 5vw, 46px); } .bot-final em { color: var(--electric); font-style: normal; }
 .bot-cta--large { margin-top: var(--s-4); padding: var(--s-3) var(--s-3); }
