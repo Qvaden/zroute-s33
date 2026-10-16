@@ -42,7 +42,7 @@
     },
     {
       "key": "president-board",
-      "body": "{\"enabled\":true,\"label\":\"ПРЕЗИДЕНТ СЕРВЕРА\",\"name\":\"Kreml\",\"alliance\":\"KP33\",\"note\":\"Данные обновляются вручную\"}",
+      "body": "{\"enabled\":true,\"label\":\"ПРЕЗИДЕНТ СЕРВЕРА\",\"name\":\"Besty13\",\"alliance\":\"cccp\",\"note\":\"Данные обновляются вручную\"}",
       "title": "Президент сервера"
     }
   ],
@@ -1755,7 +1755,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-10-16T13:11:29+00",
+  "pulledAt": "2026-10-16T17:57:29+00",
   "alliances": [
     {
       "id": "a01",
