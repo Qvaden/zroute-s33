@@ -390,6 +390,7 @@
   --z-menu: 30;      /* выпадающие меню, пикер, подбор эмодзи */
   --z-head: 40;      /* липкая шапка сайта */
   --z-bar: 42;       /* телефонная полоса раздела: над содержимым, под шторкой */
+  --z-notice: 43;    /* плашка «данные не идут» у низа окна: над полосой, под шторкой */
   --z-veil: 44;      /* затемнение под шторкой разделов */
   --z-drawer: 45;    /* шторка разделов */
   --z-modal: 60;     /* модальное окно */
@@ -2598,22 +2599,103 @@ button:hover, .seg__btn:hover, .cal__btn:hover { box-shadow: 0 8px 20px -16px cu
 @keyframes s33-loading-dots { 0% { content: ' ·'; } 33% { content: ' ··'; } 66% { content: ' ···'; } }
 
 /*
-  Полоска «показан снимок» или «данные не дошли». Стоит над содержимым и на
-  широком, и на узком экране: её смысл — объяснить пустые таблицы, поэтому
-  прятать её в подвал нельзя. Кнопка «Повторить» внутри обязана доставаться
-  пальцем, а текст — читаться без лупы.
+  Полоска «откуда цифры на экране» — одна строка постоянной высоты.
+
+  СТАРАЯ БЕДА. Полоска стояла над содержимым, но появлялась только вместе с
+  ответом: пока база молчала, её высоты в документе не было. В момент, когда
+  ответ всё-таки приходил, под шапкой вырастал чужой блок, и весь экран —
+  герой, панели, ряды — уезжал вниз на 102 px на мониторе и на 244 px на
+  телефоне. Замер (scratch/cls.mjs) писал это как +0.06 CLS на каждой
+  загрузке: копия таблицы у сайта рабочий путь, а не исключение.
+
+  ЧТО СДЕЛАНО. Полоска живёт на своём месте с первого кадра и никогда не
+  прячется: меняется только её текст. Высоту задаёт число, а не текст, —
+  закрытая полоска ровно `--strip-h` и в одну, и в две строки, и в пустом, и
+  в полном состоянии, поэтому приход данных не сдвигает ничего. Длинное
+  объяснение спрятано под словом «подробности»: раскрытие делает человек сам,
+  а сдвиг по его нажатию браузер в CLS не записывает.
+
+  ПОЧЕМУ ОДИН РАЗМЕР НЕ ДЛЯ ВСЕХ ШИРИН. На телефоне самая длинная строка
+  («Показан снимок таблицы от 30.09, 09:56 — база не ответила») в одну строку
+  не влезала и переносилась: резерв в 44 px отрезал бы ей хвост молча —
+  читатель увидел бы оборванную фразу без шанса её дочитать. Перенос убран
+  из подробного слова: оно сжимается и режется многоточием, а целая фраза
+  лежит под «подробностями». Поэтому высота одна на все ширины и держится
+  числом, а не содержимым.
+
+  Цвет планки слева — состояние, а не украшение: ожидание и снимок спокойные,
+  «данные не дошли» краснеет, живая база зеленеет. Смысл при этом всегда
+  написан словами, цвет только помогает его найти глазами.
 */
 .data-notice {
-  margin: var(--s-3) auto 0; padding: var(--s-2) var(--s-3); max-width: var(--wrap);
-  border: 1px solid var(--line); border-left: 3px solid var(--win);
+  --strip-h: 44px;
+  height: var(--strip-h);
+  overflow: hidden;
+  display: grid;
+  align-content: center;
+  margin: var(--s-3) auto 0;
+  padding: 0 var(--s-3);
+  max-width: var(--wrap);
+  border: 1px solid var(--line); border-left: 3px solid var(--dim);
   border-radius: var(--r); background: var(--raised);
-  color: var(--dim); font: 400 var(--fs-text)/1.55 Inter, sans-serif;
+  color: var(--dim); font: 400 var(--fs-text)/1.5 Inter, sans-serif;
+  cursor: pointer;
 }
-.data-notice[hidden] { display: none; }
-.data-notice .forum-btn { margin-left: var(--s-2); }
+.data-notice[data-state="snapshot"], .data-notice[data-state="live"] { border-left-color: var(--win); }
+.data-notice[data-state="none"] { border-left-color: var(--loss); }
+/* Открытая полоска перестаёт быть одной строкой: это нажатие читателя, а не приход данных. */
+.data-notice[open] { height: auto; overflow: visible; padding-bottom: var(--s-2); cursor: auto; }
+.data-notice__line {
+  display: flex; flex-wrap: nowrap; align-items: baseline; gap: var(--s-1) var(--s-2);
+  min-width: 0; padding: 0; list-style: none; cursor: pointer;
+}
+.data-notice__line::-webkit-details-marker { display: none; }
+.data-notice[open] .data-notice__line { cursor: auto; }
+/*
+  Имя состояния не сжимается никогда: «Показан снимок…» вместо «Показан
+  снимок таблицы» читалось бы как другой статус. Многоточие забирает
+  подробность, а не заголовок — поэтому у подписи `flex: none` и перенос
+  запрещён.
+*/
+.data-notice__line b { color: var(--text); font-weight: 700; flex: none; white-space: nowrap; }
+/*
+  Подробность режется многоточием, а не переносится. Рамка держит ровно
+  столько, сколько задано в --strip-h, и перенесённая строка утонула бы в ней
+  молча: читатель увидел бы оборванную фразу без шанса её дочитать. Целая
+  фраза лежит под словом «подробности», поэтому здесь достаточно начала.
+*/
+.data-notice__line span {
+  min-width: 0; flex: 1 1 auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.data-notice__hint {
+  order: 9; margin-left: auto; color: var(--win);
+  font: 700 var(--fs-small)/1 Inter, sans-serif; font-style: normal; white-space: nowrap;
+}
+.data-notice__hint::after { content: ' ▾'; }
+.data-notice[open] .data-notice__hint::after { content: ' ▴'; }
+.data-notice__body {
+  display: grid; gap: var(--s-2); justify-items: start; align-items: center;
+  margin-top: var(--s-2); padding-top: var(--s-2); border-top: 1px solid var(--line);
+  color: var(--dim); font-size: var(--fs-small); line-height: 1.55;
+}
+.data-notice__body p { margin: 0; }
 @media (max-width: 559px) {
+  /*
+    Только кегль: высота та же, потому что строка не переносится. Мелкий
+    шрифт нужен ровно для одного — под многоточие влезает больше букв.
+  */
   .data-notice { font-size: var(--fs-small); }
-  .data-notice .forum-btn { display: block; margin: var(--s-2) 0 0; width: 100%; }
+  /*
+    Слово «подробности» на телефоне уступает место стрелке. Ряд запрещён
+    переносить, имя состояния сжимать нельзя, и на 320 px подпись
+    («Показан снимок таблицы», 151 px) с этим словом (100 px) и двумя
+    зазорами занимают 287 px из 268 — полоска резала бы сам статус, а не
+    подробность. Рамка кликабельна целиком, стрелка остаётся: она и есть
+    знак того, что тут есть что раскрыть.
+  */
+  .data-notice__hint { font-size: 0; }
+  .data-notice__hint::after { font-size: var(--fs-small); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2810,6 +2892,40 @@ button:active, .seg__btn:active, .cal__btn:active { animation: s33-control-pop .
 @media (prefers-reduced-motion: reduce) {
   .boot-loader::after, .boot-loader__mark, .boot-loader__mark::before, .boot-loader__mark::after, .boot-loader__signal i, .boot-loader__status { animation: none; }
   .boot-loader { transition-duration: .01ms; }
+}
+
+/*
+  Плашка «данные не идут» прибита к низу окна и стоит вне потока страницы.
+  Прежний вариант вписывал объяснение внутрь самой заглушки «Загружаем
+  данные…», то есть стирал её: документ оседал с 1724 px до 325 px, подвал
+  взлетал вверх, а через три секунды, когда база всё-таки отвечала, падал
+  обратно. На телефоне одна эта плашка стоила +0.19 CLS ещё до прихода
+  данных. Фиксированное положение не меняет высоту документа ни на пиксель:
+  объяснение видно там, куда смотрит человек, а контур под ним стоит
+  нетронутым и держит резерв.
+
+  Слой у плашки — своя ступень ряда, `--z-notice`: она обязана перекрывать
+  прилипающую телефонную полосу, но не открытую шторку разделов. Отступ снизу
+  берёт системную безопасную зону, поэтому кнопка «Повторить» остаётся на
+  высоте большого пальца, а не уезжает под навигацию телефона.
+*/
+.boot-notice {
+  position: fixed; left: var(--s-3); right: var(--s-3); bottom: calc(var(--s-3) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-notice);
+  display: grid; gap: var(--s-2); justify-items: center; margin-inline: auto;
+  max-width: var(--wrap); padding: var(--s-3);
+  border: 1px solid var(--line); border-left: 3px solid var(--win);
+  border-radius: var(--r); background: var(--raised); box-shadow: var(--shadow);
+  color: var(--dim); font: 400 var(--fs-text)/1.55 Inter, sans-serif;
+}
+.boot-notice__text { margin: 0; }
+.boot-notice__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s-2) var(--s-3); }
+.boot-notice .boot-loader__mirror { margin: 0; }
+@media (max-width: 559px) {
+  .boot-notice { font-size: var(--fs-small); }
+  .boot-notice__acts { flex-direction: column; align-items: stretch; }
+  .boot-notice .forum-btn { min-height: 44px; }
+  .boot-notice .boot-loader__mirror a { display: block; padding: var(--s-2) 0; text-align: center; }
 }
 
 /* ── Страница бота-справочника в Telegram                                   */

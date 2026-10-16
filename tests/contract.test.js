@@ -12451,8 +12451,8 @@ console.log('\nAN. Доска аккаунтов');
 
   check('срок, после которого ожидание называют вслух, — число в config',
     /slowBootSeconds:\s*\d+/.test(cfgSrc) && bootSrc.includes('CONFIG.slowBootSeconds * 1000'));
-  check('объяснение показывает и плашка первого захода, и заглушка страницы',
-    bootSrc.includes('boot-loader__slow') && /app\.querySelector\('\.loading'\)/.test(bootSrc));
+  check('объяснение показывают и плашка первого захода, и плашка у низа окна',
+    bootSrc.includes('boot-loader__slow') && bootSrc.includes('boot-notice'));
   check('пришедшие данные уже не объясняют чужое молчание',
     /function showSlowBootNotice\(\)\s*\{\s*if \(dataArrived\) return;/.test(bootSrc)
       && /const data = await loadAll\(\);\r?\n\s*dataArrived = true;/.test(bootSrc));
@@ -12469,8 +12469,14 @@ console.log('\nAN. Доска аккаунтов');
   check('у объяснения есть повтор, и он идёт тем же путём, что открытие страницы',
     bootSrc.includes('data-boot-retry')
       && /data-boot-retry\]'\)\)\s*\r?\n?\s*boot\(\);/.test(bootSrc));
-  check('честное объяснение выключает крутящиеся точки «ещё ждём»',
-    cssAll.includes('.loading.is-honest::after') && bootSrc.includes("classList.add('is-honest')"));
+  /*
+    Класс «честного» ожидания остался за другими заглушками — справочник не
+    догрузился, панель не догрузилась, данные легли криво. Объяснение молчания
+    базы к ним больше не относится: оно прибито к низу окна и оставляет
+    контур страницы стоять, а не перекрашивает его.
+  */
+  check('страница, которая называет отказ вместо точек, выключает анимацию «ещё ждём»',
+    cssAll.includes('.loading.is-honest::after') && bootSrc.includes('loading is-honest'));
   check('текст объяснения говорит про сон базы и не обещает лишнего',
     bootSrc.includes('база на бесплатном тарифе засыпает')
       && bootSrc.includes('Форум, календарь') && bootSrc.includes('SLOW_BOOT_TEXT'));
@@ -12528,48 +12534,88 @@ console.log('\nAN. Доска аккаунтов');
     classList: { contains: () => false },
     querySelector: (sel) => (sel === '.boot-loader__core' ? core : null),
   };
-  const box = {
-    innerHTML: '', added: [], querySelector: () => null,
-    classList: { add(cls) { box.added.push(cls); } },
+  /*
+    Плашка объяснения прибита к низу окна и вставляется в конец body, а не
+    вписывается в заглушку страницы. Подставной документ поэтому знает ровно
+    одно место — саму плашку — и считает вызовы вставки: повторный зов не
+    имеет права плодить второй «Повторить» над тем же объяснением.
+  */
+  const плашка = { calls: [] };
+  const doc = {
+    body: { insertAdjacentHTML(_where, html) { плашка.calls.push(html); } },
+    querySelector(sel) {
+      if (sel !== '[data-boot-notice]') return null;
+      return плашка.calls.length ? { remove() { плашка.calls.length = 0; } } : null;
+    },
   };
-  const appEl = { querySelector: (sel) => (sel === '.loading' ? box : null) };
   const mirrorFn = mirrorRun(
     { mirrorUrl: 'https://qvaden.github.io/zroute-s33/' },
     { hostname: 'zroutehub.bond', hash: '#/forum' },
     (s) => String(s)
   );
-  const makeNotice = new Function('app', 'bootLoader', 'esc', 'SLOW_BOOT_TEXT', 'dataArrived',
+  const makeNotice = new Function('document', 'bootLoader', 'esc', 'SLOW_BOOT_TEXT', 'dataArrived',
     'CONFIG', 'location', 'mirrorLinkHtml',
-    `${noticeSrc}${mirrorSrc}; return showSlowBootNotice;`);
+    `${noticeSrc}${mirrorSrc}; return { showSlowBootNotice, hideSlowBootNotice };`);
   const noticeLocation = { hostname: 'zroutehub.bond', hash: '#/forum' };
   const noticeConfig = { mirrorUrl: 'https://qvaden.github.io/zroute-s33/' };
+  /** Обе функции ожидания исполняются на одном подставном теле документа. */
+  const notice = (dataArrived = false) => makeNotice(doc, loaderEl, (s) => String(s),
+    'ТЕКСТ-ОБЪЯСНЕНИЕ', dataArrived, noticeConfig, noticeLocation, mirrorFn);
 
-  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', false,
-    noticeConfig, noticeLocation, mirrorFn)();
-  check('объяснение вставляется в оба места ожидания',
-    core.html.includes('ТЕКСТ-ОБЪЯСНЕНИЕ') && box.innerHTML.includes('ТЕКСТ-ОБЪЯСНЕНИЕ')
-      && box.innerHTML.includes('Повторить') && box.added.includes('is-honest'));
-  check('повтор зовет загрузку, а не перекрашивает заглушку',
-    box.innerHTML.includes('data-boot-retry'));
+  notice().showSlowBootNotice();
+  const noticeHtml = плашка.calls.at(-1) ?? '';
+  check('объяснение показывают оба места ожидания',
+    core.html.includes('ТЕКСТ-ОБЪЯСНЕНИЕ') && noticeHtml.includes('ТЕКСТ-ОБЪЯСНЕНИЕ'));
+  check('у объяснения есть повтор, и он в самой плашке',
+    noticeHtml.includes('Повторить') && noticeHtml.includes('data-boot-retry'));
+  /*
+    Здесь прячется вся цена правки. Прежнее объяснение перетирало innerHTML
+    заглушки «Загружаем данные…», то есть стирало контур: документ оседал с
+    1724 px до 325 px, подвал взлетал вверх и падал обратно, когда база
+    отвечала. На телефоне одна плашка стоила +0.19 CLS до прихода данных.
+    Плашка обязана вставиться поверх стоящего контура, а не вместо него.
+  */
+  check('объяснение не перетирает контур и не трогает заглушку страницы',
+    !/innerHTML\s*=/.test(noticeSrc) && !noticeSrc.includes("querySelector('.loading')")
+      && плашка.calls.length === 1);
+  check('плашка прибита к низу окна и стоит вне потока страницы',
+    /\.boot-notice \{[^}]*position: fixed;/.test(cssAll)
+      && /\.boot-notice \{[\s\S]{0,700}?bottom: calc\(var\(--s-3\) \+ env\(safe-area-inset-bottom, 0px\)\);/.test(cssAll));
+  check('плашка не перекрывает шторку разделов и не тонет под телефонной полосой',
+    /\.boot-notice \{[\s\S]{0,200}?z-index: var\(--z-notice\);/.test(cssAll)
+      && /--z-bar: 42;[\s\S]{0,120}?--z-notice: 43;[\s\S]{0,120}?--z-veil: 44;/.test(cssAll));
+  check('повторный зов объяснения не плодит вторую плашку, а пришедшие данные снимают её',
+    (() => {
+      notice().showSlowBootNotice();
+      const one = плашка.calls.length === 1;
+      notice().hideSlowBootNotice();
+      return one && плашка.calls.length === 0;
+    })());
   check('объяснение в оба места проходит через экранирование',
     (noticeSrc.match(/esc\(SLOW_BOOT_TEXT\)/g) || []).length === 2);
   check('пока ждём данные на домене, в обоих местах виден запасной адрес',
-    core.html.includes('data-boot-mirror') && box.innerHTML.includes('data-boot-mirror'));
+    core.html.includes('data-boot-mirror') && noticeHtml.includes('data-boot-mirror'));
 
-  core.html = ''; box.innerHTML = '';
+  core.html = ''; плашка.calls.length = 0;
   noticeLocation.hostname = 'qvaden.github.io';
-  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', false,
-    noticeConfig, noticeLocation, mirrorFn)();
+  notice().showSlowBootNotice();
   check('на зеркале объяснение не предлагает то же зеркало',
     core.html.includes('ТЕКСТ-ОБЪЯСНЕНИЕ') && !core.html.includes('data-boot-mirror')
-      && !box.innerHTML.includes('data-boot-mirror'));
+      && !(плашка.calls.at(-1) ?? '').includes('data-boot-mirror'));
   noticeLocation.hostname = 'zroutehub.bond';
 
-  core.html = ''; box.innerHTML = '';
-  makeNotice(appEl, loaderEl, (s) => String(s), 'ТЕКСТ-ОБЪЯСНЕНИЕ', true,
-    noticeConfig, noticeLocation, mirrorFn)();
+  core.html = ''; плашка.calls.length = 0;
+  notice(true).showSlowBootNotice();
   check('если данные всё-таки пришли, объяснение не появляется',
-    core.html === '' && box.innerHTML === '');
+    core.html === '' && плашка.calls.length === 0);
+  /*
+    Обратная половина того же обещания: плашка нужна ровно пока молчат.
+    Пришедшие данные — а вместе с ними и честный отказ — обязаны её снять,
+    иначе объяснение про чужое молчание останется висеть над полной страницей.
+  */
+  check('пришедшие данные и честный отказ снимают плашку объяснения',
+    /function hideSlowBootNotice\(\) \{[\s\S]{0,140}?remove\(\);/.test(bootSrc)
+      && (bootSrc.match(/dataArrived = true;\r?\n\s*hideSlowBootNotice\(\);/g) || []).length === 2);
 }
 
 /* ── 11. Снимок вместо базы: пустая таблица обязана быть подписана ────────
@@ -12698,6 +12744,7 @@ console.log('\nAN. Доска аккаунтов');
       && jsonAdapterSrc.includes('(await raw()).pulledAt'));
 
   /* ── Полоска объяснения: исполняем её на подставных узлах ── */
+  const v8Notice = await readFile('src/styles-v8.css', 'utf8');
   const noticeStart = mainSrc.indexOf('function dataNotice()');
   const bootStart = mainSrc.indexOf('async function boot() {');
   const noticeSrc = mainSrc.slice(noticeStart, bootStart);
@@ -12710,7 +12757,7 @@ console.log('\nAN. Доска аккаунтов');
     noticeSrc + '; return { dataNotice, snapshotStamp, sourceBadge };');
 
   function paint(state, sourceName) {
-    const box = { hidden: true, innerHTML: '' };
+    const box = { dataset: {}, innerHTML: '' };
     const badge = { textContent: '' };
     const doc = { getElementById: (id) => (id === 'data-notice' ? box : badge) };
     const run = runNotice(state, doc, (s) => '[' + String(s) + ']',
@@ -12725,7 +12772,7 @@ console.log('\nAN. Доска аккаунтов');
     'supabase'
   );
   check('на копии сайт говорит об этом прямо, а не молчит пустым рейтингом',
-    shown.box.hidden === false && shown.box.innerHTML.includes('Показан снимок таблицы от ['));
+    shown.box.dataset.state === 'snapshot' && shown.box.innerHTML.includes('Показан снимок таблицы'));
   check('час снятия показан числом, а не исходным адресом даты',
     /\[\d{2}\.\d{2}/.test(shown.box.innerHTML));
   check('объяснение копии не обещает, что форум и запись постов живы',
@@ -12741,8 +12788,8 @@ console.log('\nAN. Доска аккаунтов');
     { source: '', snapshotAt: null, primaryError: '<script>bad</script>' },
     'supabase'
   );
-  check('когда не пришло ничего, полоска появляется и называет причину',
-    none.box.hidden === false && none.box.innerHTML.includes('Данные не дошли'));
+  check('когда не пришло ничего, полоска называет причину и краснеет состоянием',
+    none.box.dataset.state === 'none' && none.box.innerHTML.includes('Данные не дошли'));
   check('если и причина не известна, полоска говорит про базу и про копию словами',
     (() => {
       const blind = paint({ source: '', snapshotAt: null, primaryError: '' }, 'supabase');
@@ -12772,14 +12819,36 @@ console.log('\nAN. Доска аккаунтов');
   */
   check('объяснение пустоты не упоминает другие серверы',
     !noticeSrc.includes('Копия данных сайта') && !/для сервера \(/.test(noticeSrc));
-  check('в исправном состоянии полоска скрыта, а подвал называет базу',
+  /*
+    Раньше в исправном состоянии полоска пряталась (`box.hidden = true`), и из-за
+    этого приход данных двигал весь экран: высоты полоски в документе не было,
+    а через двенадцать секунд она появлялась — на мониторе на 102 px, на
+    телефоне на 244 px. Теперь состояние «живая база» — такие же слова в той же
+    рамке, а не пустое место, и прятаться полоске негде.
+  */
+  check('в исправном состоянии полоска остаётся на месте и называет базу',
     (() => {
       const clean = paint(
         { source: 'supabase', snapshotAt: null, primaryError: '' }, 'supabase'
       );
-      return clean.box.hidden === true && clean.box.innerHTML === ''
+      return clean.box.dataset.state === 'live'
+        && clean.box.innerHTML.includes('Живая база')
+        && !/\.hidden/.test(clean.box.innerHTML)
         && clean.badge.textContent === 'живая база';
     })());
+  check('полоска ничего не прячет: скрытие вычеркнуто из её кода и стилей',
+    !/box\.hidden/.test(noticeSrc) && !/\.data-notice\[hidden\]/.test(v8Notice));
+  /*
+    Само исправление сидит в стилях: высота полоски задана числом, поэтому
+    документ знает о её присутствии с первого кадра и приход данных не может
+    сдвинуть то, что под ней.
+  */
+  check('высота полоски задана числом, а не содержимым',
+    /\.data-notice \{[\s\S]{0,200}?--strip-h: \d+px;[\s\S]{0,80}?height: var\(--strip-h\);/.test(v8Notice)
+      && /\.data-notice\[open\] \{ height: auto;/.test(v8Notice));
+  check('на узком экране подробность режется многоточием: вторую строку рамка не переживёт',
+    /\.data-notice__line span \{[\s\S]{0,120}?text-overflow: ellipsis;[\s\S]{0,40}?white-space: nowrap;/.test(v8Notice)
+      && !/@media \(max-width: 559px\)[\s\S]{0,200}\.data-notice \{ --strip-h/.test(v8Notice));
   check('полоску зовут и в успехе, и в падении — молчаливой пустоты не остаётся',
     (mainSrc.match(/\bdataNotice\(\);/g) || []).length === 2
       && /function sourceBadge\(\)[\s\S]{0,400}'живая база'/.test(mainSrc));
@@ -12800,8 +12869,8 @@ console.log('\nAN. Доска аккаунтов');
   /* ── Раздача и документы ── */
   const siteHtml = await readFile('index.html', 'utf8');
   check('на странице есть место под полоску, и оно объявлено живой областью',
-    /<div id="data-notice" class="data-notice wrap" role="status"/.test(siteHtml));
-  check('полоска о копии описана стилем, которым нарисовано остальное',
+    /<details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait"/.test(siteHtml));
+  check('полоска описана стилем, которым нарисовано остальное',
     (await readFile('src/styles-v8.css', 'utf8')).includes('.data-notice'));
   check('копия собирается каждые два часа, а не раз в сутки',
     /- cron: '5 \*\/2 \* \* \*'/.test(workflowSrc)
@@ -15328,6 +15397,7 @@ console.log('\nAQ. Стабильность кадра');
   const { renderAccounts } = await import('../src/pages/accounts.js');
   const { renderUserPage } = await import('../src/pages/user.js');
   const refineCss = await readFile('src/refine.css', 'utf8');
+  const mobileCss = await readFile('src/mobile.css', 'utf8');
   const mainJs = await readFile('src/main.js', 'utf8');
   const forumCalendar = await readFile('src/forum/calendar.js', 'utf8');
   const forumChats = await readFile('src/forum/chats.js', 'utf8');
@@ -15406,17 +15476,37 @@ console.log('\nAQ. Стабильность кадра');
     Высота окна и полоса прокрутки.
 
     10 px, которые отнимает появившаяся полоса, пересчитывают центрование
-    шапки; min-height #app держит подвал на месте, пока данных нет. У чата
-    резерв убирается: у него собственный мессенджерский рост, и минимальная
-    высота расколола бы окно пополам.
+    шапки; растяжение #app задаёт колонка, а подвал в кадре ожидания вовсе не
+    участвует — он скрыт до первых настоящих строк. Раньше положение подвала
+    считал номер --page-chrome — «шапка плюс подвал», снятый один раз. Он
+    устарел в день, когда в шапку встала полоска статуса, а в подвал — ссылки
+    разделов, и устарел бы снова при любой новой строке в них: высота подвала
+    зависит от ширины, а номер задан один на брейкпоинт. Поэтому проверяется
+    макет, а не цифра, и проверяется, что цифры в коде не осталось.
   */
   check('полоса прокрутки зарезервирована, а не появляется',
     /html \{ scrollbar-gutter: stable; \}/.test(refineCss));
   check('страница с первого кадра занимает окно целиком',
-    /--page-chrome: 110px/.test(refineCss)
-      && /#app \{\s*min-height: calc\(100vh - var\(--page-chrome\)\);\s*min-height: calc\(100dvh - var\(--page-chrome\)\);/.test(refineCss));
+    /body \{ display: flex; flex-direction: column; \}/.test(refineCss)
+      && /#app \{ flex: 1 0 auto; \}/.test(refineCss));
+  check('резерва-числа в оболочке не осталось: его место считает макет',
+    !/--page-chrome/.test(stripCss(refineCss)));
   check('чат остаётся со своей высотой',
-    /body:has\(\.chat-layout\) #app \{ min-height: 0; \}/.test(refineCss));
+    /body:has\(\.chat-layout\) #app \{ flex: none; \}/.test(refineCss));
+  /*
+    Подвал — единственный элемент, который ездит при заходе.
+
+    Его позиция есть высота документа, а документ за заход меняется дважды:
+    пустой экран, потом контур, потом данные. Мерить каждое изменение окном
+    нельзя — резерв устаревает вместе с первой же новой строкой в списке.
+    Поэтому подвал на время ожидания скрыт: появляющийся элемент в расчёт
+    CLS не берётся, и у него нет прежней позиции, которую он мог бы потерять.
+  */
+  check('подвал не ездит, пока страница ждёт данные',
+    /body:has\(#app:empty\) > \.site-foot,\s*body:has\(\.sk\) > \.site-foot \{ display: none; \}/
+      .test(refineCss));
+  check('пустой экран не держит высоту числом: её считает flex-колонка',
+    !/#app:empty \{ min-height/.test(stripCss(refineCss)));
   check('контур не удваивает ожидание бегущими точками',
     /\.loading:has\(\.sk\) \{ padding: 0; text-align: left; \}/.test(refineCss)
       && /\.loading:has\(\.sk\)::after \{ content: none; animation: none; \}/.test(refineCss));
@@ -15442,6 +15532,29 @@ console.log('\nAQ. Стабильность кадра');
   check('плашка президента молчит, пока строчка та же',
     /if \(line === presidentBoardLine\) return;/.test(mainJs));
   /*
+    Пустая доска держит свою строку в шапке телефона.
+
+    Пока база молчит, доски нет (атрибут `hidden`), и шапка стоит в одну
+    строку — 65 px. С ответом она приезжает, ряд переносится (forum.css,
+    до 759 px) и шапка вырастает до 110 px: полоска статуса и весь экран
+    уезжают вниз на 45 px ровно в тот миг, когда читатель уже смотрит на
+    цифры. Замер scratch/above.mjs, 390×844: +0.0486 CLS.
+
+    `!important` обязателен: заводское `[hidden] { display: none !important }`
+    из styles-v8.css стоит с ним же, и без него пустая доска просто не
+    участвовала бы в раскладке. `visibility: hidden` оставляет геометрию и
+    убирает плашку — резерв не видно.
+
+    И только до 759 px: на широком экране доска встаёт в строку к марке
+    (33.4 против 48 px) и высоты не добавляет, а её место там держит
+    `margin-left: auto` — невидимая плашка тянула бы за собой переключатель
+    темы, и дёргалась бы уже горизонталь шапки.
+  */
+  check('пустая доска держит строку в шапке телефона',
+    /@media \(max-width: 759px\)[\s\S]{0,1700}\.president-board\[hidden\]:empty \{\s*display: flex !important;\s*visibility: hidden;\s*min-height: calc\(/.test(mobileCss));
+  check('резерв строки доски собран из токенов, а не из снятого числа',
+    /min-height: calc\(var\(--fs-text\) \* 1\.1 \+ var\(--s-1\) \* 2 \+ 2px\)/.test(mobileCss));
+  /*
      Стартовый экран живого раздела остаётся пустым намеренно: форум красит
      себя сам, и контур над ним был бы вторым ожиданием. Контур нужен
      статическим разделам, которые ждут данные рейтинга.
@@ -15449,16 +15562,69 @@ console.log('\nAQ. Стабильность кадра');
   check('первый кадр сайта — контур для статики, пустота для живого',
     /app\.innerHTML = liveFirst \? ''\s*: `<div class="loading">/.test(mainJs));
   /*
-    Контур главной — не те же семь карточек, что у остальных вкладок: первая
-    настоящая рамка там героя на полэкрана, и справа у него панель источника.
+    Контур главной — не те же семь карточек, что у остальных вкладок, и уже
+    не пять одинаковых рамок. Живая сводка — пять разных по росту блоков:
+    герой на первый экран, панель «Прямо сейчас», ряд рейки с летописью, ряд
+    обсуждений с графиком и «движение». Одинаковые рамки по 190 px
+    недосчитали до живого документа 452 px на мониторе и 1545 px на телефоне,
+    и в момент прихода данных подвал уезжал вниз ровно на столько.
     Проверяется и выбор вида по вкладке, и то, что остальные статики своё
     «card» не потеряли.
   */
   check('контур главной подогнан под форму командного центра',
-    /skWithCaption\('Загружаем данные…', id === 'home' \? 'ops' : 'card', id === 'home' \? 6 : 7\)/.test(mainJs)
-      && /^<div class="sk sk--ops" aria-hidden="true"><div class="sk__card sk__card--ops(?= |">)/.test(skeleton('ops', 6))
-      && (skeleton('ops', 6).match(/sk__side/g) || []).length === 1
+    /\['ops', 5\]/.test(mainJs)
+      && /^<div class="sk sk--ops" aria-hidden="true"><div class="sk__card sk__card--ops(?= |">)/.test(skeleton('ops', 5))
+      && (skeleton('ops', 5).match(/sk__side/g) || []).length === 1
       && cards(skeleton('card', 7)) === 7);
+  /*
+    Форма контура берётся по маршруту, а не ставится одна на все вкладки.
+
+    Перемер 17.10 по пятнадцати маршрутам (scratch/cls.mjs) показал, что
+    «семь карточек для остальных» ошибается в ту же сторону, только громче:
+    живой экран «Турниров» — одна плашка на 197 px на мониторе и 220 на
+    телефоне, а резерв в 1410 px раздувал документ до 1939. С приходом данных
+    документ сжимался на метр, и телефон платил за это 0,30 CLS.
+    «Гайды» и справочник получают свой первый кадр в тон контуру модуля:
+    иначе страница дёргается дважды — сначала с карточек на строки, потом со
+    строк на живой список.
+  */
+  check('первый кадр повторяет форму будущего экрана, а не одну рамку на всех',
+    /const shape = id === 'home' \? \['ops', 5\]/.test(mainJs)
+      && /\['row', 6\]/.test(mainJs) && /\['card', 1\]/.test(mainJs)
+      && /\['card', 7\]/.test(mainJs)
+      && /skWithCaption\('Загружаем данные…', shape\[0\], shape\[1\]\)/.test(mainJs)
+      && cards(guidesLoading) === 6 && cards(calendarLoading) === 2
+      && cards(updatesLoading) === 7 && cards(accountsLoading) === 6);
+  /*
+    Порядок рамок в контуре обязан совпадать с порядком живых блоков: резерв
+    работает только тогда, когда под рамкой стоит тот блок, под который её
+    снимали. Перестановка местами в renderHome() молча вернёт рывок.
+  */
+  check('пять рамок сводки идут в живом порядке и каждая своей формы',
+    (() => {
+      const attrs = (skeleton('ops', 5).match(/class="sk__card[^"]*"/g) || [])
+        .map((a) => (a.match(/sk__card--([a-z]+)/) || [, 'безымянная'])[1]);
+      return attrs.join(' ') === 'ops live lead back move'
+        && (skeleton('ops', 5).match(/sk__cols/g) || []).length === 4;
+    })());
+  check('ряды сводки складываются в те же доли, что и живые: 7+5 и 5+7',
+    /\.sk--ops \.sk__card--lead \.sk__cols \{\s*grid-template-columns: minmax\(0, 7fr\) minmax\(0, 5fr\);/.test(refineCss)
+      && /\.sk--ops \.sk__card--back \.sk__cols \{\s*grid-template-columns: minmax\(0, 5fr\) minmax\(0, 7fr\);/.test(refineCss));
+  check('высоты рядов различаются: одной карточки на все блоки больше нет',
+    /@media \(min-width: 900px\) \{[\s\S]{0,600}?\.sk--ops \.sk__card--live \{ --sk-h: 180px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--lead \{ --sk-h: 553px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--back \{ --sk-h: 324px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--move \{ --sk-h: 248px; \}/.test(refineCss));
+  /*
+    Одних высот мало: рамки должны стоять на тех же местах, что и живые
+    блоки. Общий контурный зазор в 8 px и отступ подписи «Загружаем
+    данные…» съезжали вниз на 24 и 30 px — четвёртая и первая рамки
+    приезжали не на свои места, и текст под глазами читателя подпрыгивал
+    при приходе цифр. Замер: scratch/cls.mjs, живые зазоры 15/7/16/27 на
+    мониторе и 8/12/16/12 на телефоне — по сумме ровно 4×16 и 4×12.
+  */
+  check('ритм контурных рамок равен ритму живых блоков',
+    /\.sk--ops \{ gap: var\(--gap\); \}/.test(refineCss)
+      && /@media \(min-width: 900px\) \{[\s\S]{0,760}?\.sk--ops \{ gap: var\(--s-3\); \}/.test(refineCss));
+  check('подпись контура не раздвигает резерв',
+    /\.sk__caption:has\(\+ \.sk--ops\) \{ margin-bottom: 0; \}/.test(refineCss));
   /*
     Рамка полосы кадра обязана появляться в контуре ровно тогда, когда кадр
     будет нарисован. Разойдутся — резерв не досчитает или пересчитает высоту
@@ -17682,7 +17848,7 @@ console.log('\nBC. Слои и кегль: числа живут в ряду, а
   const ladder = [...root.matchAll(/(--z-[a-z0-9-]+)\s*:\s*(-?\d+)\s*;/g)]
     .map((m) => ({ name: m[1], z: Number(m[2]) }));
   check('ступени идут снизу вверх и порядок совпадает с объявлением',
-    ladder.length === 20 && ladder.every((s, i) => i === 0 || ladder[i - 1].z < s.z),
+    ladder.length === 21 && ladder.every((s, i) => i === 0 || ladder[i - 1].z < s.z),
     ladder.map((s) => s.z).join('/'));
   const zIdle = ladder.filter((s) => !all.includes(`var(${s.name})`)).map((s) => s.name);
   check('каждая ступень ряда слоёв востребована: токенов-украшений нет (§64)',

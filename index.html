@@ -86,11 +86,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=109">
+  <link rel="modulepreload" href="./src/main.js?v=111">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css?v=16">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=17">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -108,7 +108,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=38">
+  <link rel="stylesheet" href="./src/mobile.css?v=39">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -126,7 +126,7 @@
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=42">
+  <link rel="stylesheet" href="./src/refine.css?v=44">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -254,8 +254,31 @@
     этот момент — значит самому создавать эту мысль. Сайт говорит правду сам:
     показан снимок таблицы или не пришло ничего. Разбирается в src/main.js
     (dataNotice), подробности — в docs/ARCHITECTURE.md.
+
+    ПОЧЕМУ ОНА СТОИТ ЗДЕСЬ С САМОГО НАЧАЛА, А НЕ ПОЯВЛЯЕТСЯ С ОТВЕТОМ.
+    Пока полоски нет, в документе нет и её высоты. Значит ровно в тот момент,
+    когда база наконец отвечает, под шапкой вырастает чужой блок и весь экран
+    уезжает вниз: на мониторе на 102 px, на телефоне на 244 px. Замер
+    (scratch/cls.mjs, 1361×900 и 390×844) считал это как +0.06 CLS на КАЖДОЙ
+    загрузке, потому что копия таблицы — рабочий путь сайта, а не исключение.
+    Поэтому здесь всегда одна строка, а её высота задана стилем, а не текстом:
+    состояние меняется, рамка остаётся. Длинное объяснение живёт под словом
+    «подробности» и раскрывается по нажатию — сдвиг, который человек сделал
+    сам, браузер в CLS не пишет.
   -->
-  <div id="data-notice" class="data-notice wrap" role="status" aria-live="polite" hidden></div>
+  <details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait">
+    <summary class="data-notice__line">
+      <b>Источник данных</b>
+      <span>ждём ответ базы несколько секунд</span>
+      <em class="data-notice__hint">подробности</em>
+    </summary>
+    <div class="data-notice__body">
+      <p>Если ответ не придёт, сайт покажет автоматическую копию таблицы и
+      напишет, каким часом она снята. Форум, вход и новые посты живут только в
+      живой базе — без неё они не работают, и копия их не заменит.</p>
+      <button type="button" class="forum-btn forum-btn--ghost" data-boot-retry>Повторить</button>
+    </div>
+  </details>
 
   <!--
     ГОЛОС СМЕНИВШЕГОСЯ РАЗДЕЛА.
@@ -368,7 +391,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=109"></script>
+  <script type="module" src="./src/main.js?v=111"></script>
 
   <script>
     /*
