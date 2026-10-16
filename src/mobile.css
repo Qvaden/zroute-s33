@@ -704,91 +704,141 @@ html {
   высота как у шапки. Всё, что делало её монументом, убрано — не «уменьшено»,
   а именно убрано: блеск, вторая рамка, надпись в углу и подпись под именем.
 */
+/*
+  АНАТОМИЯ ОДНА НА ВСЕХ ЭКРАНАХ.
+
+  Раньше этот набор правил сидел внутри `@media (min-width: 760px)`,
+  а телефон добира свою копию из styles-v8.css на границах 700 и 390 px.
+  Копии разъехались: в окне 701–759 px не действовала ни одна, и доска
+  президента сжималась в колонку на 131 px вместо строки в 39.
+*/
+.president-board {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  /*
+    Полей у доски нет: расстояние до соседей задаёт ряд шапки. Прежние
+    отступы сверху и снизу (24 и 32 px из styles-v8.css) доставались
+    телефону и раздували шапку до 188 px — почти четверть экрана 390×844.
+  */
+  margin: 0;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-pill);
+  border-width: 1px;
+  /*
+    Дышащая тень и бегущий блеск отвлекали от содержимого страницы.
+    Строке справочного назначения движение не нужно вовсе.
+  */
+  animation: none;
+  box-shadow: inset 0 1px color-mix(in srgb, var(--text) 6%, transparent);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--electric) 10%, transparent), color-mix(in srgb, var(--text) 3%, transparent));
+}
+.president-board::before { display: none; }
+
+/* Голова доски перестаёт быть отдельным ярусом и встаёт в ту же строку. */
+.president-board__head {
+  display: contents;
+}
+.president-board__signal {
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--electric) 10%, transparent);
+}
+.president-board__label {
+  /*
+    Метка сжимается первой: она на всех серверах одна и та же и ничего не
+    сообщает нового, тогда как имя — единственное, что в этой строке меняется.
+    Без `min-width: 0` слово `nowrap` не давало ей укоротиться, и на 320 px
+    всё давление ложилось на имя (замер: 33 px, «Bes…»).
+  */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-eyebrow);
+  /*
+    .12em из прежней телефонной копии стоила 25 px ширины метки — на 320 px
+    их не хватало, и обрезаться начинал альянс. Разрядка здесь украшение,
+    а имя с альянсом — данные.
+  */
+  letter-spacing: .06em;
+}
+
+.president-board__identity {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: var(--s-1);
+  flex: 1;
+  min-width: 0;
+  padding-left: 0;
+}
+/*
+  Имя было clamp(18px, 2.2vw, 25px) — крупнее, чем заголовки разделов.
+  Президент сервера важен, но не важнее того, ради чего открыли страницу.
+*/
+.president-board__name {
+  flex: 1;
+  /* Пол в шесть знаков: ниже имени в этой строке быть не может, и держит
+     его не метка, а само правило. */
+  min-width: 6ch;
+  font-size: var(--fs-text);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.president-board__alliance {
+  /* Без права сжиматься альянс вылезал за скруглённый край плашки на 320 px
+     и обрезался без многоточия: «ССС» вместо «СССР». */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  line-height: 1.1;
+}
+/*
+  Подпись («Данные обновляются вручную») — второй ярус с разделительной
+  чертой: та же высота ради фразы, которую читают один раз. На узком
+  экране строки для неё нет; она возвращается там, где шапке хватает
+  ширины, — см. блок `min-width: 1040px` ниже.
+*/
+.president-board__note { display: none; }
+
+/*
+  Размещение. На широком экране доска стоит в одной строке с маркой и
+  прижата вправо; на узком свою строку ей даёт ряд шапки (forum.css),
+  и прижимать там нечего.
+
+  480 px — не украшение: при прежних 420 имя президента сжималось до
+  двух букв (замер 52 px на экране 1440), потому что метка и альянс
+  стояли в той же строке неподвижно.
+*/
 @media (min-width: 760px) {
-  .president-board {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    /* Прижимаем к правому краю шапки: слева марка, справа статус. */
-    margin: 0 0 0 auto;
-    max-width: 420px;
-    padding: var(--s-1) var(--s-2);
-    border-radius: var(--r-pill);
-    border-width: 1px;
-    /*
-      Дышащая тень и бегущий блеск отвлекали от содержимого страницы.
-      Строке справочного назначения движение не нужно вовсе.
-    */
-    animation: none;
-    box-shadow: inset 0 1px color-mix(in srgb, var(--text) 6%, transparent);
-    background: linear-gradient(110deg, color-mix(in srgb, var(--electric) 10%, transparent), color-mix(in srgb, var(--text) 3%, transparent));
-  }
-  .president-board::before { display: none; }
-
-  /* Голова доски перестаёт быть отдельным ярусом и встаёт в ту же строку. */
-  .president-board__head {
-    display: contents;
-  }
-  .president-board__signal {
-    width: 7px;
-    height: 7px;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--electric) 10%, transparent);
-  }
-  .president-board__label {
-    flex: none;
-    font-size: var(--fs-eyebrow);
-    letter-spacing: .12em;
-  }
-  .president-board__live {
-    order: 5;
-    flex: none;
-    margin-left: 0;
-    padding: var(--s-fine) var(--s-1);
-    font-size: var(--fs-eyebrow);
-  }
-
-  .president-board__identity {
-    display: flex;
-    align-items: baseline;
-    justify-content: flex-start;
-    gap: var(--s-1);
-    flex: 1;
-    min-width: 0;
-    padding-left: 0;
-  }
-  /*
-    Имя было clamp(18px, 2.2vw, 25px) — крупнее, чем заголовки разделов.
-    Президент сервера важен, но не важнее того, ради чего открыли страницу.
-  */
-  .president-board__name {
-    flex: 1;
-    min-width: 0;
-    font-size: var(--fs-text);
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .president-board__alliance {
-    flex: none;
-    font-size: var(--fs-small);
-    line-height: 1.1;
-  }
-  /*
-    Подпись («Данные обновляются вручную») в строку не влезает и была
-    вторым ярусом с разделительной чертой — то есть удваивала высоту ради
-    фразы, которую читают один раз. Оставляем её только на телефоне,
-    где доска стоит отдельной строкой под маркой.
-  */
-  .president-board__note { display: none; }
+  .president-board { margin-left: auto; max-width: 480px; }
 }
 
 /*
-  Очень широкий экран: доска не должна растягиваться на пол-шапки.
-  Ограничение по ширине уже стоит выше, здесь только запас по краю.
+  От марки шапка освобождается на 1040 px (forum.css), и строке хватает
+  места на подпись владельца. Без этого поля панели «Небольшая подпись»
+  не видел никто: на сайте она была скрыта на всех ширинах, а в
+  предпросмотре экрана «Президент» её не рисовали.
 */
-@media (min-width: 1240px) {
-  .president-board { max-width: 460px; }
+@media (min-width: 1040px) {
+  .president-board { max-width: 620px; }
+  .president-board__note {
+    display: block;
+    flex: none;
+    margin: 0;
+    padding-left: var(--s-2);
+    border-top: 0;
+    border-left: 1px solid color-mix(in srgb, var(--electric) 18%, transparent);
+    color: var(--mute);
+    font-size: var(--fs-eyebrow);
+    line-height: 1.2;
+  }
 }
 
 /* ── Компьютер: содержимое не должно тонуть в пустоте ─────────────────────── */
@@ -1069,6 +1119,24 @@ html {
   .site-head__inner > .brand--head { order: 0; }
   .site-head__inner > #president-board { order: 1; }
   .site-head__inner > .theme-toggle { order: 2; }
+}
+
+/*
+  На узком экране ряд переносится (forum.css, до 759px): доска президента
+  уходит на вторую строку и забирает её целиком. Если переключатель темы
+  остаётся после доски, он переносится третьим — и шапка вырастает до трёх
+  строк, 164 px на экране 390×844. Служебная кнопка не стоит отдельной
+  строки: она встаёт в первую, у правого края, рядом с маркой.
+*/
+@media (max-width: 759px) {
+  .site-head__inner > .theme-toggle { order: 1; }
+  .site-head__inner > #president-board { order: 2; }
+  /*
+    Здесь доска занимает строку целиком, и её собственные 12 px зазоров
+    с полями стоят 26 px ширины: на 320 px имени с альянсом не хватало
+    ровно их (нужно 285, есть 270) и оба обрезались.
+  */
+  .president-board { gap: var(--s-1); padding: var(--s-1); }
 }
 
 /* ── Шторка меню: во всю ширину ───────────────────────────────────────────── */

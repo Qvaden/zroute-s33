@@ -706,7 +706,6 @@ function renderPresidentBoard(texts = []) {
     <div class="president-board__head">
       <span class="president-board__signal" aria-hidden="true"></span>
       <span class="president-board__label">${esc(board.label)}</span>
-      <span class="president-board__live">СВЕЖИЕ</span>
     </div>
     <div class="president-board__identity">
       <strong class="president-board__name">${esc(board.name)}</strong>

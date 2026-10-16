@@ -2622,8 +2622,12 @@ document.addEventListener('input', (e) => {
     const box = e.target.closest('[data-president-editor]');
     const nameEl = box?.querySelector('[data-president-preview-name]');
     const allyEl = box?.querySelector('[data-president-preview-alliance]');
+    const labelEl = box?.querySelector('[data-president-preview-label]');
+    const noteEl = box?.querySelector('[data-president-preview-note]');
     if (nameEl) nameEl.textContent = view.presidentDraft.name || '';
     if (allyEl) allyEl.textContent = view.presidentDraft.alliance || '';
+    if (labelEl) labelEl.textContent = view.presidentDraft.label || '';
+    if (noteEl) noteEl.textContent = view.presidentDraft.note || '';
     return;
   }
   /*

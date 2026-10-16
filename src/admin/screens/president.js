@@ -10,10 +10,16 @@ export function renderPresident(view) {
         <h1 class="adm-h1">Президент сервера</h1>
         <p class="adm-lead">Эта карточка отображается сверху на всех вкладках сайта. Заполняйте её вручную, когда меняется президент или альянс.</p>
       </header>
+      <!--
+        Метка и подпись показаны здесь потому, что на сайте подпись видна
+        не на всякой ширине (mobile.css прячет её до 1040 px). Без превью
+        поле «Небольшая подпись» правилось бы вслепую.
+      -->
       <div class="adm-president-preview">
         <span class="president-board__signal" aria-hidden="true"></span>
-        <div><small>ПРЕДПРОСМОТР ДОСКИ</small><strong data-president-preview-name>${esc(board.name)}</strong></div>
+        <div><small>ПРЕДПРОСМОТР ДОСКИ · <span data-president-preview-label>${esc(board.label)}</span></small><strong data-president-preview-name>${esc(board.name)}</strong></div>
         <b data-president-preview-alliance>${esc(board.alliance)}</b>
+        <i data-president-preview-note>${esc(board.note)}</i>
       </div>
       <div class="adm-president-grid">
         <label class="adm-field adm-field--wide"><span>Метка</span><input data-president-field="label" value="${esc(board.label)}" placeholder="ПРЕЗИДЕНТ СЕРВЕРА"></label>
