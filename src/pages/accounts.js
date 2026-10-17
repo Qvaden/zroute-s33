@@ -202,6 +202,7 @@ function renderComposer(s) {
       <label class="forum-field">
         <span>Комментарий к объявлению <small class="muted">необязательно</small></span>
         <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+             aria-label="Комментарий к объявлению"
              name="body" data-editor data-limit="${L.bodyMax}"
              data-placeholder="Что добавить к описанию: почему отдаёте, что осталось за кадром. Пусто — и текстом темы станет описание аккаунта."></div>
       </label>

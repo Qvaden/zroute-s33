@@ -34,6 +34,7 @@
  */
 import { CONFIG } from '../../config.js';
 import { esc, plural } from '../ui/helpers.js';
+import { trapDialog, releaseDialog, focusFirstIn } from '../ui/dialog-focus.js';
 import { mapDataset } from '../data/adapters/_map.js';
 import { byWeekStartDesc, findCurrentWeek } from '../data/week-order.js';
 import { validateDataset } from '../data/contract.js';
@@ -1267,12 +1268,13 @@ function openGuideColorModal(trigger) {
   document.body.style.width = '100%';
   document.body.classList.add('guide-color-modal-open');
   modal.hidden = false;
+  trapDialog(modal);
   input?.focus({ preventScroll: true });
 }
 
 function closeGuideColorModal() {
   const modal = root.querySelector('[data-guide-color-modal]');
-  if (modal) modal.hidden = true;
+  if (modal) { modal.hidden = true; releaseDialog(modal); }
   const scrollY = view?.colorScrollY ?? 0;
   document.body.classList.remove('guide-color-modal-open');
   document.body.style.position = '';
@@ -1523,6 +1525,11 @@ function openPlayerModal(selector, nick, targetId, extra = {}) {
 
   for (const [key, value] of Object.entries(extra)) modal.dataset[key] = value;
   modal.hidden = false;
+  /* Клавиатура остаётся внутри окна, а после закрытия возвращается на кнопку
+     «⋯», из которой окно открыли: ряд строк панели перерисовывается, и
+     потерянный фокус означал бы начать обход с самого верха таблицы. */
+  trapDialog(modal);
+  focusFirstIn(modal);
 }
 
 function closePlayerModal(selector) {
@@ -1531,6 +1538,7 @@ function closePlayerModal(selector) {
   modal.hidden = true;
   modal.querySelectorAll('form').forEach((form) => form.reset());
   modal.querySelectorAll('.adm-result').forEach((b) => { b.hidden = true; });
+  releaseDialog(modal);
 }
 
 /*
@@ -2736,7 +2744,7 @@ document.addEventListener('keydown', (e) => {
   // Окна игроков закрываются тем же жестом, что и остальные: Esc — самый
   // ожидаемый способ убрать модалку, а раньше он работал только у палитры.
   if (e.key === 'Escape') {
-    for (const sel of ['[data-restrict-modal]', '[data-delete-modal]', '[data-rename-modal]', '[data-leader-modal]']) {
+    for (const sel of ['[data-restrict-modal]', '[data-delete-modal]', '[data-rename-modal]', '[data-leader-modal]', '[data-rep-modal]']) {
       if (root.querySelector(`${sel}:not([hidden])`)) { closePlayerModal(sel); break; }
     }
   }

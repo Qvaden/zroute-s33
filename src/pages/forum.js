@@ -1834,6 +1834,7 @@ function renderComposer(s) {
         <label class="forum-field">
           <span>Текст</span>
           <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+               aria-label="Текст поста"
                name="body" data-editor data-limit="${L.bodyMax}"
                data-placeholder="Писать можно сразу как надо: выделили — стало жирным или цветным, прямо в поле."></div>
         </label>
@@ -1966,6 +1967,7 @@ function renderEditForm(p) {
       <label class="forum-field">
         <span>Текст</span>
         <div class="forum-editor" contenteditable="true" role="textbox" aria-multiline="true"
+             aria-label="Текст поста"
              name="body" data-editor data-limit="${L.bodyMax}"
              data-placeholder="Править можно прямо здесь — стили применяются сразу">${editorHtml(p.body)}</div>
       </label>
@@ -2706,6 +2708,7 @@ function renderComments(post, s) {
         s.me && !s.me.banned && !writeBlocked
           ? `<form class="forum-reply" data-forum-comment-form="${esc(post.id)}">
               <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+                   aria-label="Текст комментария"
                    name="body" data-editor data-limit="${L.commentMax}"
                    data-placeholder="Ответить по делу и по правилам"></div>
               ${renderMdBar()}

@@ -194,6 +194,7 @@ function composeForm(s) {
       <label class="forum-field">
         <span>Текст гайда</span>
         <div class="forum-editor is-empty" contenteditable="true" role="textbox" aria-multiline="true"
+             aria-label="Текст гайда"
              name="body" data-editor data-limit="${L.guideBodyMax}"
              data-placeholder="Опишите стратегию шаг за шагом. Жирный, списки, цитаты и цвет — как в посте форума."></div>
         <small class="muted">${L.guideBodyMin}–${L.guideBodyMax} символов видимого текста.

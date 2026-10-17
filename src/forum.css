@@ -2568,7 +2568,14 @@
   border: 1px solid var(--line);
   transition: border-color .15s;
 }
-.guide-search:focus-within { border-color: var(--accent); }
+/*
+  Обводка нужна оболочке, а не полю: у input она намеренно снята (`outline: 0`
+  выше), и без halo клавиатурный фокус выдавал бы себя только сменой цвета
+  рамки в 1 px. Тот же `--ring`, что у обычных полей сайта (refine.css:92), и
+  без перехода: цвету идёт переход, указателю фокуса нужно быть видимым
+  в тот же кадр.
+*/
+.guide-search:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
 .guide-search svg {
   width: 16px;
   height: 16px;

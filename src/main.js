@@ -650,8 +650,7 @@ if (siteHead) {
 */
 document.querySelector('.skip-link')?.addEventListener('click', (e) => {
   e.preventDefault();
-  // Живой раздел ещё без заголовка: фокус уходит на само содержимое.
-  if (!focusAppHeading()) app.focus({ preventScroll: true });
+  jumpToContent();
 });
 
 /*
@@ -668,6 +667,39 @@ function focusAppHeading() {
   h1.setAttribute('tabindex', '-1');
   h1.focus({ preventScroll: true });
   return true;
+}
+
+/*
+  ПРЫЖОК К СОДЕРЖИМОМУ, КОТОРЫЙ ПЕРЕКРАСКА НЕ ОТБИРАЕТ.
+
+  Живой раздел (гайды, форум, календарь) рисует первый кадр, а потом
+  перекрашивается целиком, когда приходят данные. Заголовок, на который сел
+  читатель, при этой перекраске удаляется из документа, и фокус падает на
+  <body>: следующий Tab начинается снова с шапки, а человек, ждавший содержимое,
+  остаётся ни с чем. Поэтому за прыжком смотрим короткое время.
+
+  Гвард возвращает фокус ТОЛЬКО когда его совсем нет (activeElement — body или
+  документ): перешёл ли человек сам или нет, видно по тому, что фокус стоит на
+  узле. Срок — 2,5 с, дальше наблюдатель снимается сам: перекраски, начавшиеся
+  позже, это уже не последствия нажатия.
+
+  Наблюдатель висит на детях самого #app: перерисовка раздела — это замена
+  содержимого контейнера, а не узла внутри вложенного блока.
+*/
+let jumpWatch = null;
+
+function jumpToContent() {
+  // Живой раздел ещё без заголовка: фокус уходит на само содержимое.
+  if (!focusAppHeading()) app.focus({ preventScroll: true });
+
+  if (jumpWatch) { jumpWatch.ob.disconnect(); clearTimeout(jumpWatch.timer); }
+  const ob = new MutationObserver(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body && a !== document.documentElement) return;
+    if (!focusAppHeading()) app.focus({ preventScroll: true });
+  });
+  ob.observe(app, { childList: true });
+  jumpWatch = { ob, timer: setTimeout(() => { ob.disconnect(); }, 2500) };
 }
 
 /*

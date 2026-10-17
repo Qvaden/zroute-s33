@@ -15365,6 +15365,102 @@ console.log('\nAP. Доступность');
     /!keepScroll && !live && focusAppHeading\(\)/.test(mainJs));
   check('перекраска того же экрана молчит',
     /screen !== lastAnnouncedRoute/.test(mainJs) && /const screen = `\$\{id\}\/\$\{param \|\| ''\}`/.test(mainJs));
+
+  /*
+    Клавиатура в окне: не выпускать наружу и вернуть туда, откуда пришли (§77).
+
+    Замер без экрана (../scratch/keyboard.mjs, режим dialogs, стенд 8299 на
+    черновом адаптере) поймал две поломки, которых по разметке не видно: обход
+    Tab-ом выходил из окна в страницу за ним, а Escape закрывал окно, оставляя
+    фокус на <body> — следующий Tab начинался со ссылки «К содержимому».
+    Чинит их общий модуль src/ui/dialog-focus.js, поэтому проверка держит не
+    наличие файла, а hookup в обоих приложениях: окно без ловушки выглядит
+    целым, пока клавиатуру не потрогают.
+
+    Третье, что нашёл тот же прогон, — узел без имени. Редактор поста и
+    комментария это <div contenteditable>, а не <textarea>: подпись из
+    обёртки-<label> к нему не привязывается (div не относится к labelable),
+    и программа экрана объявляла голое «поле ввода».
+  */
+  const dlgJs = await readFile('src/ui/dialog-focus.js', 'utf8');
+  const mountJs = await readFile('src/forum/mount.js', 'utf8');
+  const adminMainJs = await readFile('src/admin/main.js', 'utf8');
+  const chatsPageJs = await readFile('src/pages/chats.js', 'utf8');
+
+  check('модуль окон объявляет ловушку, возврат и первый узел',
+    /export function trapDialog/.test(dlgJs) && /export function releaseDialog/.test(dlgJs)
+      && /export function focusFirstIn/.test(dlgJs));
+  check('окна форума объявлены модальными диалогами',
+    (forumJs.match(/role="dialog" aria-modal="true"/g) || []).length === 2);
+  check('форум ставит ловушку на обоих окнах и снимает её одним закрытием',
+    (mountJs.match(/trapDialog\(modal\)/g) || []).length === 2
+      && (mountJs.match(/releaseDialog\(modal\)/g) || []).length === 1
+      && (mountJs.match(/focusFirstIn\(modal\)/g) || []).length === 2);
+  check('панель держит клавиатуру тем же модулем на своих окнах',
+    adminMainJs.includes("from '../ui/dialog-focus.js'")
+      && (adminMainJs.match(/trapDialog\(modal\)/g) || []).length === 2
+      && (adminMainJs.match(/releaseDialog\(modal\)/g) || []).length === 2);
+  const adminEsc = (adminMainJs.match(/for \(const sel of \[[\s\S]*?\]\)/) || [''])[0];
+  check('Escape в панели закрывает каждое из пяти окон',
+    ['[data-restrict-modal]', '[data-delete-modal]', '[data-rename-modal]',
+      '[data-leader-modal]', '[data-rep-modal]'].every((sel) => adminEsc.includes(sel)),
+    adminEsc.replace(/\s+/g, ' ').slice(0, 160));
+  check('Escape на форуме не сворачивает список, пока открыто окно',
+    /const modalWasOpen = Boolean\(host\.querySelector\('\.forum-modal:not\(\[hidden\]\)'\)\);/.test(mountJs)
+      && /if \(modalWasOpen\) return;/.test(mountJs));
+  check('возврат фокуса раскрывает свернутый <details>, а не бросает его на body',
+    /for \(let d = opener\.closest\('details'\)/.test(dlgJs));
+  check('замыкая ряд, окно докручивает прокрутку до узла',
+    /scrollIntoView\(\{ block: 'nearest', inline: 'nearest', behavior: 'instant' \}\)/.test(dlgJs)
+      && /focusAndReveal\(first\)/.test(dlgJs) && /focusAndReveal\(last\)/.test(dlgJs));
+  check('закрытое окно форума возвращает страницу и сбрасывает свою прокрутку',
+    /scroller\.scrollTop = 0/.test(mountJs)
+      && /window\.scrollTo\(\{ top: modalScrollY, left: 0, behavior: 'instant' \}\)/.test(mountJs));
+
+  /*
+    Прыжок «К содержимому», который перекраска не отбирает (§77).
+
+    Замер: на живой вкладке первый кадр рисуется сразу, фокус садится на
+    заголовок, а следующая перекраска выбрасывает его на <body> — Tab
+    начинался заново с шапки. Гвард висит на MutationObserver и возвращается
+    только когда фокуса совсем нет; без него ссылка помогает только статичным
+    экранам.
+  */
+  check('прыжок к содержимому переживает перекраску раздела',
+    /function jumpToContent\(\)/.test(mainJs)
+      && /const ob = new MutationObserver/.test(mainJs)
+      && /ob\.observe\(app, \{ childList: true \}\)/.test(mainJs)
+      && /jumpWatch = \{ ob, timer: setTimeout/.test(mainJs));
+  check('наблюдатель прыжка снимается, а не висит вечно',
+    /if \(jumpWatch\) \{ jumpWatch\.ob\.disconnect\(\); clearTimeout\(jumpWatch\.timer\); \}/.test(mainJs)
+      && /a !== document\.body && a !== document\.documentElement/.test(mainJs));
+
+  /*
+    Поле поиска отвечает на фокус рамкой, а не только миганием каретки.
+
+    Восьми прогонам матрицы нечего было показать: `outline: none` на input и
+    обёртка-`<label>` вместо настоящего поля — фокус есть, видимой перемены
+    нет. Halo держится на обёртке (:focus-within), потому что у неё есть
+    границы, а у голого input их отображать негде.
+  */
+  const forumCss = await readFile('src/forum.css', 'utf8');
+  const handbookCss = await readFile('src/handbook.css', 'utf8');
+  check('поле поиска гайдов подсвечивает обёртку при фокусе',
+    /\.guide-search:focus-within \{[^}]*box-shadow: var\(--ring\)/.test(forumCss),
+    (forumCss.match(/\.guide-search:focus-within[^\n]*/) || [''])[0]);
+  check('поле поиска справочника подсвечивает обёртку при фокусе',
+    /\.hb-search:focus-within \{[^}]*box-shadow: var\(--ring\)/.test(handbookCss),
+    (handbookCss.match(/\.hb-search:focus-within[^\n]*/) || [''])[0]);
+  check('обводка собрана из акцента и не зависит от темы',
+    /--ring: 0 0 0 3px color-mix\(in srgb, var\(--accent\) 22%, transparent\)/.test(refineCss));
+
+  for (const [name, src] of [['форум', forumJs], ['доска аккаунтов', accountsJs],
+    ['гайды', guidesJs], ['чаты', chatsPageJs]]) {
+    const tags = (src.match(/<[a-z]+[^>]*contenteditable="true"[^>]*>/g) || [])
+      .filter((t) => !/aria-label=/.test(t));
+    check(`редакторы «${name}» названы словом`, tags.length === 0,
+      `${tags.length} без имени: ${String(tags[0] || '').replace(/\s+/g, ' ').slice(0, 90)}`);
+  }
 }
 
 /* ── AQ. Стабильность кадра: пока грузится, страница не дёргается ───────────

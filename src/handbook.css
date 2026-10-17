@@ -64,7 +64,7 @@
 
 /* ── Поле поиска ─────────────────────────────────────────────────────────── */
 .hb-search { display: flex; align-items: center; gap: var(--s-1); padding: var(--s-1) var(--s-2); border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: var(--r); background: color-mix(in srgb, var(--text) 4%, transparent); margin: 0 0 var(--s-2); }
-.hb-search:focus-within { border-color: var(--accent); }
+.hb-search:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
 .hb-search svg { width: 16px; height: 16px; flex: none; stroke: var(--mute); fill: none; stroke-width: 2; stroke-linecap: round; }
 .hb-search input { flex: 1; border: none; background: none; font: inherit; font-size: var(--fs-text); color: inherit; outline: none; }
 .hb-search input::placeholder { color: var(--mute); }

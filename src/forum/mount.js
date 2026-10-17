@@ -42,6 +42,7 @@ import {
 import { CONFIG } from '../../config.js';
 import { siteServer } from '../data/server.js';
 import { startQuarterTimer, stopQuarterTimer } from '../ui/quarter-timer.js';
+import { trapDialog, releaseDialog, focusFirstIn } from '../ui/dialog-focus.js';
 
 /** Состояние страницы. Живёт между перерисовками, сбрасывается при уходе. */
 const state = {
@@ -3190,8 +3191,19 @@ function wire() {
     if (!host) return;
 
     if (e.key === 'Escape') {
+      /*
+        Открытое окно и выпадающий список — разные слои, и закрывать их
+        одним нажатием нельзя: кнопка, позвавшая окно, живёт внутри списка
+        «Ещё действия с постом». Свернём список сразу после закрытия окна —
+        и фокусу некуда возвращаться, браузер отдаст его <body>, а следующий
+        Tab начнётся с самого начала страницы. Поэтому при открытом окне
+        Escape закрывает только окно, а список сворачивает следующим
+        нажатием, когда окна уже нет.
+      */
+      const modalWasOpen = Boolean(host.querySelector('.forum-modal:not([hidden])'));
       closeModal('[data-forum-report-modal]');
       closeModal('[data-forum-delete-modal]');
+      if (modalWasOpen) return;
       host.querySelectorAll('[data-forum-emoji-pop]').forEach((p) => { p.hidden = true; });
       closePicks();
       host.querySelectorAll('.forum-act-menu[open]').forEach((el) => el.removeAttribute('open'));
@@ -3247,6 +3259,15 @@ function wire() {
 
 /* ── Окна ─────────────────────────────────────────────────────────────────── */
 
+/* Куда прокручена страница в момент, когда окно открылось, — чтобы закрыть
+   окно и вернуть человека на то же место. Храним одно число: окна форума
+   никогда не стоят друг на друге. */
+let modalScrollY = null;
+
+function rememberScroll() {
+  if (modalScrollY === null) modalScrollY = window.scrollY;
+}
+
 function openModal(selector) {
   const modal = host?.querySelector(selector);
   if (!modal) return;
@@ -3256,9 +3277,14 @@ function openModal(selector) {
     палец двигает страницу, а не список пунктов правил, и окно уезжает
     из вида вместе с ней.
   */
+  rememberScroll();
   document.documentElement.classList.add('is-modal-open');
+  /* Клавиатуру держим внутри окна и помним, кому её вернуть при закрытии.
+     Порядок обхода браузер считает по разметке, а `aria-modal="true"` —
+     обещание программе чтения с экрана, а не правило раскладки. */
+  trapDialog(modal);
   // Фокус внутрь окна: с клавиатуры иначе не добраться до кнопок.
-  modal.querySelector('input, button, textarea, select')?.focus({ preventScroll: true });
+  focusFirstIn(modal);
 }
 
 function closeModal(selector) {
@@ -3267,10 +3293,25 @@ function closeModal(selector) {
   modal.hidden = true;
   modal.querySelector('form')?.reset();
   modal.querySelectorAll('.forum-error').forEach((p) => { p.hidden = true; });
+  /* Слой прокрутки окна живёт в разметке и после `hidden`: scrollTop остаётся
+     там, где его оставили. Следующее открытие ставит фокус на первый пункт, а
+     с preventScroll докрутить окно до него браузер не может — человек получил
+     бы фокус, которого не видно. Поэтому список пунктов возвращаем наверх. */
+  const scroller = modal.querySelector('.forum-modal__box');
+  if (scroller) scroller.scrollTop = 0;
+  /* Возврат прокрутки страницы делаем сами: `focus()` зовём с preventScroll,
+     чтобы окно не прыгало под липкую шапку, — значит, страница сама не
+     вернётся туда, где человек стоял перед нажатием, и он не увидит,
+     куда вернулся фокус. */
+  if (modalScrollY !== null) {
+    window.scrollTo({ top: modalScrollY, left: 0, behavior: 'instant' });
+    modalScrollY = null;
+  }
 
   // Запрет прокрутки снимаем только когда закрыты оба окна.
   const anyOpen = host?.querySelector('.forum-modal:not([hidden])');
   if (!anyOpen) document.documentElement.classList.remove('is-modal-open');
+  releaseDialog(modal);
 }
 
 /** Своё удаление и чужое — разные окна по смыслу, но одно по разметке. */
@@ -3288,11 +3329,13 @@ function openDeleteModal() {
   modal.querySelector('[data-forum-delete-note]').hidden = !needReason || own;
 
   modal.hidden = false;
+  rememberScroll();
   document.documentElement.classList.add('is-modal-open');
-  // Найдём ПЕРВЫЙ ВИДИМЫЙ элемент для фокуса
-  const firstFocusable = [...modal.querySelectorAll('button, input, textarea, select')]
-    .find((el) => el.offsetParent !== null);
-  firstFocusable?.focus({ preventScroll: true });
+  /* Часть пунктов окна зависит от того, кто и что удаляет, поэтому их
+     перекрашивают прямо здесь — и только после этого ставим ловушку:
+     обход считается по видимым узлам текущего кадра. */
+  trapDialog(modal);
+  focusFirstIn(modal);
 }
 
 /** В именах реакций есть двоеточие, поэтому в селекторе его надо закрыть. */
