@@ -18372,9 +18372,12 @@ console.log('\nBF. Мера ряда: дробных долей нет, пары
 
    Бриф (§56 и группа «performance» в §77) просит отзывчивые картинки и
    оптимальные форматы. Реализовано так: рядом с каждой картинкой справочника
-   и с кадром героя лежат WebP-копии шириной 560, 840 и 1120 px, разметка
-   отдаёт их в `srcset`, а `sizes` сняты живым замером рамок, а не на глаз
-   (src/ui/responsive-images.js).
+   и с кадром героя лежат копии шириной 560, 840 и 1120 px — в AVIF и в WebP,
+   одним и тем же рядом ширин. Разметка отдаёт их в `srcset` двумя `<source>`,
+   а `sizes` сняты живым замером рамок, а не на глаз
+   (src/ui/responsive-images.js). Порядок не случайность: `<picture>` берёт
+   ПЕРВЫЙ подошедший `<source>`, поэтому AVIF стоит выше WebP, а WebP — выше
+   оригинала.
 
    Риск у схемы один, но громкий: `srcset` — это обещание. Браузер выбирает
    файл сам, и если обещанной копии нет, он НЕ откатывается на `<img>` внутри
@@ -18396,10 +18399,11 @@ console.log('\nBF. Мера ряда: дробных долей нет, пары
    Размеры читаются из заголовков файлов, своими руками. Зависимостей у
    проекта нет, и заводить библиотеку ради одной проверки нельзя.
 
-   Чего здесь сознательно нет: AVIF. Энкодера под него в этом окружении нет
-   (sharp пишет WebP, System.Drawing — только JPEG/PNG), поэтому «оптимальные
-   форматы» закрыты одним WebP. Это надо сказать отдельно, а не прятать за
-   зелёным выводом.
+   Форматов теперь два, и проверка обязана читать заголовки обоих: если бы AVIF
+   разбирался неверно, ряд «ширина копии равна дескриптору» просто молча
+   упал бы, а не показал бы себя зелёным. Поэтому разбор ISO-BMFF здесь ищет
+   бокс `ispe` и берёт из него пару чисел, а правдоподобность размеров
+   подтверждается равнением с дескриптором `Nw`.
 ────────────────────────────────────────────────────────────────────────── */
 console.log('\nBG. Отзывчивые картинки: копии, размеры и вес');
 {
@@ -18419,10 +18423,13 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
   };
 
   /*
-    Ширина и высота из заголовка файла. Три формата, какие есть в репозитории:
-    JPEG (обход сегментов до кадра), PNG (IHDR) и WebP (три варианта чанка —
-    lossy, lossless и extended). Разбор пишется по спецификации контейнеров, а
-    не «на память», чтобы проверка не начала угадывать ответы.
+    Ширина и высота из заголовка файла. Четыре формата, какие есть в
+    репозитории: JPEG (обход сегментов до кадра), PNG (IHDR), WebP (три варианта
+    чанка — lossy, lossless и extended) и AVIF (ISO-BMFF: кадр описан боксом
+    `ispe`, и он в файле единственный). У AVIF ищем четыре буквы и берём пару
+    чисел после версии-флагов; если бы разбор ошибся, следующий же тест
+    «ширина копии равна дескриптору» покраснел бы — неверное число здесь не
+    прячется за зелёным выводом, а видно.
   */
   const sizeOf = (buf) => {
     if (!buf || buf.length < 30) return null;
@@ -18452,6 +18459,15 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
       }
       if (tag === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
     }
+    if (buf.toString('ascii', 4, 8) === 'ftyp' && /^(avif|avis)$/.test(buf.toString('ascii', 8, 12))) {
+      const at = buf.indexOf('ispe');
+      if (at > 0 && at + 16 <= buf.length) {
+        const w = buf.readUInt32BE(at + 8);
+        const h = buf.readUInt32BE(at + 12);
+        if (w > 0 && w < 30000 && h > 0 && h < 30000) return { w, h };
+      }
+      return null;
+    }
     return null;
   };
   const readSize = async (rel) => {
@@ -18468,9 +18484,14 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
   check('ряд копий назван тремя ступенями по возрастанию',
     RI.WEBP_LADDER.length === 3 && RI.WEBP_LADDER.every((v, i) => i === 0 || v > RI.WEBP_LADDER[i - 1]),
     RI.WEBP_LADDER.join(', '));
-  equal('имя копии строится по ширине, расширение меняется на webp',
+  equal('имя копии строится по ширине, расширение по умолчанию webp',
     RI.variantPath('./public/guides/a/b.jpg', 840), './public/guides/a/b-840.webp');
+  equal('расширение копии меняется на вызванную форму',
+    RI.variantPath('./public/guides/a/b.jpg', 840, 'avif'), './public/guides/a/b-840.avif');
+  equal('у двух форматов один и тот же ряд ширин, отличаются только имена',
+    RI.avifSrcset('./a/b.jpg', 1177).replace(/\.avif/g, '.webp'), RI.webpSrcset('./a/b.jpg', 1177));
   equal('srcset пуст, когда копий нет', RI.webpSrcset('./a.jpg', 0), '');
+  equal('у avif-ряда пусто ровно в тех же случаях', RI.avifSrcset('./a.jpg', 0), '');
 
   /* 2. Данные: каждая картинка знает настоящую ширину своего оригинала. */
   const figures = [];
@@ -18496,30 +18517,47 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
   check('записанная ширина и высота равны настоящими',
     wrongSize.length === 0, `${wrongSize.length} разошлось: ${wrongSize.slice(0, 3).join(' | ')}`);
 
-  /* 3. Обещание srcset: файл есть, и он ровно той ширины, что названо. */
+  /* 3. Обещание srcset: файл есть, и он ровно той ширины, что названо.
+        Оба формата — потому что `<picture>` выбирает ПЕРВЫЙ подошедший
+        `<source>` и на следующий уже не откатывается. Если у картинки ряд
+        AVIF короче WebP-ряда, обещанный несуществующий файл показал бы пустое
+        место там, где один формат работал бы отлично. */
   const absent = [];
   const wrongWidth = [];
   const heavier = [];
+  const outOfStep = [];
   let promisedCount = 0;
   for (const f of uniq) {
-    const list = RI.webpSrcset(f.image, f.w);
-    if (!list) { absent.push(`${f.image}: копий нет вовсе`); continue; }
-    for (const entry of list.split(', ')) {
-      const [file, desc] = entry.split(' ');
-      const rel = file.replace(/^\.\//, '');
-      promisedCount += 1;
-      const buf = await fsa.readFile(rel).catch(() => null);
-      if (!buf) { absent.push(entry); continue; }
-      const real = sizeOf(buf);
-      if (!real || real.w !== Number(desc.slice(0, -1))) {
-        wrongWidth.push(`${entry}: файл ${real ? `${real.w}x${real.h}` : 'не читается'}`);
+    const rows = [
+      ['webp', RI.webpSrcset(f.image, f.w)],
+      ['avif', RI.avifSrcset(f.image, f.w)],
+    ];
+    if (!rows[0][1] && !rows[1][1]) { absent.push(`${f.image}: копий нет вовсе`); continue; }
+    /* Ряды обязаны совпасть ступень в ступень: разметка обещает avif-ряд
+       всякий раз, когда обещает webp-ряд. */
+    if (rows[0][1].replace(/\.webp/g, '.avif') !== rows[1][1]) {
+      outOfStep.push(`${f.image}: webp «${rows[0][1]}», avif «${rows[1][1]}»`);
+    }
+    const origin = await exists(f.image.replace(/^\.\//, ''));
+    for (const [fmt, list] of rows) {
+      for (const entry of list.split(', ')) {
+        const [file, desc] = entry.split(' ');
+        const rel = file.replace(/^\.\//, '');
+        promisedCount += 1;
+        const buf = await fsa.readFile(rel).catch(() => null);
+        if (!buf) { absent.push(`${entry} (${fmt})`); continue; }
+        const real = sizeOf(buf);
+        if (!real || real.w !== Number(desc.slice(0, -1))) {
+          wrongWidth.push(`${entry}: файл ${real ? `${real.w}x${real.h}` : 'не читается'}`);
+        }
+        if (origin && buf.byteLength >= origin.size) heavier.push(`${file}: ${buf.byteLength} против ${origin.size}`);
       }
-      const origin = await exists(f.image.replace(/^\.\//, ''));
-      if (origin && buf.byteLength >= origin.size) heavier.push(`${file}: ${buf.byteLength} против ${origin.size}`);
     }
   }
   check(`каждая обещанная копия существует (${promisedCount} файлов)`,
     absent.length === 0, `${absent.length} нет: ${absent.slice(0, 4).join(' | ')}`);
+  check('avif-ряд совпадает со webp-рядом ступень в ступень',
+    outOfStep.length === 0, `${outOfStep.length} разошлось: ${outOfStep.slice(0, 2).join(' | ')}`);
   check('ширина копии равна её дескриптору в srcset',
     wrongWidth.length === 0, `${wrongWidth.length} не совпало: ${wrongWidth.slice(0, 4).join(' | ')}`);
   check('каждая копия легче оригинала — иначе ряд добавляет вес, а не снимает',
@@ -18533,13 +18571,15 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
     if (!origin) { heroBad.push(`${path}: оригинала нет`); continue; }
     /* Ширина кадра — то, что просит владелец в config.js (длинная сторона
        до 1600 px), и она же задаёт верхнюю ступень ряда. */
-    for (const entry of RI.webpSrcset(path, 1600).split(', ')) {
-      const [file, desc] = entry.split(' ');
-      const buf = await fsa.readFile(file.replace(/^\.\//, '')).catch(() => null);
-      if (!buf) { heroBad.push(entry); continue; }
-      const real = sizeOf(buf);
-      if (!real || real.w !== Number(desc.slice(0, -1))) heroBad.push(`${entry}: ${real ? real.w : 'нечитается'}`);
-      if (buf.byteLength >= origin.size) heroBad.push(`${file}: тяжелее оригинала`);
+    for (const list of [RI.webpSrcset(path, 1600), RI.avifSrcset(path, 1600)]) {
+      for (const entry of list.split(', ')) {
+        const [file, desc] = entry.split(' ');
+        const buf = await fsa.readFile(file.replace(/^\.\//, '')).catch(() => null);
+        if (!buf) { heroBad.push(entry); continue; }
+        const real = sizeOf(buf);
+        if (!real || real.w !== Number(desc.slice(0, -1))) heroBad.push(`${entry}: ${real ? real.w : 'нечитается'}`);
+        if (buf.byteLength >= origin.size) heroBad.push(`${file}: тяжелее оригинала`);
+      }
     }
   }
   check('у каждого кадра из списка копий они на диске и по своей ширине',
@@ -18547,7 +18587,6 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
   const heroSrc = String(CONFIG.hero?.image ?? '').trim();
   check('кадр, вписанный владельцем, лежит на диске',
     !heroSrc || Boolean(await exists(heroSrc.replace(/^\.\//, ''))), heroSrc || 'кадра нет');
-
   /* 5. Живая разметка: `<picture>` там, где копии, и обычный `<img>` там,
         где их нет; ленивость и приоритет героя не потерялись по дороге. */
   const withCopies = uniq.find((f) => RI.webpSrcset(f.image, f.w));
@@ -18556,6 +18595,15 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
   check('рамка рисунка отдаётся через picture с webp и sizes',
     /<source type="image\/webp" srcset="[^"]+ \d+w" sizes="[^"]+">/.test(figureHtml),
     `${withCopies.image}: в разметке нет <source> с дескрипторами`);
+  check('рамка рисунка отдаёт и avif-ряд с теми же sizes',
+    /<source type="image\/avif" srcset="[^"]*\.avif \d+w[^"]*" sizes="[^"]+">/.test(figureHtml),
+    `${withCopies.image}: в разметке нет <source type="image/avif">`);
+  /* Порядок внутри `<picture>` — часть контракта, а не косметика: браузер
+     берёт ПЕРВЫЙ подошедший источник, и второй после него уже не рассматривает. */
+  check('avif-источник стоит выше webp-источника',
+    figureHtml.indexOf('<source type="image/avif"') >= 0
+      && figureHtml.indexOf('<source type="image/avif"') < figureHtml.indexOf('<source type="image/webp"'),
+    `avif ${figureHtml.indexOf('<source type="image/avif"')}, webp ${figureHtml.indexOf('<source type="image/webp"')}`);
   check('у fallback-картинки осталась отложенная загрузка',
     /<img [^>]*loading="lazy"[^>]*decoding="async"/.test(figureHtml));
   check('рамка рисунка не осталась бы без размеров — высота забронирована',
@@ -18568,9 +18616,14 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
   const heroHasCopies = RI.HERO_WITH_COPIES.has(heroSrc);
   check('кадр героя отдаётся picture, когда копии заявлены, и img, когда нет',
     heroHasCopies
-      ? /<picture>\s*<source type="image\/webp" srcset="\.\/public\/hero\//.test(heroHtml)
-      : !/<source type="image\/webp"/.test(heroHtml) && /<img class="hero__img" src=/.test(heroHtml),
+      ? /<picture>\s*<source type="image\/avif" srcset="\.\/public\/hero\//.test(heroHtml)
+      : !/<source type="image\/(avif|webp)"/.test(heroHtml) && /<img class="hero__img" src=/.test(heroHtml),
     heroHasCopies ? `копии заявлены для ${heroSrc}, но picture не отрисовался` : `копий нет для ${heroSrc}, а разметка ушла в picture`);
+  check('у героя avif-источник стоит выше webp-источника',
+    !heroHasCopies
+      || (heroHtml.indexOf('<source type="image/avif"') >= 0
+        && heroHtml.indexOf('<source type="image/avif"') < heroHtml.indexOf('<source type="image/webp"')),
+    `avif ${heroHtml.indexOf('<source type="image/avif"')}, webp ${heroHtml.indexOf('<source type="image/webp"')}`);
   check('кадр героя грузится вне очереди — он на первом экране',
     /class="hero__img"[^>]*fetchpriority="high"/.test(heroHtml));
 
@@ -18588,7 +18641,7 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
     for (const m of html.matchAll(/srcset="([^"]+)"/g)) {
       for (const entry of m[1].split(',')) {
         const url = entry.trim().split(' ')[0];
-        if (!url || !/\.(webp|jpe?g|png)$/i.test(url)) { dangling.push(`${dir}: srcset «${entry.trim()}»`); continue; }
+        if (!url || !/\.(webp|avif|jpe?g|png)$/i.test(url)) { dangling.push(`${dir}: srcset «${entry.trim()}»`); continue; }
         const abs = ppath.resolve('handbook', dir, url);
         if (!(await exists(abs))) dangling.push(`${dir}: ${url}`);
       }

@@ -2,7 +2,7 @@ import { esc, fmtDate, deltaBadge, plural, pluralWord, formDots, standingsRowLab
 import { raceChart } from '../ui/chart.js';
 import { byWeekStart, findCurrentWeek } from '../data/week-order.js';
 import { heroImage, heroAlt } from '../ui/hero-slot.js';
-import { HERO_SIZES, HERO_WITH_COPIES, webpSrcset } from '../ui/responsive-images.js';
+import { HERO_SIZES, HERO_WITH_COPIES, avifSrcset, webpSrcset } from '../ui/responsive-images.js';
 import { EVENT_TYPE, pillText, isServerEvent } from '../logic/event-types.js';
 
 /* Формы слова «день» для счёта: 1 день, 2 дня, 5 дней. */
@@ -38,6 +38,7 @@ function heroMedia() {
   const img = `<img class="hero__img" src="${esc(src)}" alt="${esc(heroAlt())}" fetchpriority="high" decoding="async">`;
   return `<div class="hero__media">
             ${copies ? `<picture>
+              <source type="image/avif" srcset="${esc(avifSrcset(src, HERO_SRC_WIDTH))}" sizes="${HERO_SIZES}">
               <source type="image/webp" srcset="${esc(copies)}" sizes="${HERO_SIZES}">
               ${img}
             </picture>` : img}
