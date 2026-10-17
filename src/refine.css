@@ -39,7 +39,6 @@
 */
 :root {
   --gap: var(--s-2);
-  --pad: 16px;
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
