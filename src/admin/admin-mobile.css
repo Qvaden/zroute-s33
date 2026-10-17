@@ -48,7 +48,7 @@
     и хвостом токена. Токена больше нет, но строка всё равно тесная: ник
     и две кнопки на 360 пикселах не помещаются без переноса посреди слова.
   */
-  .adm-top__right { flex-wrap: wrap; gap: 8px; }
+  .adm-top__right { flex-wrap: wrap; gap: var(--s-1); }
   .adm-who { order: -1; flex-basis: 100%; }
 }
 
@@ -63,15 +63,15 @@
     Одна в ряд: строка становится шире, название читается целиком, кнопки
     отметки уезжают вправо и попадают под большой палец.
   */
-  .adm-cells { grid-template-columns: 1fr; gap: 7px; }
-  .adm-cell { min-height: 56px; padding: 9px 12px; }
+  .adm-cells { grid-template-columns: 1fr; gap: var(--s-1); }
+  .adm-cell { min-height: 56px; padding: var(--s-1) var(--s-2); }
   .adm-cell__name { white-space: normal; overflow-wrap: anywhere; }
 
   /*
     Кнопки «победа» и «поражение». 40 на 40 — граница, ниже которой начинаются
     промахи, а промах здесь означает неверный результат в истории сервера.
   */
-  .adm-marks { gap: 7px; }
+  .adm-marks { gap: var(--s-1); }
   .adm-mark { min-width: 44px; min-height: 44px; }
 }
 
@@ -85,8 +85,8 @@
   */
   .adm-ally {
     grid-template-columns: 6px 1fr auto;
-    gap: 4px 9px;
-    padding: 11px 0;
+    gap: var(--s-fine) var(--s-1);
+    padding: var(--s-2) 0;
   }
   .adm-ally__name { overflow-wrap: anywhere; }
   /* Заметка и id на телефоне лишние: место нужнее названию и кнопкам. */
@@ -96,7 +96,7 @@
     Кнопки действий в строке. Раньше они прижимались друг к другу, и «удалить»
     оказывалась рядом с «править» — на телефоне это одно неверное касание.
   */
-  .adm-ally__acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .adm-ally__acts { display: flex; flex-wrap: wrap; gap: var(--s-1); }
   .adm-ally__acts .adm-btn { min-height: 40px; }
 
   .adm-ev__acts .adm-btn { min-height: 40px; }
@@ -110,7 +110,7 @@
     задевает соседнее поле и открывает клавиатуру не там; 16 достаточно,
     чтобы этого не было.
   */
-  .adm-field { margin-bottom: 16px; }
+  .adm-field { margin-bottom: var(--s-3); }
 
   /*
     ШРИФТ ПОЛЕЙ НЕ МЕНЬШЕ 16px.
@@ -139,7 +139,7 @@
     при длинной форме. Но с открытой клавиатурой она занимала треть видимой
     высоты: отступы ужимаем.
   */
-  .adm-publish--top { padding: 10px 12px; gap: 8px; }
+  .adm-publish--top { padding: var(--s-2) var(--s-2); gap: var(--s-1); }
   .adm-publish__state { font-size: var(--fs-meta); }
 }
 
@@ -151,14 +151,14 @@
     правил в окне запрета уходит за край, а кнопка «Применить» оказывается
     недостижимой — единственным выходом остаётся перезагрузка.
   */
-  .adm-modal { padding: 10px; align-items: flex-end; }
+  .adm-modal { padding: var(--s-2); align-items: flex-end; }
   .adm-modal__box {
     width: 100%;
     max-height: calc(100svh - 20px);
     /* Скругление только сверху: окно выезжает снизу, как в приложениях. */
-    border-radius: 18px 18px 12px 12px;
+    border-radius: var(--r-xl) var(--r-xl) var(--r-lg) var(--r-lg);
   }
-  .adm-modal__box .adm-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, #0b111a 40%); }
+  .adm-modal__box .adm-actions { position: sticky; bottom: 0; padding-top: var(--s-2); background: linear-gradient(transparent, #0b111a 40%); }
   .adm-reserved__add { max-width: none; }
   .adm-reserved__add input { height: 44px; }
   .adm-reserved__add .adm-btn { height: 44px; min-height: 44px; }
@@ -174,17 +174,17 @@
 */
 @supports (padding: env(safe-area-inset-left)) {
   .adm-top {
-    padding-top: max(10px, env(safe-area-inset-top));
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
+    padding-top: max(var(--s-2), env(safe-area-inset-top));
+    padding-left: max(var(--s-2), env(safe-area-inset-left));
+    padding-right: max(var(--s-2), env(safe-area-inset-right));
   }
   .adm-main {
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
-    padding-bottom: max(44px, calc(env(safe-area-inset-bottom) + 28px));
+    padding-left: max(var(--s-2), env(safe-area-inset-left));
+    padding-right: max(var(--s-2), env(safe-area-inset-right));
+    padding-bottom: max(var(--s-6), calc(env(safe-area-inset-bottom) + var(--s-5)));
   }
-  .adm-foot { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
-  .adm-modal { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .adm-foot { padding-bottom: max(var(--s-3), env(safe-area-inset-bottom)); }
+  .adm-modal { padding-bottom: max(var(--s-2), env(safe-area-inset-bottom)); }
 }
 
 /* ── Компьютер ────────────────────────────────────────────────────────────── */

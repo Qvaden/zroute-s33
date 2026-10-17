@@ -12022,8 +12022,14 @@ console.log('\nAN. Доска аккаунтов');
     /\.accounts-card \{[\s\S]{0,420}?background: linear-gradient\(180deg, var\(--raised\), var\(--surface\)\)/.test(cssSrc)
       && /\.accounts-card__price \{[\s\S]{0,420}?color: var\(--gold\)/.test(cssSrc)
       && /\.accounts-composer \{[\s\S]{0,320}?background: var\(--surface\)/.test(cssSrc));
+  /*
+    Телефон витрины — общая граница сайта, 759 px. Раньше блок стоял под
+    одиночным `max-width: 700px`: на 701–759 px витрина уже считалась
+    десктопом и разворачивала две колонки там, где mobile.css ещё прятал
+    разделы за шторку. Ряд границ (§28) не позволяет числу жить одиночкой.
+  */
   check('телефон: шапка и сетка складываются в одну колонку, а кнопки становятся во всю ширину',
-    /@media \(max-width: 700px\)[\s\S]{0,1200}?\.accounts-hero \{ grid-template-columns: 1fr;[\s\S]{0,900}?\.accounts-grid \{ grid-template-columns: 1fr;[\s\S]{0,700}?\.accounts-act \{ min-height: 44px/.test(cssSrc));
+    /@media \(max-width: 759px\)[\s\S]{0,1200}?\.accounts-hero \{ grid-template-columns: 1fr;[\s\S]{0,900}?\.accounts-grid \{ grid-template-columns: 1fr;[\s\S]{0,700}?\.accounts-act \{ min-height: 44px/.test(cssSrc));
   check('главное действие витрины остаётся общей кнопкой сайта, но краску берёт бирюзовую',
     /class="forum-btn forum-btn--primary accounts-hero__cta"/.test(boardSrc)
       && /class="forum-btn forum-btn--ghost accounts-hero__cta"/.test(boardSrc)
@@ -17421,48 +17427,49 @@ console.log('\nAX. Полоса разделов и подвал');
    может сломаться молча:
 
    Литерал, появившийся после захода. Проверка по файлам глазами не ловится:
-   строк `border-radius` в шести рабочих файлах больше трёхсот, и `11px` в
+   строк `border-radius` в восьми рабочих файлах больше трёхсот, и `11px` в
    новой правке утонет в них. Здесь значение каждого скругления обязано быть
    токеном ряда — кроме нуля, круга `50%` и `inherit`, которые рядом не
    скругление угла, а его отсутствие, перенос формы или окружность.
 
    Тихий дубль. Ровно так заход 16 обнаружил, что жёсткая геометрия захода 11
    никогда не действовала: `refine.css` объявлял те же имена `--r-sm/--r/--r-lg`
-   другими числами и грузился позже. Поэтому ряд ищется во всех шести файлах и
+   другими числами и грузился позже. Поэтому ряд ищется во всех восьми файлах и
    обязан быть объявлен ровно один раз.
 ────────────────────────────────────────────────────────────────────────────── */
 console.log('\nAY. Скругления: ряд в одном источнике, чисел вне ряда нет');
 {
   const { readFile } = await import('node:fs/promises');
-  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const LIVE = ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css',
+    'src/refine.css', 'src/handbook.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css'];
   const src = {};
-  for (const name of LIVE) src[name] = await readFile(`src/${name}.css`, 'utf8');
+  for (const f of LIVE) src[f] = await readFile(f, 'utf8');
 
   const okValue = (val) => /^0$/.test(val) || /^50%$/.test(val) || /^inherit$/.test(val)
     || /^calc\(/.test(val)
     || val.split(/\s+/).every((part) => /^var\(--r(-[a-z0-9]+)?\)$/.test(part)
       || /^var\(--surface-radius\)$/.test(part) || part === '0');
   const stray = [];
-  for (const name of LIVE) {
-    for (const m of src[name].matchAll(/border-radius:\s*([^;}]+)/g)) {
-      if (!okValue(m[1].trim())) stray.push(`${name}.css: ${m[1].trim()}`);
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/border-radius:\s*([^;}]+)/g)) {
+      if (!okValue(m[1].trim())) stray.push(`${f}: ${m[1].trim()}`);
     }
   }
-  check('ни одного скругления вне ряда в шести рабочих файлах', stray.length === 0,
+  check('ни одного скругления вне ряда в восьми рабочих файлах', stray.length === 0,
     stray.slice(0, 6).join(' | '));
 
   const declared = [];
-  for (const name of LIVE) {
-    for (const m of src[name].matchAll(/^\s*(--r(?:-(?:hair|xs|sm|lg|xl|2xl|pill))?|(--surface-radius)):\s*([^;]+);/gm)) {
-      declared.push(`${name}.css ${m[1]}`);
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/^\s*(--r(?:-(?:hair|xs|sm|lg|xl|2xl|pill))?|(--surface-radius)):\s*([^;]+);/gm)) {
+      declared.push(`${f} ${m[1]}`);
     }
   }
   const dup = declared.filter((x, i) => declared.indexOf(x) !== i);
   check('ряд скруглений объявлен ровно один раз и только в styles-v8.css',
-    dup.length === 0 && declared.every((x) => x.startsWith('styles-v8.css')),
+    dup.length === 0 && declared.every((x) => x.startsWith('src/styles-v8.css ')),
     dup.length ? dup.join(', ') : declared.join(', '));
 
-  const row = [...src['styles-v8'].matchAll(/^\s*--r(?:-(hair|xs|sm|lg|xl|2xl|pill))?[:\s]+(\d+)px/gm)]
+  const row = [...src['src/styles-v8.css'].matchAll(/^\s*--r(?:-(hair|xs|sm|lg|xl|2xl|pill))?[:\s]+(\d+)px/gm)]
     .map((m) => Number(m[2]));
   check('ступени ряда идут от метки к капсуле и не путают порядок',
     row.join('/') === '2/4/6/10/14/16/24/999', row.join('/'));
@@ -17491,51 +17498,65 @@ console.log('\nAY. Скругления: ряд в одном источнике
 
    Востребованность верха ряда: если 48/64/96 снова станут не нужны, «воздух
    между разделами» снова превратится в 22 px, и это надо увидеть в тесте.
+
+   Панель внутри того же ряда. `src/admin/admin.css` и `admin-mobile.css`
+   жили своими числами: 496 литералов отступов и скруглений, и ни один из них
+   не касался правка ступени в `styles-v8.css`. Панель подключает
+   `styles-v8.css` первой строкой, поэтому перевод ничего не перекрасил и не
+   переломил — зато ступень теперь одна на сайт и панель. Проверки идут по
+   списку путей, а не по шести коротким именам: у файла панели путь начинается
+   с `src/admin/`, и рядом с ним нельзя промахнуться.
+
+   Дыра, которую нельзя оставить: панель правят пальцем с телефона. Числа
+   `--s-*` здесь обязаны быть, а не украшать: `admin.html` тянет
+   `styles-v8.css` по версии, и если версия отстанет, незакрытый токен обнулится,
+   ряд кнопок слипнется, и увидит это только тот, кто будет вносить итоги.
 ────────────────────────────────────────────────────────────────────────────── */
 console.log('\nAZ. Отступы: ряд в одном источнике, чисел вне ряда нет');
 {
   const { readFile } = await import('node:fs/promises');
-  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const LIVE = ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css',
+    'src/refine.css', 'src/handbook.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css'];
   const src = {};
-  for (const name of LIVE) src[name] = await readFile(`src/${name}.css`, 'utf8');
+  for (const f of LIVE) src[f] = await readFile(f, 'utf8');
 
   const declRe = /(^|[;{}[\s])((?:padding|margin|gap|row-gap|column-gap)(?:-[a-z-]+)?)\s*:\s*([^;}]+)/g;
   const stray = [];
   let checked = 0;
-  for (const name of LIVE) {
-    for (const m of src[name].matchAll(declRe)) {
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(declRe)) {
       checked++;
       const value = m[3];
       for (const px of value.matchAll(/(-?)(\d+(?:\.\d+)?)px/g)) {
         const num = Number(px[2]);
         if (num === 0 || px[1] === '-') continue;
-        stray.push(`${name}.css ${m[2]}: ${value.trim().slice(0, 46)}`);
+        stray.push(`${f} ${m[2]}: ${value.trim().slice(0, 46)}`);
         break;
       }
     }
   }
-  check('ни одного положительного отступа вне ряда в шести рабочих файлах',
+  check('ни одного положительного отступа вне ряда в восьми рабочих файлах',
     stray.length === 0, `${checked} правил проверено, чужих: ${stray.slice(0, 5).join(' | ')}`);
 
   const declared = [];
-  for (const name of LIVE) {
-    for (const m of src[name].matchAll(/(^|[{;\s])--s-([a-z0-9]+)\s*:/g)) {
-      declared.push(`${name}.css --s-${m[2]}`);
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/(^|[{;\s])--s-([a-z0-9]+)\s*:/g)) {
+      declared.push(`${f} --s-${m[2]}`);
     }
   }
   const dup = declared.filter((x, i) => declared.indexOf(x) !== i);
   check('ряд отступов объявлен ровно один раз и только в styles-v8.css',
-    dup.length === 0 && declared.every((x) => x.startsWith('styles-v8.css')),
+    dup.length === 0 && declared.every((x) => x.startsWith('src/styles-v8.css ')),
     dup.length ? dup.join(', ') : declared.length + ' объявлений');
 
-  const row = [...src['styles-v8'].matchAll(/--s-(hair|fine|[1-8])\s*:\s*(\d+)px/g)]
+  const row = [...src['src/styles-v8.css'].matchAll(/--s-(hair|fine|[1-8])\s*:\s*(\d+)px/g)]
     .map((m) => [m[1] === 'hair' ? 0 : m[1] === 'fine' ? 0.5 : Number(m[1]), Number(m[2])])
     .sort((a, b) => a[0] - b[0])
     .map((s) => s[1]);
   check('ступени идут от микрозазора к воздуху и не путают порядок',
     row.join('/') === '2/4/8/12/16/24/32/48/64/96', row.join('/'));
 
-  const used = (token) => LIVE.reduce((n, name) => n + (src[name].match(new RegExp(`var\\(--s-${token}\\)`, 'g')) || []).length, 0);
+  const used = (token) => LIVE.reduce((n, f) => n + (src[f].match(new RegExp(`var\\(--s-${token}\\)`, 'g')) || []).length, 0);
   const top = ['6', '7', '8'].map((t) => `${t}:${used(t)}`).join(' ');
   check('три верхние ступени ряда востребованы: воздух между разделами существует',
     used('6') > 0 && used('7') > 0 && used('8') > 0, top);
@@ -17545,7 +17566,29 @@ console.log('\nAZ. Отступы: ряд в одном источнике, чи
     used('hair') > 0 && used('fine') > 0, micro);
 
   /*
-    Дыра, которую нашёл сам заход 18. Охрана смотрит в шесть CSS-файлов, а
+    Обращение к рядом, которого в ряду нет. Литерал хотя бы рисует пиксель, а
+    `var(--s-9)` без объявления обнуляет отступ молча: правило остаётся
+    валидным, и глазами в нём ничего не сломано. Проверка идёт по всем восьми
+    файлам, потому что панель ссылается на ряд сайта, а не объявляет свой.
+  */
+  // базовая ступень ряда называется без суффикса: `--r: 10px`, и на неё ссылаются
+  // как var(--r) — регистр ступеней обязан знать и это имя, иначе проверка сама
+  // оказывается той ошибкой, которую ловит
+  const declaredTokens = new Set(
+    [...src['src/styles-v8.css'].matchAll(/--([sr](?:-[a-z0-9]+)?)\s*:/g)]
+      .map((m) => `--${m[1]}`)
+  );
+  const ghost = [];
+  for (const f of LIVE) {
+    for (const m of src[f].matchAll(/var\((--(?:s|r)(?:-[a-z0-9]+)?)\)/g)) {
+      if (!declaredTokens.has(m[1])) ghost.push(`${f}: ${m[1]}`);
+    }
+  }
+  check('каждая ссылка var(--s-*) и var(--r-*) ведёт в объявленную ступень',
+    ghost.length === 0, `${declaredTokens.size} ступеней объявлено, ссылок в никуда: ${[...new Set(ghost)].slice(0, 5).join(', ')}`);
+
+  /*
+    Дыра, которую нашёл сам заход 18. Охрана смотрела в шесть CSS-файлов, а
     карточка Кварта жила по своим правилам: в JS-шаблоне стоял инлайн
     `style="...gap:5px"`, и он перебивал класс из styles-v8.css — ни ряд, ни
     проверки его не видели. Таких инлайн-отступов нашлось пять. Три убраны
@@ -17576,6 +17619,31 @@ console.log('\nAZ. Отступы: ряд в одном источнике, чи
   }
   check('в JS-разметке нет пиксельных отступов: числа приходят только из ряда',
     inline.length === 0, `${inlineChecked} инлайн-объявлений проверено, чужих: ${inline.slice(0, 4).join(' | ')}`);
+
+  /*
+    Ряд для панели живёт не в панели. admin.html тянет styles-v8.css первой
+    строкой, и с этих пор панель берёт из него не только краски, но и каждую
+    ступень отступа. Два способа всё сломать лежат в одном файле-обвязке:
+    отстать по версии (браузер отдаёт кэшированный ряд без новых токенов,
+    var(--s-*) становится нечем, и отступы обнуляются молча) и поставить ссылку
+    после admin.css (ряд перестаёт быть базой, и панель снова красит себя сама).
+  */
+  const { readFile: rd } = await import('node:fs/promises');
+  const adminHtml = await rd('admin.html', 'utf8');
+  const indexHtml = await rd('index.html', 'utf8');
+  const vIn = (html) => {
+    const m = html.match(/src\/styles-v8\.css\?v=(\d+)/);
+    return m ? Number(m[1]) : -1;
+  };
+  check('панель тянет тот же ряд, что и сайт: версии styles-v8.css совпадают',
+    vIn(adminHtml) > 0 && vIn(adminHtml) === vIn(indexHtml),
+    `admin.html v=${vIn(adminHtml)}, index.html v=${vIn(indexHtml)}`);
+  const links = [...adminHtml.matchAll(/<link[^>]+href="\.\/(src\/[^"?]+)/g)].map((m) => m[1]);
+  const posV8 = links.indexOf('src/styles-v8.css');
+  const posAdm = links.findIndex((l) => /admin(-mobile)?\.css$/.test(l));
+  check('ряд в панели подключён раньше её собственных файлов',
+    posV8 === 0 && posAdm > 0,
+    `порядок ссылок: ${links.join(' → ')}`);
 }
 
 /* ── BA. Границы ширины: один ряд и ни одного числа с двух сторон ────────────
@@ -17596,11 +17664,19 @@ console.log('\nAZ. Отступы: ряд в одном источнике, чи
    правила: на 760 px навигация была уже десктопной, а плотный слой и боковая
    колонка — ещё телефонными. Нижняя полоса обязана останавливаться на B-1, и
    это тоже выводится из ряда, а не записано вторым списком.
+
+   Панель в том же ряду. У неё свой телефонный край — 640 px: панелью правят
+   с планшета и с поворотенного телефона, и до 639 px клетки обязаны оставаться
+   крупными. Прежняя граница 700 px жила одиночкой: ни одна другая полоса сайта
+   там не переключалась, а витрина аккаунтов просто складывалась в одну колонку
+   на 30 px позже основной телефонной границы. Ряд это два числа: 640 min у
+   панели и 760 min у сайта, и проверка держит обе пары.
 ────────────────────────────────────────────────────────────────────────────── */
 console.log('\nBA. Границы ширины: ряд в одном источнике, дублей с двух сторон нет');
 {
   const { readFile } = await import('node:fs/promises');
-  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const LIVE = ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css',
+    'src/refine.css', 'src/handbook.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css'];
 
   const row = await readFile('src/styles-v8.css', 'utf8');
   const bounds = [];
@@ -17619,8 +17695,8 @@ console.log('\nBA. Границы ширины: ряд в одном источ�
   const seenMin = new Set();
   const seenMax = new Set();
   let conditions = 0;
-  for (const name of LIVE) {
-    const css = await readFile(`src/${name}.css`, 'utf8');
+  for (const file of LIVE) {
+    const css = await readFile(file, 'utf8');
     for (const line of css.split(/\r\n|\n|\r/)) {
       if (!/^\s*@media/.test(line)) continue;
       for (const m of line.matchAll(/\((min|max)-width:\s*([0-9.]+)px/g)) {
@@ -17628,7 +17704,7 @@ console.log('\nBA. Границы ширины: ряд в одном источ�
         conditions++;
         if (m[1] === 'min') seenMin.add(n); else seenMax.add(n);
         const ok = m[1] === 'min' ? allowedMin.has(n) : allowedMax.has(n);
-        if (!ok) stray.push(`${name}.css: ${m[1]}-width ${n}px`);
+        if (!ok) stray.push(`${file}: ${m[1]}-width ${n}px`);
       }
     }
   }
@@ -17641,6 +17717,23 @@ console.log('\nBA. Границы ширины: ряд в одном источ�
       : 'границы дополняют друг друга: до B-1 и от B');
 
   /*
+    Мёртвая строка в ряду. Проверка выше следит, чтобы вызвали только числа из
+    списка, — но не наоборот. Так в ряду пережил редизайн границу «359 max»:
+    кнопка меню с подписью ушла из шапки, правило ушло вместе с ней, а строка
+    осталась и делала вид, что на 359 px что-то переключается. Теперь каждая
+    объявленная граница обязана звучать хотя бы в одном живом файле: для min
+    это либо `min-width: B`, либо нижняя полоса той же пары `max-width: B-1`.
+  */
+  const dead = [];
+  for (const b of bounds) {
+    const used = b.side === 'min' ? (seenMin.has(b.n) || seenMax.has(b.n - 1)) : seenMax.has(b.n);
+    if (!used) dead.push(`${b.n} ${b.side}`);
+  }
+  check('в ряду нет границы, которую никто не вызывает', dead.length === 0,
+    dead.length ? `ни одного @media: ${dead.join(', ')}`
+      : `${bounds.length} объявлено, все вызваны`);
+
+  /*
     Телефон и десктоп расходятся ровно на одной границе. Если её сдвинут,
     не сказав никому, плотный слой refine.css и полоса разделов mobile.css
     перестанут стыковаться, а проверка выше это пропустит: оба числа будут
@@ -17649,6 +17742,27 @@ console.log('\nBA. Границы ширины: ряд в одном источ�
   check('главная граница телефона и десктопа — одна на весь сайт, 760 px',
     seenMin.has(760) && seenMax.has(759) && !seenMin.has(761) && !seenMax.has(760),
     `min-границы вокруг: ${[...seenMin].filter((n) => n > 700 && n < 800).sort((a, b) => a - b).join(', ') || 'нет'}`);
+
+  /*
+    То же требование у панели, но с её числом. admin.css пишет крупные клетки в
+    полосе до 639 px, а admin-mobile.css подключён тем же условием; если кто-то
+    вернёт одиночную границу (640 max или 641 min), панель получит третью полосу,
+    в которой навигация уже в ряд, а итоги всё ещё вносят пальцем по 44 px.
+  */
+  const admMin = new Set();
+  const admMax = new Set();
+  for (const file of ['src/admin/admin.css', 'src/admin/admin-mobile.css']) {
+    const css = await readFile(file, 'utf8');
+    for (const line of css.split(/\r\n|\n|\r/)) {
+      if (!/^\s*@media/.test(line)) continue;
+      for (const m of line.matchAll(/\((min|max)-width:\s*([0-9.]+)px/g)) {
+        (m[1] === 'min' ? admMin : admMax).add(Number(m[2]));
+      }
+    }
+  }
+  check('телефонный край панели — 640 px, и он стыкуется с соседом снизу',
+    admMin.has(640) && admMax.has(639) && !admMax.has(640),
+    `min: ${[...admMin].sort((a, b) => a - b).join(', ')} | max: ${[...admMax].sort((a, b) => a - b).join(', ')}`);
 }
 
 /* ── BB. Тёмные острова дневной темы зеркалят ночную ─────────────────────────
@@ -18076,48 +18190,55 @@ console.log('\nBE. Короткое сообщение собрано в оди�
    auto-fit/auto-fill ряд обязан быть в перечне: иначе новый ряд можно
    перевести на 12 колонок молча, хотя число карточек в нём приходит с
    сервера и последний ряд встал бы пустыми клетками.
+
+   Панель считается рядом сайта. Два ряда `1.4fr` и `1.3fr` жили именно там.
+   Первый ничего не решал: гибкая доля в ряду одна, а значит 90px 1.4fr 120px
+   и 90px 1fr 120px рисуют ровно одно и то же. Второй — кнопки окна подбора
+   цвета, и он переведён в пару 5+7: 58 % против прежних 56 %, шире «Применить»,
+   как и задумано.
 ────────────────────────────────────────────────────────────────────────────── */
 console.log('\nBF. Мера ряда: дробных долей нет, пары складываются в 12');
 {
   const { readFile } = await import('node:fs/promises');
-  const LIVE = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
+  const LIVE = ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css',
+    'src/refine.css', 'src/handbook.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css'];
 
   const cssAll = {};
-  for (const name of LIVE) cssAll[name] = await readFile(`src/${name}.css`, 'utf8');
+  for (const f of LIVE) cssAll[f] = await readFile(f, 'utf8');
   const ALL = Object.values(cssAll).join('\n');
 
   /* 1. Дробная доля запрещена целиком. */
   const fraction = [];
   const pairs = [];
-  for (const [name, css] of Object.entries(cssAll)) {
+  for (const [file, css] of Object.entries(cssAll)) {
     for (const m of css.matchAll(/grid-template-columns:\s*([^;]+);/g)) {
       const value = m[1];
       for (const fr of value.matchAll(/(\d*\.?\d+)fr/g)) {
         const n = Number(fr[1]);
-        if (!Number.isInteger(n)) fraction.push(`${name}.css: ${value.trim()}`);
+        if (!Number.isInteger(n)) fraction.push(`${file}: ${value.trim()}`);
       }
       const tracks = [...value.matchAll(/(?:^|[\s,(])(\d+(?:\.\d+)?)fr\b/g)].map((t) => Number(t[1]));
-      if (tracks.length === 2) pairs.push({ name, value: value.trim(), tracks });
+      if (tracks.length === 2) pairs.push({ file, value: value.trim(), tracks });
     }
   }
-  check('ни одной дробной доли в grid-template-columns шести живых файлов',
+  check('ни одной дробной доли в grid-template-columns восьми живых файлов',
     fraction.length === 0, `${fraction.length} вне меры: ${fraction.slice(0, 4).join(' | ')}`);
 
   /* 2. Пара неравных долей обязана складываться в меру. */
   const odd = pairs.filter((p) => p.tracks[0] !== p.tracks[1] && p.tracks[0] + p.tracks[1] !== 12);
   check('ряд из двух колонок делится равными долями или парой из двенадцати',
-    odd.length === 0, `${pairs.length} пар проверено, вне меры: ${odd.map((p) => `${p.name}: ${p.value}`).join(' | ')}`);
+    odd.length === 0, `${pairs.length} пар проверено, вне меры: ${odd.map((p) => `${p.file}: ${p.value}`).join(' | ')}`);
 
   const mirrors = pairs.filter((p) => p.tracks[0] + p.tracks[1] === 12 && p.tracks[0] !== p.tracks[1]);
   check('неравные пары в мере есть, а не только равные половины',
     mirrors.length >= 2, `пар 7+5 и 5+7 в ряду: ${mirrors.length}`);
 
   /* 3. Сама мера объявлена в одном месте — рядом с остальными рядами. */
-  const head = cssAll['styles-v8'].search(/МЕРА РЯДА:/);
+  const head = cssAll['src/styles-v8.css'].search(/МЕРА РЯДА:/);
   check('мера ряда объявлена комментарием в styles-v8.css', head > 0,
-    head < 0 ? 'заголовка нет' : `строка ${cssAll['styles-v8'].slice(0, head).split('\n').length}`);
+    head < 0 ? 'заголовка нет' : `строка ${cssAll['src/styles-v8.css'].slice(0, head).split('\n').length}`);
 
-  const block = /МЕРА РЯДА:[\s\S]*?\*\// .exec(cssAll['styles-v8'])?.[0] ?? '';
+  const block = /МЕРА РЯДА:[\s\S]*?\*\// .exec(cssAll['src/styles-v8.css'])?.[0] ?? '';
   const named = [...new Set([...block.matchAll(/`([^`]+)`/g)]
     .map((m) => m[1].replace(/\s+/g, ' ').trim())
     .filter((s) => s.startsWith('.')))];
@@ -18138,10 +18259,10 @@ console.log('\nBF. Мера ряда: дробных долей нет, пары
       .trim();
   };
   const walls = [];
-  for (const [name, css] of Object.entries(cssAll)) {
+  for (const [file, css] of Object.entries(cssAll)) {
     for (const m of css.matchAll(/repeat\((auto-fit|auto-fill)[^)]*\)/g)) {
       const owner = ownerOf(css, m.index).replace(/:.*$/, '').trim();
-      if (owner.startsWith('.')) walls.push({ name, owner, file: `${name}.css` });
+      if (owner.startsWith('.')) walls.push({ file, owner });
     }
   }
   const unnamed = walls.filter((w) => !named.includes(w.owner));

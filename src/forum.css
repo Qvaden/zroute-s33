@@ -4211,7 +4211,7 @@
   во всю ширину — на доске её нажимают пальцем, и мелкий чип рядом с ней
   означал бы промах. Сетка — в одну колонку, поиск тоже растягивается.
 */
-@media (max-width: 700px) {
+@media (max-width: 759px) {
   .accounts-hero { grid-template-columns: 1fr; align-items: start; }
   .accounts-hero__aside { align-items: stretch; width: 100%; }
   .accounts-stats { width: 100%; }

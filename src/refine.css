@@ -2523,7 +2523,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 .forum-nicklog__item code { color: var(--accent-ink); overflow-wrap: anywhere; }
 .forum-nicklog__item .muted { font-size: var(--fs-meta); }
-@media (max-width: 640px) {
+@media (max-width: 639px) {
   .forum-verify .forum-btn { width: 100%; min-height: 44px; }
 }
 
@@ -2657,7 +2657,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .adm-player .adm-toggle[data-player-leader].is-on { color:var(--violet-ink); border-color:color-mix(in srgb, var(--violet) 48%, transparent); background:color-mix(in srgb, var(--violet) 15%, transparent); }
 .adm-player .adm-menu__btn { width:38px; height:38px; border-radius: var(--r); }
 
-@media (max-width:700px) {
+@media (max-width:639px) {
   .adm-players__toolbar { align-items:stretch; flex-direction:column; }
   .adm-player-search { max-width:none; }
   .adm-players__stats { justify-content:flex-start; }
@@ -2703,7 +2703,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 .about-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--s-3); }
 .about-card { min-width:0; padding:var(--s-3); border:1px solid var(--line); border-radius:var(--r); }
 .about-page .about-panel--privacy { border-inline-start:4px solid var(--accent); }
-@media (max-width:640px) {
+@media (max-width:639px) {
   .about-grid { grid-template-columns:1fr; }
 }
 
