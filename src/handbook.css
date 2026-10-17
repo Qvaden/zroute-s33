@@ -43,6 +43,7 @@
 
 /* ── Фигура с картинкой и подписью ───────────────────────────────────────── */
 .hb-fig { margin: var(--s-3) 0; }
+.hb-fig picture { display: block; }
 .hb-fig img { display: block; max-width: 100%; height: auto; border-radius: var(--r-sm); border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
 .hb-fig figcaption { font-size: var(--fs-meta); color: var(--mute); margin-top: var(--s-fine); line-height: 1.4; padding-left: var(--s-hair); white-space: pre-line; }
 .hb-fig figcaption p { margin: 0; }

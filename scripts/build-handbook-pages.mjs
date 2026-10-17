@@ -106,7 +106,11 @@ function toSiteLinks(html, depth) {
     .replace(/href="#\/handbook\/([^"]+)"/g, (_m, id) => `href="${depth.node(id)}"`)
     .replace(/href="#\/guides"/g, `href="${depth.book}"`)
     .replace(/href="#\//g, (m) => `${depth.root}${m.slice(6)}`)
-    .replace(/src="\.\/((?:public|src)\/)/g, (_m, tail) => `src="${depth.root}${tail}`);
+    .replace(/src="\.\/((?:public|src)\/)/g, (_m, tail) => `src="${depth.root}${tail}`)
+    .replace(/srcset="([^"]*)"/g, (_m, list) => `srcset="${list
+      .split(',')
+      .map((part) => part.trim().replace(/^\.\/((?:public|src)\/)/, (_x, tail) => `${depth.root}${tail}`))
+      .join(', ')}"`);
 }
 
 /**

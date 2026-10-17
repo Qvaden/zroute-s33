@@ -18151,6 +18151,251 @@ console.log('\nBF. Мера ряда: дробных долей нет, пары
     walls.length >= 8, `рядов на автозаполнении: ${walls.length}`);
 }
 
+/* ── BG. Картинки: что обещано в srcset, то лежит на диске ────────────────
+
+   Бриф (§56 и группа «performance» в §77) просит отзывчивые картинки и
+   оптимальные форматы. Реализовано так: рядом с каждой картинкой справочника
+   и с кадром героя лежат WebP-копии шириной 560, 840 и 1120 px, разметка
+   отдаёт их в `srcset`, а `sizes` сняты живым замером рамок, а не на глаз
+   (src/ui/responsive-images.js).
+
+   Риск у схемы один, но громкий: `srcset` — это обещание. Браузер выбирает
+   файл сам, и если обещанной копии нет, он НЕ откатывается на `<img>` внутри
+   `<picture>`: на месте картинки пустое пространство. При этом страница
+   выглядит здоровой ровно до того момента, пока нужный экран не попадёт на
+   нужную ступень, — то есть проверка глазами на одном ноутбуке ничего не
+   доказывает. Поэтому ниже сверяются файлы, а не разметка:
+
+   · каждая обещанная копия существует и имеет ровно ту ширину, которую ей
+     назначен дескриптор: «560w» — обещание, что файл шириной 560 px;
+   · записанная в данных ширина оригинала совпадает с настоящей — на ней
+     держатся и подбор ступеней, и бронь высоты рамки (секция AQ);
+   · копия легче оригинала: генератор с другими настройками вместо экономии
+     добавил бы вес, и глазом этого не увидеть;
+   · в опубликованных статических страницах нет ни одной ссылки на
+     несуществующий файл — их пересобирает скрипт, и правка путей в скрипте
+     ломает только документы, а не приложение.
+
+   Размеры читаются из заголовков файлов, своими руками. Зависимостей у
+   проекта нет, и заводить библиотеку ради одной проверки нельзя.
+
+   Чего здесь сознательно нет: AVIF. Энкодера под него в этом окружении нет
+   (sharp пишет WebP, System.Drawing — только JPEG/PNG), поэтому «оптимальные
+   форматы» закрыты одним WebP. Это надо сказать отдельно, а не прятать за
+   зелёным выводом.
+────────────────────────────────────────────────────────────────────────── */
+console.log('\nBG. Отзывчивые картинки: копии, размеры и вес');
+{
+  const fsa = await import('node:fs/promises');
+  const ppath = await import('node:path');
+  const { HANDBOOK } = await import('../src/handbook/guides.js');
+  const RI = await import('../src/ui/responsive-images.js');
+  const hb = await import('../src/pages/handbook.js');
+  const home = await import('../src/pages/home.js');
+
+  const exists = async (rel) => {
+    try {
+      return await fsa.stat(rel);
+    } catch {
+      return null;
+    }
+  };
+
+  /*
+    Ширина и высота из заголовка файла. Три формата, какие есть в репозитории:
+    JPEG (обход сегментов до кадра), PNG (IHDR) и WebP (три варианта чанка —
+    lossy, lossless и extended). Разбор пишется по спецификации контейнеров, а
+    не «на память», чтобы проверка не начала угадывать ответы.
+  */
+  const sizeOf = (buf) => {
+    if (!buf || buf.length < 30) return null;
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+      return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    }
+    if (buf[0] === 0xff && buf[1] === 0xd8) {
+      let i = 2;
+      while (i < buf.length - 8) {
+        if (buf[i] !== 0xff) return null;
+        let marker = buf[i + 1];
+        while (marker === 0xff) { i += 1; marker = buf[i + 1]; }
+        if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { i += 2; continue; }
+        const len = buf.readUInt16BE(i + 2);
+        const sof = (marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xcf);
+        if (sof) return { w: buf.readUInt16BE(i + 7), h: buf.readUInt16BE(i + 5) };
+        i += 2 + len;
+      }
+      return null;
+    }
+    if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+      const tag = buf.toString('ascii', 12, 16);
+      if (tag === 'VP8X') return { w: 1 + buf.readUIntLE(24, 3), h: 1 + buf.readUIntLE(27, 3) };
+      if (tag === 'VP8L') {
+        const bits = buf.readUInt32LE(21);
+        return { w: 1 + (bits & 0x3fff), h: 1 + ((bits >> 14) & 0x3fff) };
+      }
+      if (tag === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+    }
+    return null;
+  };
+  const readSize = async (rel) => {
+    const buf = await fsa.readFile(rel).catch(() => null);
+    return buf ? sizeOf(buf) : null;
+  };
+
+  /* 1. Подбор ступеней — правило, а не список; три края проверены явно. */
+  equal('оригинал шире ряда получает все три ступени', RI.variantWidths(1177), [560, 840, 1120]);
+  equal('ступень шире оригинала не берётся', RI.variantWidths(700), [560, 700]);
+  equal('узкий оригинал получает копию своей ширины', RI.variantWidths(500), [500]);
+  check('битная ширина не обещает копий',
+    [0, -5, Number.NaN, 'abc', null, undefined].map(RI.variantWidths).every((v) => v.length === 0));
+  check('ряд копий назван тремя ступенями по возрастанию',
+    RI.WEBP_LADDER.length === 3 && RI.WEBP_LADDER.every((v, i) => i === 0 || v > RI.WEBP_LADDER[i - 1]),
+    RI.WEBP_LADDER.join(', '));
+  equal('имя копии строится по ширине, расширение меняется на webp',
+    RI.variantPath('./public/guides/a/b.jpg', 840), './public/guides/a/b-840.webp');
+  equal('srcset пуст, когда копий нет', RI.webpSrcset('./a.jpg', 0), '');
+
+  /* 2. Данные: каждая картинка знает настоящую ширину своего оригинала. */
+  const figures = [];
+  for (const node of HANDBOOK) {
+    for (const block of node.blocks ?? []) {
+      if (block.image) figures.push({ id: node.id, ...block });
+    }
+  }
+  const uniq = [...new Map(figures.map((f) => [f.image, f])).values()];
+  check('в справочнике есть картинки, и проверка не пуста',
+    uniq.length >= 100, `уникальных файлов: ${uniq.length}`);
+
+  const noOriginal = [];
+  const wrongSize = [];
+  for (const f of uniq) {
+    const rel = f.image.replace(/^\.\//, '');
+    const real = await readSize(rel);
+    if (!real) { noOriginal.push(f.image); continue; }
+    if (real.w !== f.w || real.h !== f.h) wrongSize.push(`${f.image}: данные ${f.w}x${f.h}, файл ${real.w}x${real.h}`);
+  }
+  check('каждый оригинал из данных лежит на диске и читается',
+    noOriginal.length === 0, `${noOriginal.length} нет: ${noOriginal.slice(0, 3).join(' | ')}`);
+  check('записанная ширина и высота равны настоящими',
+    wrongSize.length === 0, `${wrongSize.length} разошлось: ${wrongSize.slice(0, 3).join(' | ')}`);
+
+  /* 3. Обещание srcset: файл есть, и он ровно той ширины, что названо. */
+  const absent = [];
+  const wrongWidth = [];
+  const heavier = [];
+  let promisedCount = 0;
+  for (const f of uniq) {
+    const list = RI.webpSrcset(f.image, f.w);
+    if (!list) { absent.push(`${f.image}: копий нет вовсе`); continue; }
+    for (const entry of list.split(', ')) {
+      const [file, desc] = entry.split(' ');
+      const rel = file.replace(/^\.\//, '');
+      promisedCount += 1;
+      const buf = await fsa.readFile(rel).catch(() => null);
+      if (!buf) { absent.push(entry); continue; }
+      const real = sizeOf(buf);
+      if (!real || real.w !== Number(desc.slice(0, -1))) {
+        wrongWidth.push(`${entry}: файл ${real ? `${real.w}x${real.h}` : 'не читается'}`);
+      }
+      const origin = await exists(f.image.replace(/^\.\//, ''));
+      if (origin && buf.byteLength >= origin.size) heavier.push(`${file}: ${buf.byteLength} против ${origin.size}`);
+    }
+  }
+  check(`каждая обещанная копия существует (${promisedCount} файлов)`,
+    absent.length === 0, `${absent.length} нет: ${absent.slice(0, 4).join(' | ')}`);
+  check('ширина копии равна её дескриптору в srcset',
+    wrongWidth.length === 0, `${wrongWidth.length} не совпало: ${wrongWidth.slice(0, 4).join(' | ')}`);
+  check('каждая копия легче оригинала — иначе ряд добавляет вес, а не снимает',
+    heavier.length === 0, `${heavier.length} тяжелее: ${heavier.slice(0, 4).join(' | ')}`);
+
+  /* 4. Кадр героя: копии обещаются только тому файлу, который в списке. */
+  const heroBad = [];
+  for (const path of RI.HERO_WITH_COPIES) {
+    const rel = path.replace(/^\.\//, '');
+    const origin = await exists(rel);
+    if (!origin) { heroBad.push(`${path}: оригинала нет`); continue; }
+    /* Ширина кадра — то, что просит владелец в config.js (длинная сторона
+       до 1600 px), и она же задаёт верхнюю ступень ряда. */
+    for (const entry of RI.webpSrcset(path, 1600).split(', ')) {
+      const [file, desc] = entry.split(' ');
+      const buf = await fsa.readFile(file.replace(/^\.\//, '')).catch(() => null);
+      if (!buf) { heroBad.push(entry); continue; }
+      const real = sizeOf(buf);
+      if (!real || real.w !== Number(desc.slice(0, -1))) heroBad.push(`${entry}: ${real ? real.w : 'нечитается'}`);
+      if (buf.byteLength >= origin.size) heroBad.push(`${file}: тяжелее оригинала`);
+    }
+  }
+  check('у каждого кадра из списка копий они на диске и по своей ширине',
+    heroBad.length === 0, heroBad.slice(0, 4).join(' | '));
+  const heroSrc = String(CONFIG.hero?.image ?? '').trim();
+  check('кадр, вписанный владельцем, лежит на диске',
+    !heroSrc || Boolean(await exists(heroSrc.replace(/^\.\//, ''))), heroSrc || 'кадра нет');
+
+  /* 5. Живая разметка: `<picture>` там, где копии, и обычный `<img>` там,
+        где их нет; ленивость и приоритет героя не потерялись по дороге. */
+  const withCopies = uniq.find((f) => RI.webpSrcset(f.image, f.w));
+  const pageWithFigure = HANDBOOK.find((n) => (n.blocks ?? []).some((b) => b.image === withCopies.image));
+  const figureHtml = hb.renderHandbook({ guideId: pageWithFigure.id });
+  check('рамка рисунка отдаётся через picture с webp и sizes',
+    /<source type="image\/webp" srcset="[^"]+ \d+w" sizes="[^"]+">/.test(figureHtml),
+    `${withCopies.image}: в разметке нет <source> с дескрипторами`);
+  check('у fallback-картинки осталась отложенная загрузка',
+    /<img [^>]*loading="lazy"[^>]*decoding="async"/.test(figureHtml));
+  check('рамка рисунка не осталась бы без размеров — высота забронирована',
+    /<img [^>]*width="\d+" height="\d+"/.test(figureHtml));
+
+  const heroHtml = home.renderHome({ week: {}, standings: [], alliances: [], updates: [], events: [], user: null });
+  /* Список копий — обещание, данное конкретному файлу. Если владелец впишет
+     в config.js другой кадр, герой обязан остаться на обычном <img>: иначе
+     <picture> выберет несуществующую копию и покажет пустое место. */
+  const heroHasCopies = RI.HERO_WITH_COPIES.has(heroSrc);
+  check('кадр героя отдаётся picture, когда копии заявлены, и img, когда нет',
+    heroHasCopies
+      ? /<picture>\s*<source type="image\/webp" srcset="\.\/public\/hero\//.test(heroHtml)
+      : !/<source type="image\/webp"/.test(heroHtml) && /<img class="hero__img" src=/.test(heroHtml),
+    heroHasCopies ? `копии заявлены для ${heroSrc}, но picture не отрисовался` : `копий нет для ${heroSrc}, а разметка ушла в picture`);
+  check('кадр героя грузится вне очереди — он на первом экране',
+    /class="hero__img"[^>]*fetchpriority="high"/.test(heroHtml));
+
+  /* 6. Опубликованные документы: пути в srcset переписаны под их глубину.
+        Приложение живёт в корне, статья — в /handbook/<id>/, и непрописанный
+        путь дал бы 404 только на статических страницах, то есть ровно там,
+        где человек приходит из поиска. */
+  const dirs = (await fsa.readdir('handbook')).filter((d) => !d.includes('.'));
+  const dangling = [];
+  let srcsetFiles = 0;
+  for (const dir of dirs) {
+    const file = ppath.join('handbook', dir, 'index.html');
+    const html = await fsa.readFile(file, 'utf8').catch(() => null);
+    if (!html) { dangling.push(`${dir}: документа нет`); continue; }
+    for (const m of html.matchAll(/srcset="([^"]+)"/g)) {
+      for (const entry of m[1].split(',')) {
+        const url = entry.trim().split(' ')[0];
+        if (!url || !/\.(webp|jpe?g|png)$/i.test(url)) { dangling.push(`${dir}: srcset «${entry.trim()}»`); continue; }
+        const abs = ppath.resolve('handbook', dir, url);
+        if (!(await exists(abs))) dangling.push(`${dir}: ${url}`);
+      }
+      srcsetFiles += 1;
+    }
+    for (const m of html.matchAll(/<img[^>]+src="([^"]+\.webp)"/g)) {
+      if (!(await exists(ppath.resolve('handbook', dir, m[1])))) dangling.push(`${dir}: img ${m[1]}`);
+    }
+  }
+  check('ни в одном документе ссылки на несуществующую картинку',
+    dangling.length === 0, `${dangling.length} битых: ${dangling.slice(0, 4).join(' | ')}`);
+  check('документы со srcset есть — перепись путей в сборке работает',
+    srcsetFiles >= 20, `страниц с srcset: ${srcsetFiles} из ${dirs.length}`);
+
+  /* 7. Стили: `<picture>` — инлайн-элемент по умолчанию, и без явного
+        block он добавил бы рамке лишнюю строку базовой линии. */
+  const hbCss = await fsa.readFile('src/handbook.css', 'utf8');
+  const v8 = await fsa.readFile('src/styles-v8.css', 'utf8');
+  check('картинка справочника объявлена блочной внутри picture',
+    /\.hb-fig picture\s*\{[^}]*display:\s*block/.test(hbCss));
+  check('кадр героя объявлен тянущимся внутри picture',
+    /\.hero__media picture\s*\{[^}]*width:\s*100%/.test(v8));
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

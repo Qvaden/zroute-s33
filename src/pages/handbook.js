@@ -29,6 +29,7 @@
 import { esc, plural } from '../ui/helpers.js';
 import { postBody } from '../forum/format.js';
 import { HANDBOOK, HANDBOOK_ROOTS } from '../handbook/guides.js';
+import { FIGURE_SIZES, webpSrcset } from '../ui/responsive-images.js';
 
 const byId = new Map(HANDBOOK.map((g) => [g.id, g]));
 const ROOTS = HANDBOOK_ROOTS.filter((id) => byId.has(id));
@@ -267,10 +268,15 @@ const leadOf = handbookLead;
 
 function blockHtml(block) {
   if (block.image) {
+    const copies = webpSrcset(block.image, block.w);
+    const img = `<img src="${esc(block.image)}" alt="${esc(block.alt)}" width="${block.w}" height="${block.h}"
+             loading="lazy" decoding="async">`;
     return `
       <figure class="hb-fig">
-        <img src="${esc(block.image)}" alt="${esc(block.alt)}" width="${block.w}" height="${block.h}"
-             loading="lazy" decoding="async">
+        ${copies ? `<picture>
+          <source type="image/webp" srcset="${esc(copies)}" sizes="${FIGURE_SIZES}">
+          ${img}
+        </picture>` : img}
         ${block.caption ? `<figcaption>${postBody(block.caption)}</figcaption>` : ''}
       </figure>`;
   }

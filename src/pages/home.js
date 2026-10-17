@@ -2,6 +2,7 @@ import { esc, fmtDate, deltaBadge, plural, pluralWord, formDots, standingsRowLab
 import { raceChart } from '../ui/chart.js';
 import { byWeekStart, findCurrentWeek } from '../data/week-order.js';
 import { heroImage, heroAlt } from '../ui/hero-slot.js';
+import { HERO_SIZES, HERO_WITH_COPIES, webpSrcset } from '../ui/responsive-images.js';
 import { EVENT_TYPE, pillText, isServerEvent } from '../logic/event-types.js';
 
 /* Формы слова «день» для счёта: 1 день, 2 дня, 5 дней. */
@@ -23,11 +24,23 @@ const DAYS = ['день', 'дня', 'дней'];
  * экрана, а `decoding="async"` — потому что раскодирование кадра не должно
  * задерживать текст недели.
  */
+/**
+ * Ширина кадра, который лежит в репозитории (config.js просит длинную сторону
+ * 1600 px). Нужна только чтобы вычислить ряд копий; проверка в тестах сверяет
+ * это число с фактическим файлом, иначе `srcset` пообещал бы копию, которой нет.
+ */
+const HERO_SRC_WIDTH = 1600;
+
 function heroMedia() {
   const src = heroImage();
   if (!src) return '';
+  const copies = HERO_WITH_COPIES.has(src) ? webpSrcset(src, HERO_SRC_WIDTH) : '';
+  const img = `<img class="hero__img" src="${esc(src)}" alt="${esc(heroAlt())}" fetchpriority="high" decoding="async">`;
   return `<div class="hero__media">
-            <img class="hero__img" src="${esc(src)}" alt="${esc(heroAlt())}" fetchpriority="high" decoding="async">
+            ${copies ? `<picture>
+              <source type="image/webp" srcset="${esc(copies)}" sizes="${HERO_SIZES}">
+              ${img}
+            </picture>` : img}
           </div>`;
 }
 
