@@ -1101,13 +1101,6 @@
 /* ── Поля и кнопки ────────────────────────────────────────────────────────── */
 
 .forum-field { display: block; margin-bottom: var(--s-2); }
-.forum-field > span {
-  display: block;
-  margin-bottom: var(--s-fine);
-  color: var(--dim);
-  font-size: var(--fs-eyebrow);
-  font-weight: 600;
-}
 .forum-field input,
 .forum-field select,
 .forum-field textarea,
@@ -1126,16 +1119,6 @@
   */
   font-size: 16px;
   line-height: 1.5;
-}
-.forum-field textarea,
-.forum-reply textarea { resize: vertical; min-height: 76px; }
-.forum-field input:focus,
-.forum-field select:focus,
-.forum-field textarea:focus,
-.forum-reply textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .forum-btn {
@@ -1442,7 +1425,6 @@
 .forum-editor:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .forum-editor:empty::before,
 .forum-editor.is-empty::before {
@@ -1649,7 +1631,6 @@
 .forum-post__body a { color: var(--accent-ink); }
 
 .forum-post__expand {
-  display: inline-block;
   margin-top: var(--s-fine);
   color: var(--accent-ink);
   font-size: var(--fs-meta);
@@ -1935,7 +1916,7 @@
   cursor: pointer;
 }
 .forum-modal__rule:hover { border-color: color-mix(in srgb, var(--text) 20%, transparent); }
-.forum-modal__rule input { margin-top: var(--s-fine); accent-color: var(--accent); }
+.forum-modal__rule input { margin-top: var(--s-fine);  }
 .forum-modal__rule b { display: block; font-size: var(--fs-small); }
 .forum-modal__rule small {
   display: block;
@@ -1994,7 +1975,7 @@
   .forum-save { padding: var(--s-1) var(--s-2); }
   .forum-emoji__item { min-width: 44px; min-height: 44px; justify-content: center; }
   .side .nav__link { min-height: 46px; }
-  .forum-post__title a { display: inline-block; padding: var(--s-hair) 0; }
+  .forum-post__title a {  padding: var(--s-hair) 0; }
 
   /* Наведения на телефоне не бывает — движение при нажатии только мешает. */
   .forum-btn:hover, .forum-react__btn:hover { transform: none; }
@@ -2041,9 +2022,6 @@
 .forum-modal__box { overscroll-behavior: contain; }
 
 /* Подвал и содержимое над полосой жестов. */
-@media (max-width: 1039px) {
-  .site-foot { padding-bottom: max(var(--s-4), env(safe-area-inset-bottom)); }
-}
 
 /* ── Приветственный баннер ────────────────────────────────────────────────── */
 .forum-welcome {
@@ -3855,8 +3833,6 @@
 }
 .accounts-controls__sorts { display: flex; flex-wrap: wrap; gap: var(--s-1); }
 .accounts-controls__sold {
-  display: flex;
-  align-items: center;
   gap: var(--s-1);
   font-size: var(--fs-meta);
   color: var(--mute);

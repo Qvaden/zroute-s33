@@ -537,11 +537,6 @@ html {
 */
 .forum-profile-edit__ava-acts label { cursor: pointer; }
 
-.forum-field input:disabled {
-  opacity: .55;
-  cursor: not-allowed;
-}
-.forum-field small { display: block; margin-top: var(--s-fine); font-size: var(--fs-eyebrow); line-height: 1.45; }
 
 @media (max-width: 519px) {
   /*

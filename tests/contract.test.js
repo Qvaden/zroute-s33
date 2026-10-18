@@ -18666,6 +18666,209 @@ console.log('\nBG. Отзывчивые картинки: копии, разме
     /\.hero__media picture\s*\{[^}]*width:\s*100%/.test(v8));
 }
 
+/* ── BH. Мёртвые объявления в каскаде ───────────────────────────────────────
+
+   §1 брифа требует найти «дублирование стилей, конфликтующие правила и
+   исторически накопившиеся CSS-overrides», §19 — вырезать их, §18 — не плодить
+   заплаточных слоёв. 158 таких объявлений вырезаны; эта проверка держит дверь,
+   чтобы дубль не вернулся молча: объявление, которое позже в том же каскаде
+   перебито равной специфичностью, не рисует ни одного пикселя, и оставлять его
+   в файле не за чем.
+
+   Правило то же, что и при чистке: тот же селектор, то же условие
+   @media/@supports, то же свойство, равная специфичность, и ни одна из сторон
+   не !important. Сноситcя только то, где перебита КАЖДАЯ строка списка
+   селекторов и где это верно для ОБЕИХ страниц: панель грузит пять слоёв, а не
+   шесть, и объявление, перебитое на сайте forum.css, в панели рисует.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBH. Мёртвых объявлений в каскаде нет, заплаточных слоёв не появилось');
+{
+  const { readFile } = await import('node:fs/promises');
+
+  const chainOf = async (entry) => {
+    const html = await readFile(entry, 'utf8');
+    return [...html.matchAll(/href="\.?\.?\/(src\/[^"?]+\.css)/g)].map((m) => m[1]);
+  };
+  const SITE = await chainOf('index.html');
+  const ADMIN = await chainOf('admin.html');
+  const LAYERS = [...new Set([...SITE, ...ADMIN])];
+
+  /* Маска комментариев сохраняет длину, поэтому смещения из неё совпадают
+     со смещениями файла как он лежит. */
+  const mask = (raw) => {
+    let out = '';
+    let i = 0;
+    while (i < raw.length) {
+      if (raw.startsWith('/*', i)) {
+        const end = raw.indexOf('*/', i + 2);
+        const stop = end < 0 ? raw.length : end + 2;
+        out += raw.slice(i, stop).replace(/[^\n\r]/g, ' ');
+        i = stop;
+      } else { out += raw[i]; i += 1; }
+    }
+    return out;
+  };
+
+  /* :hover, :focus, :active и :visited в вес не входят: они не делают
+     селектор сильнее соседа без псевдостояния. */
+  const spec = (sel) => {
+    const s = sel.replace(/:where\([^)]*\)/g, '');
+    const ids = (s.match(/#[\w-]+/g) || []).length;
+    const cls = (s.match(/\.[\w-]+|\[[^\]]+\]|:(?!hover|focus|active|visited|focus-visible)[\w-]+(\([^)]*\))?/g) || []).length;
+    const tags = (s.match(/(^|[\s>+~])([a-zA-Z][\w-]*)|::[\w-]+/g) || []).length;
+    return ids * 100 + cls * 10 + tags;
+  };
+
+  const texts = new Map();
+  for (const f of LAYERS) texts.set(f, mask(await readFile(f, 'utf8')));
+
+  /* Объявления файла идут по возрастанию смещения, поэтому номер строки
+     набирается одним проходом по тексту, а не вычисляется заново. */
+  const lineAtOf = (text) => {
+    let seen = 0;
+    let n = 1;
+    return (off) => {
+      while (seen < off) {
+        if (text[seen] === '\n') n += 1;
+        seen += 1;
+      }
+      return n;
+    };
+  };
+
+  function walk(text, from, to, ctx, file, out, lineAt) {
+    let i = from;
+    while (i < to) {
+      const open = text.indexOf('{', i);
+      if (open < 0 || open >= to) break;
+      let depth = 1;
+      let j = open + 1;
+      while (j < to && depth > 0) {
+        if (text[j] === '{') depth += 1;
+        else if (text[j] === '}') depth -= 1;
+        j += 1;
+      }
+      const prelude = text.slice(i, open).trim();
+      if (prelude.startsWith('@')) {
+        if (/@media|@supports/.test(prelude)) {
+          const cond = prelude.replace(/\s+/g, ' ');
+          walk(text, open + 1, j - 1, ctx === 'base' ? cond : `${ctx} + ${cond}`, file, out, lineAt);
+        }
+      } else if (prelude) {
+        const body = text.slice(open + 1, j - 1);
+        let cursor = 0;
+        while (cursor < body.length) {
+          const semi = body.indexOf(';', cursor);
+          const end = semi < 0 ? body.length : semi;
+          const chunk = body.slice(cursor, end);
+          const colon = chunk.indexOf(':');
+          if (colon >= 0 && !chunk.slice(0, colon).includes('@') && !chunk.includes('{')) {
+            const prop = chunk.slice(0, colon).trim().toLowerCase();
+            const value = chunk.slice(colon + 1).trim();
+            if (prop && value && /^[a-z-]/.test(prop)) {
+              const important = /!\s*important/.test(value);
+              const off = open + 1 + cursor;
+              for (const sel of prelude.split(',').map((s) => s.trim()).filter(Boolean)) {
+                out.push({ id: `${file}|${off}`, file, off, line: lineAt(off), ctx, sel, prop, important,
+                  weight: spec(sel), key: `${ctx}||${sel}||${prop}` });
+              }
+            }
+          }
+          cursor = end + 1;
+        }
+      }
+      i = j;
+    }
+    return out;
+  }
+
+  const layerIndex = new Map(LAYERS.map((f, n) => [f, n]));
+  const siteIndex = new Map(SITE.map((f, n) => [f, n]));
+  const adminIndex = new Map(ADMIN.map((f, n) => [f, n]));
+
+  const flat = [];
+  for (const f of LAYERS) {
+    const text = texts.get(f);
+    walk(text, 0, text.length, 'base', f, flat, lineAtOf(text));
+  }
+  flat.sort((a, b) => (layerIndex.get(a.file) - layerIndex.get(b.file)) || (a.off - b.off));
+
+  const byKey = new Map();
+  const byDecl = new Map();
+  for (const e of flat) {
+    let list = byKey.get(e.key);
+    if (!list) byKey.set(e.key, (list = []));
+    list.push(e);
+    let decl = byDecl.get(e.id);
+    if (!decl) byDecl.set(e.id, (decl = []));
+    decl.push(e);
+  }
+
+  /* Позднее — значит позже и на сайте, и в панели. Слой, которого страница не
+     грузит, порядок не задаёт, поэтому он пропускается, а не спорит.
+     Две строки на одной строке — не дубль, а запас: `.forum-modal` пишет
+     `height: 100vh; height: 100dvh;` и старый браузер обязан взять первое. */
+  const beaten = (e, w, orders) => {
+    if (e.prop !== w.prop || e.weight !== w.weight) return false;
+    if (e.important && !w.important) return false;
+    for (const order of orders) {
+      const from = order.get(e.file);
+      if (from === undefined) continue;
+      const p = order.get(w.file);
+      const laterHere = p !== undefined && (p > from || (w.file === e.file && w.line > e.line));
+      if (!laterHere) return false;
+    }
+    return true;
+  };
+
+  /* Обход идёт от позднего объявления к раннему: победителем считается только
+     тот, кто сам переживает чистку. Итерация «сняли — пересчитали» на цепочке
+     «A бьётся B, B бьётся C» замирала и оставляла в каскаде 30 чистых дублей. */
+  function solve(orders) {
+    const deadEntry = new Map();
+    const stack = new Set();
+    const entryDead = (e) => {
+      if (deadEntry.has(e)) return deadEntry.get(e);
+      if (stack.has(e)) return false;
+      stack.add(e);
+      const list = byKey.get(e.key);
+      let hit = false;
+      for (const w of list.slice(list.indexOf(e) + 1)) {
+        if (beaten(e, w, orders) && !declDead(w.id)) { hit = true; break; }
+      }
+      stack.delete(e);
+      deadEntry.set(e, hit);
+      return hit;
+    };
+    function declDead(id) {
+      for (const e of byDecl.get(id)) if (!entryDead(e)) return false;
+      return true;
+    }
+    const dead = [];
+    for (const [, decl] of byDecl) if (decl.every(entryDead)) dead.push(decl[0]);
+    return dead;
+  }
+
+  const deadBoth = solve([siteIndex, adminIndex]);
+  check('ни одного объявления, позже перебитого равной специфичностью на обеих страницах',
+    deadBoth.length === 0,
+    `${deadBoth.length} мёртвых: ${deadBoth.slice(0, 4).map((e) => `${e.file}:${e.line} ${e.sel}{${e.prop}}`).join(' | ')}`);
+
+  /* 2. §19 запрещает плодить заплаточные слои (styles-v9.css, fix.css,
+        mobile-fix-final.css), потому что порядок каскада держит доказательство
+        нейтральности: он сверен именно для этих шести и пяти файлов. */
+  equal('каскад сайта остаётся ряд из шести слоёв в заданном порядке', SITE,
+    ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css', 'src/refine.css', 'src/handbook.css']);
+  equal('каскад панели остаётся ряд из пяти слоёв без форумных заплаток', ADMIN,
+    ['src/styles-v8.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css', 'src/controls.css', 'src/refine.css']);
+
+  /* 3. Двадцать пять объявлений styles-v8.css мертвы на сайте и живы в панели:
+        правило «позже на обеих страницах» бережёт их от вырезки. */
+  const deadSite = solve([siteIndex]);
+  check('панель защищена: находятся объявления, мёртвые на сайте, но живые в панели',
+    deadSite.length > deadBoth.length, `на сайте ${deadSite.length}, на обеих ${deadBoth.length}`);
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск
