@@ -155,12 +155,40 @@ const css = (await Promise.all(cssFiles.map((f) => readFile(f, 'utf8')))).join('
   Скрипты фильтров написаны без import и export именно ради этих строк:
   их можно вставить дословно, не дублируя логику. Собираем все *-controls.js
   автоматически, чтобы новый фильтр не пришлось вспоминать и дописывать сюда.
+
+  ПОЧЕМУ ПРОВЕРКА НА import ЗДЕСЬ, А НЕ В СОГЛАШЕНИИ НА СЛОВАХ.
+  Драйверы вставлялись в один обычный `<script>`, а обычный скрипт со строкой
+  `import` внутри не разбирается целиком: браузер выдаёт SyntaxError ДО первой
+  выполненной строки. Один файл с import глушил поэтому всю копию — и делал
+  это молча: сборка печатала «Готово» и размер, потому что для неё самой всё
+  было в порядке. Так и вышло: с 13.09 (timeline-controls.js) и 27.09
+  (handbook-controls.js) в копии не работал ни один фильтр, включая те, что
+  жили там месяцами.
+
+  Два следствия, и оба дороже самой проверки.
+
+  1. Каждый драйвер получает свой `<script>`. Сломанный файл ломает только
+     себя — копия деградирует на один раздел, а не на весь интерактив.
+  2. Файл со статическим import в копию не вставляется вовсе: он остаётся там,
+     где его загружают как модуль (src/main.js), а здесь о нём говорит
+     сборочный лог. Молчание стоило пяти недель веры в неработающую копию,
+     поэтому оно не повторяется без подписи.
 */
 const { readdir } = await import('node:fs/promises');
 const controlFiles = (await readdir('src/ui')).filter((f) => f.endsWith('-controls.js')).sort();
-const controlsJs = (
-  await Promise.all(controlFiles.map((f) => readFile(`src/ui/${f}`, 'utf8')))
-).join('\n');
+/*
+  Знак статического import/export — слово в начале строки. Динамический
+  `import('./x.js')` так не выглядит: он стоит в выражении, а не в начале
+  строки, и в обычном скрипте разрешён — копию не ломает.
+*/
+const STATIC_MODULE = /^[ \t]*(?:import|export)\b/m;
+const driverBlocks = [];
+const skipped = [];
+for (const f of controlFiles) {
+  const src = await readFile(`src/ui/${f}`, 'utf8');
+  if (STATIC_MODULE.test(src)) skipped.push(f);
+  else driverBlocks.push(`<script data-driver="src/ui/${f}">\n${src}\n</script>\n`);
+}
 
 const html = `<!DOCTYPE html>
 <html lang="ru">
@@ -344,10 +372,9 @@ document.addEventListener('click', function (e) {
   window.scrollTo(0, 0);
 });
 </script>
-<script>
-${controlsJs}
-</script>
-</body>
+${skipped.length
+    ? `<!--\n  Не вставлено в копию: статический import в ${skipped.join(', ')}.\n  Эти драйверы загружаются модулями в живом сайте; здесь их поведение недоступно.\n-->\n`
+    : ''}${driverBlocks.join('')}</body>
 </html>
 `;
 
@@ -357,3 +384,10 @@ console.log(
   `Готово: ${outFile} (${(html.length / 1024).toFixed(0)} КБ), ` +
     `страниц: ${PAGES.length}, стартовая: ${startId}`
 );
+/*
+  Драйверы, которых в копии нет, называются здесь, а не молчат: «Готово» и
+  размер — ровно то, что скрывало поломку пять недель.
+*/
+if (skipped.length) {
+  console.log(`ВНИМАНИЕ: без поведения остались ${skipped.length} драйвера(ов): ${skipped.join(', ')} — в них статический import.`);
+}

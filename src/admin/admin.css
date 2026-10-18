@@ -261,7 +261,7 @@
   font-weight: 800;
   font-size: 40px;
   line-height: 1;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .adm-week-now p { margin: var(--s-fine) 0 0; }
 
@@ -450,13 +450,17 @@
 }
 .adm-mark:hover:not(:disabled) { color: var(--text); border-color: var(--mute); }
 .adm-mark:disabled { opacity: .4; cursor: default; }
+/* Отметки исхода залиты краской РОЛИ (зелёный выигрыш, красный проигрыш), а не
+   брендом. В дневной теме бренд — яркий кирпич, и его чернила темнеют: на
+   глубоком зелёном #1a6446 они дали бы 2,31:1. Ролевые чернила в этой теме
+   светлеют и держат 6,66:1 здесь и 7,75:1 в ночи. */
 .adm-mark--win.is-on {
-  color: var(--on-accent);
+  color: var(--on-role);
   background: var(--win);
   border-color: var(--win);
 }
 .adm-mark--loss.is-on {
-  color: var(--on-accent);
+  color: var(--on-role);
   background: var(--loss);
   border-color: var(--loss);
 }
@@ -487,7 +491,7 @@
 .adm-result b { display: block; margin-bottom: var(--s-fine); }
 .adm-result ul { margin: var(--s-1) 0; padding-left: var(--s-3); }
 .adm-result p { margin: var(--s-1) 0 0; }
-.adm-result a { color: var(--accent); }
+.adm-result a { color: var(--accent-ink); }
 .adm-result--ok { border-color: color-mix(in srgb, var(--win) 40%, transparent); }
 .adm-result--ok b { color: var(--win); }
 .adm-result--bad { border-color: color-mix(in srgb, var(--loss) 40%, transparent); }
@@ -521,7 +525,7 @@
 .adm-preview__body .hero, .adm-preview__body .panel { margin-bottom: var(--s-3); }
 
 .adm-badge--draft {
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   text-decoration: none;
@@ -615,7 +619,7 @@
   letter-spacing: .13em;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .adm-ev__meta time { font-size: var(--fs-meta); color: var(--mute); font-variant-numeric: tabular-nums; }
 .adm-ev__id { color: var(--mute); }
@@ -762,7 +766,7 @@
 .adm-help ol { margin: var(--s-2) 0; padding-left: var(--s-4); color: var(--dim); font-size: var(--fs-small); }
 .adm-help li { margin-bottom: var(--s-1); }
 .adm-help p { margin: var(--s-2) 0; color: var(--dim); font-size: var(--fs-small); }
-.adm-help code { color: var(--accent); }
+.adm-help code { color: var(--accent-ink); }
 .adm-login__foot {
   margin: var(--s-3) 0 0;
   display: flex;
@@ -773,7 +777,7 @@
 }
 /* Ссылки панели не должны выглядеть синим подчёркнутым текстом браузера:
    в styles.css глобального правила для <a> нет, каждый блок красит свои. */
-.adm-login__foot a, .adm-help a { color: var(--accent); text-decoration: none; }
+.adm-login__foot a, .adm-help a { color: var(--accent-ink); text-decoration: none; }
 .adm-login__foot a:hover, .adm-help a:hover { text-decoration: underline; }
 
 /* ── Шире телефона ────────────────────────────────────────────────────────── */
@@ -814,7 +818,7 @@
 .adm-quarter-week { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--s-3); padding: var(--s-2); border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
 .adm-quarter-week > div { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
 .adm-quarter-week > div b { overflow: hidden; font-size: var(--fs-small); text-overflow: ellipsis; white-space: nowrap; }
-.adm-quarter-week__num { color: var(--accent); font-family: Unbounded, sans-serif; font-size: var(--fs-meta); font-weight: 700; }
+.adm-quarter-week__num { color: var(--accent-ink); font-family: Unbounded, sans-serif; font-size: var(--fs-meta); font-weight: 700; }
 @media (max-width: 639px) {
   .adm-quarter-week { grid-template-columns: 1fr auto; }
   .adm-quarter-week > .muted { grid-column: 1; grid-row: 2; }
@@ -825,7 +829,7 @@
 .adm-img-preview--grid img { width: 100%; height: 74px; object-fit: cover; border-radius: var(--r-sm); }
 .adm-img-preview--grid .adm-img-preview__row { grid-column: 1 / -1; }
 .adm-ev__gallery { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-top: var(--s-1); }
-.adm-ev__img { color: var(--accent); font-size: var(--fs-eyebrow); }
+.adm-ev__img { color: var(--accent-ink); font-size: var(--fs-eyebrow); }
 
 /* Стилизованный выбор фотографий */
 .adm-photo-drop {
@@ -846,7 +850,7 @@
 .adm-photo-drop:hover::before, .adm-photo-drop.is-drag::before { transform: translateX(120%); }
 .adm-photo-drop.is-busy { cursor: wait; opacity: .72; }
 .adm-photo-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.adm-photo-drop__icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent); font-size: 27px; line-height: 1; animation: adm-photo-pulse 2.4s ease-in-out infinite; }
+.adm-photo-drop__icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent-ink); font-size: 27px; line-height: 1; animation: adm-photo-pulse 2.4s ease-in-out infinite; }
 
 /* Микроанимации админ-панели */
 @keyframes adm-control-pop { 0% { transform: scale(.95); } 65% { transform: scale(1.025); } 100% { transform: scale(1); } }
@@ -936,6 +940,7 @@
   --accent-dk: #e0453a;
   --accent-ink: #ff5a36;
   --on-accent: #0a0e15;
+  --on-role:   #0a0e15;
   --gold:      #d9a94a;
   --gold-ink:  #d9a94a;
   --bronze:    #c18c62;
@@ -1254,7 +1259,7 @@ body.guide-color-modal-open{overflow:hidden}
 }
 .adm-pill:hover { color: var(--text); border-color: var(--mute); }
 .adm-toggle.is-on {
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
@@ -1511,7 +1516,7 @@ body.guide-color-modal-open{overflow:hidden}
   box-shadow: var(--shadow-3);
 }
 .adm-modal__box h3 { margin: 0 0 var(--s-1); font-size: 18px; }
-.adm-modal__box h3 b { color: var(--accent); }
+.adm-modal__box h3 b { color: var(--accent-ink); }
 .adm-modal__box > .muted { margin: 0 0 var(--s-3); font-size: var(--fs-meta); line-height: 1.5; }
 .adm-modal__box .adm-field { margin-bottom: var(--s-3); }
 .adm-modal__box .adm-actions { margin-top: var(--s-fine); }
@@ -1616,7 +1621,7 @@ body.guide-color-modal-open{overflow:hidden}
   padding: var(--s-1) var(--s-2); border: 1px solid var(--line-soft); border-radius: var(--r);
   font-size: var(--fs-small);
 }
-.adm-reserved__item code { color: var(--accent); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.adm-reserved__item code { color: var(--accent-ink); font-size: var(--fs-small); overflow-wrap: anywhere; }
 .adm-reserved__item .adm-btn { margin-left: auto; min-height: 26px; }
 .adm-mod-queue, .adm-mod-log { margin: var(--s-3) 0; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-lg); background: color-mix(in srgb, var(--text) 2%, transparent); }
 .adm-mod-queue h2, .adm-mod-log h2 { margin: 0; font-size: var(--fs-body); }
@@ -1671,7 +1676,7 @@ body.guide-color-modal-open{overflow:hidden}
 */
 .adm-rep-history { margin-top: var(--s-3); border-top: 1px solid var(--line-soft); padding-top: var(--s-3); }
 .adm-rep-history h4 { margin: 0 0 var(--s-1); font-size: var(--fs-eyebrow); letter-spacing: .1em; text-transform: uppercase; }
-.adm-rep__delta { min-width: 42px; font-variant-numeric: tabular-nums; color: var(--accent); }
+.adm-rep__delta { min-width: 42px; font-variant-numeric: tabular-nums; color: var(--accent-ink); }
 .adm-rep__delta--minus { color: var(--loss); }
 .adm-rep__reason { flex: 1 1 100%; font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
 
@@ -1726,9 +1731,9 @@ body.guide-color-modal-open{overflow:hidden}
 .adm-boot__mark { position: relative; display: grid; width: 56px; height: 56px; place-items: center; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line)); border-radius: var(--r-lg); background: color-mix(in srgb, var(--accent) 13%, transparent); }
 .adm-boot__mark i { position: absolute; inset: -60%; background: conic-gradient(from 0deg, transparent 0 68%, var(--accent) 79%, transparent 91%); animation: adm-boot-spin 2.1s linear infinite; }
 .adm-boot__mark::after { content: ''; position: absolute; inset: 2px; border-radius: var(--r); background: var(--surface); }
-.adm-boot__mark b { position: relative; z-index: var(--z-content); color: var(--accent); font: 800 var(--fs-body)/1 Unbounded, sans-serif; }
+.adm-boot__mark b { position: relative; z-index: var(--z-content); color: var(--accent-ink); font: 800 var(--fs-body)/1 Unbounded, sans-serif; }
 .adm-boot__copy { display: grid; gap: var(--s-fine); }
-.adm-boot__copy span { color: var(--accent); font-size: var(--fs-eyebrow); font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+.adm-boot__copy span { color: var(--accent-ink); font-size: var(--fs-eyebrow); font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
 .adm-boot__copy b { color: var(--text); font-size: var(--fs-body); }
 .adm-boot__rail { grid-column: 1 / -1; height: 3px; overflow: hidden; border-radius: var(--r-xs); background: color-mix(in srgb, var(--text) 7%, transparent); }
 .adm-boot__rail i { display:block; width:42%; height:100%; border-radius:inherit; background:linear-gradient(90deg, transparent, var(--accent), var(--gold), transparent); animation:adm-boot-scan 1.45s ease-in-out infinite; }

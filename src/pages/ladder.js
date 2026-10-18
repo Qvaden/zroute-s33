@@ -1,4 +1,6 @@
 import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavailableNote, emptyState } from '../ui/helpers.js';
+import { byWeekStart } from '../data/week-order.js';
+import { CONFIG } from '../../config.js';
 
 /**
  * Общий рейтинг — главная ценность сайта.
@@ -18,6 +20,7 @@ import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavai
  */
 export function renderLadder({
   standings,
+  weeks,
   eyebrow = 'Сезон целиком',
   title = 'Рейтинг альянсов',
   description = 'Победа +1 · Поражение −1 · Третьего не бывает',
@@ -53,7 +56,7 @@ export function renderLadder({
        здесь повторён явно, потому что этот файл читают как договорённость о
        поведении.
   */
-  return `
+  const table = `
     <section class="panel${variant === 'quarter' ? ' panel--quarter' : ''}">
       <header class="panel__head">
         <span class="eyebrow">${eyebrow}</span>
@@ -101,6 +104,121 @@ export function renderLadder({
       <p class="lad__count muted" data-ladder-count role="status" aria-live="polite">
         ${plural(active, 'активный альянс', 'активных альянса', 'активных альянсов')} из ${list.length}
       </p>
+    </section>`;
+
+  // Доска Кварта — тот же ряд, но за четыре недели; график сезона под ней
+  // рассказывал бы про другой период и противоречил бы таблице над собой.
+  return variant === 'quarter' ? table : `${table}${racePanel(list, weeks)}`;
+}
+
+/**
+ * ГРАФИК СЕЗОНА — под таблицей, а не на главной.
+ *
+ * Причина переноса не в месте на сводке, а в том, с каким вопросом человек
+ * спускается вниз: таблицу смотрят ради места, график — чтобы сравнить
+ * двоих-троих за весь сезон. На главной он был картинкой про пятерых
+ * лидеров, которых никто не выбирал; здесь он инструмент сравнения, и
+ * кнопки выбора живут тут же, под ним.
+ *
+ * ЧЕМ ЭТА РАЗМЕТКА ОТЛИЧАЕТСЯ ОТ СОСЕДЕЙ ПО СТРАНИЦЕ. Строки рейтинга
+ * рисуются целиком здесь, а драйвер только переставляет и скрывает их.
+ * График так устроен быть не может: его линии зависят от выбора, а вместе
+ * с ними и вертикальная шкала — снять одного лидера и оставить аутсайдера
+ * значит перерисовать поле заново, а не спрятать одну `<polyline>`. Поэтому
+ * страница печатает только пустой кадр (`[data-race-plot]`) и данные в
+ * `<script type="application/json">`, а рисует ui/race-controls.js — один и
+ * тот же файл на живом сайте и в собранной копии.
+ *
+ * ПОЧЕМУ ДАННЫЕ ЛЕЖАТ В СТРАНИЦЕ, А НЕ ВЫЧИТЫВАЮТСЯ ИЗ ТАБЛИЦЫ. Драйвер
+ * собран без import и потому не доходит до `computeStandings`: ряды таблицы
+ * несут очки и место, но не накопленную серию по неделям. Числа графика
+ * записаны здесь ровно в том виде, в каком их посчитал слой данных, —
+ * пересчитывать их во втором месте значит однажды получить два разных
+ * сезона на одном экране.
+ */
+function racePanel(list, weeks) {
+  /*
+    Недели берём отсортированными по старту, как это делает и
+    `computeStandings`. Поле `weeks` приходит из состояния в порядке
+    таблицы, а серия строится по порядку дат: без сортировки подпись
+    «неделя 12» встала бы над точкой недели 3, и график начал бы врать
+    ровно там, где его читают.
+  */
+  const ordered = [...(Array.isArray(weeks) ? weeks : [])].sort(byWeekStart);
+  if (ordered.length < 2) return '';
+
+  const lines = list
+    .filter((r) => Array.isArray(r.series) && r.series.length === ordered.length)
+    .map((r) => ({
+      id: r.alliance.id,
+      tag: r.alliance.tag,
+      name: r.alliance.name,
+      color: r.alliance.color || '',
+      active: !!r.alliance.active,
+      series: r.series,
+    }));
+  if (lines.length < 2) return '';
+
+  /*
+    Кнопок выбора ровно столько, сколько альянсов в таблице. Они
+    не перерисовываются при клике — драйвер меняет только `aria-pressed` и
+    класс, — и потому фокус после нажатия остаётся на той же кнопке: у
+    человека с клавиатуры он не уезжает в начало списка.
+
+    Про состояние «на графике». Здесь его нет ни в классе, ни в `aria-pressed`:
+    поле при загрузке пустое, а подсветка кнопки обещала бы линию, которой не
+    видно. Отмечает выбранное только драйвер — обоими способами сразу.
+    Неактивный альянс помечен статически, тем же словом, что и строка выше.
+  */
+  const chips = lines
+    .map(
+      (l) => `
+        <button type="button" class="race__chip${l.active ? '' : ' race__chip--off'}"
+                data-race-chip="${esc(l.id)}" aria-pressed="false"
+                aria-label="${esc(l.tag)} — ${esc(l.name)}${l.active ? '' : ' · неактивный'}">
+          <i class="race__dot" style="--tag-color:${esc(l.color || 'var(--mute)')}" aria-hidden="true"></i>${esc(l.tag)}
+        </button>`
+    )
+    .join('');
+
+  /*
+    `<` в JSON заменяется на `\u003c` не косметически. Имя альянса вносит
+    человек, и одно «</script>» внутри него закрыло бы блок с данными
+    посередине: остальной текст страницы браузер прочитал бы как код.
+  */
+  const payload = JSON.stringify({ weeks: ordered.map((w) => w.number), lines }).replace(/</g, '\\u003c');
+  const cap = CONFIG.raceMaxLines;
+  const def = CONFIG.raceDefaultLines;
+
+  return `
+    <section class="panel panel--race" data-race-panel data-race-cap="${cap}" data-race-default="${def}">
+      <header class="panel__head">
+        <span class="eyebrow">График сезона</span>
+        <h2 class="panel__title" tabindex="-1" data-race-title>Как менялись очки</h2>
+        <p class="muted">Накопленные очки по неделям · на поле до ${cap} линий — отметьте, кого сравнивать</p>
+      </header>
+
+      <div class="race__plot" data-race-plot></div>
+
+      ${emptyState({
+        title: 'Не выбран ни один альянс',
+        note: 'Отметьте кого-нибудь в списке ниже — и линия появится.',
+        attrs: 'data-race-empty',
+        hidden: true,
+      })}
+
+      <p class="lad__count muted" data-race-count role="status" aria-live="polite"></p>
+
+      <details class="race__picker" data-race-picker>
+        <summary class="race__summary">Выбрать альянсы</summary>
+        <div class="race__tools">
+          <button type="button" class="race__btn" data-race-preset="top">Топ-${def}</button>
+          <button type="button" class="race__btn" data-race-preset="none">Снять все</button>
+        </div>
+        <div class="race__chips" role="group" aria-label="Альянсы на графике">${chips}</div>
+      </details>
+
+      <script type="application/json" data-race-data>${payload}</script>
     </section>`;
 }
 

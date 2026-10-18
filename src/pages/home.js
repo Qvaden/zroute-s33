@@ -1,5 +1,4 @@
 import { esc, fmtDate, deltaBadge, plural, pluralWord, formDots, standingsRowLabel } from '../ui/helpers.js';
-import { raceChart } from '../ui/chart.js';
 import { byWeekStart, findCurrentWeek } from '../data/week-order.js';
 import { heroImage, heroAlt } from '../ui/hero-slot.js';
 import { HERO_SIZES, HERO_WITH_COPIES, avifSrcset, webpSrcset } from '../ui/responsive-images.js';
@@ -564,13 +563,19 @@ function renderCommunitySlot() {
  * ряда, а не содержимым:
  *
  *   ряд с двумя колонками 60/40 — рейтинг (широкая рейка) рядом с летописью;
- *   следующий ряд 40/60 — живые обсуждения рядом с графиком очков;
+ *   следующий ряд — живые обсуждения на всю ширину;
  *   одинокая утилитарная панель — движение за неделю, самое короткое.
  *
- * Порядок внутри ряда зеркально противоположен ряду выше: колонки не выстраиваются
- * в одну вертикальную полосу, и глаз, спускаясь, каждый раз находит новый блок,
- * а не продолжение прежнего. На телефоне ряды схлопываются в одну колонку и
- * остаются в том же порядке — сначала «кто ведёт», потом «чем жил сервер».
+ * Про график, которого здесь больше нет. «Гонка сезона» отвечала на чужой
+ * вопрос — как распределились пятеро, которых никто не выбирал. Настоящий
+ * вопрос другой: как мой альянс выглядит на фоне соседей за весь сезон. Он
+ * живёт под таблицей «Рейтинга», там же, где и места, и выбор линий
+ * (src/pages/ladder.js, racePanel). На главной от него осталась одна кнопка
+ * в герое, и ряд обсуждений растянут на всю ширину: делить экран пополам
+ * больше не с чем.
+ *
+ * Про телефон. Ряды схлопываются в одну колонку и остаются в том же порядке:
+ * сначала «кто ведёт», потом «чем жил сервер», потом движение за неделю.
  */
 export function renderHome(view = {}) {
   const { summary, standings, movers, weeks, allWeeks, results, events, dataMeta, loadError } = view;
@@ -640,7 +645,6 @@ export function renderHome(view = {}) {
        <span class="muted">${r.place} место</span>
      </li>`;
 
-  const top5 = active.slice(0, 5);
   // Движение за неделю — необязательная часть: без него страница осмысленна.
   const moved = movers ?? { up: [], down: [] };
 
@@ -666,6 +670,7 @@ export function renderHome(view = {}) {
           </div>
           <div class="hero__actions">
             <a class="hero__cta hero__cta--primary" href="#/ladder">Весь рейтинг<span aria-hidden="true"> →</span></a>
+            <a class="hero__cta hero__cta--ghost" href="#/ladder?race=1">График сезона</a>
             <a class="hero__cta hero__cta--ghost" href="#/forum">Форум сервера</a>
           </div>
         </div>
@@ -737,16 +742,8 @@ export function renderHome(view = {}) {
       ${renderChronicle(events)}
     </div>
 
-    <div class="home__row home__row--back">
+    <div class="home__row">
       ${renderCommunitySlot()}
-      <section class="panel panel--race">
-        <header class="panel__head">
-          <span class="eyebrow">Гонка сезона</span>
-          <h2>Как менялись очки лидеров</h2>
-          <p class="muted">Накопленные очки по неделям · показаны пятеро лучших</p>
-        </header>
-        ${raceChart(top5, weeks)}
-      </section>
     </div>
 
     <section class="panel panel--utility">

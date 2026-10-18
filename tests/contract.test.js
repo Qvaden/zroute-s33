@@ -4199,19 +4199,130 @@ console.log('\nS. Чистые функции');
     !chart.areaChart([0, 10], twoWeeks, 'red" onload="x').includes(' onload="'));
   equal('placeChart: мало точек → пусто', chart.placeChart([1], twoWeeks, 4, '#00f'), '');
   check('placeChart: движение по местам', chart.placeChart([2, 1], twoWeeks, 4, '#00f').includes('ch__ytick'));
-  equal('raceChart: пустой список → пусто', chart.raceChart([], twoWeeks), '');
-  equal('raceChart: мало недель → пусто', chart.raceChart([{ alliance: { tag: 'A' }, series: [0, 1] }], [twoWeeks[0]]), '');
-  const race = chart.raceChart(
-    [
-      { alliance: { tag: 'A', color: '#111' }, series: [0, 10] },
-      { alliance: { tag: 'B', color: '#222' }, series: [0, 10] },
-    ],
-    twoWeeks
-  );
-  check('raceChart: подписи двух альянсов', (race.match(/class="ch__label"/g) ?? []).length === 2);
-  check('raceChart: сдвинутые подписи соединяются чёрточкой', race.includes('<line x1='));
-  const raceEsc = chart.raceChart([{ alliance: { tag: '<b>x</b>' }, series: [0, 10] }], twoWeeks);
-  check('raceChart: тег в имени не становится разметкой', !raceEsc.includes('<b>x') && raceEsc.includes('&lt;b&gt;x&lt;/b&gt;'));
+  /*
+    Гоночный график больше не рисует модуль: он переехал на страницу
+    «Рейтинг», и его линии зависят от выбора человека, поэтому рисует их
+    драйвер. Здесь остаётся одна проверка на исчезновение старого входа —
+    если `raceChart` вернётся, значит на главной снова появилась картинка,
+    которую никто не выбирал.
+  */
+  check('chart.js больше не рисует сезон', chart.raceChart === undefined);
+}
+
+{
+  /* ── панель «График сезона» под таблицей рейтинга ── */
+  const { readFile } = await import('node:fs/promises');
+  const { renderLadder } = await import('../src/pages/ladder.js');
+  const { CONFIG } = await import('../config.js');
+
+  const raceWeeks = [{ id: 'w1', number: 1 }, { id: 'w2', number: 2 }, { id: 'w3', number: 3 }];
+  const raceRows = [
+    {
+      alliance: { id: 'a1', tag: '<b>A</b>', name: 'Альфа', color: '#111', active: true },
+      series: [0, 10, 20], points: 20, wins: 2, losses: 0, form: ['win', 'win'], place: 1,
+    },
+    {
+      alliance: { id: 'a2', tag: 'B', name: 'Бета', color: '', active: false },
+      series: [0, 5, 8], points: 8, wins: 1, losses: 1, form: ['loss'], place: 2,
+    },
+  ];
+  const view = { standings: raceRows, weeks: raceWeeks };
+  const html = renderLadder(view);
+  const chips = [...html.matchAll(/data-race-chip="([^"]+)"/g)];
+
+  check('панель стоит под таблицей', html.indexOf('lad__row') < html.indexOf('data-race-panel'));
+  /*
+    Ни `is-on`, ни `aria-pressed="true"` на кнопке выбора быть не должно: поле
+    при загрузке пустое, а подсвеченная кнопка обещала бы линию, которой не
+    видно. Проверка смотрит только на открывающий тег кнопки — переключатели
+    таблицы рядом по-прежнему нажимаются, и их `aria-pressed` тут ни при чём.
+  */
+  const chipTags = [...html.matchAll(/<button[^>]*data-race-chip="[^"]*"[^>]*>/g)].map((m) => m[0]);
+  equal('кнопок ровно по альянсам', chips.length, raceRows.length);
+  check('ни одна кнопка не обещает линию до драйвера',
+    chipTags.length === raceRows.length
+      && chipTags.every((tag) => tag.includes('aria-pressed="false"') && !tag.includes('is-on')));
+  check('неактивный альянс назван неактивным', chips.some((m) => /неактивный/.test(html.slice(m.index, m.index + 260))));
+
+  const cap = Number(html.match(/data-race-cap="(\d+)"/)[1]);
+  const def = Number(html.match(/data-race-default="(\d+)"/)[1]);
+  equal('предел линий приходит из CONFIG', cap, CONFIG.raceMaxLines);
+  equal('список по умолчанию приходит из CONFIG', def, CONFIG.raceDefaultLines);
+  check('кнопка «Топ-N» называет то же число', html.includes(`>Топ-${def}<`));
+
+  const payload = html.match(/data-race-data>([\s\S]*?)<\/script>/)[1];
+  equal('данные читаются обратно', JSON.parse(payload).lines.length, 2);
+  equal('недели записаны по порядку старта', JSON.parse(payload).weeks.join(','), '1,2,3');
+  check('тег в имени не закрывает блок с данными',
+    !payload.includes('<') && payload.includes('\\u003c'));
+
+  /*
+    Тот же рендер с неделями в обратном порядке. Серия строится по датам, и
+    подпись «неделя 3» обязана встать над третьей точкой, в каком бы порядке
+    таблицу ни передали.
+  */
+  const reversed = renderLadder({ standings: raceRows, weeks: [...raceWeeks].reverse() });
+  equal('недели сортируются, даже пришли шиворот',
+    JSON.parse(reversed.match(/data-race-data>([\s\S]*?)<\/script>/)[1]).weeks.join(','), '1,2,3');
+
+  check('Кварт остаётся без графика сезона',
+    !renderLadder({ ...view, variant: 'quarter' }).includes('data-race-panel'));
+  check('по неделям короче двух графика нет',
+    !renderLadder({ standings: raceRows, weeks: [raceWeeks[0]] }).includes('data-race-panel'));
+
+  /*
+    ДРАЙВЕР. Собирается без import и работает одинаково на живом сайте и в
+    статической копии, поэтому проверяем его исходником: импорт сломал бы
+    сборку копии, а расхождение с разметкой — вешает обработчики в пустоту.
+  */
+  const driver = await readFile('src/ui/race-controls.js', 'utf8');
+  check('драйвер без import (живёт в собранной копии)', !/^\s*import\s/m.test(driver));
+  const raceHooks = [...new Set([...driver.matchAll(/\[data-(race-[a-z-]+)\]/g)].map((m) => m[1]))];
+  check('драйвер вообще что-то ищет', raceHooks.length >= 5, `нашли: ${raceHooks.join(', ')}`);
+  for (const hook of raceHooks) check(`разметка содержит data-${hook}`, html.includes(`data-${hook}`));
+  check('выбор хранится под одним ключом', driver.includes("'s33-race'"));
+  check('отметка ведётся и классом, и вслух',
+    driver.includes('is-on') && driver.includes('aria-pressed'));
+
+  /*
+    НУЛЕВАЯ ЧЕРТА ПОЛЯ. Пунктир «очки = 0» — единственная линия, которая
+    говорит числом, и она обязана быть видна на подложке панели. Первое
+    объявление красило её сорока пятью процентами сигнальной краски: 1,65:1 в
+    светлой теме и 2,07:1 в тёмной, то есть ниже порога 3:1 для графики.
+    Поэтому черта стоит той же подписной краской, что и числа оси (5,93:1 и
+    6,55:1), а от сетки отличается пунктиром, а не яркостью.
+  */
+  const raceCss = await readFile('src/styles-v8.css', 'utf8');
+  const zeroRule = (raceCss.match(/\.race__grid--zero\s*\{([^}]*)\}/) || [])[1] || '';
+  check('нулевая черта не прозрачным сигналом, а подписной краской',
+    /stroke:\s*var\(--mute\)/.test(zeroRule), `объявление: ${zeroRule.trim()}`);
+  check('нулевая черта остаётся пунктирной, иначе сольётся с сеткой',
+    /stroke-dasharray/.test(zeroRule));
+
+  /*
+    СБОРКА КОПИИ ОТВЕЧАЕТ ЗА СВОЮ ЖИЗНЕСПОСОБНОСТЬ.
+
+    Проверка родилась из находки, а не из аккуратности: до 18.10 все
+    драйверы вставлялись в ОДИН обычный <script>, и одного файла со
+    статическим import было довольно, чтобы браузер не разобрал весь блок.
+    Такой файл уже лежал в src/ui с 13.09 (timeline-controls.js, следом
+    handbook-controls.js) — и в копии не работал ни один фильтр, включая
+    график. Молчало при этом всё: сборка печатала «Готово» и размер, тесты не
+    смотрели в scripts/, а проверка «драйвер без import» висела только над
+    новыми файлами.
+
+    Поэтому здесь ровно три обещания сборки: файлы не делят один скрипт на
+    всех, файл со статическим import в копию не попадает, и отказ не молчит —
+    он называет файлы в сборочном логе.
+  */
+  const buildSrc = await readFile('scripts/build-preview.mjs', 'utf8');
+  check('копия: каждый драйвер в своём <script> (один сломанный не глушит остальные)',
+    /<script data-driver=/.test(buildSrc) && !/const controlsJs = \(\n\s*await Promise\.all/.test(buildSrc));
+  check('копия: файл со статическим import отбраковывается, а не вставляется вслепую',
+    /import\|export/.test(buildSrc) && /skipped/.test(buildSrc));
+  check('копия: отказ называет файлы в сборочном логе',
+    /console\.log\([^)]*skipped/.test(buildSrc)
+      && /ВНИМАНИЕ/.test(buildSrc));
 }
 
 {
@@ -5062,8 +5173,18 @@ console.log('\nR2. Главная страница');
     !liveHtml.slice(0, liveHtml.indexOf('<details')).includes('class="tile"'));
   check('«Вершина таблицы» не вернулась третьим дублем топа',
     !/Вершина таблицы/.test(liveHtml));
-  check('гонка сезона и движение рейтинга остались',
-    /Гонка сезона/.test(liveHtml) && /Движение в рейтинге/.test(liveHtml));
+  /*
+    График сезона ушёл со сводки на страницу «Рейтинг» (src/pages/ladder.js,
+    racePanel): на главной он был картинкой про пятерых, которых никто не
+    выбирал. Проверка держит обе стороны переезда — что на главной его нет и
+    что кнопка героя ведёт именно туда, где он теперь.
+  */
+  check('движение рейтинга осталось, а гонка сезона ушла со сводки',
+    /Движение в рейтинге/.test(liveHtml) && !/Гонка сезона/.test(liveHtml));
+  check('на главной ни одной линии сезона: ни поля, ни данных графика',
+    !liveHtml.includes('data-race-panel') && !liveHtml.includes('data-race-plot'));
+  check('со сводки на график ведёт кнопка героя',
+    liveHtml.includes('href="#/ladder?race=1"'));
   check('ссылка на весь рейтинг есть под катом', liveHtml.includes('href="#/ladder"'));
 
   // Внесены не все: главная обязана сказать «N из M», а не «всё внесено».
@@ -5197,16 +5318,17 @@ console.log('\nR2. Главная страница');
 
     /* ── Композиция: вес задаёт ряд, а не содержимое ── */
     const leadIx = svod.indexOf('home__row--lead');
-    const backIx = svod.indexOf('home__row--back');
+    const commIx = svod.indexOf('panel--community');
     const utilIx = svod.indexOf('panel--utility');
     check('сводка: рейтинг стоит выше обсуждений, а движение за неделю — последним',
-      leadIx > 0 && leadIx < backIx && backIx < utilIx);
-    check('сводка: в первом ряду рейтинг и летопись, во втором — форум и график',
+      leadIx > 0 && leadIx < commIx && commIx < utilIx);
+    check('сводка: в первом ряду рейтинг и летопись, вторым — одни обсуждения',
       /home__row--lead">\s*<section class="panel panel--rank"[\s\S]*?class="panel panel--chron"/.test(svod)
-        && /home__row--back">\s*<section class="panel panel--community"[\s\S]*?class="panel panel--race"/.test(svod));
-    check('колонки ряда не равны по весу и зеркальны: 7 против 5, затем 5 против 7',
-      /\.home__row--lead \{ grid-template-columns: minmax\(0, 7fr\) minmax\(0, 5fr\); \}/.test(v8src)
-        && /\.home__row--back \{ grid-template-columns: minmax\(0, 5fr\) minmax\(0, 7fr\); \}/.test(v8src));
+        && /class="home__row">\s*<section class="panel panel--community"/.test(svod));
+    check('второй ряд не делится: зеркальной колонки больше нет ни в разметке, ни в стилях',
+      !svod.includes('home__row--back') && !v8src.includes('.home__row--back'));
+    check('колонки первого ряда не равны по весу: 7 против 5',
+      /\.home__row--lead \{ grid-template-columns: minmax\(0, 7fr\) minmax\(0, 5fr\); \}/.test(v8src));
     check('две колонки появляются только на мониторе: на телефоне ряд остаётся одной колонкой',
       /@media \(min-width: 900px\) \{\s*\.home__row--lead/.test(v8src));
     check('колонка ряда сжимается содержимым, а не растягивает страницу',
@@ -12826,28 +12948,46 @@ console.log('\nAN. Доска аккаунтов');
   check('объяснение пустоты не упоминает другие серверы',
     !noticeSrc.includes('Копия данных сайта') && !/для сервера \(/.test(noticeSrc));
   /*
-    Раньше в исправном состоянии полоска пряталась (`box.hidden = true`), и из-за
-    этого приход данных двигал весь экран: высоты полоски в документе не было,
-    а через двенадцать секунд она появлялась — на мониторе на 102 px, на
-    телефоне на 244 px. Теперь состояние «живая база» — такие же слова в той же
-    рамке, а не пустое место, и прятаться полоске негде.
+    Полоска молчит, когда всё хорошо.
+
+    Правило сменилось 18.10.2026 по слову владельца: «плашка с живой базой по
+    сути даже и не нужна… шоб как-то скрытно была, никакого смысла для показа
+    не имеет». Раньше она стояла с первого кадра во всех состояниях — это
+    лечение от CLS: без её высоты в документе приход данных уезжал экраном
+    вниз на 102 px (монитор) и 244 px (телефон), +0.06 CLS на каждой
+    загрузке. Ценой было то, что человек всегда видел лишнюю строку, а в
+    исправном состоянии она не сообщает ничего.
+
+    Теперь рамка есть только там, где есть о чём сказать: снимок и авария.
+    Живая база и ожидание — пустое место, и резерва высоты больше нет.
+    Честная цена: на копии и в аварии экран дёрнется на 68 px в момент
+    прихода ответа. Это сознательная плата, и её измеряют заново
+    (tools/walk.mjs), а не предполагают.
   */
-  check('в исправном состоянии полоска остаётся на месте и называет базу',
+  check('в исправном состоянии полоски не видно, но состояние посчитано',
     (() => {
       const clean = paint(
         { source: 'supabase', snapshotAt: null, primaryError: '' }, 'supabase'
       );
       return clean.box.dataset.state === 'live'
+        && clean.box.hidden === true
         && clean.box.innerHTML.includes('Живая база')
-        && !/\.hidden/.test(clean.box.innerHTML)
         && clean.badge.textContent === 'живая база';
     })());
-  check('полоска ничего не прячет: скрытие вычеркнуто из её кода и стилей',
-    !/box\.hidden/.test(noticeSrc) && !/\.data-notice\[hidden\]/.test(v8Notice));
+  check('копия и авария показаны: прятать беду полоска не имеет права',
+    shown.box.hidden === false && none.box.hidden === false);
+  check('скрытие прописано ровно в одном состоянии и берёт только исправное',
+    /box\.hidden = state === 'live';/.test(noticeSrc)
+      && (noticeSrc.match(/^\s*box\.hidden =/gm) || []).length === 1);
+  check('полоска показывается раньше, чем в ней меняются слова: иначе живая область молчит',
+    /box\.hidden = state === 'live';\r?\n\s*box\.dataset\.state = state;\r?\n\s*box\.innerHTML = html;/.test(noticeSrc));
+  check('спрятанную полоску не возвращает ни один стиль',
+    /\[hidden\] \{ display: none !important; \}/.test(v8Notice)
+      && !/\.data-notice\b[^{]*\{[^}]*display:[^;}]*!important/.test(v8Notice));
   /*
-    Само исправление сидит в стилях: высота полоски задана числом, поэтому
-    документ знает о её присутствии с первого кадра и приход данных не может
-    сдвинуть то, что под ней.
+    Пока полоска показана, её высота остаётся числом, а не содержимым:
+    раскрытие «подробностей» — это нажатие читателя, и перекосой строки оно
+    не должно выглядеть.
   */
   check('высота полоски задана числом, а не содержимым',
     /\.data-notice \{[\s\S]{0,200}?--strip-h: \d+px;[\s\S]{0,80}?height: var\(--strip-h\);/.test(v8Notice)
@@ -12855,7 +12995,7 @@ console.log('\nAN. Доска аккаунтов');
   check('на узком экране подробность режется многоточием: вторую строку рамка не переживёт',
     /\.data-notice__line span \{[\s\S]{0,120}?text-overflow: ellipsis;[\s\S]{0,40}?white-space: nowrap;/.test(v8Notice)
       && !/@media \(max-width: 559px\)[\s\S]{0,200}\.data-notice \{ --strip-h/.test(v8Notice));
-  check('полоску зовут и в успехе, и в падении — молчаливой пустоты не остаётся',
+  check('полоску зовут и в успехе, и в падении: в успехе она гаснет',
     (mainSrc.match(/\bdataNotice\(\);/g) || []).length === 2
       && /function sourceBadge\(\)[\s\S]{0,400}'живая база'/.test(mainSrc));
 
@@ -12874,8 +13014,8 @@ console.log('\nAN. Доска аккаунтов');
 
   /* ── Раздача и документы ── */
   const siteHtml = await readFile('index.html', 'utf8');
-  check('на странице есть место под полоску, и оно объявлено живой областью',
-    /<details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait"/.test(siteHtml));
+  check('полоска заявлена скрытой с первого кадра и остаётся живой областью',
+    /<details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait" hidden/.test(siteHtml));
   check('полоска описана стилем, которым нарисовано остальное',
     (await readFile('src/styles-v8.css', 'utf8')).includes('.data-notice'));
   check('копия собирается каждые два часа, а не раз в сутки',
@@ -15362,7 +15502,19 @@ console.log('\nAP. Доступность');
     темой) получает только голос. Проверка держит именно этот порядок условий.
   */
   check('живой раздел получает голос, а не фокус',
-    /!keepScroll && !live && focusAppHeading\(\)/.test(mainJs));
+    /!keepScroll && !live && !racePanel && focusAppHeading\(\)/.test(mainJs));
+  /*
+    Прыжок «График сезона» с главной. Это не смена раздела вслух: человек сам
+    сказал, куда идёт, и повтор «Открыт раздел» глушил бы объявление заголовка
+    панели. Поэтому прыжок фокусирует заголовок панели и молчит голосом, а
+    прокрутку вверх в этот момент не делают — иначе экран уплыл бы от цели.
+  */
+  check('прыжок к графику фокусирует его заголовок',
+    /takeRaceJump\(id, search\)/.test(mainJs)
+      && /\[data-race-title\]/.test(mainJs) && /title\.focus\(\{ preventScroll: true \}\)/.test(mainJs));
+  check('прыжок к графику не прокручивает страницу вверх и не дублирует голос',
+    /if \(!keepScroll && !racePanel\) window\.scrollTo\(0, 0\)/.test(mainJs)
+      && /if \(!byHeading && !racePanel\) announceRoute\(id\)/.test(mainJs));
   check('перекраска того же экрана молчит',
     /screen !== lastAnnouncedRoute/.test(mainJs) && /const screen = `\$\{id\}\/\$\{param \|\| ''\}`/.test(mainJs));
 
@@ -15634,13 +15786,34 @@ console.log('\nAQ. Стабильность кадра');
   check('плашка президента молчит, пока строчка та же',
     /if \(line === presidentBoardLine\) return;/.test(mainJs));
   /*
+    Подпись под именем убрана из шапки совсем.
+
+    «Данные обновляются вручную» — строка, которую читают один раз и которая
+    стоила плашке второго яруса: на широком экране ради неё доска растягивалась
+    до 620 px и отнимала у шапки всё живое место. Слово осталось в данных (панели
+    есть чем заполнять) и живёт подсказкой на наведении — этого хватает, чтобы
+    не соврать, и не просит ни пиксела ширины.
+
+    Поэтому проверка держит три вещи сразу: элемента в разметке нет, поле в
+    формате данных остался, и ширина доски ограничена числом, из которого
+    складывается бронь (см. flex-basis ниже).
+  */
+  check('подпись президента не рисуется элементом',
+    !/president-board__note/.test(mainJs) && !/\.president-board__note\s*\{/.test(mobileCss));
+  check('подпись президента стала подсказкой на наведении, а не пропала',
+    /presidentBoard\.title\s*=/.test(mainJs)
+      && (await import('../src/logic/president-board.js')).normalizePresidentBoard({ note: 'вручную' }).note === 'вручную');
+  check('плашка ограничена шириной, которая помещается в шапку',
+    /@media \(min-width: 760px\) \{\s*\.president-board \{[^}]*flex: 0 1 (\d+)px; max-width: \1px/.test(mobileCss)
+      && !/min-width: 1040px[\s\S]{0,400}\.president-board/.test(mobileCss));
+  /*
     Пустая доска держит свою строку в шапке телефона.
 
     Пока база молчит, доски нет (атрибут `hidden`), и шапка стоит в одну
     строку — 65 px. С ответом она приезжает, ряд переносится (forum.css,
     до 759 px) и шапка вырастает до 110 px: полоска статуса и весь экран
     уезжают вниз на 45 px ровно в тот миг, когда читатель уже смотрит на
-    цифры. Замер scratch/above.mjs, 390×844: +0.0486 CLS.
+    цифры. Замер tools/walk.mjs, 390×844: +0.0486 CLS.
 
     `!important` обязателен: заводское `[hidden] { display: none !important }`
     из styles-v8.css стоит с ним же, и без него пустая доска просто не
@@ -15681,7 +15854,7 @@ console.log('\nAQ. Стабильность кадра');
   /*
     Форма контура берётся по маршруту, а не ставится одна на все вкладки.
 
-    Перемер 17.10 по пятнадцати маршрутам (scratch/cls.mjs) показал, что
+    Перемер 17.10 по всем маршрутам (tools/walk.mjs) показал, что
     «семь карточек для остальных» ошибается в ту же сторону, только громче:
     живой экран «Турниров» — одна плашка на 197 px на мониторе и 220 на
     телефоне, а резерв в 1410 px раздувал документ до 1939. С приходом данных
@@ -15706,20 +15879,27 @@ console.log('\nAQ. Стабильность кадра');
     (() => {
       const attrs = (skeleton('ops', 5).match(/class="sk__card[^"]*"/g) || [])
         .map((a) => (a.match(/sk__card--([a-z]+)/) || [, 'безымянная'])[1]);
-      return attrs.join(' ') === 'ops live lead back move'
-        && (skeleton('ops', 5).match(/sk__cols/g) || []).length === 4;
+      return attrs.join(' ') === 'ops live lead comm move'
+        && (skeleton('ops', 5).match(/sk__cols/g) || []).length === 3;
     })());
-  check('ряды сводки складываются в те же доли, что и живые: 7+5 и 5+7',
+  /*
+    Долей у контура осталось ровно столько, сколько делящих рядов на живой
+    сводке: рейка с летописью — 7+5. Обсуждения после переезда графика стоят
+    в ряду одни, их растягивает *:only-child, поэтому рамка обязана быть
+    одноголосой: колонка внутри неё резервировала бы ширину, которой нет.
+  */
+  check('ряды сводки складываются в те же доли, что и живые: 7+5 и только они',
     /\.sk--ops \.sk__card--lead \.sk__cols \{\s*grid-template-columns: minmax\(0, 7fr\) minmax\(0, 5fr\);/.test(refineCss)
-      && /\.sk--ops \.sk__card--back \.sk__cols \{\s*grid-template-columns: minmax\(0, 5fr\) minmax\(0, 7fr\);/.test(refineCss));
+      && !/\.sk__card--(?:back|comm) \.sk__cols/.test(refineCss)
+      && !/sk__card--back/.test(refineCss));
   check('высоты рядов различаются: одной карточки на все блоки больше нет',
-    /@media \(min-width: 900px\) \{[\s\S]{0,600}?\.sk--ops \.sk__card--live \{ --sk-h: 180px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--lead \{ --sk-h: 553px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--back \{ --sk-h: 324px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--move \{ --sk-h: 248px; \}/.test(refineCss));
+    /@media \(min-width: 900px\) \{[\s\S]{0,600}?\.sk--ops \.sk__card--live \{ --sk-h: 180px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--lead \{ --sk-h: 553px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--comm \{ --sk-h: 300px; \}[\s\S]{0,200}?\.sk--ops \.sk__card--move \{ --sk-h: 248px; \}/.test(refineCss));
   /*
     Одних высот мало: рамки должны стоять на тех же местах, что и живые
     блоки. Общий контурный зазор в 8 px и отступ подписи «Загружаем
     данные…» съезжали вниз на 24 и 30 px — четвёртая и первая рамки
     приезжали не на свои места, и текст под глазами читателя подпрыгивал
-    при приходе цифр. Замер: scratch/cls.mjs, живые зазоры 15/7/16/27 на
+    при приходе цифр. Замер: tools/walk.mjs, живые зазоры 15/7/16/27 на
     мониторе и 8/12/16/12 на телефоне — по сумме ровно 4×16 и 4×12.
   */
   check('ритм контурных рамок равен ритму живых блоков',
@@ -16872,13 +17052,21 @@ console.log('\nAV. Честная пустота и контур командн�
    сплошной текст. Всё, что не доходит до 4.5 как обычный текст, не прячется,
    а названо в документе об архитектуре, и проверку этого держим здесь.
 
-   Третья — сами лестницы, а не только пары. Шесть ступеней темы обязаны идти
+   Третья — разделение «заливающей» и «подписной» краски. Сигнальный оранжевый
+   дневной темы (`#ff5a36` на бумаге — 2,75:1) годится только как плашка, но не
+   как буквы; поэтому подпись бренда живёт отдельным токеном `--accent-ink`, а
+   чернила на залитой плашке делятся по краске под ними: `--on-accent` для
+   брендовой и `--on-role` для ролевой (красный, зелёный, золотой, фиолетовый).
+   Сюда же — структурная проверка, что ни один `color:` или `fill:` в восьми
+   файлах не ссылается на заливающую краску.
+
+   Четвёртая — сами лестницы, а не только пары. Шесть ступеней темы обязаны идти
    по светлоте ровно тем порядком, каким они объявлены, и с заметным шагом:
    иначе «слоистость» брифа (§25, §27) превращается в шесть цветов, различимых
    только рамкой. Здесь же держится главное обещание редизайна — что дневная
    тема НЕ переворот ночной.
 
-   Четвёртая — шкалы, а не числа на месте: лестница отступов, полосы кеглей,
+   Пятая — шкалы, а не числа на месте: лестница отступов, полосы кеглей,
    ширина контента и длительности. Редизайн живёт токенами; если следующая
    правка впишет в блок `padding: 26px`, система перестанет быть системой,
    и проверить это регуляркой дешевле, чем спорить на ревью.
@@ -16939,10 +17127,30 @@ console.log('\nAW. AA у токенов обеих тем');
       && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(dark[i], dark['--overlay']) >= 4.5)
       && ['--text', '--dim', '--mute', '--link'].every((i) => ratio(light[i], light['--recessed']) >= 4.5));
 
+  /*
+     Акцентные краски как текст. Порог здесь 3:1, то есть AA для крупного
+     текста: акцентом красятся заголовки, статистика и плашки, а не сплошной
+     текст. Всё, что не доходит до 4.5 как обычный текст, не прячется, а названо
+     в документе об архитектуре, и проверку этого держим здесь.
+
+     РЯД КРАСОК У ТЕМ РАЗНЫЙ, И ЭТО НЕ ОСЛАБЛЕНИЕ ПРОВЕРКИ. В светлой теме
+     «тёплой бумаги» сигнальный оранжевый — чистая заливка: он же бренд, он же
+     плашка кнопки, поэтому подпись на ней обязана быть темнее бумаги. Чёрным
+     числом он как текст быть не может физически: #ff5a36 на дневной странице
+     даёт 2,75:1, а на провале под полями — 2,34:1. Подписью в обеих темах
+     живёт `--accent-ink` (ночью это тот же #ff5a36, днём — отдельный тон), а
+     ниже стоит структурная проверка: ни одного правила, где текст красится
+     `var(--accent)`. Держать в матрице краску, которая текстом не бывает, —
+     значит проверять число, которого на экране нет.
+  */
+  const ACCENT_AS_TEXT = {
+    'тёмная': ['--accent', '--accent-dk', '--gold', '--win', '--loss'],
+    'светлая': ['--gold', '--win', '--loss'],
+  };
   const accents = [];
   for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
     if (!t) continue;
-    for (const ink of ['--accent', '--accent-dk', '--gold', '--win', '--loss']) {
+    for (const ink of ACCENT_AS_TEXT[theme]) {
       for (const s of surfaces) accents.push([`${theme}: ${ink} на ${s}`, ratio(t[ink], t[s])]);
     }
   }
@@ -17031,11 +17239,10 @@ console.log('\nAW. AA у токенов обеих тем');
     'литерал #c6a9df — это 1,77:1 днём; свип по нарисованным пикселам нашёл его именно так');
 
   /*
-     Активный пункт заливается фиолетом, и чернила на такой плашке берутся
-     --on-accent: у каждой темы свой конец ряда (ночь светлеет к тёмным
-     чернилам, день темнеет к светлым). Направление смешения читается из
-     самого правила темы, а не предполагается: --tint объявлен ссылкой на
-     ступень, и проверка берёт ту же ступень.
+     Активный пункт заливается фиолетом — краской РОЛИ, а не брендом, — и
+     чернила на нём берутся --on-role. Направление смешения читается из самого
+     правила темы, а не предполагается: --tint объявлен ссылкой на ступень, и
+     проверка берёт ту же ступень.
   */
   const tintOf = (t, raw) => {
     const m = /--tint:\s*var\((--[\w-]+)\)\s*;/.exec(raw);
@@ -17046,25 +17253,153 @@ console.log('\nAW. AA у токенов обеих тем');
     const tint = t && tintOf(t, raw);
     if (!tint) continue;
     for (const share of [1, 0.85]) {
-      const c = ratio(t['--on-accent'], srgbMix(t['--violet'], share, tint));
+      const c = ratio(t['--on-role'], srgbMix(t['--violet'], share, tint));
       if (c < 4.5) {
-        violetPlateFail.push(`${theme}: --on-accent на ${Math.round(share * 100)} % фиолета — ${c.toFixed(2)}:1`);
+        violetPlateFail.push(`${theme}: --on-role на ${Math.round(share * 100)} % фиолета — ${c.toFixed(2)}:1`);
       }
     }
   }
-  check('чернила активны на залитом фиолетом конце ряда в обеих темах',
+  check('чернила роли активны на залитом фиолетом конце ряда в обеих темах',
     violetPlateFail.length === 0 && dark && light
       && Boolean(tintOf(dark, darkRaw)) && Boolean(tintOf(light, lightRaw)),
     violetPlateFail.join('; ') || '');
 
   check('акцентные краски как текст дотягивают до 3:1 — AA для крупного текста',
-    accents.length === 60 && accents.every(([, c]) => c >= 3),
+    accents.length === 48 && accents.every(([, c]) => c >= 3),
     accents.filter(([, c]) => c < 3).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ') || '');
   const subNormalAA = accents.filter(([, c]) => c < 4.5);
   check('всё, что не доходит до AA как обычный текст, не спрятано: это названо в документе',
     subNormalAA.length > 0 && arch.includes('цвета альянсов')
       && /AA для крупного текста/.test(arch),
     `${subNormalAA.length} пар: ${subNormalAA.map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')}`);
+
+  /*
+     Бренд подписью — отдельный токен, и держится он по-разному в двух темах.
+     Дневной тон обязан дотягивать до полного AA на всех шести ступенях, потому
+     что им пишут ссылки, подписи плиток и цифры, а не только крупные
+     заголовки: #9c3a12 держит 5,24:1 на худшей ступени (провал под полями).
+
+     Ночной бренд подписью остаётся самим сигнальным оранжевым — там он светлый
+     и на тёмных ступенях читается; его AA держит матрица крупного текста выше
+     (4,25:1 на слое окна, то есть 3:1, но не 4,5). Поэтому проверка требует,
+     чтобы ночная подпись и ночная заливка были ОДНИМ числом: два разных тона
+     бренда в ночной теме — это уже третья краска, которой в палитре нет.
+  */
+  const accentInk = [];
+  if (light) {
+    for (const s of surfaces) accentInk.push([`светлая: --accent-ink на ${s}`, ratio(light['--accent-ink'], light[s])]);
+  }
+  check('дневный бренд подписью живёт в --accent-ink и набирает AA на всех шести ступенях',
+    accentInk.length === 6 && accentInk.every(([, c]) => c >= 4.5),
+    accentInk.filter(([, c]) => c < 4.5).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
+      || `худшая ${accentInk.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`);
+  check('ночной бренд подписью остаётся самим акцентом: одной краской, а не двумя тонами',
+    Boolean(dark) && dark['--accent-ink'] === dark['--accent'],
+    dark ? `${dark['--accent-ink']} против ${dark['--accent']}` : 'нет ночного блока');
+
+  /*
+     Арифметика по токенам ловит только плохие ЧИСЛА. ПлоХУЮ СТРУКТУРУ — когда
+     правило красит текст краской, оставленной для заливки, — она не видит
+     вообще: токены при этом в порядке. Ровно так светлая тема и теряла надпись
+     на кнопке: `--on-accent` считался, а правило брало его там, где плашка
+     тёмная. Поэтому рядом стоит проверка по исходникам правил.
+  */
+  const LIVE = ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css',
+    'src/refine.css', 'src/handbook.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css'];
+  const liveSrc = {};
+  for (const f of LIVE) liveSrc[f] = await readFile(f, 'utf8');
+  const accentAsText = [];
+  for (const f of LIVE) {
+    for (const m of liveSrc[f].matchAll(/(?:^|[^-\w])(?:color|fill)\s*:\s*var\(--accent\)/gm)) {
+      accentAsText.push(`${f}: ${m[0].trim()}`);
+    }
+  }
+  check('текст нигде не красится заливающей краской: color и fill берут --accent-ink',
+    accentAsText.length === 0, accentAsText.join(' | ')
+      || '27 мест на сайте и в панели переведены на подписную краску бренда');
+
+  /*
+     Плашка, залитая КРАСКОЙ РОЛИ (исход, приз, место набора), — не брендовая.
+     В светлой теме они глубокие, и чернила на них светлеют, а на брендовой
+     плашке темнеют: тот же случай, из-за которого отдельно существуют
+     `--electric-ink` и `--violet-ink`. Прежний `--on-accent` тут работал, пока
+     дневной акцент был кирпичом; с ярким брендом он стал тёмным, и зелёная
+     галочка отметки в панели дала бы 1,17:1.
+
+     Второй конец ряда берётся ИЗ САМОГО ПРАВИЛА темы, а не предполагается:
+     ночная плашка смешивает краску ВВЕРХ по лестнице (`--tint`), дневная —
+     ВНИЗ (`--shade`). Подставить наугад одно вместо другого — значит посчитать
+     несуществующий цвет.
+  */
+  const varRef = (t, raw, name) => {
+    const m = new RegExp(`--${name}:\\s*var\\((--[\\w-]+)\\)\\s*;`).exec(raw);
+    return m ? t[m[1]] : null;
+  };
+  const plateEdge = (t, raw, decl, paint) => {
+    const body = new RegExp(`--${decl}:([^;]+);`).exec(raw);
+    if (!body || !t) return null;
+    const m = new RegExp(`color-mix\\(in srgb, var\\(${paint}\\)\\s+(\\d+)%,\\s*var\\((--[\\w-]+)\\)\\)`).exec(body[1]);
+    if (!m) return null;
+    const via = m[2].replace(/^--/, '');
+    const target = (via === 'shade' || via === 'tint') ? varRef(t, raw, via) : t[via];
+    return target && srgbMix(t[paint], +m[1] / 100, target);
+  };
+  const deepPlates = [];
+  for (const [theme, t, raw] of [['тёмная', dark, darkRaw], ['светлая', light, lightRaw]]) {
+    if (!t) continue;
+    const lossEdge = plateEdge(t, raw, 'danger-plate', '--loss');
+    const tint = varRef(t, raw, 'tint');
+    const pairs = [
+      ['--loss плоско', ratio(t['--on-role'], t['--loss'])],
+      lossEdge && ['--loss на краю плашки', ratio(t['--on-role'], lossEdge)],
+      ['--win плоско', ratio(t['--on-role'], t['--win'])],
+      ['--gold плоско', ratio(t['--on-role'], t['--gold'])],
+      ['--violet плоско', ratio(t['--on-role'], t['--violet'])],
+      tint && ['--violet 85 % на краю', ratio(t['--on-role'], srgbMix(t['--violet'], 0.85, tint))],
+    ].filter(Boolean);
+    for (const [plate, c] of pairs) deepPlates.push([`${theme}: --on-role на ${plate}`, c]);
+  }
+  check('чернила роли держат AA на каждой плашке, залитой краской роли, в обеих темах',
+    deepPlates.length === 12 && deepPlates.every(([, c]) => c >= 4.5)
+      && light && dark && '--on-role' in light && '--on-role' in dark,
+    deepPlates.filter(([, c]) => c < 4.5).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
+      || `худшая ${deepPlates.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`);
+
+  /*
+     Отметка победы/поражения в панели, счётчик непрочитанного в ленте, плашка
+     удаления, знак «Объявление» и активный пункт «Кварт» залиты краской РОЛИ, а
+     не брендом. Если правило вернётся на `--on-accent`, дневная тема потеряет
+     их все разом, а ночная — ничего не заметит: там оба конца ряда тёмные.
+  */
+  check('плашки, залитые краской роли, берут чернила роли, а не чернила бренда',
+    /\.nav__badge\s*\{[^}]*color:\s*var\(--on-role\)/.test(liveSrc['src/forum.css'])
+      && /\.forum-bell__badge\s*\{[^}]*color:\s*var\(--on-role\)/.test(liveSrc['src/forum.css'])
+      && /\.forum-btn--danger\s*\{[^}]*color:\s*var\(--on-role\)/.test(liveSrc['src/forum.css'])
+      && /\.forum-btn--danger\s*\{[^}]*color:\s*var\(--on-role\)/.test(refineSrc)
+      && /\.adm-mark--win\.is-on\s*\{[^}]*color:\s*var\(--on-role\)/.test(liveSrc['src/admin/admin.css'])
+      && /\.adm-mark--loss\.is-on\s*\{[^}]*color:\s*var\(--on-role\)/.test(liveSrc['src/admin/admin.css'])
+      && /\.roles-notice__mark\s*\{[^}]*color:\s*var\(--on-role\)/.test(v8)
+      && /\.nav__link\[href="#\/quarter"\]\.is-active\s*\{[^}]*color:\s*var\(--on-role\)/.test(v8)
+      && /\.evt-btn--seat\.is-on\s*\{[^}]*color:\s*var\(--on-role\)/.test(liveSrc['src/forum.css']),
+    'почти-чёрный тон дневного бренда на зелёном исходе даёт 2,31:1: надпись пропадает ровно там, где её ждут');
+
+  /*
+     И ровно почему у плашки ДВЕ пары чернил. Брендовая плашка в дневной теме
+     светлая, а плашки ролей — глубокие, и подпись на них идёт в противоположные
+     стороны. Анти-переворот двух тем при этом держит НЕ краска бренда: ярким
+     сигнальным оранжевым собирает обе темы один и тот же бренд, а не зеркало
+     палитр. Зеркалом их делает направление лестницы — её проверка стоит ниже,
+     в разделе «Лестницы: порядок, шаг и запрет на переворот».
+  */
+  check('брендовая плашка одна на обе темы, а анти-переворот держит лестница, а не краска',
+    dark && light && dark['--accent'] === light['--accent']
+      && ratio(dark['--on-accent'], light['--accent']) >= 4.5
+      && ratio(light['--on-accent'], dark['--accent']) >= 4.5
+      && lum(light['--raised']) < lum(light['--bg']) && lum(dark['--raised']) > lum(dark['--bg']),
+    dark && light
+      ? `${dark['--accent']} под ночными ${ratio(dark['--on-accent'], light['--accent']).toFixed(2)}:1 `
+        + `и под дневными ${ratio(light['--on-accent'], dark['--accent']).toFixed(2)}:1`
+      : '');
 
   /* ── Лестницы: порядок, шаг и запрет на переворот ── */
   const order = (t) => surfaces.slice().sort((a, b) => lum(t[a]) - lum(t[b]));
@@ -17127,17 +17462,6 @@ console.log('\nAW. AA у токенов обеих тем');
         + `на ${t['--accent-dk']} — ${ratio(t['--on-accent'], t['--accent-dk']).toFixed(2)}:1`
         : '');
   }
-  /*
-     И ровно поэтому чернила плашки в двух темах РАЗНЫЕ. Ночной почти-чёрный
-     тон на дневной плашке даёт 3,66:1: надпись на самой частой кнопке сайта
-     перестала бы читаться, поменяй её одним числом на общей лестнице.
-  */
-  check('чернила плашки не могут быть одни на обе темы: чужой тон не набирает AA',
-    dark && light && ratio(dark['--on-accent'], light['--accent']) < 4.5,
-    dark && light
-      ? `${dark['--on-accent']} на ${light['--accent']} — ${ratio(dark['--on-accent'], light['--accent']).toFixed(2)}:1`
-      : '');
-
   /* ── Шкалы редизайна ── */
   const steps = [...v8.matchAll(/--s-(?:([1-8])|(hair|fine)):\s*(\d+)px/g)]
     .map((m) => [m[1] ? Number(m[1]) : (m[2] === 'hair' ? 0 : 0.5), Number(m[3])])
@@ -18101,29 +18425,29 @@ console.log('\nBC. Слои и кегль: числа живут в ряду, а
     fsIdle.length === 0, fsIdle.join(', ') || `${fsDecls.length} ступеней, все используются`);
 }
 
-/* ── BD. Строительный блок «пусто»: одна оболочка на семь состояний ──────────
+/* ── BD. Строительный блок «пусто»: одна оболочка на восемь состояний ─────────
 
    §42 просит общие блоки, §68 — чтобы пустой экран называл, чего именно нет,
    §64 — не раздувать систему. Пустота как раз тот случай, где раздувание
    началось бы само: состояний «ничего не нашлось» на сайте четырнадцать, и
-   семь из них — одна и та же строчка по центру, только написанная семью
+   восемь из них — одна и та же строчка по центру, только написанная разными
    способами. Три не говорили вовсе, что произошло, а только молчали серым.
 
    Проверок девять, и каждая держит конкретную границу:
    — оболочка объявлена один раз, её части используются (мёртвый слот под
-     кнопку здесь запрещён: из семи состояний ни одно ни к чему не зовёт);
+     кнопку здесь запрещён: ни одно состояние ни к чему не зовёт);
    — локальные классы оставили только макет строки, а не цвет, выравнивание
      и кегль — это и есть §67 на уровне одного состояния;
-   — семь вызовов помощника, семь разных заголовков, ни одного дежурного
+   — восемь вызовов помощника, восемь разных заголовков, ни одного дежурного
      «нет данных»: §68 требует контекст, а не шаблон;
    — контроллеры по-прежнему прячут состояние по `data-*`, потому что
      разметка переехала из `<p>` в `<div>` и хук мог потеряться;
-   — атрибут `hidden` стоит на четырёх состояниях, которые показываются
+   — атрибут `hidden` стоит на пяти состояниях, которые показываются
      после фильтра, — ровно там, где их прятал старый `<p hidden>`;
    — `margin: auto` колонки чатов имеет где разворачиваться: обёртка списка
      появилась позже этого правила и в блок-родителе превращала пустоту в
      прилипшую к шапке строку, а заодно и скролл внутри панели. */
-console.log('\nBD. Оболочка «пусто»: семь состояний говорят одним голосом');
+console.log('\nBD. Оболочка «пусто»: восемь состояний говорят одним голосом');
 {
   const { readFile } = await import('node:fs/promises');
   const CSS = ['styles-v8', 'forum', 'mobile', 'controls', 'refine', 'handbook'];
@@ -18186,17 +18510,18 @@ console.log('\nBD. Оболочка «пусто»: семь состояний 
     }
   }
   check('пустые состояния собираются одним помощником, а не разметкой на месте',
-    notWired.length === 0 && callCount === 7, notWired.join(' | ') || `вызовов: ${callCount}`);
+    notWired.length === 0 && callCount === 8, notWired.join(' | ') || `вызовов: ${callCount}`);
 
   const titles = [...jsAll.matchAll(/emptyState\(\{\s*title:\s*'([^']+)'/g)].map((m) => m[1]);
   const generic = titles.filter((t) => /нет данных|информации нет|^пусто|no data/i.test(t));
   check('каждое пустое состояние называет отсутствующее по-своему, без дежурного «нет данных» (§68)',
-    titles.length === 7 && generic.length === 0 && new Set(titles).size === titles.length,
+    titles.length === 8 && generic.length === 0 && new Set(titles).size === titles.length,
     `заголовков: ${titles.length}, разных: ${new Set(titles).size}, шаблонных: ${generic.join(', ') || 'нет'}`);
 
   /* Разметка переехала из <p hidden> в <div hidden>: хук обязан остаться живым. */
   const hooks = [['ladder-empty', 'src/ui/ladder-controls.js'],
-    ['tl-empty', 'src/ui/timeline-controls.js'], ['tl-noweeks', 'src/ui/timeline-controls.js']];
+    ['tl-empty', 'src/ui/timeline-controls.js'], ['tl-noweeks', 'src/ui/timeline-controls.js'],
+    ['race-empty', 'src/ui/race-controls.js']];
   const lostHook = [];
   for (const [name, ctrl] of hooks) {
     if (!jsAll.includes(`attrs: 'data-${name}'`)) lostHook.push(`${name}: нет в разметке`);
@@ -18205,8 +18530,8 @@ console.log('\nBD. Оболочка «пусто»: семь состояний 
   check('фильтрованные состояния прячутся тем же атрибутом, что и раньше: хук на месте',
     lostHook.length === 0, lostHook.join(' | '));
   const hiddenCount = (jsAll.match(/hidden: true/g) || []).length;
-  check('атрибут hidden стоит ровно на четырёх состояниях, которые показывает фильтр',
-    hiddenCount === 4, `скрытых состояний: ${hiddenCount}`);
+  check('атрибут hidden стоит ровно на пяти состояниях, которые показывает фильтр',
+    hiddenCount === 5, `скрытых состояний: ${hiddenCount}`);
 
   /* Пустота колонки чатов центрируется `margin: auto`, а он разворачивается
      только в flex-родителе. Обёртка `[data-chat-list-area]` пришла позже и

@@ -23,9 +23,10 @@ import { esc } from './ui/helpers.js';
 import { skWithCaption } from './ui/skeleton.js';
 import { presidentBoardFromTexts } from './logic/president-board.js';
 import { startQuarterTimer } from './ui/quarter-timer.js';
-// Побочные импорты: вешают делегированные обработчики фильтров на страницах.
+// Побочные импорты: вешают делегированные обработчики на страницы.
 import './ui/ladder-controls.js';
 import './ui/timeline-controls.js';
+import './ui/race-controls.js';
 import { mountForum, mountUser, syncForumView, unmountForum } from './forum/mount.js';
 import { mountChats, unmountChats, unreadChatsTotal } from './forum/chats.js';
 import { mountTournaments, unmountTournaments } from './forum/tournaments.js';
@@ -746,6 +747,11 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   пока слова не изменились. Вызов идёт на каждой смене раздела, а с каждой
   перерисовкой заново запускались бегущая строка и пульс — глаз дёргался без
   повода, пока человек просто ходил по вкладкам.
+
+  ПОДПИСЬ ВЛАДЕЛЬЦА БОЛЬШЕ НЕ РИСУЕТСЯ СТРОКОЙ. `note` остаётся в формате
+  данных — панели есть чем заполнять поле, — но на странице это подсказка при
+  наведении, а не второй ярус шапки. Разметка плашки стала короче ровно на
+  него: метка + имя + альянс.
 */
 let presidentBoardLine = null;
 
@@ -761,8 +767,12 @@ function renderPresidentBoard(texts = []) {
       <strong class="president-board__name">${esc(board.name)}</strong>
       <span class="president-board__alliance">${esc(board.alliance)}</span>
     </div>
-    ${board.note ? `<small class="president-board__note">${esc(board.note)}</small>` : ''}
   ` : '';
+  /*
+    Подпись ставится до стража: меняются только её слова, а рамку трогать
+    незачем. `title` — свойство-текст, разметка через него не собирается.
+  */
+  presidentBoard.title = board.enabled && board.note ? board.note : '';
   if (line === presidentBoardLine) return;
   presidentBoardLine = line;
   presidentBoard.hidden = !board.enabled;
@@ -936,11 +946,44 @@ function redirectLegacyAccountHash() {
   }
 }
 
+/*
+  КНОПКА «ГРАФИК СЕЗОНА» НА ГЛАВНОЙ.
+
+  Ведёт не в начало «Рейтинга», а к графику под таблицей: человек пришёл за
+  сравнением своих альянсов и тащиться через весь список мест не должен.
+
+  ДИРЕКТИВА ОДНОРАЗОВАЯ. render() вызывается не только при смене адреса —
+  страница перекрашивается, когда приходят данные, когда сработал фильтр и когда
+  сменился сервер, а адрес всё это время остаётся прежним, с `?race=1` в
+  хвосте. Без флага каждая такая перерисовка утаскивала бы прокрутку обратно к
+  графику, и дочитать таблицу, которую человек сам открыл, было бы нельзя.
+  Флаг возвращается на любом заходе без параметра, поэтому следующий клик по
+  кнопке снова приводит.
+
+  Панели может ещё не быть: на холодном входе рейтинг рисуется позже ответа
+  базы, и график появляется вместе с ним. Флаг в этот момент не тратим — прыжок
+  случится на той перерисовке, где цель действительно есть. Если же страница так
+  и останется без графика (неделей меньше двух), человек получит обычный вход на
+  «Рейтинг»: молча тянуть прокрутку вслепую хуже, чем не доехать до раздела.
+*/
+let raceJumpArmed = true;
+
+function takeRaceJump(id, search) {
+  if (id !== 'ladder' || new URLSearchParams(search).get('race') !== '1') {
+    raceJumpArmed = true;
+    return null;
+  }
+  if (!raceJumpArmed) return null;
+  const panel = document.querySelector('[data-race-panel]');
+  if (!panel) return null;
+  raceJumpArmed = false;
+  return panel;
+}
+
 function render() {
   if (!view) return;
   redirectLegacyAccountHash();
   const { id, param, search } = parseHash();
-
   /*
     ГЕЙТ ДЕРЕВА СПРАВОЧНИКА: на «Гайдах» и на странице узла модули могут ещё
     не прийти. Первым делом отдаём строку ожидания и догружаем их, а потом
@@ -1201,7 +1244,7 @@ function render() {
           : route.render(view);
       // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
       // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
-      for (const fn of [window.__ladderApply, window.__timelineApply]) {
+      for (const fn of [window.__ladderApply, window.__timelineApply, window.__raceApply]) {
         if (typeof fn === 'function') fn();
       }
       // Запуск таймера Кварта, если открыта страница Кварта.
@@ -1227,7 +1270,20 @@ function render() {
     после перерисовки, и внешний scrollTo здесь спорил бы с ним.
   */
   const keepScroll = (id === 'forum' && param) || id === 'chats';
-  if (!keepScroll) window.scrollTo(0, 0);
+  const racePanel = takeRaceJump(id, search);
+  if (!keepScroll && !racePanel) window.scrollTo(0, 0);
+  if (racePanel) {
+    /*
+      Отступ берём у самой шапки, а не из числа: она липкая (`position: sticky`)
+      и меняет рост при прокрутке, а заголовок панели после прыжка обязан быть
+      виден целиком, а не обрезан её краем.
+    */
+    const head = document.querySelector('.site-head');
+    const y = racePanel.getBoundingClientRect().top + window.scrollY - (head ? head.offsetHeight : 0);
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    const title = racePanel.querySelector('[data-race-title]');
+    if (title) title.focus({ preventScroll: true });
+  }
 
   /*
     СМЕНИЛСЯ РАЗДЕЛ — ЧИТАТЕЛЬ УЗНАЁТ ОБ ОДНОМ ИЗ ДВУМЯ СПОСОБОВ.
@@ -1262,8 +1318,13 @@ function render() {
   */
   const screen = `${id}/${param || ''}`;
   if (lastAnnouncedRoute !== null && screen !== lastAnnouncedRoute) {
-    const byHeading = !keepScroll && !live && focusAppHeading();
-    if (!byHeading) announceRoute(id);
+    /*
+      Прыжок к графику говорит сам: фокус встаёт на его заголовок, и читатель
+      слышит «Как менялись очки». Второй голос поверх него был бы эхом, поэтому
+      обычные два способа здесь уступают одному.
+    */
+    const byHeading = !keepScroll && !live && !racePanel && focusAppHeading();
+    if (!byHeading && !racePanel) announceRoute(id);
   }
   lastAnnouncedRoute = screen;
 
@@ -1306,12 +1367,17 @@ function emptyView(loadError = '') {
  * «Повторить» дёргает тот же обработчик, что и в объяснении долгого ожидания:
  * [data-boot-retry] уже слушается на странице.
  *
- * ПОЛОСКА НЕ ИСЧЕЗАЕТ. Она стоит над содержимым с первого кадра — в ожидании,
- * на копии, на живой базе и в аварии, — и высота её задана стилем, а не
- * текстом. Раньше она появлялась только вместе с ответом, и в момент
- * прихода цифр весь экран уезжал вниз на 102 px (монитор) или 244 px
- * (телефон): одна эта полоска стоила +0.06 CLS на каждой загрузке. Замер —
- * scratch/cls.mjs, правки — в src/styles-v8.css.
+ * ПОЛОСКА ГОВОРИТ ТОЛЬКО БЕДУ. Рамка стоит над содержимым на снимке и в
+ * аварии; на живой базе и в ожидании её не видно. Прежняя договорённость была
+ * обратной — «не исчезает никогда», — и стоила она permanent 68 px мёртвого
+ * места, потому что исправное состояние не сообщает читателю ничего.
+ *
+ * Цена смены правила честна и названа: высоты полоски в документе больше нет,
+ * поэтому на копии и в аварии экран при ответе сдвинется на её рост. Это
+ * ровно тот дефект (+0.06 CLS на каждой загрузке), от которого полоску
+ * лечили, — но теперь он случается только там, где сайтов и правда не в
+ * порядке, а не на каждом открытии. Замер — tools/walk.mjs, числа после
+ * правки лежат в docs/ARCHITECTURE.md.
  *
  * Три части строки: жирное имя состояния, короткая подробность и слово
  * «подробности», раскрывающее длинный текст. Длинный текст в самой строке
@@ -1371,9 +1437,18 @@ function dataNotice() {
     Страж перерисовки: повтор после аварии даёт тот же текст, а полоска —
     живая область (aria-live), и второй раз подряд читатель услышал бы то же
     слово как новое. Совпало — DOM не трогаем.
+
+    ПОКАЗ ИСКЛЮЧИТЕЛЬНО БЕДЫ: `live` и стартовое `wait` прячут рамку,
+    `snapshot` и `none` показывают. Порядок присваиваний не случайный —
+    полоска снимается с скрытия до того, как внутри меняются слова. Живая
+    область объявляет то, что появилось в видимом узле; если сделать наоборот,
+    читатель с программой экрана не услышал бы ни «снимок», ни «данные не
+    дошли» — то есть остался бы без единственного сигнала, для которого рамка
+    и существует.
   */
   if (lastNoticePainted === state + html) return;
   lastNoticePainted = state + html;
+  box.hidden = state === 'live';
   box.dataset.state = state;
   box.innerHTML = html;
 }
@@ -1458,7 +1533,7 @@ async function boot() {
     блока сводки: семь карточек по 190 px резервировали бы другую высоту, и в
     момент прихода цифр страница всё равно разъезжалась бы.
 
-    Перемер 17.10 (scratch/cls.mjs по всем пятнадцати маршрутам) показал, что
+    Перемер 17.10 (tools/walk.mjs по всем пятнадцати маршрутам) показал, что
     «семь карточек для остальных» ошибается в ту же сторону, только громче:
     живой экран «Турниров» — одна компактная плашка на 197 px на мониторе и
     220 на телефоне, а резерв в 1410 раздувал документ до 1939 px. С приходом

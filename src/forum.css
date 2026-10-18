@@ -117,10 +117,10 @@
   /*
     Счётчик новых тем — 11 px жирного текста, то есть обычный текст по WCAG, и
     ему нужен полный порог. Прежний `#fff` на ночном красном #f2555f давал
-    3,37:1 — плашка «не прочитано» была нечитаема сама. Локальная `--on-accent`
-    держит 5,74:1 в ночи и 6,85:1 днём.
+    3,37:1 — плашка «не прочитано» была нечитаема сама. Плашку красит РОЛЬ,
+    поэтому и подпись её берётся из `--on-role`: 5,74:1 в ночи и 6,79:1 днём.
   */
-  color: var(--on-accent);
+  color: var(--on-role);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   line-height: 1;
@@ -852,7 +852,7 @@
   place-items: center;
   border-radius: var(--r-sm);
   background: var(--loss);
-  color: var(--on-accent);
+  color: var(--on-role);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   line-height: 1;
@@ -1155,8 +1155,8 @@
 }
 .forum-btn--ghost:hover { border-color: color-mix(in srgb, var(--text) 22%, transparent); box-shadow: none; }
 /*
-  Красная плашка живёт тем же токеном, что и сигнальная: в тёмной теме она
-  осветляется, в светлой затемняется, а подпись в обеих — локальная `--on-accent`.
+  Красная плашка живёт краской РОЛИ, а не брендом: в тёмной теме она
+  осветляется, в светлой затемняется, а подпись в обеих — `--on-role`.
   Прежний градиент `#ff6b7a → --loss` не был тематическим: в светлой теме его
   верхний край оставался розовым #ff6b7a, и белый текст давал на нём 2,75:1 —
   кнопка удаления была единственной, где собственный текст не читался.
@@ -1164,7 +1164,7 @@
 .forum-btn--danger {
   background: var(--danger-plate);
   border-color: var(--danger-plate-line);
-  color: var(--on-accent);
+  color: var(--on-role);
 }
 .forum-btn--danger:hover:not(:disabled) { box-shadow: 0 8px 20px -12px var(--loss); }
 .forum-btn--wide { display: block; width: 100%; margin: var(--s-fine) 0 var(--s-3); }
@@ -3001,7 +3001,10 @@
   background: var(--accent);
   border-color: transparent;
 }
-.evt-btn--seat.is-on { background: var(--win); }
+/* Кнопка «место занято» залита зелёным исходом, а не брендом: подпись у неё
+   своя, роли. Чернила бренда в светлой теме темнеют, а на глубоком зелёном
+   #1a6446 они дали бы 2,31:1 — ровно то, что держит `--on-role` (6,66:1). */
+.evt-btn--seat.is-on { color: var(--on-role); background: var(--win); }
 .evt-btn[disabled] { opacity: .55; cursor: progress; }
 
 .evt-remind {

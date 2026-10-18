@@ -89,11 +89,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=113">
+  <link rel="modulepreload" href="./src/main.js?v=114">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css?v=20">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=21">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -102,7 +102,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=57">
+  <link rel="stylesheet" href="./src/forum.css?v=58">
   <!--
     Телефон — последним слоем.
 
@@ -111,7 +111,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=41">
+  <link rel="stylesheet" href="./src/mobile.css?v=42">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -129,7 +129,7 @@
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=46">
+  <link rel="stylesheet" href="./src/refine.css?v=47">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -137,7 +137,7 @@
     последним: картинки и подписи в гайдах игры важнее общей плотности, и
     правило «подпись под картинкой» не должно перебиваться соседним слоем.
   -->
-  <link rel="stylesheet" href="./src/handbook.css?v=10">
+  <link rel="stylesheet" href="./src/handbook.css?v=11">
   <script>
     try {
       if (localStorage.getItem('s33-loader-seen') === '1') {
@@ -258,18 +258,23 @@
     показан снимок таблицы или не пришло ничего. Разбирается в src/main.js
     (dataNotice), подробности — в docs/ARCHITECTURE.md.
 
-    ПОЧЕМУ ОНА СТОИТ ЗДЕСЬ С САМОГО НАЧАЛА, А НЕ ПОЯВЛЯЕТСЯ С ОТВЕТОМ.
-    Пока полоски нет, в документе нет и её высоты. Значит ровно в тот момент,
-    когда база наконец отвечает, под шапкой вырастает чужой блок и весь экран
-    уезжает вниз: на мониторе на 102 px, на телефоне на 244 px. Замер
-    (scratch/cls.mjs, 1361×900 и 390×844) считал это как +0.06 CLS на КАЖДОЙ
-    загрузке, потому что копия таблицы — рабочий путь сайта, а не исключение.
-    Поэтому здесь всегда одна строка, а её высота задана стилем, а не текстом:
-    состояние меняется, рамка остаётся. Длинное объяснение живёт под словом
-    «подробности» и раскрывается по нажатию — сдвиг, который человек сделал
-    сам, браузер в CLS не пишет.
+    ПОЧЕМУ ОНА ЗДЕСЬ СПРЯТАНА И ПОКАЖЕТСЯ ТОЛЬКО В БЕДЕ.
+    Ровно год этот блок спорил сам с собой. Первая версия появлялась вместе с
+    ответом, и heights в документе до неё не было: экран уезжал вниз на 102 px
+    (монитор) и 244 px (телефон), +0.06 CLS на каждой загрузке. Вторая версия
+    лечила это ценой постоянства — рамка стояла всегда, включая «живую базу»,
+    где она не сообщает ничего, и отнимала 68 px у первого экрана.
+
+    Выбрано постоянство наоборот: не видно там, где всё в порядке. Снимок и
+    авария по-прежнему говорят словами и получают свои 68 px, а исправный
+    сайт — нет. Дёргается теперь только сломанное: на копии и в аварии сдвиг
+    при ответе вернулся, и он перемерен (tools/walk.mjs), а не угадан.
+
+    Стартовая разметка живёт под `hidden`, а не пуста: если скрипт не дойдёт
+    до dataNotice, в DOM останется то, что человек должен был прочитать, —
+    ожидание ответа базы и кнопка повтора.
   -->
-  <details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait">
+  <details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait" hidden>
     <summary class="data-notice__line">
       <b>Источник данных</b>
       <span>ждём ответ базы несколько секунд</span>
@@ -394,7 +399,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=113"></script>
+  <script type="module" src="./src/main.js?v=114"></script>
 
   <script>
     /*
