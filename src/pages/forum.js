@@ -766,7 +766,7 @@ function renderAccountBar(s) {
       </section>`;
   }
 
-  return `<section class="panel forum-account">${renderWhoAmI(s)}</section>`;
+  return `<section class="forum-account">${renderWhoAmI(s)}</section>`;
 }
 
 /* ── Уведомления ──────────────────────────────────────────────────────────── */
@@ -1101,53 +1101,45 @@ export function renderSectionMutes(s) {
 
 function renderWhoAmI(s) {
   /*
-    КОРОТКАЯ ПОЛОСА О СЕБЕ, А НЕ ЭКРАН ПРОФИЛЯ.
+    ОДНА СТРОКА О СЕБЕ, ВЫСОТОЙ В ОДНУ ТАЧ-ПЛАНКУ.
 
-    Профиль живёт на своей странице; здесь нужны четыре вещи: кто я, могу ли
-    писать, куда пойти прямо сейчас. Всё остальное — настройки push — уехало
-    под раскрытие: оно не состояние, а выбор, и человек меняет его раз в
-    жизнь, а не при каждом заходе.
+    Человек открыл форум читать темы, а попадал на ряд кнопок: «Чаты», «Профиль»,
+    «Выйти» и раскрытие настроек — четыре клика, из них два вели туда, куда и без
+    них ведут нижняя полоса разделов и нажатие на аватар. Осталось три вещи,
+    которые спрашивают при каждом заходе: кто я (ник и роль), открыт ли мне рот
+    (значок роли) и не накопилось ли нового (колокольчик со счётчиком).
 
-    Запреты и тишину по разделам под раскрытие не прячем сознательно: это
-    не настройки, а причина, по которой кнопка «Написать» не работает. Их
-    человек должен видеть, не нажимая ничего.
+    Аватар — ссылка на свой профиль: рука тянется к картинке, а не к слову
+    «Профиль». Выход и настройки push уехали туда же, на страницу участника:
+    выходят раз в жизни, а не между темами, и кнопка «Выйти» в ленте только
+    мешала, привлекая палец туда, где человек её не искал.
+
+    Запреты и тишину по разделам не прячем сознательно: это не настройки, а
+    причина, по которой кнопка «Написать» не работает. Их человек должен видеть,
+    не нажимая ничего.
   */
   if (s.me) {
-    const prefs = renderPushPrefs(s);
     return `
       <div class="forum-me">
-        ${avatarHtml(s.me.nick, s.me.avatarUrl)}
+        <a class="forum-me__ava" href="#/user/${encodeURIComponent(s.me.nick)}"
+           aria-label="Открыть свой профиль">${avatarHtml(s.me.nick, s.me.avatarUrl)}</a>
         <span class="forum-me__body">
           <b>${nickLink(s.me.nick)}</b>
           <small>${roleBadge(s.me) || esc(roleLabel(s.me))}${s.me.isLeader ? leaderBadge() : ''}</small>
         </span>
-        <span class="forum-me__acts">
-          <a class="forum-btn forum-btn--ghost forum-chats-link" href="#/chats">Чаты</a>
-          <button type="button" class="forum-btn forum-btn--ghost forum-bell"
-                  data-forum-notify-open aria-label="Уведомления"
-                  ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>
+        <button type="button" class="forum-bell"
+                data-forum-notify-open aria-label="Уведомления"
+                ${s.notifyOpen ? 'aria-expanded="true"' : 'aria-expanded="false"'}>
 <svg class="forum-bell__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-            <span class="forum-bell__label">Уведомления</span>
             ${
               s.notifyUnread > 0
                 ? `<span class="forum-bell__badge" data-forum-notify-badge>${s.notifyUnread}</span>`
                 : ''
             }
-          </button>
-          <a class="forum-btn forum-btn--ghost" href="#/user/${encodeURIComponent(s.me.nick)}">Профиль</a>
-          <button type="button" class="forum-btn forum-btn--ghost" data-forum-signout>Выйти</button>
-        </span>
+        </button>
       </div>
       ${renderSanctions(s)}
-      ${renderSectionMutes(s)}
-      ${prefs ? `
-        <details class="forum-me__more" data-forum-me-more${s.meMoreOpen ? ' open' : ''}>
-          <summary class="forum-me__more-sum">
-            <span class="forum-me__more-arrow" aria-hidden="true"></span>
-            <b>Куда писать и когда будить</b>
-          </summary>
-          ${prefs}
-        </details>` : ''}`;
+      ${renderSectionMutes(s)}`;
   }
 
   /*
@@ -1350,7 +1342,7 @@ function renderRecovery(s) {
 }
 
 /**
- * Push-настройки форума под учётной строкой.
+ * Настройки оповещений — их рисует страница участника, а не лента.
  *
  * Два тумблера: уведомлять ли о новых постах и об ответах на ваши записи.
  * Состояние хранится в базе (forum_push_prefs) и подгружается адаптером.
@@ -1361,8 +1353,12 @@ function renderRecovery(s) {
  * локальным временем браузера, поэтому часовой пояс здесь не спрашивают:
  * переехал — и ночь поехала следом. Выключенные часы показываются с числами
  * по умолчанию, чтобы включение не требовало сначала набирать окно.
+ *
+ * Разметку держит этот файл, а место — pages/user.js: поведение (оба тумблера,
+ * окно, зеркало в IndexedDB) живёт в forum/mount.js одним документным
+ * слушателем, поэтому переезд блока не потребовал нового обработчика.
  */
-function renderPushPrefs(s) {
+export function renderPushPrefs(s) {
   if (!s.me || !s.pushPrefs) return '';
   const L = CONFIG.forum.limits;
   const toggle = (key, label) => `

@@ -135,14 +135,13 @@
   }
   .forum-side { position: sticky; top: 76px; }
   /*
-    Полоса о себе в узкой колонке. Три столбца (аватар, имя, четыре кнопки)
-    здесь не помещаются: кнопки по максимуму съедали 259 px из 305, на имя
-    оставалось 46, и ник рассыпался по буквам на шесть строк. В колонке
-    кнопка встаёт под имя — той же раскладкой, что на телефоне, и из §21
-    («профиль + быстрые действия») столбиком, а не в одну строку.
+    Строка о себе в узкой колонке держится в один ряд: аватар 30 px,
+    колокольчик 36 px и два зазора по 8 px занимают 82 px из 320 — остальное
+    остаётся нику. Прежний состав (четыре кнопки) съедал 259 px из 305, имя
+    сжимался до 46 px и рассыпался по буквам на шесть строк — поэтому колонка
+    и переносила кнопки под имя. Перенос больше не нужен ни здесь, ни на
+    телефоне, и сетка одна на все ширины.
   */
-  .forum-me { grid-template-columns: auto minmax(0, 1fr); }
-  .forum-me__acts { grid-column: 1 / -1; justify-content: flex-start; }
   /*
     Гость — не «профиль», поэтому его вход не обязан стоять в правой колонке.
     Раскрытая форма в колонке 340 px набирала 440 px высоты, и левая половина
@@ -153,13 +152,6 @@
   .forum-head:has(.forum-authbox[open]) { grid-template-columns: minmax(0, 1fr); }
   .forum-authbox[open] .forum-auth__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
   .forum-authbox[open] .forum-auth__actions { margin-top: var(--s-1); }
-  /*
-    Слово «Уведомления» в колонке лишнее: у кнопки есть aria-label и значок
-    счётчика, а с подписью четыре действия не влезали в одну строку и полоса
-    вырастала до 200 px — столько же, сколько название раздела рядом, и левая
-    половина шапки пустела. Телефон это слово уже прячет, здесь тот же приём.
-  */
-  .forum-me .forum-bell__label { display: none; }
   /* В колонке панели уже: убираем крупные отступы героя. */
   .forum-side .hero, .forum-side .panel { padding: var(--s-3) var(--s-3); }
   /* Заголовок летописи — титул карточки, а не раздела: настоящий H1 страницы
@@ -368,12 +360,16 @@ h1.hero__week { font-size: var(--fs-h1); }
 .forum-rules__note { margin: 0 var(--s-3) var(--s-2); font-size: var(--fs-eyebrow); }
 
 /* ── ФОРУМ: аккаунт и уведомления ─────────────────────────────────────────── */
-.forum-account { padding: var(--s-2) var(--s-3); }
+/*
+  Строка о себе без плашки: отступов у неё своих нет, она стоит в шапке
+  раздела и выравнивается по её колонкам. Колокольчик — квадрат, а не кнопка
+  с текстом, поэтому ряда «минимальная высота кнопки» здесь больше нет.
+*/
 .forum-me { gap: var(--s-1); }
 .forum-me .forum-ava { width: 30px; height: 30px; border-radius: var(--r-sm); font-size: var(--fs-meta); }
 .forum-me__body b { font-size: var(--fs-small); }
 .forum-me__body small { font-size: var(--fs-eyebrow); }
-.forum-me .forum-btn { min-height: 32px; padding: var(--s-fine) var(--s-2); font-size: var(--fs-meta); }
+.forum-bell { width: 36px; height: 36px; }
 .forum-bell__badge { top: -6px; right: -6px; min-width: 16px; height: 16px; font-size: var(--fs-eyebrow); }
 
 .forum-notice { padding: var(--s-2) var(--s-3); }
@@ -389,7 +385,7 @@ h1.hero__week { font-size: var(--fs-h1); }
 .forum-auth__actions { margin-top: var(--s-2); gap: var(--s-1); }
 .forum-auth__note { margin-top: var(--s-1); font-size: var(--fs-eyebrow); }
 .forum-authbox__sum-name { font-size: var(--fs-small); }
-.forum-me__more-sum { font-size: var(--fs-meta); }
+.forum-self__more-sum { font-size: var(--fs-meta); }
 
 /* ── ФОРУМ: формы ──────────────────────────────────────────────────────────── */
 .forum-field { margin-bottom: var(--s-1); }
@@ -536,18 +532,16 @@ h1.hero__week { font-size: var(--fs-h1); }
 }
 
 /* ── Колокольчик уведомлений ─────────────────────────────────────────────── */
-/* Иконка стоит всегда: на широком экране — перед словом, на телефоне —
-   одна (mobile.css прячет подпись), и тогда кнопка — квадрат под палец. */
-.forum-bell { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-1); }
+/*
+  Слов у кнопки нет ни на одной ширине: строка о себе стала одной линией, и
+  колокольчик читается сам. Здесь остаётся только размер картинки — рамку,
+  фон и квадрат кнопки рисует forum.css.
+*/
 .forum-bell__icon { width: 17px; height: 17px; flex: 0 0 auto; }
 
 @media (max-width: 759px) {
-  .forum-bell { min-width: 44px; min-height: 44px; padding: 0 var(--s-2); }
+  .forum-bell { width: 44px; height: 44px; }
   .forum-bell__icon { width: 20px; height: 20px; }
-  /* Строка «аватар · ник · кнопки» на телефоне переносится: кнопки уходят на
-     свою строку (сетка и перенос описаны у самой полосы, в forum.css), а ник
-     не давится до нуля. Здесь остаётся только запрет кнопкам тянуться. */
-  .forum-me .forum-btn { flex: 0 0 auto; }
 }
 
 /* ── ЧАТЫ: ПОЛНОЭКРАННЫЙ МЕССЕНДЖЕР ──────────────────────────────────────── */
@@ -2999,12 +2993,14 @@ body:has(.chat-layout) #app { flex: none; }
   виду кнопки не имеет отношения.
 
   Второй замер того же захода показал, что объявления мало: в mobile.css жили
-  `body .cal-tab` (38 px), `body .evt-actions .evt-btn` (38), `body .evt-remind
-  select` (36) и `body .forum-me .forum-btn` (40), и префикс `body` делал их
-  сильнее местных составных селекторов — порядок загрузки не помогал. Правила
-  высоты оттуда убраны, а не подняты до 44: одна планка живёт в одном месте, и
-  проверка это требует. Поле напоминания класса не имеет вовсе, поэтому оно в
-  списке отдельной строкой.
+  `body .cal-tab` (38 px), `body .evt-actions .evt-btn` (38) и `body .evt-remind
+  select` (36), и префикс `body` делал их сильнее местных составных селекторов —
+  порядок загрузки не помогал. Правила высоты оттуда убраны, а не подняты до 44:
+  одна планка живёт в одном месте, и проверка это требует. Поле напоминания
+  класса не имеет вовсе, поэтому оно в списке отдельной строкой. Четвёртой целью
+  в том же mobile.css был ряд кнопок строки о себе — кнопки из строки ушли на
+  страницу участника, и под палец там остались аватар-ссылка да колокольчик,
+  названные в списке своими именами.
 
   Третий замер — уже с починенным пином харнесса — назвал тех, кого список не
   накрывал вовсе: `a.forum-btn` (40 px: класс есть, но планка знала только
@@ -3070,7 +3066,7 @@ body:has(.chat-layout) #app { flex: none; }
   .seg--lead .seg__btn,
   .cal__btn,
   .forum-btn--sm,
-  .forum-me .forum-btn,
+  .forum-me__ava,
   .chat-join .forum-btn,
   button.forum-tag,
   .forum-alliance-sub,
@@ -3103,9 +3099,17 @@ body:has(.chat-layout) #app { flex: none; }
     палец попадал в поле, а не в раскрытие.
   */
   .forum-authbox__sum,
-  .forum-me__more-sum,
+  .forum-self__more-sum,
   .accounts-chip,
   .accounts-controls__sold { min-height: 44px; }
+  /*
+    Строка о себе: под палец в ней две цели — аватар-ссылка и колокольчик.
+    Аватару нужна только зона: сам кружок остаётся 30 px и центрируется в
+    высоте. Колокольчик квадратом: min-height без ширины дал бы 36×44, а
+    щелчок мимо кнопки по горизонтали — это та же промашка, что и по вертикали.
+  */
+  .forum-me__ava { display: flex; align-items: center; }
+  .forum-bell { width: 44px; height: 44px; }
   /*
     Шапка: промер пальцем назвал в ней цель 36 px — переключатель темы.
     Прежде сюда же попадал «бургер», но кнопки меню в шапке больше нет:

@@ -25,6 +25,7 @@ function isOnline(lastSeen) {
   return Date.now() - d.getTime() < 5 * 60 * 1000;
 }
 import { levelOf, progressOf, achievementsOf, doneCount, reputationOf, reputationSourcesOf } from '../forum/rank.js';
+import { renderPushPrefs } from './forum.js';
 
 /**
  * @param {{
@@ -37,6 +38,9 @@ import { levelOf, progressOf, achievementsOf, doneCount, reputationOf, reputatio
  *   error?: string,
  *   nick?: string,
  *   history?: {createdAt: Date, oldNick: string, newNick: string, changedBy: string|null, reason: string}|null,
+ *   pushPrefs?: any,
+ *   quietError?: string,
+ *   meMoreOpen?: boolean,
  * }} state
  */
 export function renderUserPage(state = {}) {
@@ -73,6 +77,7 @@ export function renderUserPage(state = {}) {
 
   return `
     ${renderCard(profile, isMe, editing)}
+    ${isMe ? renderSelf(state) : ''}
     ${renderVerify(profile, me)}
     ${renderNickLog(profile, me, history, isMe)}
     ${editing && isMe ? renderEditForm(profile, me) : ''}
@@ -113,6 +118,42 @@ function renderCard(p, isMe, editing) {
                </button>`
         }
       </div>
+    </section>`;
+}
+
+/* ── Своё: оповещения и выход ──────────────────────────────────────────────── */
+
+/**
+ * Блок, который есть только у своего человека.
+ *
+ * Пришёл он с ленты. На форуме кнопка «Выйти» висела рядом с темами, хотя
+ * выходят тогда, когда с чтения закончили, — и на пути к посту в неё попадал
+ * палец, который её не искал. Тумблеры оповещений уехали следом: меняются раз
+ * в жизнь, а на форуме занимали раскрытие под собственным ником.
+ *
+ * Поведение не переписывали: обработчики обеих вещей висят на всём документе в
+ * forum/mount.js, поэтому переезд — это только разметка. Раскрытость тумблеров
+ * по-прежнему живёт в состоянии (`meMoreOpen`): `<details>` при перерисовке
+ * сборки вернулась бы свёрнутым, и щёлкнутый тумблер исчез бы с экрана.
+ */
+function renderSelf(s) {
+  const { me, pushPrefs, quietError, meMoreOpen } = s;
+  const prefs = renderPushPrefs({ me, pushPrefs, quietError });
+  if (!me) return '';
+
+  return `
+    <section class="panel forum-self">
+      <span class="eyebrow">Ваш аккаунт</span>
+      ${prefs ? `
+        <details class="forum-self__more" data-forum-me-more${meMoreOpen ? ' open' : ''}>
+          <summary class="forum-self__more-sum">
+            <span class="forum-self__more-arrow" aria-hidden="true"></span>
+            <b>Куда писать и когда будить</b>
+          </summary>
+          ${prefs}
+        </details>` : ''}
+      <button type="button" class="forum-btn forum-btn--ghost forum-self__out"
+              data-forum-signout>Выйти</button>
     </section>`;
 }
 

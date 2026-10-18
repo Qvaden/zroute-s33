@@ -2656,12 +2656,25 @@ console.log('\nQ. Форум');
     напрямую из базы, и без базы нажатие на ник давало «Не удалось связаться
     с базой». Теперь локальный адаптер отдаёт профиль сам, а profile.js идёт
     к нему, если тот умеет.
+
+    СПРАШИВАЮТ В МОМЕНТ ВЫЗОВА. Черновой адаптер приезжает отдельным import()
+    и наполняет `forum` после того, как profile.js прочитан, — поэтому проверка,
+    снятая один раз при загрузке файла, в черновом режиме навсегда остаётся
+    «ложь» и страница только что зарегистрировавшегося человека говорит
+    «Такого участника нет», читая чужую (боевую) базу.
   */
   check('локальный адаптер умеет профили',
     ['getProfile', 'getUserPosts', 'saveProfile'].every((m) => typeof localAdapter[m] === 'function'));
   const profileSource = await readFile('src/forum/profile.js', 'utf8');
   check('profile.js ходит к адаптеру, если тот умеет профили',
-    /typeof forum\.getProfile === 'function'/.test(profileSource) && /if \(ownProfiles\) return forum\.getProfile/.test(profileSource));
+    /typeof forum\.getProfile === 'function'/.test(profileSource)
+      && /if \(ownProfiles\(\)\) return forum\.getProfile/.test(profileSource));
+  check('умеет ли адаптер профили — спрашивают при каждом вызове, а не один раз при загрузке',
+    /const ownProfiles = \(\) => typeof forum\.getProfile === 'function';/.test(profileSource)
+      && !/const ownProfiles = typeof forum\./.test(profileSource));
+  check('ни один профильный вызов не разминился с местной записью',
+    (profileSource.match(/if \(ownProfiles\(\)\)/g) || []).length === 5
+      && !/if \(ownProfiles\)/.test(profileSource.replace(/if \(ownProfiles\(\)\)/g, '')));
 
   /*
     АДРЕС ПРОЕКТА ПРИВОДИТСЯ К ОДНОМУ ВИДУ.
@@ -4508,6 +4521,64 @@ console.log('\nS. Чистые функции');
   */
   check('профиль: ♥ назван симпатией, а не репутацией',
     /симпат/i.test(own) && !/♥ репутаци/i.test(own));
+
+  /* ── Строка о себе: одна линия, и всё лишнее ушло в профиль ── */
+  /*
+    Форум — для тем. Раньше строка «кто я» была рядом из четырёх кнопок, и две
+    из них дублировали нижнюю полосу разделов и нажатие на аватар. Проверки
+    ниже держат ровно это: в ленте не осталось «Чатов», «Профиля» и «Выйти»,
+    аватар ведёт на страницу участника, а выход и тумблеры живут там же.
+  */
+  const whoAmI = memberHtml.match(/<div class="forum-me"[\s\S]*?<\/div>/)?.[0] ?? '';
+  check('строка о себе нарисована', whoAmI !== '');
+  check('строка о себе: аватар — ссылка на свой профиль',
+    whoAmI.includes('class="forum-me__ava" href="#/user/') && /aria-label="Открыть свой профиль"/.test(whoAmI));
+  check('строка о себе: nick и роль остались, кнопок нет',
+    /forum-me__body/.test(whoAmI) && !/forum-btn/.test(whoAmI) && !/Выйти/.test(whoAmI));
+  check('строка о себе: колокольчик — единственная кнопка',
+    /data-forum-notify-open/.test(whoAmI) && (whoAmI.match(/<button/g) ?? []).length === 1);
+  check('строка о себе: выход и настройки push из ленты ушли',
+    !memberHtml.includes('data-forum-signout') && !memberHtml.includes('data-forum-push-pref')
+      && !memberHtml.includes('data-forum-quiet-toggle'));
+  check('строка о себе: чужих надписей про разделы в ней нет',
+    !/Чаты|Профиль/.test(whoAmI));
+  check('строка о себе: без плашки — это строка шапки, а не panel',
+    /<section class="forum-account">/.test(memberHtml)
+      && !/<section class="panel forum-account">/.test(memberHtml));
+
+  const selfHtml = renderUserPage({
+    profile: mine, posts, nick: 'Кто-то',
+    me: { id: 'u', nick: 'Кто-то', role: 'user' },
+    pushPrefs: { newForumPost: true, newForumReply: false },
+  });
+  check('профиль: выход переехал сюда', /data-forum-signout/.test(selfHtml));
+  check('профиль: блок своего аккаунта отделён от карточки',
+    /<section class="panel forum-self">/.test(selfHtml));
+  check('профиль: тумблеры и тихие часы раскрываются, а не торчат сразу',
+    /<details class="forum-self__more" data-forum-me-more>/.test(selfHtml)
+      && /data-forum-push-pref="newForumPost"/.test(selfHtml)
+      && /data-forum-quiet-toggle/.test(selfHtml));
+  check('профиль: без прочитанных настроек тумблеров нет, а выход остаётся',
+    !own.includes('data-forum-push-pref') && own.includes('data-forum-signout'));
+  check('профиль: чужому ни выход, ни тумблеры не рисуют',
+    !userHtml.includes('data-forum-signout') && !/forum-self/.test(userHtml));
+
+  /*
+    ДВЕ ВЕЩИ, КОТОРЫЕ ПОЛОМАЛИСЬ ИМЕННО ОТ ПЕРЕЕЗДА КНОПКИ.
+
+    раньше выход торчал в строке о себе, то есть на ленте: кнопка нажималась,
+    лента перезагружалась, и человек оставался там же, где был. Переехав на
+    страницу участника, он обязан с этой страницы уводить — иначе гость стоит
+    перед чужим профилем без настроек и без входа.
+
+    Вторая — следствие первой: перезагружая ленту, та запись переписывала адрес
+    через replaceState, и над разметкой профиля повисал «#/forum».
+  */
+  const mountSelfSource = await (await import('node:fs/promises')).readFile('src/forum/mount.js', 'utf8');
+  check('выход со своей страницы уходит на форум сменой адреса, а не тихой подменой',
+    /if \(mode === 'user'\) \{\r?\n\s*location\.hash = '#\/forum';/.test(mountSelfSource));
+  check('лента не переписывает адрес, пока на экране страница участника',
+    /function writeFilters\(\) \{[\s\S]{0,700}if \(mode !== 'feed'\) return;/.test(mountSelfSource));
 
   // Значение достижения экранируется — иначе накрученный ник открыл бы атрибут.
   const evil = achievementsOf({ postCount: 1, commentCount: 0, likesReceived: 0 }).find((a) => a.id === 'first_post');
@@ -14830,6 +14901,20 @@ console.log('\nAN. Доска аккаунтов');
   check('в mobile.css не осталось конкурирующих высот у кнопок ленты',
     !/forum-react__btn,[\s\S]{0,240}min-height: 36px/.test(mobileSrc)
       && !/\.seg__btn, \.cal__btn \{ min-height:/.test(mobileSrc));
+
+  /*
+    Строка о себе: кнопок в ней больше нет, но две цели под палец остались —
+    аватар-ссылка и колокольчик. Планка называет их по имени, а мёртвые
+    селекторы прежних кнопок убраны вместе с разметкой: правило без цели —
+    это будущая заплатка, которую никто не найдёт.
+  */
+  check('тач-планка называет аватар и колокольчик строки о себе',
+    /\.forum-btn--sm,\n\s*\.forum-me__ava,/.test(refineSrc)
+      && /\.forum-me__ava \{ display: flex; align-items: center; \}\n\s*\.forum-bell \{ width: 44px; height: 44px; \}/.test(refineSrc));
+  check('раскрытие настроек своего аккаунта стоит в планке под новым именем',
+    /\.forum-authbox__sum,\n\s*\.forum-self__more-sum,/.test(refineSrc));
+  check('селекторов прежних кнопок строки о себе в стилях нет',
+    !/forum-me__acts|forum-bell__label|forum-me__more|forum-me \.forum-btn/.test(refineSrc + mobileSrc));
 
   /*
     Перенос плашек спас ник, но вторая строка («Новости», «Ваш след», «2 новых

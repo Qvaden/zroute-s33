@@ -19,8 +19,16 @@ import { forum } from './index.js';
   к нему, а не в базу: в черновом режиме базы нет, и страница участника
   падала с «Не удалось связаться с базой». Рабочий адаптер этих методов
   не имеет — для него всё по-прежнему читается из forum_profiles ниже.
+
+  СПРАШИВАЮТ В МОМЕНТ ВЫЗОВА, А НЕ ОДИН РАЗ ПРИ ЗАГРУЗКЕ ФАЙЛА. Черновой
+  адаптер приходит отдельным import() и наполняет `forum` уже после того, как
+  этот файл прочитан (src/main.js:30 тянет его в стартовом графе, а forumReady()
+  ждут лишь на входе сайта). Значение, снятое на строке объявления, в черновом
+  режиме осталось бы «ложь» навсегда — и страница только что зарегистрировавшегося
+  человека сказала бы «Такого участника нет», потому что в боевой базе его ника
+  действительно нет.
 */
-const ownProfiles = typeof forum.getProfile === 'function';
+const ownProfiles = () => typeof forum.getProfile === 'function';
 
 const toDate = (v) => (v ? new Date(v) : null);
 
@@ -108,7 +116,7 @@ function profileFrom(row) {
 export async function getProfile(nick) {
   const clean = String(nick ?? '').trim();
   if (!clean) return null;
-  if (ownProfiles) return forum.getProfile(clean);
+  if (ownProfiles()) return forum.getProfile(clean);
 
   /*
     Сравнение без учёта регистра: ссылка из чата может прийти в любом виде,
@@ -124,7 +132,7 @@ export async function getProfile(nick) {
 
 /** Последние посты участника — для его страницы. */
 export async function getUserPosts(userId, limit = 10) {
-  if (ownProfiles) return forum.getUserPosts(userId, limit);
+  if (ownProfiles()) return forum.getUserPosts(userId, limit);
   const rows = await rest(
     `/forum_post_list?select=*&author_id=eq.${encodeURIComponent(userId)}` +
       `&deleted=is.false&order=created_at.desc&limit=${Number(limit)}`
@@ -148,7 +156,7 @@ export async function getUserPosts(userId, limit = 10) {
  * @param {{about?: string, allianceTag?: string, serverId?: number|string|null}} patch
  */
 export async function saveProfile(patch) {
-  if (ownProfiles) return forum.saveProfile(patch);
+  if (ownProfiles()) return forum.saveProfile(patch);
   const myId = currentUserId();
   if (!myId) throw new Error('Сначала войдите');
 
@@ -189,7 +197,7 @@ export async function saveProfile(patch) {
  * @returns {Promise<string>} публичная ссылка
  */
 export async function uploadAvatar(file) {
-  if (ownProfiles) throw new Error('В локальном режиме аватарку загрузить некуда — хранилища нет');
+  if (ownProfiles()) throw new Error('В локальном режиме аватарку загрузить некуда — хранилища нет');
   const myId = currentUserId();
   if (!myId) throw new Error('Сначала войдите');
 
@@ -223,7 +231,7 @@ export async function uploadAvatar(file) {
 
 /** Убрать аватарку: вернуться к букве в цветном квадрате. */
 export async function clearAvatar() {
-  if (ownProfiles) return;
+  if (ownProfiles()) return;
   const myId = currentUserId();
   if (!myId) throw new Error('Сначала войдите');
 
