@@ -89,7 +89,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=115">
+  <link rel="modulepreload" href="./src/main.js?v=116">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -138,6 +138,20 @@
     правило «подпись под картинкой» не должно перебиваться соседним слоем.
   -->
   <link rel="stylesheet" href="./src/handbook.css?v=11">
+  <!--
+    Краски альянсов, доведённые до контраста. Пустой блок — это нормально.
+
+    Наполняет его main.js, когда приходят данные: цвет альянса вносит человек
+    в панели, поэтому правило нельзя положить в файл темы — оно зависит от
+    таблицы, а не от оформления. Место здесь, а не в конце `<body>`, по двум
+    причинам: вместе со всеми стилями браузер решает, какой краской рисовать,
+    до первой отрисовки графика, и в собранной копии сайта этот же блок
+    печатает сборщик — порядок каскада обязан совпадать.
+
+    Сила селектора `:root[data-theme=…]` выше любого правила темы в этих
+    файлах, поэтому спорить с ними из-за порядка блок не будет.
+  -->
+  <style id="alliance-inks"></style>
   <script>
     try {
       if (localStorage.getItem('s33-loader-seen') === '1') {
@@ -399,7 +413,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=115"></script>
+  <script type="module" src="./src/main.js?v=116"></script>
 
   <script>
     /*

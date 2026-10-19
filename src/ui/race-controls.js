@@ -29,6 +29,23 @@
     });
   }
 
+  /*
+    Краска линии и краска подписи. Обе приходят со страницы и обе — ссылка на
+    CSS-переменную темы, уже посчитанную на контраст: `var(--aink-a01,#ade773)`.
+    Сырой цвет альянса живёт внутри этой ссылки запасным значением, поэтому
+    даже без объявленной переменной линия выйдет цветом альянса, а не чёрной.
+
+    Значение берётся из `style`, а не из атрибута `stroke`: атрибутом
+    CSS-переменную задать нельзя, и paint остался бы былым HEXом при любой теме.
+  */
+  function inkOf(r) {
+    return r.ink || r.color || NO_COLOR;
+  }
+
+  function labelInkOf(r) {
+    return r.inkLabel || r.color || NO_COLOR;
+  }
+
   function plural(n, one, few, many) {
     var m10 = n % 10, m100 = n % 100;
     if (m10 === 1 && m100 !== 11) return n + ' ' + one;
@@ -219,7 +236,7 @@
     var lines = rows
       .map(function (r) {
         var pts = r.series.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
-        return '<polyline points="' + pts + '" fill="none" stroke="' + esc(r.color || NO_COLOR) +
+        return '<polyline points="' + pts + '" fill="none" style="stroke:' + esc(inkOf(r)) +
           '" stroke-width="' + g.stroke + '" stroke-linejoin="round" stroke-linecap="round" class="race__line"/>';
       })
       .join('');
@@ -234,7 +251,13 @@
     var gap = g.label + 3;
     var ends = rows
       .map(function (r) {
-        return { tag: r.tag, color: r.color || NO_COLOR, realY: y(r.series[r.series.length - 1]) };
+        return {
+          tag: r.tag,
+          color: r.color || NO_COLOR,
+          ink: inkOf(r),
+          inkLabel: labelInkOf(r),
+          realY: y(r.series[r.series.length - 1]),
+        };
       })
       .sort(function (a, b) { return a.realY - b.realY; });
 
@@ -250,13 +273,20 @@
     var labels = ends
       .map(function (e) {
         var shifted = Math.abs(e.labelY - e.realY) > 1.5;
-        return '<circle cx="' + lastX.toFixed(1) + '" cy="' + e.realY.toFixed(1) + '" r="3.4" fill="' + esc(e.color) + '"/>' +
+        /*
+          Точка и подпись берут контрастную краску, чёрточка между ними — нет.
+          Она печатается при `opacity=".5"` и служит связью двух знаков, а не
+          самостоятельным элементом: требование 3:1 к ней не предъявляют,
+          зато требуемое затемнение сделало бы её невидимой на бумаге.
+        */
+        return '<circle cx="' + lastX.toFixed(1) + '" cy="' + e.realY.toFixed(1) + '" r="3.4" style="fill:' +
+          esc(e.ink) + '"/>' +
           (shifted
             ? '<line x1="' + (lastX + 3).toFixed(1) + '" y1="' + e.realY.toFixed(1) + '" x2="' + (lastX + 8).toFixed(1) +
               '" y2="' + e.labelY.toFixed(1) + '" stroke="' + esc(e.color) + '" stroke-width="1" opacity=".5"/>'
             : '') +
           '<text x="' + (lastX + 11).toFixed(1) + '" y="' + (e.labelY + g.label * 0.35).toFixed(1) +
-          '" class="race__label" fill="' + esc(e.color) + '" font-size="' + g.label + '">' + esc(e.tag) + '</text>';
+          '" class="race__label" style="fill:' + esc(e.inkLabel) + '" font-size="' + g.label + '">' + esc(e.tag) + '</text>';
       })
       .join('');
 

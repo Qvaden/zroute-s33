@@ -1,4 +1,5 @@
 import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavailableNote, emptyState } from '../ui/helpers.js';
+import { inkOf } from '../ui/ink.js';
 import { byWeekStart } from '../data/week-order.js';
 import { CONFIG } from '../../config.js';
 
@@ -149,14 +150,27 @@ function racePanel(list, weeks) {
 
   const lines = list
     .filter((r) => Array.isArray(r.series) && r.series.length === ordered.length)
-    .map((r) => ({
-      id: r.alliance.id,
-      tag: r.alliance.tag,
-      name: r.alliance.name,
-      color: r.alliance.color || '',
-      active: !!r.alliance.active,
-      series: r.series,
-    }));
+    .map((r) => {
+      /*
+        `ink` и `inkLabel` — ссылки на CSS-переменные с контрастной краской
+        альянса (ui/ink.js), а не сами цвета. Драйвер графика собран без
+        import и поэтому не умеет ни считать контраст, ни sanitизовать id в
+        имя переменной; правила с переменными печатает модуль, который до
+        слоя данных дотягивается. Числа в атрибутах остались бы краской той
+        темы, что была на экране при сборке разметки.
+      */
+      const ink = inkOf(r.alliance.id, r.alliance.color || '');
+      return {
+        id: r.alliance.id,
+        tag: r.alliance.tag,
+        name: r.alliance.name,
+        color: r.alliance.color || '',
+        ink: ink.line,
+        inkLabel: ink.label,
+        active: !!r.alliance.active,
+        series: r.series,
+      };
+    });
   if (lines.length < 2) return '';
 
   /*
@@ -318,6 +332,6 @@ function rowHtml(r, byId, variant = 'season', achievements) {
       ${r.points > 0 ? '+' : ''}${r.points}
     </span>
 
-    ${isQuarter ? '' : `<span class="lad__spark">${sparkline(r.series, color, 92, 26)}</span>`}
+    ${isQuarter ? '' : `<span class="lad__spark">${sparkline(r.series, inkOf(a.id, color).line, 92, 26)}</span>`}
   </a>`;
 }

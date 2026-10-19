@@ -4337,6 +4337,274 @@ console.log('\nS. Чистые функции');
     /console\.log\([^)]*skipped/.test(buildSrc)
       && /ВНИМАНИЕ/.test(buildSrc));
 }
+{
+  /* ── краски альянсов, доведённые до контраста (src/ui/ink.js) ── */
+  const { readFile } = await import('node:fs/promises');
+  const { INK, NO_ALLIANCE_COLOR, isColor, contrastRatio, inkFor, inkOf, allianceInkCss } =
+    await import('../src/ui/ink.js');
+  const { renderLadder } = await import('../src/pages/ladder.js');
+
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+  const th = themeTokens(v8);
+  const cssClean = stripCss(v8);
+
+  /*
+    АРИФМЕТИКА У ПРОВЕРКИ СВОЯ, НЕ ИЗ МОДУЛЯ.
+    Тест, который зовёт формулу из ink.js, повторяет её ошибку. Здесь контраст
+    и подмешивание краски считаются заново — тем же WCAG-путём, но независимым
+    кодом, — и совпадение двух реализаций само по себе является проверкой.
+  */
+  const over = (fg, bg, alpha) =>
+    `#${[0, 2, 4]
+      .map((i) =>
+        Math.round(
+          parseInt(fg.slice(i + 1, i + 3), 16) * alpha + parseInt(bg.slice(i + 1, i + 3), 16) * (1 - alpha)
+        )
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')}`;
+
+  /*
+    ЧЕТЫРЕ НАСТОЯЩИХ СЛОЯ КАРТОЧКИ, А НЕ ФОН СТРАНИЦЫ.
+    Линию рисует пластинка панели: `--plate-grad` кладёт её на `--raised-2` с
+    переходом в `--surface`, а строка рейтинга сверху подкрашивает пластинку
+    чернилами темы. Stops и процент берутся из CSS: правка токена темы или
+    процента обязана поменять саму проверку, а не оставить в ней старый замер.
+    Считать по `--bg` было бы самообманом — ровно так и потеряли провалы ночи.
+  */
+  const gradStops = /--plate-grad:\s*linear-gradient\([^,]+,\s*var\((--[\w-]+)\),\s*var\((--[\w-]+)\)/.exec(cssClean) || [];
+  const rowTint = (() => {
+    for (const m of cssClean.matchAll(/\.lad__row\s*\{([^}]*)\}/g)) {
+      const g = /background:\s*linear-gradient\([^)]*color-mix\(in srgb,\s*var\(--text\)\s*([\d.]+)%/.exec(m[1]);
+      if (g) return Number(g[1]) / 100;
+    }
+    return 0;
+  })();
+  const plateLayers = (theme) => {
+    const t = th[theme];
+    const a = t[gradStops[1]];
+    const b = t[gradStops[2]];
+    return [a, b, over(t['--text'], a, rowTint), over(t['--text'], b, rowTint)];
+  };
+  const fadeOf = (kind, theme) => (kind === 'label' ? 1 : INK[theme].fade);
+  /* Не проходит ли краска хотя бы на одном из четырёх слоёв. */
+  const fails = (color, theme, kind) =>
+    plateLayers(theme).some((s) => contrast(over(color, s, fadeOf(kind, theme)), s) < INK[theme][kind]);
+
+  check('из CSS вычитаны два слоя пластинки и подкраска строки',
+    Boolean(gradStops[1] && gradStops[2] && rowTint > 0 && rowTint < 0.2),
+    `${gradStops[1]} ${gradStops[2]} подкраска ${rowTint * 100} %`);
+
+  /* ПОРОГИ. Это числа стандарта, а не вкуса: 1.4.11 для графики, 1.4.3 для текста. */
+  equal('порог графики — 3:1 (WCAG 1.4.11)', [INK.light.stroke, INK.dark.stroke], [3, 3]);
+  equal('порог подписи — 4,5:1 (WCAG 1.4.3)', [INK.light.label, INK.dark.label], [4.5, 4.5]);
+  equal('в расчёте стоит бледность точек, а не сплошная линия', [INK.light.fade, INK.dark.fade], [0.85, 0.85]);
+  check('публичная арифметика совпадает с независимой',
+    ['#d44949', '#ade773', '#f2eee8'].every((c) => Math.abs(contrastRatio(c, INK.light.surface) - contrast(c, INK.light.surface)) < 1e-9));
+  equal('чёрный на белом — ровно 21:1', Math.round(contrastRatio('#000000', '#ffffff') * 1e6) / 1e6, 21);
+
+  /* ПОДЛОЖКА И ЧЕРНИЛА = ТЕКУЩИЕ ТОКЕНЫ ТЕМ. */
+  equal('чернила светлой темы — её же --text', INK.light.ink, th.light['--text']);
+  equal('чернила тёмной темы — её же --text', INK.dark.ink, th.dark['--text']);
+  for (const theme of ['light', 'dark']) {
+    const layers = plateLayers(theme);
+    const worst = theme === 'light'
+      ? layers.reduce((x, y) => (relLum(y) < relLum(x) ? y : x))
+      : layers.reduce((x, y) => (relLum(y) > relLum(x) ? y : x));
+    check(`подложка ${theme} — худший из четырёх слоёв карточки, а не фон страницы`,
+      INK[theme].surface === worst,
+      `в расчёте ${INK[theme].surface}, ждали ${worst}; слои: ${layers.join(' ')}`);
+  }
+
+  /* ФУНКЦИЯ: что считается краской и что с ней происходит. */
+  equal('HEX любого регистра и длины — краска',
+    [isColor('#ade773'), isColor('#FFF'), isColor(' #d44949 ')], [true, true, true]);
+  equal('всё остальное краской не притворяется',
+    [isColor(''), isColor('red'), isColor('rgb(1,2,3)'), isColor(null), isColor(undefined)],
+    [false, false, false, false, false]);
+  equal('не-краска проходит насквозь нетронутой',
+    [inkFor('currentColor', 'light'), inkFor('var(--accent)', 'dark', 'label'), inkFor('', 'light')],
+    ['currentColor', 'var(--accent)', '']);
+
+  /*
+    ЧЕТЫРЕ КРАСКИ ИЗ ЗАГОЛОВКА ink.js. Проверка начиналась именно с них:
+    живые линии графика. Первая пара обещаний даёт тесту зубы — если краска
+    вдруг станет читаться сама по себе, «до правки не проходила» закричит.
+  */
+  for (const c of ['#ade773', '#51e1aa', '#ed925a', '#6ab0dc']) {
+    check(`${c} до правки не проходила 3:1 на бумаге`, fails(c, 'light', 'stroke'));
+    check(`${c} после правки держит 3:1 линией и 4,5:1 подписью на всех слоях бумаги`,
+      !fails(inkFor(c, 'light', 'stroke'), 'light', 'stroke') && !fails(inkFor(c, 'light', 'label'), 'light', 'label'),
+      `${inkFor(c, 'light', 'stroke')} / ${inkFor(c, 'light', 'label')}`);
+    check(`${c} в ночи держит те же пороги`,
+      !fails(inkFor(c, 'dark', 'stroke'), 'dark', 'stroke') && !fails(inkFor(c, 'dark', 'label'), 'dark', 'label'),
+      `${inkFor(c, 'dark', 'stroke')} / ${inkFor(c, 'dark', 'label')}`);
+    check(`${c} осталась своим тоном, а не стала чернилами темы`,
+      inkFor(c, 'light', 'stroke') !== INK.light.ink && inkFor(c, 'dark', 'stroke') !== INK.dark.ink);
+  }
+
+  /*
+    ВСЕ КРАСКИ ДАННЫХ, обе темы и обе роли. Демонстрационный набор — то, на
+    чём сайт крутится в тестах; живой снимок — то, что человек видит на проде.
+    Считаются оба, потому что краски владелец вводит руками и любой из них
+    может оказаться салатовым на бумаге.
+  */
+  const datasets = [];
+  {
+    const { data } = await loadAndValidate(jsonAdapter);
+    datasets.push(['демо', data.alliances]);
+  }
+  try {
+    datasets.push(['живой снимок', JSON.parse(await readFile('data/live.json', 'utf8')).alliances]);
+  } catch { /* снимок необязателен: в свежей копии репозитория его может не быть */ }
+  check('красок данных набрано не меньше двух десятков',
+    datasets.every(([, list]) => Array.isArray(list) && list.length >= 20),
+    datasets.map(([n, list]) => `${n}: ${Array.isArray(list) ? list.length : 'нет'}`).join(', '));
+  for (const [name, list] of datasets) {
+    for (const theme of ['light', 'dark']) {
+      for (const kind of ['stroke', 'label']) {
+        const bad = list
+          .filter((a) => isColor(a.color))
+          .map((a) => ({ id: a.id, from: a.color, to: inkFor(a.color, theme, kind) }))
+          .filter((x) => fails(x.to, theme, kind));
+        check(`${name}: ${theme}/${kind} — все краски проходят на четырёх слоях`,
+          bad.length === 0, bad.map((x) => `${x.id} ${x.from}→${x.to}`).join(' '));
+      }
+    }
+  }
+  /* Ночь правит не меньше дня: при честной подложке это проверено, а не обещано. */
+  for (const [name, list] of datasets) {
+    const six = list.filter((a) => /^#[0-9a-f]{6}$/i.test(String(a.color).trim()));
+    for (const theme of ['light', 'dark']) {
+      const moved = six.filter((a) => inkFor(a.color, theme, 'stroke') !== a.color.toLowerCase()).length;
+      check(`${name}: в теме ${theme} краска сдвинута, а не признана годной молча`, moved > 0, `сдвинуто ${moved} из ${six.length}`);
+    }
+  }
+
+  /* ССЫЛКИ И БЛОК ПРАВИЛ. */
+  equal('штрих ссылается на переменную темы с запасом', inkOf('a01', '#d44949').line, 'var(--aink-a01,#d44949)');
+  equal('подпись — на свою переменную', inkOf('a01', '#d44949').label, 'var(--ainkt-a01,#d44949)');
+  equal('альянс без краски ссылается на общий серый',
+    inkOf('a01', '').label, `var(--ainkt-a01,${NO_ALLIANCE_COLOR})`);
+  equal('id режется в имя переменной целиком', inkOf('A 1}-', '#d44949').line, 'var(--aink-a-1--,#d44949)');
+
+  const block = allianceInkCss([{ id: 'a1', color: '#ade773' }, { id: 'a2', color: '' }]);
+  const lightBlock = /:root\[data-theme="light"\]\{([^}]*)\}/.exec(block);
+  const darkBlock = /:root\[data-theme="dark"\]\{([^}]*)\}/.exec(block);
+  check('блок содержит обе темы, а в каждой — штрих и подпись на каждый альянс',
+    Boolean(lightBlock && darkBlock) &&
+      ['--aink-a1:', '--ainkt-a1:', '--aink-a2:', '--ainkt-a2:'].every((v) => lightBlock[1].includes(v) && darkBlock[1].includes(v)),
+    block);
+  for (const [theme, body] of [['light', lightBlock[1]], ['dark', darkBlock[1]]]) {
+    const strokes = [...body.matchAll(/--aink-([a-z0-9_-]+):(#[0-9a-f]{6})/gi)];
+    const labels = [...body.matchAll(/--ainkt-([a-z0-9_-]+):(#[0-9a-f]{6})/gi)];
+    check(`блок ${theme}: каждый штрих проходит 3:1`, strokes.every((m) => !fails(m[2], theme, 'stroke')),
+      strokes.map((m) => `${m[1]}:${m[2]}`).join(' '));
+    check(`блок ${theme}: каждая подпись проходит 4,5:1`, labels.every((m) => !fails(m[2], theme, 'label')),
+      labels.map((m) => `${m[1]}:${m[2]}`).join(' '));
+  }
+  const evil = allianceInkCss([{ id: 'x{}body{display:none}', color: '#000000' }]);
+  check('id не дописывает в блок своих правил',
+    (evil.match(/\{/g) || []).length === 2 && (evil.match(/\}/g) || []).length === 2, evil);
+  equal('пустой набор не печатает блока', allianceInkCss([]), '');
+  equal('не-массив и строки без id тоже', [allianceInkCss(null), allianceInkCss([{ id: '', color: '#000' }, null])], ['', '']);
+
+  /*
+    ПРОВОДКА. Краску в CSS-переменные пишет один владелец состояния, а не
+    каждая страница: иначе набор правил расходился бы по маршрутам. Драйвер
+    графика собран без import и поэтому только печатает готовую ссылку.
+  */
+  check('на странице есть блок, куда эти правила кладутся',
+    /<style id="alliance-inks"><\/style>/.test(await readFile('index.html', 'utf8')));
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  check('правила считаются и пишутся в одном месте, а не по каждой странице',
+    /import \{ allianceInkCss \} from '\.\/ui\/ink\.js'/.test(mainSrc)
+      && (mainSrc.match(/allianceInks\(view\.alliances\)/g) || []).length === 2,
+    `вызовов: ${(mainSrc.match(/allianceInks\(view\.alliances\)/g) || []).length}`);
+  check('стили не пересобираются, когда краски не изменились',
+    /if \(node\.textContent === css\) return;/.test(mainSrc));
+
+  const previewSrc = await readFile('scripts/build-preview.mjs', 'utf8');
+  check('сборка копии печатает правила прямо из данных',
+    /const inksCss = allianceInkCss\(view\.alliances\);/.test(previewSrc) && /\$\{inksCss\}/.test(previewSrc));
+
+  /* СОБРАННАЯ КОПИЯ. dist/ лежит в .gitignore: проверяем её, только если она есть на диске. */
+  try {
+    const dist = await readFile('dist/preview.html', 'utf8');
+    const dLight = /:root\[data-theme="light"\]\{([^}]*)\}\n:root\[data-theme="dark"\]\{([^}]*)\}/m.exec(dist);
+    check('копия: блок красок на обе темы собран', Boolean(dLight));
+    if (dLight) {
+      const ids = (body, re) => [...body.matchAll(re)].map((m) => m[1]).sort().join(',');
+      const pattern = /--aink(t?)-([a-z0-9_-]+):/g;
+      check('копия: набор переменных в обеих темах одинаков',
+        ids(dLight[1], pattern) === ids(dLight[2], pattern),
+        `${ids(dLight[1], pattern)}\n       ${ids(dLight[2], pattern)}`);
+      for (const [theme, body] of [['light', dLight[1]], ['dark', dLight[2]]]) {
+        const bad = [...body.matchAll(/--aink(t?)-([a-z0-9_-]+):(#[0-9a-f]{6})/gi)]
+          .map((m) => ({ v: m[2], kind: m[1] ? 'label' : 'stroke', color: m[3] }))
+          .filter((x) => fails(x.color, theme, x.kind));
+        check(`копия: ${theme} — ни одна краска блока не ниже порога`, bad.length === 0,
+          bad.map((x) => `${x.v}→${x.color} (${x.kind})`).join(' '));
+      }
+    }
+  } catch { /* копия не собрана — проверять нечего */ }
+
+  /* РАЗМЕТКА И ДРАЙВЕР: краска обязана идти по style, а не по атрибуту. */
+  const raceWeeks = [{ id: 'w1', number: 1 }, { id: 'w2', number: 2 }, { id: 'w3', number: 3 }];
+  const raceRows = [
+    {
+      alliance: { id: 'a1', tag: 'A', name: 'Альфа', color: '#ade773', active: true },
+      series: [0, 10, 20], points: 20, wins: 2, losses: 0, form: ['win', 'win'], place: 1,
+    },
+    {
+      alliance: { id: 'a2', tag: 'B', name: 'Бета', color: '', active: true },
+      series: [0, 5, 8], points: 8, wins: 1, losses: 1, form: ['loss'], place: 2,
+    },
+  ];
+  const ladderHtml = renderLadder({ standings: raceRows, weeks: raceWeeks });
+  const raceLines = JSON.parse(/data-race-data>([\s\S]*?)<\/script>/.exec(ladderHtml)[1]).lines;
+  equal('строка данных несёт ссылку, а не число', raceLines[0].ink, 'var(--aink-a1,#ade773)');
+  equal('и ссылку подписи', raceLines[0].inkLabel, 'var(--ainkt-a1,#ade773)');
+  equal('исходная краска остаётся рядом — она же запас в var()', raceLines[0].color, '#ade773');
+  equal('альянс без краски получает серый запас', raceLines[1].ink, 'var(--aink-a2,#7a8494)');
+  check('искра в строке рейтинга тоже красится ссылкой', /style="stroke:var\(--aink-a1,/.test(ladderHtml));
+
+  const driver = await readFile('src/ui/race-controls.js', 'utf8');
+  check('штрих, точка и подпись идут через style: в атрибут var() не положить',
+    driver.includes(`style="stroke:' + esc(inkOf(r))`) && /style="fill:'/.test(driver) && driver.includes('esc(e.inkLabel)'));
+  check('нет блока переменных — линия остаётся прежней краской, а не исчезает',
+    /r\.ink \|\| r\.color \|\| NO_COLOR/.test(driver) && /r\.inkLabel \|\| r\.color \|\| NO_COLOR/.test(driver));
+  check('чёрточка между точкой и подписью остаётся исходной краской с половинной яркостью',
+    driver.includes(`stroke="' + esc(e.color) + '" stroke-width="1" opacity=".5"`));
+
+  const helpersSrc = await readFile('src/ui/helpers.js', 'utf8');
+  const chartSrc = await readFile('src/ui/chart.js', 'utf8');
+  check('sparkline красит штрихом через style', /style="stroke:\$\{color\}"/.test(helpersSrc));
+  check('графики альянса красят линию, точки и заливку через style',
+    /style="stroke:\$\{esc\(color\)\}/.test(chartSrc)
+      && /style="fill:\$\{esc\(color\)\}"/.test(chartSrc)
+      && /style="stop-color:\$\{esc\(color\)\}"/.test(chartSrc));
+
+  const allySrc = await readFile('src/pages/alliance.js', 'utf8');
+  check('страница альянса берёт краску из ссылки, а не из данных',
+    /const ink = inkOf\(a\.id, color\)\.line;/.test(allySrc)
+      && /areaChart\(row\.series, ordered, ink/.test(allySrc)
+      && /placeChart\(places, ordered, standings\.length, ink\)/.test(allySrc));
+
+  /*
+    Линия активности форума красится не краской альянса, а фирменной — и она
+    тоже обязана держать порог: по ней сверяют дни.
+  */
+  check('линия активности форума красится чернилами акцента, а не самим акцентом',
+    /const sparkColor = 'var\(--accent-ink\)';/.test(await readFile('src/pages/forum.js', 'utf8')));
+  for (const theme of ['light', 'dark']) {
+    check(`--accent-ink в теме ${theme} держит 3:1 на всех шести ступенях`,
+      SURFACES.every((s) => contrast(th[theme]['--accent-ink'], th[theme][s]) >= 3),
+      SURFACES.map((s) => `${s}:${contrast(th[theme]['--accent-ink'], th[theme][s]).toFixed(2)}`).join(' '));
+  }
+}
+
 
 {
   /* ── Уровни, достижения и репутация форума (rank.js) ── */
@@ -4583,6 +4851,74 @@ console.log('\nS. Чистые функции');
   // Значение достижения экранируется — иначе накрученный ник открыл бы атрибут.
   const evil = achievementsOf({ postCount: 1, commentCount: 0, likesReceived: 0 }).find((a) => a.id === 'first_post');
   check('achievements: подпись не должна зависеть от текста профиля', typeof evil.hint === 'string' && !/"/.test(evil.hint));
+}
+
+/* ── Колокольчик: одно нажатие красит только панель уведомлений ── */
+{
+  /*
+    Человек на телефоне жаловался, что после нажатия на колокольчик «страница
+    перезагружается». Так и было: ради одной панели перестраивался весь форум,
+    карточки ленты создавались заново, их картинки грузились заново. Проверки
+    держат малое: у панели есть метка, рядом якорь, а колокольчик зовёт
+    перекраску панели, а не страницы.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const { renderForum } = await import('../src/pages/forum.js');
+  const pagesSource = await readFile('src/pages/forum.js', 'utf8');
+  const mountSource = await readFile('src/forum/mount.js', 'utf8');
+  const base = {
+    ready: true, shared: true, sourceName: 's', loading: false, error: '',
+    me: { id: 'u', nick: 'Кто-то', role: 'user', createdAt: new Date() },
+    posts: [], hot: [], lead: [], total: 0, category: 'all', tag: 'all', sort: 'fresh',
+    openPostId: null, comments: [], query: '', editingPostId: null,
+  };
+  const closedHtml = renderForum({ events: [] }, base);
+  const openedHtml = renderForum({ events: [] }, {
+    ...base,
+    notifyOpen: true,
+    notifyUnread: 0,
+    notifyFresh: new Set(['n1']),
+    notifyList: [{
+      id: 'n1', kind: 'comment', postId: 'p1', actorNick: 'Кто-то',
+      preview: 'ответ по теме', createdAt: new Date(), readAt: new Date(),
+    }],
+  });
+
+  check('панель уведомлений помечена атрибутом — её и перекрашивают',
+    /<section class="panel forum-notify" data-forum-notify-panel>/.test(openedHtml));
+  check('закрытая панель ничего не рисует', !/data-forum-notify-panel/.test(closedHtml));
+  /*
+    Второй пояс безопасности, а не перестраховка: колокольчик и панель живут на
+    ленте, а выход уводит человека именно туда. Если бы состояние панели протекло
+    за выход, следующий в этом браузере увидел бы чужие уведомления. Разметка не
+    отдаёт их гостю, даже когда открытость стоит в состоянии.
+  */
+  const guestWithOpenPanel = renderForum({ events: [] }, {
+    ...base, me: null, notifyOpen: true, notifyUnread: 3,
+    notifyList: [{
+      id: 'n1', kind: 'comment', postId: 'p1', actorNick: 'Кто-то',
+      preview: 'ответ по теме', createdAt: new Date(), readAt: null,
+    }],
+  });
+  check('гость не видит ни панели уведомлений, ни колокольчика — даже с открытым состоянием',
+    !/data-forum-notify-panel/.test(guestWithOpenPanel)
+      && !/data-forum-notify-open/.test(guestWithOpenPanel));
+  check('якорь для панели стоит в разметке и при закрытой, и при открытой панели',
+    /<span data-forum-notify-anchor hidden><\/span>/.test(closedHtml)
+      && /<span data-forum-notify-anchor hidden><\/span>/.test(openedHtml));
+  check('панель встаёт перед якорем — там же, где её рисует полная перерисовка',
+    openedHtml.indexOf('data-forum-notify-panel') < openedHtml.indexOf('data-forum-notify-anchor'));
+  check('renderNotifications отдаётся наружу: монтаж красит панель им',
+    /export function renderNotifications/.test(pagesSource)
+      && /import \{[^}]*\brenderNotifications\b[^}]*\} from '\.\.\/pages\/forum\.js'/.test(mountSource));
+  check('колокольчик зовёт paintNotifications, а не полную перерисовку',
+    /if \(t\.closest\('\[data-forum-notify-open\]'\)\) \{[\s\S]{0,1200}paintNotifications\(\);\s*\r?\n\s*return;/.test(mountSource));
+  check('список для панели грузится без перерисовки страницы',
+    /if \(t\.closest\('\[data-forum-notify-open\]'\)\) \{[\s\S]{0,200}loadNotifications\(\{ repaint: false \}\)/.test(mountSource));
+  check('перекраска снимает счётчик и объявляет панель открытой',
+    /function paintNotifications\(\)[\s\S]{0,900}setAttribute\('aria-expanded'[\s\S]{0,200}data-forum-notify-badge/.test(mountSource));
+  check('без якоря перекраска возвращается к полной перерисовке, а не молчит',
+    /function paintNotifications\(\) \{[\s\S]{0,200}if \(!anchor\) \{\s*\r?\n\s*paint\(\);/.test(mountSource));
 }
 
 /* ── Источник: «Самое обсуждаемое» тянется вместе с лентой ── */
@@ -9707,8 +10043,11 @@ console.log('\nAG. Тихие часы');
   const on = await local.getPushPrefs();
   check('окно через полночь принято и вернулось целым',
     on.quietStart === 1320 && on.quietEnd === 480);
-  check('и легло в черновую базу под своими именами',
-    raw().pushPrefs.quietStart === 1320 && raw().pushPrefs.quietEnd === 480);
+  const owners = Object.keys(raw().pushPrefsBy || {});
+  check('и легло в черновую базу привязано к вошедшему, а не валится в общую кучу',
+    owners.length === 1 && raw().pushPrefsBy[owners[0]].quietStart === 1320
+      && raw().pushPrefsBy[owners[0]].quietEnd === 480
+      && String(raw().me) === owners[0]);
   equal('половина окна отказана теми же словами, что и страница',
     await says(() => local.setPushPrefs({ quietStart: 600 })),
     'У тихих часов должно быть две границы: начало и конец');
@@ -9723,6 +10062,29 @@ console.log('\nAG. Тихие часы');
     cleared.quietStart === null && cleared.quietEnd === null);
   check('тумблеры подписки при этом живут своей жизнью',
     'newForumPost' in cleared && 'newForumReply' in cleared);
+
+  /*
+    Настройки — про человека. В боевом режиме за них отвечает строка
+    пользователя в базе, и черновой режим обязан делить их так же: иначе
+    второй, кто откроет сайт в этом браузере, увидит чужие галки и уйдёт
+    молчать в часы, которые выбрал не он.
+  */
+  await local.signUp('Настройкпервый', 'пароль-для-проверки', '33');
+  await local.setPushPrefs({ newForumPost: true, quietStart: 1320, quietEnd: 480 });
+  const firstOn = await local.getPushPrefs();
+  await local.signUp('Настройквторой', 'пароль-для-проверки', '33');
+  const secondFresh = await local.getPushPrefs();
+  check('черновой режим: у второго игрока нет ни галок, ни окна первого',
+    firstOn.newForumPost === true && firstOn.quietStart === 1320
+      && secondFresh.newForumPost === false && secondFresh.quietStart === null
+      && secondFresh.quietEnd === null);
+  await local.signIn('Настройкпервый');
+  const firstBack = await local.getPushPrefs();
+  check('черновой режим: возврат на первого приносит его настройки',
+    firstBack.newForumPost === true && firstBack.quietStart === 1320 && firstBack.quietEnd === 480);
+  await local.signOut();
+  check('черновой режим: гостю чужие настройки не отдаются',
+    (await local.getPushPrefs()).newForumPost === false);
 
   /* Зеркало для работника: без IndexedDB — честный отказ и честное null. */
   check('без хранилища браузера зеркало не делает вид, что записало',

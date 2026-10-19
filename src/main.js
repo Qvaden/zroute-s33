@@ -20,6 +20,7 @@ import { renderAbout } from './pages/about.js';
 import { renderAlliance } from './pages/alliance.js';
 import { computeAchievements } from './logic/achievements.js';
 import { esc } from './ui/helpers.js';
+import { allianceInkCss } from './ui/ink.js';
 import { skWithCaption } from './ui/skeleton.js';
 import { presidentBoardFromTexts } from './logic/president-board.js';
 import { startQuarterTimer } from './ui/quarter-timer.js';
@@ -1491,6 +1492,37 @@ function sourceBadge() {
       : 'живая база';
 }
 
+/**
+ * КРАСКИ АЛЬЯНСОВ, ДОВЕДЁННЫЕ ДО КОНТРАСТА.
+ *
+ * Цвет альянса вносит человек, и на светлой бумаге бледная краска исчезает:
+ * замер худшей из 28 красок живого графика давал 1,13:1 при норме 3:1. ui/ink.js считает для
+ * каждого цвета по два значения — для бумаги и для ночи, — а сюда приходит
+ * готовый CSS-блок для `<style id="alliance-inks">` из головы страницы.
+ *
+ * ПРАВДУ ГОВОРИТ БЛОК, А НЕ КРАСКА В РАЗМЕТКЕ. Страницы рисуют линии ссылкой
+ * `var(--aink-…)`, поэтому переключатель темы перекрашивает график сам:
+ * `applyTheme` меняет атрибут и больше ничего, и per-theme значения — единство,
+ * которое не даёт нарисованному для бумаги графику остаться бумажным ночью.
+ *
+ * Пишется один раз на приход данных, а не на каждую отрисовку: данные едут
+ * из слоя данных, а render() вызывается и сменой вкладки, и сотней других
+ * поводов — пересобирать правила стилей ради них незачем.
+ */
+function allianceInks(alliances) {
+  const node = document.getElementById('alliance-inks');
+  if (!node) return;
+  const css = allianceInkCss(alliances);
+  /*
+    Присваивание тексту `<style>` заставляет браузер пересобрать правила и
+    перекрасить документ. Тот же набор альянсов приходит и когда человек жмёт
+    «Повторить» на полоске про недоступную таблицу: без проверки страница
+    перекрашивалась бы заново при каждом нажатии.
+  */
+  if (node.textContent === css) return;
+  node.textContent = css;
+}
+
 async function boot() {
   /*
     Адаптер форума наполнен до первого render(): в бою этот await не ждёт
@@ -1621,6 +1653,7 @@ async function refreshView() {
       problems,
     };
 
+    allianceInks(view.alliances);
     sourceBadge();
     dataNotice();
     render();
@@ -1644,6 +1677,11 @@ async function refreshView() {
       таблицы результатов — плохая сделка.
     */
     view = emptyView(String(err.message ?? err));
+
+    // Альянсов нет, поэтому краски чистятся. Пропустить — значит оставить
+    // блок от прежших данных: после удачной загрузки, за которой «Повторить»
+    // уже не сумел, на экране висели бы переменные про таблицу, которой нет.
+    allianceInks(view.alliances);
 
     const badge = document.getElementById('source-badge');
     if (badge) badge.textContent = 'недоступен';

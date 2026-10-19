@@ -87,10 +87,15 @@ export function sparkline(series, color = '#e0a33e', w = 84, h = 24) {
     неравномерном масштабе круг превратился бы в эллипс. Потери нет — текущие
     очки и так стоят числом в соседней колонке.
     vector-effect держит толщину линии постоянной при любом растяжении.
+
+    Краска стоит свойством `style`, а не атрибутом `stroke`: атрибутом нельзя
+    сослаться на CSS-переменную, а именно ею теперь приходит контрастная
+    краска альянса (см. ui/ink.js) — иначе после переключения темы линия
+    осталась бы краской прежней темы.
   */
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"
     preserveAspectRatio="none" aria-hidden="true">
-    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"
+    <polyline points="${pts}" fill="none" style="stroke:${color}" stroke-width="1.6"
       stroke-linejoin="round" stroke-linecap="round" opacity="0.9"
       vector-effect="non-scaling-stroke"/>
   </svg>`;

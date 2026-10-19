@@ -21,7 +21,7 @@
  */
 import { forum } from './index.js';
 import { toast } from '../ui/toast.js';
-import { renderForum, renderReportDialog, renderDeleteDialog, QUARTER_SEEN_KEY } from '../pages/forum.js';
+import { renderForum, renderReportDialog, renderDeleteDialog, renderNotifications, QUARTER_SEEN_KEY } from '../pages/forum.js';
 import { renderUserPage } from '../pages/user.js';
 import {
   validateNick, validatePassword, validatePost, validateComment, deletionReason,
@@ -653,6 +653,31 @@ function paint() {
 
   restoreInput(snapshot);
   paintPendingShots();
+}
+
+/**
+ * Колокольчик красит только панель уведомлений.
+ *
+ * Ради одной панели перестраивать весь форум нельзя: карточки ленты создаются
+ * заново, их картинки заново грузятся, а человеку это выглядит как повторная
+ * загрузка страницы — ровно на том месте, где он уже выбрал тему читать.
+ * Якорь для вставки кладёт разметка, поэтому позиция панели та же, что у
+ * полной перерисовки.
+ */
+function paintNotifications() {
+  const anchor = host?.querySelector('[data-forum-notify-anchor]');
+  if (!anchor) {
+    paint();
+    return;
+  }
+  host.querySelector('[data-forum-notify-panel]')?.remove();
+  if (state.notifyOpen) {
+    anchor.insertAdjacentHTML('beforebegin', renderNotifications(state));
+  }
+  for (const bell of host.querySelectorAll('.forum-bell[data-forum-notify-open]')) {
+    bell.setAttribute('aria-expanded', state.notifyOpen ? 'true' : 'false');
+    bell.querySelector('[data-forum-notify-badge]')?.remove();
+  }
 }
 
 /**
@@ -2330,7 +2355,7 @@ function wire() {
     if (t.closest('[data-forum-notify-open]')) {
       state.notifyOpen = !state.notifyOpen;
       if (state.notifyOpen) {
-        await loadNotifications();
+        await loadNotifications({ repaint: false });
         /*
           Открыли — прочитали. Отметку не ждём и не перерисовываем дважды:
           если сеть ответит быстро, повторный запрос списка пришёл бы
@@ -2349,7 +2374,7 @@ function wire() {
       } else {
         state.notifyFresh = new Set();
       }
-      paint();
+      paintNotifications();
       return;
     }
 

@@ -158,6 +158,7 @@ export function renderForum(view, state = {}) {
         ${renderWelcome(s)}
         ${renderStarterSteps(s)}
         ${renderNotifications(s)}
+        <span data-forum-notify-anchor hidden></span>
         ${renderComposer(s)}
         ${renderFeedControls(s)}
         ${renderFeed(s)}
@@ -482,7 +483,15 @@ function renderServerActivity(view, s) {
     просто опускаем блок.
   */
   const totalByDay = act.map((d) => d.forumPosts + d.forumComments + d.chatMessages);
-  const sparkColor = 'var(--accent)';
+  /*
+    Линия активности — не плашка: по ней сверяют дни, значит она обязана
+    читаться, а не намекать. `--accent` днём не доходит до порога 3:1 ни на
+    одном бумажном слое (на пластинке карточки — 2,68:1), а линия graphics держит
+    его только чернилами: `--accent-ink` (#9c3a12) даёт на том же слое 6,00:1 и
+    не падает ниже 5,24:1 ни на одной из шести бумажных ступеней — это сверяет
+    тест. Ночью оба токена — одно и то же число.
+  */
+  const sparkColor = 'var(--accent-ink)';
   const chart = totalByDay.some((n) => n > 0) ? sparkline(totalByDay, sparkColor, 180, 28) : '';
 
   return `
@@ -893,7 +902,7 @@ function notifyRow(n, isNew) {
  * не состояние базы, а то, что человек ещё не видел: набор id панель
  * получает от состояния сессии (notifyFresh) и теряет при закрытии.
  */
-function renderNotifications(s) {
+export function renderNotifications(s) {
   if (!s.me || !s.notifyOpen) return '';
 
   const list = s.notifyList;

@@ -1,4 +1,5 @@
 import { esc, fmtDate, plural, deltaBadge } from '../ui/helpers.js';
+import { inkOf } from '../ui/ink.js';
 import { areaChart, placeChart } from '../ui/chart.js';
 import { computeAllianceHistory, computeBestStreaks } from '../logic/standings.js';
 
@@ -29,6 +30,13 @@ export function renderAlliance(view, allianceId) {
 
   const a = row.alliance;
   const color = a.color || '#7a8494';
+  /*
+    Графики красятся контрастной краской, остальное — цветом альянса.
+    `--tag-color` ниже смешивается с фоном плитки и служит меткой рядом с
+    именем: там цвет опознавательный, и менять его нельзя. Линия же несёт
+    данные, и на бумаге #ade773 читается как полоска пустоты.
+  */
+  const ink = inkOf(a.id, color).line;
   const mergedTarget = a.mergedInto ? standings.find((r) => r.alliance.id === a.mergedInto) : null;
   const ordered = [...weeks].sort((x, y) => x.number - y.number);
   const history = computeAllianceHistory(a.id, ordered, results);
@@ -106,7 +114,7 @@ export function renderAlliance(view, allianceId) {
         <span class="eyebrow">Динамика</span>
         <h2>Накопленные очки за сезон</h2>
       </header>
-      ${areaChart(row.series, ordered, color, { reference: average })}
+      ${areaChart(row.series, ordered, ink, { reference: average })}
     </section>
 
     <section class="panel">
@@ -115,7 +123,7 @@ export function renderAlliance(view, allianceId) {
         <h2>Место в таблице по неделям</h2>
         <p class="muted">Чем выше линия, тем выше место</p>
       </header>
-      ${placeChart(places, ordered, standings.length, color)}
+      ${placeChart(places, ordered, standings.length, ink)}
     </section>
 
     <section class="panel">

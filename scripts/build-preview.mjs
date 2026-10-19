@@ -36,6 +36,7 @@ import { renderCalendar } from '../src/pages/calendar.js';
 import { renderUpdates } from '../src/pages/updates.js';
 import { renderAccounts } from '../src/pages/accounts.js';
 import { renderHandbook } from '../src/pages/handbook.js';
+import { allianceInkCss } from '../src/ui/ink.js';
 import { computeQuarterWindow, computeWindowForm } from '../src/logic/standings.js';
 
 const data = await loadAll();
@@ -152,6 +153,15 @@ const cssFiles = [...indexHtml.matchAll(/href="\.\/(src\/[^"?]+\.css)/g)].map((m
 const css = (await Promise.all(cssFiles.map((f) => readFile(f, 'utf8')))).join('\n');
 
 /*
+  Краски альянсов. На живом сайте их дописывает main.js в тот же блок, а
+  сборка статическая: здесь значение то, но взятое из данных прямо сейчас.
+
+  Без этих строк копия сайта показывала бы график бледнее оригинала — «аварийный
+  выход», который врёт про читаемость, хуже отсутствия выхода.
+*/
+const inksCss = allianceInkCss(view.alliances);
+
+/*
   Скрипты фильтров написаны без import и export именно ради этих строк:
   их можно вставить дословно, не дублируя логику. Собираем все *-controls.js
   автоматически, чтобы новый фильтр не пришлось вспоминать и дописывать сюда.
@@ -202,6 +212,7 @@ const html = `<!DOCTYPE html>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 ${css}
+${inksCss}
 .page { display: none; }
 .page.is-active { display: block; }
 </style>

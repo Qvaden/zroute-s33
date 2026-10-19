@@ -71,16 +71,17 @@ export function areaChart(series, weeks, color, opts = {}) {
            aria-label="Накопленные очки по неделям">
         <defs>
           <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="${esc(color)}" stop-opacity=".34"/>
-            <stop offset="100%" stop-color="${esc(color)}" stop-opacity="0"/>
+            <stop offset="0%"   style="stop-color:${esc(color)}" stop-opacity=".34"/>
+            <stop offset="100%" style="stop-color:${esc(color)}" stop-opacity="0"/>
           </linearGradient>
         </defs>
         ${grid}
         ${xLabels}
         <polygon points="${area}" fill="url(#${gid})"/>
         ${ref}
-        <polyline points="${line}" fill="none" stroke="${esc(color)}" stroke-width="2.8"
-          stroke-linejoin="round" stroke-linecap="round" class="ch__line" style="--dash:2200; --delay:.1s"/>
+        <polyline points="${line}" fill="none" stroke-width="2.8"
+          stroke-linejoin="round" stroke-linecap="round" class="ch__line"
+          style="stroke:${esc(color)}; --dash:2200; --delay:.1s"/>
       </svg>
       ${reference ? `<p class="ch__legend"><i class="ch__dash"></i> ${esc(referenceLabel)}</p>` : ''}
     </div>`;
@@ -129,7 +130,7 @@ export function placeChart(places, weeks, total, color) {
 
   const pts = places.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(' ');
   const dots = places
-    .map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p).toFixed(1)}" r="2.6" fill="${esc(color)}" opacity=".85"/>`)
+    .map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p).toFixed(1)}" r="2.6" style="fill:${esc(color)}" opacity=".85"/>`)
     .join('');
 
   return `
@@ -138,8 +139,9 @@ export function placeChart(places, weeks, total, color) {
            aria-label="Место в таблице по неделям">
         ${grid}
         ${xLabels}
-        <polyline points="${pts}" fill="none" stroke="${esc(color)}" stroke-width="2.2"
-          stroke-linejoin="round" stroke-linecap="round" class="ch__line" style="--dash:2200; --delay:.25s"/>
+        <polyline points="${pts}" fill="none" stroke-width="2.2"
+          stroke-linejoin="round" stroke-linecap="round" class="ch__line"
+          style="stroke:${esc(color)}; --dash:2200; --delay:.25s"/>
         ${dots}
       </svg>
     </div>`;

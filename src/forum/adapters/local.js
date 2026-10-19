@@ -4133,7 +4133,13 @@ export async function deleteStoreEvent(id) {
 
 export async function getPushPrefs() {
   const s = read();
-  const p = s.pushPrefs || {};
+  /*
+    Настройки — про конкретного человека: в боевом режиме их держит строка
+    пользователя. Черновой режим обязан отдавать то же самое, иначе второй,
+    кто откроет сайт в этом браузере, увидит чужие тумблеры и чужую ночь
+    — и уйдёт молчать в часы, которые выбрал не он.
+  */
+  const p = (s.pushPrefsBy || {})[s.me] || {};
   return {
     newForumPost: Boolean(p.newForumPost),
     newForumReply: Boolean(p.newForumReply),
@@ -4144,14 +4150,17 @@ export async function getPushPrefs() {
 
 export async function setPushPrefs(prefs) {
   const s = read();
-  s.pushPrefs = { ...(s.pushPrefs || {}) };
-  if (prefs.newForumPost != null) s.pushPrefs.newForumPost = Boolean(prefs.newForumPost);
-  if (prefs.newForumReply != null) s.pushPrefs.newForumReply = Boolean(prefs.newForumReply);
+  const all = { ...(s.pushPrefsBy || {}) };
+  const p = { ...(all[s.me] || {}) };
+  if (prefs.newForumPost != null) p.newForumPost = Boolean(prefs.newForumPost);
+  if (prefs.newForumReply != null) p.newForumReply = Boolean(prefs.newForumReply);
   const win = normalizeQuietWindow(prefs.quietStart, prefs.quietEnd);
   if (win) {
-    s.pushPrefs.quietStart = win.start;
-    s.pushPrefs.quietEnd = win.end;
+    p.quietStart = win.start;
+    p.quietEnd = win.end;
   }
+  all[s.me] = p;
+  s.pushPrefsBy = all;
   write(s);
 }
 
