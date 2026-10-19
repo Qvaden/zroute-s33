@@ -171,11 +171,45 @@ function pageHtml({ node, depth, view, pageUrl, title, description, bodyHtml }) 
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
 <meta name="theme-color" content="${esc(view.themeColor)}">
+<script>
+  /*
+    Тема — та, которую человек выбрал на сайте: страница лежит в том же
+    домене и читает то же значение. Без этих строк светлая тема превращала
+    бы статью в чёрный прямоугольник посреди светлого браузера.
+
+    Скрипт стоит до подключений стилей, иначе между разбором стилей и
+    первой отрисовкой был бы кадр в тёмной теме. Правило то же, что на сайте:
+    светлой считается ровно строка «light», всё остальное — тёмная, потому
+    что на неизвестном имени не срабатывает ни одна лестница токенов.
+  */
+  try {
+    if (localStorage.getItem('s33-theme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } catch (_) {}
+</script>
 <link rel="icon" type="image/svg+xml" href="${depth.root}public/icons/icon-32.svg">
 ${view.cssLinks.map((href) => `<link rel="stylesheet" href="${esc(depth.root + href)}">`).join('\n')}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${esc(view.fontCss)}">
+<script>
+  /*
+    ПОЛОСА СОСТОЯНИЯ ТЕЛЕФОНА — ТОТ ЖЕ ФОН, ЧТО У СТРАНИЦЫ.
+
+    Значение берут из \`--bg\` уже выбранной темы, а не дописывают вторым
+    литералом: иначе правка ступени в \`styles-v8.css\` оставила бы здесь цвет
+    из прошлой палитры — ровно ту ошибку, что жила на сайте (ночное число над
+    бежевой страницей). Скрипт стоит ПОСЛЕ подключений стилей, а не рядом с
+    скриптом темы: до них переменную читать нечего, лестница токенов ещё не
+    разобрана, и страница осталась бы с ночным числом в светлой теме.
+  */
+  try {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if (meta && bg) meta.setAttribute('content', bg);
+  } catch (_) {}
+</script>
 <link rel="canonical" href="${esc(pageUrl)}">
 ${parent ? `<link rel="up" href="${esc(depth.node(parent.id))}">` : ''}
 <meta property="og:type" content="${node ? 'article' : 'website'}">
@@ -189,15 +223,6 @@ ${parent ? `<link rel="up" href="${esc(depth.node(parent.id))}">` : ''}
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 ${jsonLd({ node, url: pageUrl, description, view })}
-</script>
-<script>
-  // Тема — та, которую человек выбрал на сайте: страница лежит в том же
-  // домене и читает то же значение. Без этих строк светлая тема превращала
-  // бы статью в чёрный прямоугольник посреди светлого браузера.
-  try {
-    var saved = localStorage.getItem('s33-theme');
-    if (saved) document.documentElement.setAttribute('data-theme', saved);
-  } catch (_) {}
 </script>
 </head>
 <body>

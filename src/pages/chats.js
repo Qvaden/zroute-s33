@@ -771,7 +771,7 @@ function renderLightbox(url) {
 /* ── Мелочи ─────────────────────────────────────────────────────────────── */
 
 export function leaderBadge() {
-  return '<span class="role-badge role-badge--leader" style="--role-tone:#5cc8ff" title="лидер альянса" role="img" aria-label="лидер альянса"><i aria-hidden="true">⚑</i><b>лидер</b></span>';
+  return '<span class="role-badge role-badge--leader" title="лидер альянса" role="img" aria-label="лидер альянса"><i aria-hidden="true">⚑</i><b>лидер</b></span>';
 }
 
 function dayKey(d) {

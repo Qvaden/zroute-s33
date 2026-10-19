@@ -420,7 +420,7 @@ function addFiles(fileList) {
   const files = [...fileList].slice(0, room);
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) {
-      toast(`«${file.name}» больше 25 МБ — не влезет`);
+      toast(`«${file.name}» больше 25 МБ — не влезет`, 'error');
       continue;
     }
     state.pendingFiles.push({
@@ -825,7 +825,7 @@ async function send(form) {
     paintComposerMeta();
     paintGoNew();
   } catch (err) {
-    toast(String(err?.message ?? err));
+    toast(String(err?.message ?? err), 'error');
   } finally {
     state.sending = false;
     if (btn?.isConnected) btn.disabled = false;
@@ -917,7 +917,7 @@ async function withBusy(btn, label, fn) {
   try {
     await fn();
   } catch (err) {
-    toast(String(err?.message ?? err));
+    toast(String(err?.message ?? err), 'error');
   } finally {
     if (btn.isConnected) { btn.disabled = false; btn.textContent = was; }
   }
@@ -1103,7 +1103,7 @@ function wire() {
         const code = await forum.rotateChatCode(state.openId);
         if (state.open) state.open.inviteCode = code;
         paint();
-        toast('Код сменён — старый больше не работает');
+        toast('Код сменён — старый больше не работает', 'warn');
       });
       return;
     }
@@ -1294,7 +1294,7 @@ function wire() {
         .map((el) => String(el.value ?? '').trim())
         .filter(Boolean);
       if (q.length < 3 || options.length < 2) {
-        toast('Нужен вопрос и хотя бы два варианта');
+        toast('Нужен вопрос и хотя бы два варианта', 'error');
         return;
       }
       const multiple = Boolean(box?.querySelector('[name="pollMultiple"]')?.checked);
@@ -1464,8 +1464,8 @@ function wire() {
       host.querySelector('.chat-menu__pop')?.remove();
       host.querySelector('[data-chat-menu-toggle]')?.setAttribute('aria-expanded', 'false');
       try {
-        if (!('Notification' in window)) { toast('Браузер не поддерживает уведомления'); return; }
-        if (!('serviceWorker' in navigator)) { toast('Service Worker не поддерживается'); return; }
+        if (!('Notification' in window)) { toast('Браузер не поддерживает уведомления', 'error'); return; }
+        if (!('serviceWorker' in navigator)) { toast('Service Worker не поддерживается', 'error'); return; }
 
         const reg = await navigator.serviceWorker.ready;
         const existing = await reg.pushManager.getSubscription();
@@ -1475,23 +1475,23 @@ function wire() {
           await existing.unsubscribe();
           await forum.removePushSubscription?.(existing.endpoint).catch(() => {});
           state.pushSubscribed = false;
-          toast('🔕 Push-уведомления отключены');
+          toast('🔕 Push-уведомления отключены', 'warn');
           paintFull();
           return;
         }
 
         // Не подписан — подписываемся.
         const perm = await Notification.requestPermission();
-        if (perm !== 'granted') { toast('Разрешение на уведомления не выдано'); return; }
+        if (perm !== 'granted') { toast('Разрешение на уведомления не выдано', 'warn'); return; }
 
         const vapidPublicKey = (document.querySelector('meta[name="vapid-public-key"]')?.content) || '';
         const vapidBytes = vapidPublicKey ? urlBase64ToUint8Array(vapidPublicKey) : null;
-        if (!vapidBytes) { toast('Push-ключ не настроен. Установите мету vapid-public-key.'); return; }
+        if (!vapidBytes) { toast('Push-ключ не настроен. Установите мету vapid-public-key.', 'warn'); return; }
         let sub;
         try {
           sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes });
         } catch {
-          toast('Не удалось подписаться на push. Попробуйте позже.');
+          toast('Не удалось подписаться на push. Попробуйте позже.', 'error');
           return;
         }
         const keys = sub.keys || {};
@@ -1500,7 +1500,7 @@ function wire() {
         toast('🔔 Push-уведомления включены');
         paintFull();
       } catch (err) {
-        toast(String(err?.message ?? err));
+        toast(String(err?.message ?? err), 'error');
       }
       return;
     }
@@ -1699,7 +1699,7 @@ export async function mountChats(container, param = null) {
       return;
     } catch (err) {
       state.error = String(err?.message ?? err);
-      toast(state.error);
+      toast(state.error, 'error');
       param = null;
     }
   }

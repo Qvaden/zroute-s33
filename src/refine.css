@@ -288,7 +288,8 @@ h1.hero__week { font-size: var(--fs-h1); }
 .pick__btn { min-height: 34px; }
 
 /* ── Боковое меню сайта ───────────────────────────────────────────────────── */
-:root { --side-w: 220px; }
+/* Ширины здесь нет: --side-w живёт одним числом в forum.css, а два :root
+   с разными цифрами означают, что одна из них всегда врёт. */
 .side { gap: var(--s-3); }
 /*
   ПОЛЯ СПИСКА — ТОЛЬКО У ПОСТОЯННОЙ КОЛОНКИ.
@@ -435,7 +436,6 @@ h1.hero__week { font-size: var(--fs-h1); }
 .forum-post__trail { padding: var(--s-hair) var(--s-1); font-size: var(--fs-eyebrow); }
 
 .forum-post__title { margin-bottom: var(--s-fine); font-size: clamp(15px, 1.9vw, 18px); line-height: 1.25; }
-.forum-post__body { font-size: var(--fs-small); line-height: 1.58; }
 .forum-post__body p { margin-bottom: var(--s-1); }
 .forum-post__expand { margin-top: var(--s-hair); font-size: var(--fs-meta); }
 
@@ -2453,6 +2453,33 @@ body:has(.chat-layout) .site-foot { display: none; }
   color: var(--role-tone);
 }
 
+/* ── Метки ролей и лидера альянса ───────────────────────────────────────────
+   Краска метки живёт здесь, а не в `forum/roles.js` и не в `pages/chats.js`,
+   и причина арифметическая: у каждой краски их ДВЕ, ночная и дневная, а в
+   разметку можно было вписать только одну. Пока тон владельца приезжал из JS
+   янтарным #ffc93c, в светлой теме он ложился на подложку из этих же 10 %
+   тона и давал 1,24:1, модератор #ff6a2b — 2,45:1, лидер #5cc8ff — 1,66:1:
+   подпись роли переставала читаться, хотя именно для этого она и нужна.
+
+   Дневные значения сняты с той же лестницы красок, что и остальная тема, и
+   проверены на худшей её ступени — песке `--recessed`, а не на бумаге:
+
+     владелец   `--gold-ink`   #6b4a0e — 4,82:1 на собственной подложке в песке;
+     модератор  `--accent-ink` #9c3a12 — 4,55:1, тот же оранжевый, сожжённый
+                                до чернила ровно как подпись бренда;
+     лидер      `--link`       #2a5480 — 5,14:1, синий остаётся синим.
+
+   Порядок не случаен: рядом в одной строке стоят зелёный «проверен», серый
+   «не проверен» и стальной номер сервера, поэтому владелец, модератор и
+   лидер берут золото, оранжевый и синий — три тона, которых в этой строке
+   ещё не было. */
+.role-badge--owner { --role-tone: #ffc93c; }
+.role-badge--moderator { --role-tone: #ff6a2b; }
+.role-badge--leader { --role-tone: #5cc8ff; }
+:root[data-theme="light"] .role-badge--owner { --role-tone: var(--gold-ink); }
+:root[data-theme="light"] .role-badge--moderator { --role-tone: var(--accent-ink); }
+:root[data-theme="light"] .role-badge--leader { --role-tone: var(--link); }
+
 /* ── Сервер участника ────────────────────────────────────────────────────────
    Метка устроена как остальные, но содержимое у неё другое: вместо имени
    роли — сам номер, «№33». Поэтому для неё сделано исключение из правила
@@ -2668,6 +2695,22 @@ body:has(.chat-layout) .site-foot { display: none; }
 .forum-topic-tags label { cursor:pointer; }
 .forum-topic-tags input { position:absolute; opacity:0; pointer-events:none; }
 .forum-topic-tags span, .forum-tag { display:inline-flex; align-items:center; min-height:27px; padding:var(--s-fine) var(--s-1); border:1px solid var(--line); border-radius: var(--r-pill); background:transparent; color:var(--dim); font:600 var(--fs-eyebrow)/1.2 Unbounded,sans-serif; cursor:pointer; }
+/*
+  МЕТКА ДОЛЖНА ПРИЗНАВАТЬСЯ НАВЕДЕНИЕМ. До этого чип тега оставался ровно
+  таким, каким был напечатан, и о том, что под курсором есть кнопка, человек
+  узнавал только по клику (§13 требует состояний для каждой темы).
+  Заливка hover — 6 % чернил: вдвое спокойнее выбранной метки (14 % акцента плюс
+  акцентная рамка ниже), поэтому «отмечено» и «под курсором» не путаются.
+  Порядок правил важен: наведение стоит ПЕРЕД строкой выбранного, и у уже
+  выбранной метки hover ничего не сбивает.
+*/
+@media (hover: hover) {
+  .forum-tag:hover, .forum-topic-tags label:hover > span {
+    border-color: color-mix(in srgb, var(--text) 22%, var(--line));
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    color: var(--text);
+  }
+}
 .forum-topic-tags input:checked + span, .forum-tag.is-on { border-color:color-mix(in srgb,var(--accent) 62%,var(--line)); background:color-mix(in srgb,var(--accent) 14%,transparent); color:var(--text); }
 .forum-tag-filter { display:flex; flex-wrap:wrap; gap:var(--s-fine); width:100%; margin-top:var(--s-1); }
 .forum-post__tags { display:flex; flex-wrap:wrap; gap:var(--s-fine); margin:-2px 0 var(--s-2); }

@@ -226,9 +226,36 @@ const isFirstVisit = !document.documentElement.classList.contains('s33-loader-se
 const bootStartedAt = performance.now();
 
 /* ── Тема (светлая / тёмная) ──────────────────────────────────────────── */
+/*
+  Светлой считается ровно строка «light», всё остальное — тёмная. Правило
+  то же, что в инлайн-скрипте `<head>`, и оно не недосмотр: на имени,
+  которого нет в лестницах токенов, не срабатывает ни одна тема, и страница
+  остаётся без красок вовсе, тогда как бриф §2 п.6 велит в этом случае
+  включать тёмную.
+*/
 function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  try { localStorage.setItem('s33-theme', theme); } catch (_) {}
+  const safe = theme === 'light' ? 'light' : 'dark';
+  const html = document.documentElement;
+  html.setAttribute('data-theme', safe);
+  /*
+    Полоса состояния телефона — тот же фон, что у страницы. Число берётся из
+    `--bg` уже выбранной темы, а не дописывается вторым литералом: правка
+    ступени в `styles-v8.css` тогда не оставит здесь цвет из прошлой палитры.
+  */
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', getComputedStyle(html).getPropertyValue('--bg').trim());
+  /*
+    Имя называет действие, а не текущее состояние: человек с программой экрана
+    слушает кнопку ДО нажатия и обязан понять, что будет, а не где он сейчас.
+    Значок при этом остаётся знаком темы — §6 допускает и такую формулировку.
+  */
+  const label = safe === 'light' ? 'Переключить на тёмную тему' : 'Переключить на светлую тему';
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) {
+    toggle.setAttribute('aria-label', label);
+    toggle.setAttribute('title', label);
+  }
+  try { localStorage.setItem('s33-theme', safe); } catch (_) {}
 }
 function initTheme() {
   try {

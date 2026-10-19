@@ -7972,7 +7972,7 @@ console.log('\nZ. Благодарности автора и репутация'
   check('повторное нажатие не отправляет ничего: благодарность не отзывают',
     /if \(!item \|\| item\.iThanked\) return;/.test(mountSrc));
   check('отказ базы человек слышит словами базы, а не молчанием',
-    /toast\(err\?\.message \|\| 'База не приняла благодарность'\)/.test(mountSrc)
+    /toast\(err\?\.message \|\| 'База не приняла благодарность', 'error'\)/.test(mountSrc)
       && /await refreshOne\(targetType, targetId\);/.test(mountSrc));
 
   /* ── Панель владельца ── */
@@ -15569,6 +15569,27 @@ console.log('\nAO. Раздел — страница');
       && /\.forum-save, button\.forum-tag, \.seg__btn, \.side__close \{ min-width: 44px; \}/.test(refine));
 
   /*
+    Заход 19, пункт 6. Чип тега молчал под курсором: о том, что это кнопка,
+    человек узнавал только по клику, а §13 требует состояния для каждой темы.
+    Держим два факта, а не один:
+    — правило наведения есть и стоит ДО строки выбранного состояния, иначе
+      наведение перебивало бы «отмечено» и два состояния сливались в одно;
+    — его заливка спокойнее выбранной метки (6 % чернил против 14 % акцента).
+    Проценты читаются из самих правил: подставить числа из головы — значит
+    проверить несуществующий цвет.
+  */
+  {
+    const hoverPct = Number(/\.forum-tag:hover[^{]*\{[^}]*var\(--text\)\s+(\d+)%/.exec(refine)?.[1]);
+    const onPct = Number(/\.forum-topic-tags input:checked \+ span[^{]*\{[^}]*var\(--accent\)\s+(\d+)%/.exec(refine)?.[1]);
+    check('чип тега отзывается на наведение и остаётся спокойнее выбранного состояния',
+      /@media \(hover: hover\) \{\s*\.forum-tag:hover/.test(refine)
+        && refine.indexOf('.forum-tag:hover') < refine.indexOf('.forum-topic-tags input:checked + span')
+        && Number.isFinite(hoverPct) && Number.isFinite(onPct) && hoverPct < onPct,
+      `наведение ${hoverPct} %, выбранное ${onPct} %; порядок: ${
+        refine.indexOf('.forum-tag:hover') < refine.indexOf('.forum-topic-tags input:checked + span') ? 'верный' : 'перепутан'}`);
+  }
+
+  /*
     Промер брейкпоинтов (заход 13) добавил к планке цели, которые до этого не
     накрывались ничем: чипы сортировки витрины держали 44 px только ниже 700 px,
     хотя планка привязана к пальцу, а не к ширине; квадрат переключателя темы
@@ -17674,6 +17695,131 @@ console.log('\nAW. AA у токенов обеих тем');
     'если подпись снова var(--violet), она вернётся на 3,42:1 в ночи и 4,28:1 днём');
 
   /*
+     ЛИТЕРАЛЬНЫЕ КРАСКИ: ТРИ МЕТКИ РОЛЕЙ И ТРИ ЗНАЧКА ДОСТИЖЕНИЙ (заход 19, п.1).
+
+     Матрица токенов выше ловит плохие ЧИСЛА, а эту поломку — нет: краски стояли
+     одним литералом там, где у темы ДВА значения, и в дневной теме ложились на
+     подложку из собственных десяти процентов того же тона. Было: владелец
+     1,24:1, модератор 2,45:1, лидер 1,66:1; из значков «↗» 2,10:1, «✦» 2,69:1,
+     «✦✦» 1,61:1. То есть метка роли переставала быть меткой, хотя существует
+     ровно для того, чтобы роль читалась.
+
+     Поэтому здесь три проверки, и первая — структурная: у каждого тона есть
+     ночное число и дневная пара, ни одна из них не приезжает из разметки, и
+     дневная обязана быть токеном, а не вторым литералом. Литерал в дневной теме
+     живёт своей жизнью: правка ступени в лестнице его не перекрасит, и следующий
+     переезд палитры снова поедет.
+  */
+  const mobileSrc = await readFile('src/mobile.css', 'utf8');
+  const markupSrc = [await readFile('src/pages/chats.js', 'utf8'), await readFile('src/forum/roles.js', 'utf8')];
+  const BADGE_KEYS = ['owner', 'moderator', 'leader'];
+  const badgeTones = {};
+  for (const k of BADGE_KEYS) {
+    const n = new RegExp(`\\.role-badge--${k}\\s*\\{[^}]*--role-tone:\\s*(#[0-9a-fA-F]{6})[^}]*\\}`).exec(refineSrc);
+    const d = new RegExp(`:root\\[data-theme="light"\\] \\.role-badge--${k}\\s*\\{[^}]*--role-tone:\\s*var\\((--[\\w-]+)\\)`).exec(refineSrc);
+    badgeTones[k] = n && d && light && { night: n[1].toLowerCase(), ink: d[1], day: light[d[1]] };
+  }
+  check('у каждой из трёх меток ролей ночное число и дневные чернила, и те и другие в CSS',
+    BADGE_KEYS.every((k) => badgeTones[k] && badgeTones[k].day)
+      && badgeTones.owner.ink === '--gold-ink' && badgeTones.moderator.ink === '--accent-ink'
+      && badgeTones.leader.ink === '--link',
+    BADGE_KEYS.map((k) => `${k}: ${badgeTones[k] ? `${badgeTones[k].night} + ${badgeTones[k].ink}` : 'нет пары'}`).join('; '));
+  check('ни одна метка роли не привозит тон из разметки: --role-tone живёт только в CSS',
+    markupSrc.every((src) => !/--role-tone/.test(src)),
+    'инлайн-стиль перекрывает правило темы, и второй тон для светлой темы врезать в него нельзя');
+
+  /* Кегль метки — ступень подписей (11 px), то есть обычный текст: порог 4,5,
+     а не 3:1 «как крупному». Число берётся из токена, чтобы правка лестницы
+     кеглей не оставила здесь устаревший порог молча. */
+  const eyebrow = +( /--fs-eyebrow:\s*(\d+(?:\.\d+)?)px/.exec(v8) || [0, 0] )[1];
+  const badgeRule = (/^\.role-badge\s*\{[\s\S]*?^\}/m.exec(mobileSrc) || [''])[0];
+  const baseShare = +( /background:\s*color-mix\(in srgb,\s*var\(--role-tone\)\s+(\d+)\s*%/.exec(badgeRule)?.[1] || 0 ) / 100;
+  const ownerStops = (/\.role-badge--owner\s*\{[\s\S]*?linear-gradient\(135deg,\s*color-mix\(in srgb,\s*var\(--gold\)\s+(\d+)\s*%,\s*transparent\),\s*color-mix\(in srgb,\s*var\(--gold\)\s+(\d+)\s*%/
+    .exec(mobileSrc) || []).slice(1, 3).map((p) => +p / 100);
+  /*
+     Ряд ступеней ограничен пятью: шестью они быть не могут, потому что шестая
+     (слой окна) — это шторка разделов, модалка и поповеры, а меток ролей в их
+     разметке нет. Живьём (проход по .role-badge на ленте форума, обе темы) метки
+     стоят на просвете страницы и на лестнице карточек: ночь худшая 5,34:1
+     (модератор), день 6,52:1. На слое окна ночной модератор дал бы 4,07:1 — если
+     метка туда переедет, это поймает свип по нарисованным пикселам
+     (tools/aasweep.mjs), а не эта матрица, и она об этом молчит нарочно.
+  */
+  const BADGE_SURF = surfaces.filter((s) => s !== '--overlay');
+  const badgePairs = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    for (const k of BADGE_KEYS) {
+      const tone = theme === 'тёмная' ? badgeTones[k]?.night : badgeTones[k]?.day;
+      if (!tone) continue;
+      const stops = k === 'owner' && ownerStops.length === 2
+        ? ownerStops.map((share) => [share, t['--gold']])
+        : [[baseShare, tone]];
+      for (const s of BADGE_SURF) {
+        for (const [share, paint] of stops) {
+          badgePairs.push([`${theme}: ${k} на ${Math.round(share * 100)} % плашки над ${s}`, ratio(tone, srgbMix(paint, share, t[s]))]);
+        }
+      }
+    }
+  }
+  check('три метки ролей читаются на собственной подложке: пять ступеней, обе темы, порог 4,5',
+    eyebrow > 0 && eyebrow < 18.66 && baseShare > 0 && badgePairs.length === 40
+      && badgePairs.every(([, c]) => c >= 4.5),
+    badgePairs.filter(([, c]) => c < 4.5).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
+      || `кегль метки ${eyebrow} px, пар ${badgePairs.length}, худшая ${badgePairs.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`);
+
+  /*
+     Значки достижений. Дневная пара нужна НЕ всем восьми: шесть из них эмодзи
+     (🔥 ⚡ 👑 🏅 🛡 🩸), их рисует системный шрифт значков и `--achievement-color`
+     им не красит букву — число работает только подкраской плашки. Требуем пару
+     ровно для тех тонах, где иконка — символ из интерфейсного шрифта, и берём
+     этот список из модуля достижений, а не из головы: добавят текстовый значок
+     без дневной пары — проверка встанет.
+
+     Порог здесь 3:1: значок — не подпись, это начертательная краска плашки
+     (бриф §13), и держит она норму графики, а не текста.
+
+     Список символьных значков собран по явным символам, а не по диапазону
+     кодовых точек. Это ловушка: «⚡» (U+26A1) и «✦» (U+2726) лежат в соседних
+     блоках, и отсечь по номеру можно только вместе с одним из них — а решение
+     «эмодзи это или буква» принимает не кодовая точка, а презентация шрифта.
+  */
+  const achSrc = await readFile('src/logic/achievements.js', 'utf8');
+  const TEXT_GLYPHS = '↗✦';
+  const glyphTones = [...achSrc.matchAll(/icon:\s*'([^']+)'[^}]*?tone:\s*'([\w-]+)'/g)]
+    .filter(([, icon]) => icon.length > 0 && [...icon].every((c) => TEXT_GLYPHS.includes(c)))
+    .map(([, , tone]) => tone);
+  const achNight = {};
+  for (const m of v8.matchAll(/^\.achievement--([\w-]+)\s*\{\s*--achievement-color:\s*(#[0-9a-fA-F]{6}|var\(--[\w-]+\))\s*;\s*\}/gm)) {
+    achNight[m[1]] = m[2];
+  }
+  const achDay = {};
+  for (const m of v8.matchAll(/\[data-theme="light"\]\s*\.achievement--([\w-]+)\s*\{\s*--achievement-color:\s*(#[0-9a-fA-F]{6}|var\(--[\w-]+\))\s*;\s*\}/g)) {
+    achDay[m[1]] = m[2];
+  }
+  const resolveTone = (t, decl) => (decl && decl.startsWith('var(') ? t[/var\((--[\w-]+)\)/.exec(decl)[1]] : decl);
+  const iconShare = +( /background:\s*color-mix\(in srgb,\s*var\(--achievement-color\)\s+(\d+)\s*%/
+    .exec(/\.achievement__icon\s*\{[^}]*\}/.exec(v8)?.[0] || '')?.[1] || 0 ) / 100;
+  const achPairs = [];
+  for (const [theme, t, pick] of [['тёмная', dark, achNight], ['светлая', light, achDay]]) {
+    if (!t) continue;
+    for (const tone of glyphTones) {
+      const ink = resolveTone(t, pick[tone]);
+      if (!ink) continue;
+      for (const s of surfaces) achPairs.push([`${theme}: значок ${tone} на ${Math.round(iconShare * 100)} % плашки над ${s}`, ratio(ink, srgbMix(ink, iconShare, t[s]))]);
+    }
+  }
+  check('у каждого текстового значка есть дневная пара, и она держит 3:1 на своей плашке',
+    glyphTones.length === 3 && glyphTones.every((tone) => achNight[tone] && achDay[tone])
+      && iconShare > 0 && achPairs.length === 36 && achPairs.every(([, c]) => c >= 3),
+    `значков-символов ${glyphTones.length} (${glyphTones.join(', ')}), пар ${achPairs.length}: `
+      + (achPairs.filter(([, c]) => c < 3).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
+        || `худшая ${achPairs.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`));
+  check('дневных пар у значков ровно столько, сколько символьных: эмодзи красит шрифт, а не CSS',
+    Object.keys(achDay).length === glyphTones.length,
+    `в CSS дневных правил ${Object.keys(achDay).length} (${Object.keys(achDay).join(', ')}), символьных значков ${glyphTones.length}`);
+
+  /*
      Литерал ночной палитры в правиле, которое работает в обеих темах, — это
      та же ошибка в другом месте: инвертировать тему по одному числу нельзя.
      Пункт «Кварт» держал подпись литералом #c6a9df и в дневной теме давал
@@ -17943,6 +18089,87 @@ console.log('\nAW. AA у токенов обеих тем');
       const eye = band('fs-eyebrow');
       return card && meta && eye && card.max >= 16 && meta.max <= 13 && eye.max <= 13;
     })());
+
+  /*
+    Заход 19, пункт 5. Три числа, которые бриф называет прямо, а широкая полоса
+    `bands` выше их не ловит:
+
+    — §9 просит заголовок «Обсуждения сообщества» 36–42 px на десктопе и 28–32
+      на телефоне. Прежний clamp(30px, 4.6vw, 46px) брал снизу шесть пикелей и
+      убегал сверху на четыре, а полоса [28,56] считала это нормой;
+    — §7 просит боковую колонку 224–240 px. Число жило в двух файлах сразу: 228
+      в forum.css и 220 в refine.css, и на сайте побеждал подключённый позднее,
+      то есть работала ширина, которую никто не выбирал;
+    — тело поста в ленте стояло на 13 px (--fs-small) при тех же 14 px у
+      служебных подписей: главный контент читался мельче второго по важности.
+  */
+  const h1Band = band('fs-h1');
+  const h1smBand = band('fs-h1-sm');
+  check('заголовок ленты сидит в полосе §9: 36–42 px на десктопе и 28–32 px на телефоне',
+    Boolean(h1Band) && h1Band.min >= 36 && h1Band.max <= 42
+      && Boolean(h1smBand) && h1smBand.min >= 28 && h1smBand.max <= 32,
+    `десктоп ${h1Band ? `${h1Band.min}–${h1Band.max}` : 'нет'} px, `
+      + `телефон ${h1smBand ? `${h1smBand.min}–${h1smBand.max}` : 'нет'} px`);
+  const phoneIdx = liveSrc['src/forum.css'].indexOf('.forum-head__title { font-size: var(--fs-h1-sm)');
+  const phoneMedia = phoneIdx < 0 ? null
+    : [...liveSrc['src/forum.css'].slice(0, phoneIdx).matchAll(/@media \(max-width:\s*(\d+)px\)/g)].pop();
+  check('телефонная ступень заголовка живёт внутри блока 759 px, а не вместо десктопной',
+    Number(phoneMedia?.[1]) === 759,
+    phoneIdx < 0 ? 'телефонного правила нет' : `ближайший @media сверху: ${phoneMedia?.[1] ?? 'нет'} px`);
+
+  const sideOwners = Object.entries(liveSrc).filter(([, src]) => /--side-w:\s*\d+px/.test(src)).map(([f]) => f);
+  const sideW = [...liveSrc['src/forum.css'].matchAll(/--side-w:\s*(\d+)px/g)].map((m) => +m[1]);
+  check('ширина боковой колонки объявлена одним числом в одном файле и сидит в полосе §7 (224–240 px)',
+    sideOwners.length === 1 && sideOwners[0] === 'src/forum.css'
+      && sideW.length === 1 && sideW[0] >= 224 && sideW[0] <= 240,
+    `владельцы: ${sideOwners.join(', ') || 'нет'}; чисел в forum.css: ${sideW.join('/') || 'нет'}`);
+  const fsOwners = Object.entries(liveSrc)
+    .filter(([, src]) => /\.forum-post__body\s*\{[^}]*font-size:/.test(src))
+    .map(([f]) => f);
+  check('тело поста в ленте идёт по ступени 14 px, а не по подписной 13',
+    /\.forum-post__body\s*\{[^}]*font-size:\s*var\(--fs-text\)/.test(liveSrc['src/forum.css'])
+      && fsOwners.length === 1 && fsOwners[0] === 'src/forum.css'
+      && !/\.forum-post__body\s*\{[^}]*font-size:\s*13px/.test(liveSrc['src/forum.css'] + refineSrc),
+    '13 px — ступень подписей; на ней главный текст ленты был мельче второго по важности');
+  /*
+    Интервал тела держат в одном месте потому, что второй раз он съехал на
+    телефон: поправка в refine.css лежала внутри `@media (min-width: 760px)`,
+    и колонка в 390 px жила с 1,62, пока десктоп читался с 1,58.
+  */
+  const lhOwners = [];
+  for (const [f, src] of Object.entries(liveSrc)) {
+    for (const m of src.matchAll(/\.forum-post__body\s*\{[^}]*?line-height:\s*([\d.]+)/g)) lhOwners.push(`${f} ${m[1]}`);
+  }
+  const bodyLh = /\.forum-post__body\s*\{[^}]*?line-height:\s*([\d.]+)/.exec(liveSrc['src/forum.css'])?.[1];
+  check('у тела поста один межстрочный интервал на весь сайт, он без условия и в полосе §10 (1,5–1,6)',
+    lhOwners.length === 1 && bodyLh && +bodyLh >= 1.5 && +bodyLh <= 1.6,
+    `владельцы: ${lhOwners.join(', ') || 'нет'}; в forum.css: ${bodyLh ?? 'нет'}`);
+
+  /*
+    Тон короткого сообщения. Красит полосу не вызывающий код, а пара токенов в
+    forum.css: светлая тема приносит свои тёмные --soft-*, и ночные числа к ней
+    не относятся. Процент подмеса читается из самого правила — иначе проверка
+    считала бы несуществующий фон, если кто-то переставит 18 % в полосе.
+  */
+  const toastRule = /\.forum-toast\s*\{([\s\S]*?)\n\}/.exec(liveSrc['src/forum.css']);
+  const toastMix = toastRule ? Number(/background:\s*color-mix\(in srgb, var\(--toast-tone\)\s+(\d+)%/.exec(toastRule[1])?.[1]) : NaN;
+  const toastFail = [];
+  for (const [theme, t] of [['тёмная', dark], ['светлая', light]]) {
+    if (!t) continue;
+    if (!Number.isFinite(toastMix)) { toastFail.push(`${theme}: правило полосы не называет процент подмеса`); break; }
+    for (const [tone, ink] of [['--win', '--soft-ok'], ['--loss', '--soft-bad'], ['--gold', '--soft-warn']]) {
+      const c = ratio(t[ink], srgbMix(t[tone], toastMix / 100, t['--overlay']));
+      if (c < 4.5) toastFail.push(`${theme}: ${ink} на ${tone} ${toastMix} % над --overlay — ${c.toFixed(2)}:1`);
+    }
+  }
+  check('подпись полосы читается на её собственном залитом фоне: три тона в обеих темах дотягивают до AA',
+    toastFail.length === 0, toastFail.join('; ') || `подмес ${toastMix} %`);
+  check('каждый тон задаёт и краску плашки, и чернила подписи — иначе в светлой теме останутся ночные буквы',
+    ['--error', '--warn', ''].every((mod) => {
+      const r = new RegExp(`\\.forum-toast${mod}\\s*\\{[^}]*--toast-tone:[^}]*--toast-ink:`);
+      return r.test(liveSrc['src/forum.css']);
+    }),
+    'одна лишь краска не спасает: подпись обязана ехать вместе с ней');
 
   const wrap = /--wrap:\s*(\d+)px/.exec(v8);
   check('ширина контента в полосе 1200–1400 px и задана одним токеном',
@@ -19018,7 +19245,9 @@ console.log('\nBE. Короткое сообщение собрано в оди�
   const MOUNT = await readFile('src/forum/mount.js', 'utf8');
   const FORUM_CSS = await readFile('src/forum.css', 'utf8');
 
-  const made = (src) => (src.match(/className = 'forum-toast'/g) || []).length;
+  /* Полосу собирает одна строка с классом; с заходом 19 у класса появился
+     тон, поэтому ищем присваивание className с именем полосы, а не литерал. */
+  const made = (src) => (src.match(/className\s*=.*forum-toast/g) || []).length;
   check('полосу собирает один модуль, а не два копии-помощника',
     /export function toast\(/.test(TOAST) && made(CHATS) === 0 && made(MOUNT) === 0 && made(TOAST) === 1,
     `созданий: чат ${made(CHATS)}, лента ${made(MOUNT)}, модуль ${made(TOAST)}`);
@@ -19038,6 +19267,31 @@ console.log('\nBE. Короткое сообщение собрано в оди�
     /\.forum-toast\s*\{[^}]*z-index:\s*var\(--z-toast\)/.test(FORUM_CSS));
   check('слово «notice» не осталось ни в одном из двух модулей',
     !/\bnotice\b/.test(CHATS + MOUNT), /\bnotice\b/.exec(CHATS + MOUNT)?.[0] || 'чисто');
+
+  /*
+    Заход 19, пункт 6. Отказ и подтверждение красились одним зелёным, а цвет —
+    единственное, что различает их за долю секунды, то есть работал против
+    человека. Проверяем дерево, а не намерение:
+
+    — ни один отказ базы не остался без тона. Считаются ровно те две формы,
+      которыми отказ печатается в обоих модулях (`String(err?.message ?? err)`
+      и текст о незагруженной картинке); подтверждения зелёным не звонят;
+    — тон выбирает имя, а краску знает только CSS. Если вызывающий код начнёт
+      подставлять hex или inline-style, светлая тема получит ночные чернила —
+      ровно ту ошибку, из-за которой весь этот сайт перешёл на токены.
+  */
+  const bare = (src) => (src.match(/toast\((?:String\(err\?\.message \?\? err\)|shotError)\)/g) || []).length;
+  const toned = (src) => (src.match(/, '(?:error|warn)'\)/g) || []).length;
+  check('ни один отказ не остался зелёным: вызовы без тона — только подтверждения',
+    bare(CHATS) === 0 && bare(MOUNT) === 0,
+    `без тона осталось: чат ${bare(CHATS)}, лента ${bare(MOUNT)}`);
+  check('полоса знает три тона, красит их CSS, а вызывающий код не носит hex',
+    /export function toast\(message, kind = 'ok'\)/.test(TOAST)
+      && /forum-toast--\$\{kind\}/.test(TOAST)
+      && !/#[0-9a-f]{3,8}\b/i.test(TOAST)
+      && /\.forum-toast--error\s*\{[^}]*--toast-tone/.test(FORUM_CSS)
+      && /\.forum-toast--warn\s*\{[^}]*--toast-tone/.test(FORUM_CSS),
+    `вызовов с тоном: ${toned(CHATS) + toned(MOUNT)}`);
 }
 
 /* ── BF. Мера ряда: доли колонки — целые числа из двенадцати ─────────────────
@@ -19639,6 +19893,73 @@ console.log('\nBH. Мёртвых объявлений в каскаде нет,
   const deadSite = solve([siteIndex]);
   check('панель защищена: находятся объявления, мёртвые на сайте, но живые в панели',
     deadSite.length > deadBoth.length, `на сайте ${deadSite.length}, на обеих ${deadBoth.length}`);
+}
+
+console.log('\nBI. Тема: имя, первый кадр, полоса состояния и имя переключателя');
+{
+  /*
+    Заход 19, пункты 2–4. Бриф §2 п.6 велит при битом сохранённом имени включать
+    тёмную тему, а §2 п.1–2 — менять интерфейс сразу, без перезагрузки. Оба
+    требования держат ДВА места, и в этом опасность: правило живёт в инлайн-
+    скрипте `<head>` (иначе первый кадр ждёт сеть) и в `applyTheme()` модуля, а
+    генератор страниц справочника печатает его третью копию. Правка одного места
+    молча возвращает либо чёрный прямоугольник посреди светлого браузера, либо
+    страницу без красок вовсе — на имени, которого нет в лестницах токенов, не
+    срабатывает ни одна тема. Поэтому проверки читают все три файла подряд.
+  */
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile('index.html', 'utf8');
+  const main = await readFile('src/main.js', 'utf8');
+  const gen = await readFile('scripts/build-handbook-pages.mjs', 'utf8');
+  const tokens = await readFile('src/styles-v8.css', 'utf8');
+
+  const COERCE = /localStorage\.getItem\('s33-theme'\)\s*===\s*'light'/;
+  const RAW = /setItem\('data-theme'|setAttribute\('data-theme',\s*(?!'light'|'dark'|safe\b)[a-z]/i;
+  check('битое имя темы не уезжает в атрибут: `<head>`, модуль и генератор знают одну проверку',
+    COERCE.test(html) && COERCE.test(gen)
+      && /theme === 'light' \? 'light' : 'dark'/.test(main)
+      && !RAW.test(html) && !RAW.test(gen),
+    `<head>: ${COERCE.test(html)}; генератор: ${COERCE.test(gen)}; applyTheme приводит: ${
+      /theme === 'light' \? 'light' : 'dark'/.test(main)}`);
+
+  /* Порядок в `<head>` — единственное, что делает тему «до первой отрисовки»:
+     скрипт после `<link>` уже ничего не успеет, страница нарисована. */
+  const headAt = html.search(COERCE);
+  const firstCss = html.indexOf('<link rel="stylesheet"');
+  const genAt = gen.search(COERCE);
+  const genCss = gen.indexOf('view.cssLinks.map');
+  check('тема включается до стилей: скрипт стоит раньше первой ссылки на CSS — и на сайте, и в шаблоне страниц',
+    headAt >= 0 && headAt < firstCss && genAt >= 0 && genAt < genCss,
+    `index.html: скрипт ${headAt} против стиля ${firstCss}; шаблон: ${genAt} против ${genCss}`);
+
+  /* Полоса состояния телефона обязана быть фоном темы. Числа здесь два, и оба
+     взяты из одного места: литерал в разметке — ночное `--bg` из токенов, а при
+     переключении модуль переписывает его значением той же переменной. Второй
+     hex в `main.js` означал бы, что правка ступени в CSS оставит здесь краску
+     из прошлой палитры. */
+  const nightBg = /^:root \{[^}]*--bg:\s*(#[0-9a-f]{6})/m.exec(tokens)?.[1];
+  const metaBg = /name="theme-color" content="([^"]+)"/.exec(html)?.[1];
+  check('полоса состояния знает фон темы, а не второе число: литерал равен ночному --bg, а модуль читает токен',
+    Boolean(nightBg) && metaBg === nightBg
+      && /meta\[name="theme-color"\][\s\S]{0,200}getPropertyValue\('--bg'\)/.test(main)
+      && gen.includes('themeColor: indexHtml.match'),
+    `--bg ${nightBg} против разметки ${metaBg}; генератор берёт число из index.html: ${
+      gen.includes('themeColor: indexHtml.match')}`);
+  check('страницы справочника перекрашивают полосу после стилей: синхронизатор читает тот же --bg',
+    /const meta = document\.querySelector\('meta\[name="theme-color"\]'\);[\s\S]{0,160}getPropertyValue\('--bg'\)/.test(gen),
+    'без этого светлая статья остаётся с ночной полосой: инлайн до стилей знает только атрибут');
+
+  /* §6 и §15: имя кнопки называет действие. Значок — знак темы, его трогать не
+     нужно; надпись в разметке обязана совпадать с тем, что модуль
+     подставит для темы по умолчанию, иначе первая секунда читается вслух
+     неверно, пока `applyTheme()` не отработал. */
+  const labelOff = /'Переключить на светлую тему'/.test(main) && /'Переключить на тёмную тему'/.test(main);
+  const staticLabel = /id="theme-toggle" aria-label="([^"]+)"/.exec(html)?.[1];
+  check('переключатель объявляет действие, а не своё состояние, и обе формулировки живут в модуле',
+    labelOff && staticLabel === 'Переключить на светлую тему'
+      && /toggle\.setAttribute\('aria-label', label\)/.test(main)
+      && /toggle\.setAttribute\('title', label\)/.test(main),
+    `в разметке: «${staticLabel}»; пар формулировок в main.js: ${labelOff ? 2 : 0}`);
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

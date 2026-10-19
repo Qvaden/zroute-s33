@@ -16,9 +16,11 @@
 /*
   Ширина панели в переменной: от неё зависит и отступ содержимого, и сдвиг
   при выдвижении. Две несогласованные цифры разъезжаются на первой правке.
+  228 px — полоса 224–240 из §7 брифа; раньше тут стояло 232, а refine.css
+  перекрывал их же своим :root на 220, и по факту жила именно она.
 */
 :root {
-  --side-w: 232px;
+  --side-w: 228px;
 }
 
 .side {
@@ -446,13 +448,14 @@
 
 /*
   На телефоне шапка идёт первой, но не она главная: под ней — свой человек,
-  быстрые действия и лента. Название ступенью H1 вместе с подписью ступенью
-  текста занимают 255 px — треть экрана до блока человека. Поэтому на узком
-  экране обе ступени берутся ниже из токенов: ряд блоков читается сверху вниз
-  без спора за глаза, а H1 на странице остаётся единственным.
+  быстрые действия и лента. Поэтому у названия своя узкая ступень — полоса
+  28–32 px из §9, а не полная --fs-h1 (ниже 1200 px она всё равно 36 px) и не
+  --fs-h2 (её верхний край 31 px полосу не покрывает). Подпись уходит ступенью
+  ниже: название остаётся единственным H1 на странице, но не спорит с лентой
+  за первые экраны.
 */
 @media (max-width: 759px) {
-  .forum-head__title { font-size: var(--fs-h2); }
+  .forum-head__title { font-size: var(--fs-h1-sm); }
   .forum-head__note { font-size: var(--fs-meta); line-height: 1.45; }
 }
 
@@ -1655,7 +1658,13 @@
 .forum-post__title a { color: inherit; text-decoration: none; }
 .forum-post__title a:hover { color: var(--accent-ink); }
 
-.forum-post__body { color: var(--dim); font-size: var(--fs-small); line-height: 1.62; }
+/*
+  ТЕЛО ПУБЛИКАЦИИ — ОСНОВНОЙ ТЕКСТ, А НЕ ВТОРИЧНЫЙ. Бриф (§10) держит основной
+  текст в полосе 14–16 px, а 13 px — ступень метаданных; межстрочный интервал
+  тот же бриф просит «около 1,5». Правило стоит без условия: поправка, зажатая
+  внутри `@media (min-width: 760px)`, оставляла телефонную колонку на 1,62.
+*/
+.forum-post__body { color: var(--dim); font-size: var(--fs-text); line-height: 1.58; }
 .forum-post__body p { margin: 0 0 var(--s-1); }
 .forum-post__body p:last-child { margin-bottom: 0; }
 .forum-post__body a { color: var(--accent-ink); }
@@ -1964,8 +1973,17 @@
 /*
   Короткое сообщение об успехе. Не alert: тот останавливает страницу
   и на телефоне выглядит как ошибка сайта.
+
+  ТРИ ТОНА, ОДИН БЛОК. Полоса стояла в зелёном и рисовала им всё подряд:
+  «База не приняла жалобу» и «Ссылка скопирована» выглядели одинаково, и
+  цвет — единственное, что различает их за долю секунды, — работал против
+  человека. Тон задаётся двумя переменными: краска плашки и чернила подписи,
+  поэтому каждая тема приносит свои (в светлой --soft-* уже тёмные).
+  Отличия не только в краске: текст полосы сам называет, что случилось.
 */
 .forum-toast {
+  --toast-tone: var(--win);
+  --toast-ink: var(--soft-ok);
   position: fixed;
   z-index: var(--z-toast);
   /* Над полосой жестов, иначе сообщение наполовину под ней. */
@@ -1974,14 +1992,16 @@
   transform: translateX(-50%);
   max-width: calc(100% - 36px);
   padding: var(--s-2) var(--s-3);
-  border: 1px solid color-mix(in srgb, var(--win) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--toast-tone) 30%, transparent);
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--win) 18%, var(--overlay));
-  color: var(--soft-ok);
+  background: color-mix(in srgb, var(--toast-tone) 18%, var(--overlay));
+  color: var(--toast-ink);
   font-size: var(--fs-small);
   box-shadow: var(--shadow-3);
   animation: forum-toast-in .26s var(--ease) both;
 }
+.forum-toast--error { --toast-tone: var(--loss); --toast-ink: var(--soft-bad); }
+.forum-toast--warn { --toast-tone: var(--gold); --toast-ink: var(--soft-warn); }
 @keyframes forum-toast-in {
   from { opacity: 0; transform: translate(-50%, 12px); }
   to { opacity: 1; transform: translate(-50%, 0); }

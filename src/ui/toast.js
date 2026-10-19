@@ -20,13 +20,19 @@
 
   Полоса, а не `alert`: последний останавливает страницу и на телефоне
   выглядит как ошибка сайта.
+
+  ТОН — ВТОРОЙ АРГУМЕНТ, И ПО УМОЛЧАНИЮ ОН ЗЕЛЁНЫЙ. `error` ставит каждый
+  отказ (база не приняла, браузер не смог, файл не влез), `warn` — то, что
+  случилось, но с последствиями, о которых надо знать: отключённые push,
+  сменённый код, запрет, остающийся на время разбора апелляции. Вызывать
+  помощник без второго аргумента значит сказать «готово».
 */
 
-export function toast(message) {
+export function toast(message, kind = 'ok') {
   const text = String(message ?? '');
   document.querySelector('.forum-toast')?.remove();
   const box = document.createElement('div');
-  box.className = 'forum-toast';
+  box.className = kind === 'ok' ? 'forum-toast' : `forum-toast forum-toast--${kind}`;
   box.textContent = text;
   document.body.append(box);
   window.setTimeout(() => box.remove(), Math.min(5000, Math.max(2600, Math.round(text.length * 60))));

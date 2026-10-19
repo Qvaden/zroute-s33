@@ -1653,7 +1653,7 @@ async function sendAppeal(form, submitter) {
       } catch {
         /* список останется прошлым: заявка принята, и это уже видно */
       }
-      toast(`Апелляция отправлена модерации. Запрет на время разбора остаётся. ${slaPromiseLine()}`);
+      toast(`Апелляция отправлена модерации. Запрет на время разбора остаётся. ${slaPromiseLine()}`, 'warn');
     } catch (err) {
       // Отказ говорит сам за себя: в нём и причина, и граница. Своего текста
       // у страницы нет, чтобы два объяснения не разошлись.
@@ -1941,7 +1941,7 @@ function wire() {
         subscribe.dataset.forumSubscribed = subscribed ? '' : '1';
         subscribe.textContent = subscribed ? 'Подписаться' : 'Отписаться';
       } catch (err) {
-        toast(String(err?.message ?? err));
+        toast(String(err?.message ?? err), 'error');
       }
       return;
     }
@@ -1977,7 +1977,7 @@ function wire() {
         */
         console.error('закладка не сохранена:', err?.message ?? err);
         await loadFeed();
-        toast(String(err?.message ?? err));
+        toast(String(err?.message ?? err), 'error');
       }
       return;
     }
@@ -1992,7 +1992,7 @@ function wire() {
         subscribed ? state.allianceSubscriptions.delete(id) : state.allianceSubscriptions.add(id);
         if (!subscribed) closeStarterStep('ally');
         paint();
-      } catch (err) { toast(String(err?.message ?? err)); }
+      } catch (err) { toast(String(err?.message ?? err), 'error'); }
       return;
     }
 
@@ -2107,7 +2107,7 @@ function wire() {
         if (iconEl) iconEl.textContent = res.liked ? '♥' : '♡';
         if (res.liked) { likeBtn.classList.add('is-liked'); } else { likeBtn.classList.remove('is-liked'); }
       } catch (err) {
-        toast(String(err?.message ?? err));
+        toast(String(err?.message ?? err), 'error');
       }
       return;
     }
@@ -2132,7 +2132,7 @@ function wire() {
         toast(was ? 'Подтверждение снято.' : 'Ник подтверждён.');
         await loadProfile(profileState.nick);
       } catch (err) {
-        toast(String(err?.message ?? err));
+        toast(String(err?.message ?? err), 'error');
         if (verifyBtn.isConnected) {
           verifyBtn.disabled = false;
           verifyBtn.textContent = was ? 'Снять подтверждение' : 'Подтвердить ник';
@@ -2455,7 +2455,7 @@ function wire() {
           слова он увидел бы только вернувшуюся кнопку.
         */
         console.error('благодарность не сохранена:', err?.message ?? err);
-        toast(err?.message || 'База не приняла благодарность');
+        toast(err?.message || 'База не приняла благодарность', 'error');
         await refreshOne(targetType, targetId);
       }
       return;
@@ -2574,7 +2574,7 @@ function wire() {
         }
         paint();
       } catch (err) {
-        toast(String(err?.message ?? err));
+        toast(String(err?.message ?? err), 'error');
         extendBtn.disabled = false;
       }
       return;
@@ -2605,7 +2605,7 @@ function wire() {
         paint();
       } catch (err) {
         toast(`${String(err?.message ?? err)}
-Если база ещё не обновлена, прогоните supabase/applied/20260926-barter-board.sql.`.trim());
+Если база ещё не обновлена, прогоните supabase/applied/20260926-barter-board.sql.`.trim(), 'error');
         barterBtn.disabled = false;
       }
       return;
@@ -2631,7 +2631,7 @@ function wire() {
         paint();
       } catch (err) {
         toast(`${String(err?.message ?? err)}
-Если база ещё не обновлена, прогоните supabase/applied/20261006-account-board.sql.`.trim());
+Если база ещё не обновлена, прогоните supabase/applied/20261006-account-board.sql.`.trim(), 'error');
         accountBtn.disabled = false;
       }
       return;
@@ -3062,7 +3062,7 @@ function wire() {
           // Сразу открываем созданное: человек должен увидеть результат,
           // а не искать свой пост в ленте.
           location.hash = `#/forum/${created.id}`;
-          if (shotError) toast(shotError);
+          if (shotError) toast(shotError, 'warn');
         } catch (err) {
           showError('[data-forum-new-error]', String(err?.message ?? err));
         }
@@ -3093,7 +3093,7 @@ function wire() {
 
           resetForm(commentForm);
           await loadThread(postId);
-          if (shotError) toast(shotError);
+          if (shotError) toast(shotError, 'warn');
         } catch (err) {
           showError('[data-forum-comment-error]', String(err?.message ?? err));
         }
@@ -3126,7 +3126,7 @@ function wire() {
           // После правки — туда же, где человек был: тред или лента.
           if (state.openPostId === id) await loadThread(id);
           else await loadFeed();
-          if (shotError) toast(shotError);
+          if (shotError) toast(shotError, 'warn');
         } catch (err) {
           showError('[data-forum-edit-error]', String(err?.message ?? err));
         }

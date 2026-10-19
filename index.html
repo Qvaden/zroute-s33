@@ -4,12 +4,51 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
+  <script>
+    /*
+      ТЕМА ДО ПЕРВОГО КАДРА.
+
+      Модуль `src/main.js` подключается в конце `<body>`, а таблицы стилей
+      разбираются в `<head>` — значит между ними был кадр, когда светлая тема
+      успевала отрисоваться тёмной, а потом вся страница мигнула обратно.
+      Бриф §2 требует применить сохранённую тему до отрисовки основной
+      страницы, и это единственное место, где так можно: инлайн, до `<link>`.
+
+      Правило здесь одно и то же, что в `src/main.js`: светлой считается
+      ровно строка «light», всё остальное — тёмная. Чужое значение (запись
+      из прошлой версии, мусор из консоли) не имеет права уезжать в атрибут:
+      на незнакомом имени не срабатывает ни одна лестница токенов, и страница
+      остаётся без красок вовсе.
+
+      Строка продублирована, а не импортирована: модуль в `<head>` значил бы,
+      что первый кадр ждёт сеть. Дублирование дешёвое — проверка BI «битое имя
+      темы не уезжает в атрибут» читает сразу все три копии правила: эту,
+      `applyTheme()` в `src/main.js` и шаблон страниц справочника.
+    */
+    (function () {
+      try {
+        if (localStorage.getItem('s33-theme') === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (_) {}
+    })();
+  </script>
+
   <title>Сервер 33 · Z Route: Redemption</title>
   <meta name="description" content="Форум сообщества 33 сервера Z Route: Redemption. Хроника захватов, рейтинг альянсов по итогам VS и разбор для малых альянсов.">
 
-  <!-- Установка на телефон -->
+  <!--
+    Установка на телефон.
+
+    `theme-color` красит полосу состояния, и он обязан быть фоном темы, а не
+    произвольным числом из прошлой палитры: здесь стоит ночное `--bg` из
+    `src/styles-v8.css`, а при переключении `applyTheme()` читает `--bg`
+    уже выбранной темы и записывает сюда её же значение. Прежняя строка
+    (#080a0f) не совпадала с ночным фоном (#0a0e15) и в светлой теме
+    оставляла чёрную полосу над бежевой страницей.
+  -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#080a0f">
+  <meta name="theme-color" content="#0a0e15">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -89,11 +128,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=116">
+  <link rel="modulepreload" href="./src/main.js?v=117">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css?v=21">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=22">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -102,7 +141,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=59">
+  <link rel="stylesheet" href="./src/forum.css?v=61">
   <!--
     Телефон — последним слоем.
 
@@ -129,7 +168,7 @@
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=48">
+  <link rel="stylesheet" href="./src/refine.css?v=50">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -215,7 +254,7 @@
       <p class="head__where" id="head-where" aria-hidden="true"></p>
 
       <div id="president-board" class="president-board" hidden></div>
-      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Переключить тему" title="Тёмная/светлая тема">
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Переключить на светлую тему" title="Переключить на светлую тему">
         <span class="icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span>
         <span class="icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
       </button>
@@ -413,7 +452,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=116"></script>
+  <script type="module" src="./src/main.js?v=117"></script>
 
   <script>
     /*
