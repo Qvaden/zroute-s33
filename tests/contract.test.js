@@ -4293,6 +4293,10 @@ console.log('\nS. Чистые функции');
   const raceHooks = [...new Set([...driver.matchAll(/\[data-(race-[a-z-]+)\]/g)].map((m) => m[1]))];
   check('драйвер вообще что-то ищет', raceHooks.length >= 5, `нашли: ${raceHooks.join(', ')}`);
   for (const hook of raceHooks) check(`разметка содержит data-${hook}`, html.includes(`data-${hook}`));
+  check('тап по полю графика раскрывает список альянсов',
+    /closest\('\[data-race-plot\]'\)[\s\S]{0,220}\bopen = true/.test(driver));
+  check('у списка есть клавиатурная дверь: раскрывающий <summary>',
+    /data-race-picker[\s\S]{0,160}<summary/.test(html));
   check('выбор хранится под одним ключом', driver.includes("'s33-race'"));
   check('отметка ведётся и классом, и вслух',
     driver.includes('is-on') && driver.includes('aria-pressed'));
