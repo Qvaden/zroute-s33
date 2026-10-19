@@ -70,6 +70,15 @@ export function isColor(value) {
   return typeof value === 'string' && HEX.test(value.trim());
 }
 
+/**
+ * Краска плашки альянса: своя, если в базе лежит HEX, иначе общий запасной.
+ * Один владелец у запасного числа: страницы подставляли то #7a8494, то
+ * #8a93a2, и «альянс без краски» выглядел двумя разными серыми.
+ */
+export function tagColor(color) {
+  return isColor(color) ? color.trim() : NO_ALLIANCE_COLOR;
+}
+
 function toRgb(hex) {
   const h = hex.trim().replace('#', '').toLowerCase();
   const s = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;

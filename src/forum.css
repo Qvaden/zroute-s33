@@ -1411,7 +1411,7 @@
   height: 24px;
   border-radius: var(--r-sm);
   border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
-  background: var(--swatch, #fff);
+  background: var(--swatch, var(--mark-plate));
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1429,6 +1429,37 @@
   transform: rotate(-45deg);
 }
 .forum-md__color:hover { transform: scale(1.12); }
+
+/*
+  ЦВЕТ ТЕКСТА, ВЫБРАННЫЙ УЧАСТНИКОМ — ДЕСЯТЬ СТРОК НА ДВЕ ТЕМЫ.
+
+  В посте живёт имя роли (`<span class="mdc mdc--red">`), краску даёт тема, и
+  поэтому записанный ночью текст светлеет вместе с интерфейсом, а не остаётся
+  ночным пятном на бумаге. Числа — токены `--mdc-*` из `styles-v8.css`, ряд и
+  обоснование контраста в `src/forum/tones.js`.
+
+  Квадратики панели берут тот же токен: человек выбирает краску, глядя на неё в
+  своей теме, а не на образец из другой.
+*/
+.mdc--red    { color: var(--mdc-red); }
+.mdc--orange { color: var(--mdc-orange); }
+.mdc--gold   { color: var(--mdc-gold); }
+.mdc--green  { color: var(--mdc-green); }
+.mdc--teal   { color: var(--mdc-teal); }
+.mdc--blue   { color: var(--mdc-blue); }
+.mdc--violet { color: var(--mdc-violet); }
+.mdc--grey   { color: var(--mdc-grey); }
+.mdc--chalk  { color: var(--mdc-chalk); }
+
+.forum-md__color--red    { --swatch: var(--mdc-red); }
+.forum-md__color--orange { --swatch: var(--mdc-orange); }
+.forum-md__color--gold   { --swatch: var(--mdc-gold); }
+.forum-md__color--green  { --swatch: var(--mdc-green); }
+.forum-md__color--teal   { --swatch: var(--mdc-teal); }
+.forum-md__color--blue   { --swatch: var(--mdc-blue); }
+.forum-md__color--violet { --swatch: var(--mdc-violet); }
+.forum-md__color--grey   { --swatch: var(--mdc-grey); }
+.forum-md__color--chalk  { --swatch: var(--mdc-chalk); }
 
 /* ── Редактор текста ───────────────────────────────────────────────────────── */
 

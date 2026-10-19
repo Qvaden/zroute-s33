@@ -24,6 +24,8 @@ import { skWithCaption } from '../ui/skeleton.js';
 import { serverEvents, verdictText, pillText, EVENT_TYPE } from '../logic/event-types.js';
 import { RULES, SANCTIONS, CATEGORIES, SORTS, REACTIONS, FORUM_TOPIC_TAGS, STARTER_STEPS, starterStepHref, categoryLabel, needsExpiry, needsEventDate, needsBarterLines } from '../forum/rules.js';
 import { postBody, excerpt, editorHtml, textOf, timeAgo, fullTime, avatarHtml } from '../forum/format.js';
+import { MD_TONES } from '../forum/tones.js';
+import { tagColor } from '../ui/ink.js';
 import { localInputValue } from '../forum/event-format.js';
 import { eventBadge, eventActions } from './calendar.js';
 import { roleBadge, roleLabel, verifiedBadge, serverBadge } from '../forum/roles.js';
@@ -1437,13 +1439,14 @@ const MD_BLOCKS = [
 ];
 
 /*
- * Цвета текста. Ровно столько, сколько читается на тёмном фоне сайта: всё,
- * что темнее этого набора, на почти чёрном фоне не видно человеческим глазом.
+ * Цвета текста — ДВЕ краски на роль, а не девять ночных чисел.
+ *
+ * Панель стоит на пяти редакторах, и прежний набор был подобран под почти
+ * чёрный фон: на тёплой бумаге светлой темы он даёт 1,08…2,58:1, то есть
+ * подпись не читается. Роль живёт в `src/forum/tones.js` вместе с обоими
+ * числами и с обратной дорогой (hex → роль для старых записей); здесь только
+ * имена, названия для подписи кнопки и порядок ряда.
  */
-const MD_COLORS = [
-  '#ff6b6b', '#ff9a4a', '#ffc93c', '#4fd98a', '#5ce0dd',
-  '#6fa8ff', '#b78cff', '#9aa4b2', '#ffffff',
-];
 
 export function renderMdBar() {
   const line = (list) =>
@@ -1455,9 +1458,16 @@ export function renderMdBar() {
       )
       .join('');
 
-  const palette = MD_COLORS.map(
-    (h) => `<button type="button" class="forum-md__color" data-editor-color="${esc(h)}"
-             title="Цвет текста" aria-label="Цвет текста ${esc(h)}" style="--swatch:${esc(h)}"></button>`
+  /*
+    Кнопка ряда отдаёт имя роли, а не краску: `data-editor-color="mdc:red"`.
+    Сам квадратик красится из токена темы (`.forum-md__color--red`), поэтому
+    человек видит ровно тот цвет, который получится в текущей теме, а не ночной
+    образец на дневной бумаге.
+  */
+  const palette = MD_TONES.map(
+    (t) => `<button type="button" class="forum-md__color forum-md__color--${t.id}"
+             data-editor-color="mdc:${t.id}" title="${esc(t.name)} текст"
+             aria-label="${esc(t.name)} текст"></button>`,
   ).join('');
 
   return `
@@ -2098,7 +2108,7 @@ function allianceCard(tag, alliances = []) {
   const alliance = alliances.find((item) => item.tag?.toUpperCase() === String(tag).toUpperCase());
   if (!alliance) return `<span class="forum-post__ally">${esc(tag)}</span>`;
   return `<a class="forum-alliance-card" href="#/alliance/${esc(encodeURIComponent(alliance.id))}" title="Открыть карточку альянса">
-    <i style="--ally-color:${esc(alliance.color || '#8a93a2')}"></i><b>${esc(alliance.tag)}</b><small>${esc(alliance.name)}</small>
+    <i style="--ally-color:${esc(tagColor(alliance.color))}"></i><b>${esc(alliance.tag)}</b><small>${esc(alliance.name)}</small>
   </a>`;
 }
 
@@ -2110,7 +2120,7 @@ function renderAllianceSubscriptions(view, s) {
     <header><b>Рейтинг альянсов</b><small>Сообщим, когда изменится место</small></header>
     <div>${alliances.map((a) => `<button type="button" class="forum-alliance-sub${subscribed.has(a.id) ? ' is-on' : ''}"
       data-forum-alliance-subscribe="${esc(a.id)}" data-forum-alliance-subscribed="${subscribed.has(a.id) ? '1' : ''}">
-      <i style="--ally-color:${esc(a.color || '#8a93a2')}"></i>${esc(a.tag)} <span>${subscribed.has(a.id) ? 'Подписан' : 'Подписаться'}</span></button>`).join('')}</div>
+      <i style="--ally-color:${esc(tagColor(a.color))}"></i>${esc(a.tag)} <span>${subscribed.has(a.id) ? 'Подписан' : 'Подписаться'}</span></button>`).join('')}</div>
   </section>`;
 }
 

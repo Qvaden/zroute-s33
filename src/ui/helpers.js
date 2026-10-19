@@ -71,8 +71,12 @@ export function formDots(form) {
 /**
  * Спарклайн динамики очков. Обычный inline-SVG, без библиотек:
  * на 32 строки это дешевле и надёжнее, чем тянуть графическую зависимость.
+ *
+ * Краска по умолчанию — `currentColor`, то есть чернила того места, где график
+ * нарисован: собственного ночного числа здесь быть не должно, а страницы
+ * всегда приносят контрастную краску альянса явным аргументом.
  */
-export function sparkline(series, color = '#e0a33e', w = 84, h = 24) {
+export function sparkline(series, color = 'currentColor', w = 84, h = 24) {
   if (!series || series.length < 2) return '';
   const min = Math.min(...series);
   const max = Math.max(...series);

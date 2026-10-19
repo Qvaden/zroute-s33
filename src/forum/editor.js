@@ -12,6 +12,7 @@
  * при навешивании.
  */
 import { textOf } from './sanitize.js';
+import { toneOfValue, toneHex } from './tones.js';
 
 /** Редактор, в котором сейчас курсор. */
 export function activeEditor() {
@@ -57,6 +58,29 @@ export function applyFormat(editor, cmd, value) {
       а чужие execCommand (например, редактор названия гайда) должны
       остаться по умолчанию.
     */
+    const tone = toneOfValue(value);
+    if (tone) {
+      /*
+        Цвет из панели — НЕ число, а имя роли, и в базу уходит обёртка
+        `<span class="mdc mdc--красный">`. Причина одна: пост переживает
+        десятки переключений темы, а запечённый hex темы не замечает.
+      */
+      if (wrapTone(editor, tone)) return;
+      /*
+        Выделения нет, и обёртку ставить не на что — остается покрасить
+        последующий ввод. Число берём для темы, в которой человек пишет сейчас
+        (иначе он видит цвет, которого не видит на экране), а санитайзер при
+        сохранении вернёт из этого числа имя роли.
+      */
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand(
+        'foreColor',
+        false,
+        toneHex(tone, document.documentElement.getAttribute('data-theme')),
+      );
+      document.execCommand('styleWithCSS', false, false);
+      return;
+    }
     document.execCommand('styleWithCSS', false, true);
     // Сброс через 'inherit': санитайзер такую обёртку выбросит на сохранении.
     document.execCommand('foreColor', false, value || 'inherit');
@@ -102,6 +126,40 @@ export function wrapInline(editor, tag) {
   range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
+}
+
+/**
+ * Обернуть выделение в span с именем цвета. Возвращает true, если обёртка
+ * стоит и выделять больше нечего — иначе вызывающий красит последующий ввод.
+ *
+ * surroundContents не умеет захватывать выделение через границы других тегов
+ * (жирный рядом с обычным), и тогда содержимое переносится узловым способом:
+ * extractContents сохраняет вложенность, а не превращает «жирный красный» в
+ * просто красный.
+ */
+export function wrapTone(editor, tone) {
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0 || !sel.anchorNode || !editor.contains(sel.anchorNode)) return false;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return false;
+
+  const node = (range.startContainer.ownerDocument ?? document).createElement('span');
+  node.className = `mdc mdc--${tone}`;
+  try {
+    range.surroundContents(node);
+  } catch {
+    node.appendChild(range.extractContents());
+    range.insertNode(node);
+  }
+
+  // Курсор возвращаем на обёртку: человек видит, что краска на месте, и может
+  // снять её той же кнопкой, не выделяя заново.
+  const after = (range.startContainer.ownerDocument ?? document).createRange();
+  after.selectNodeContents(node);
+  sel.removeAllRanges();
+  sel.addRange(after);
+  syncEditorEmpty(editor);
+  return true;
 }
 
 export function textSample(tag) {

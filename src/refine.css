@@ -2330,6 +2330,21 @@ body:has(.chat-layout) .site-foot { display: none; }
   --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
   --tag-ink-keep: 70%;
 
+  /*
+    Ряд цвета текста, который выбирает участник (`.mdc--*` в forum.css), внутри
+    острова обязан остаться ночным: остров — тёмная подложка и в дневной теме, а
+    дневная половина ряда на ней даёт 1,2…1,9:1. Токены переписываются здесь, а
+    не правилам `.mdc--*`: правило одно на обе темы, а краску диктует слой.
+  */
+  --mdc-red:    #ff6b6b;
+  --mdc-orange: #ff9a4a;
+  --mdc-gold:   #ffc93c;
+  --mdc-green:  #4fd98a;
+  --mdc-teal:   #5ce0dd;
+  --mdc-blue:   #6fa8ff;
+  --mdc-violet: #b78cff;
+  --mdc-grey:   #9aa4b2;
+  --mdc-chalk:  #ffffff;
   --electric: #a7a3c2;
   --violet:   #9c7cff;
   --violet-ink: #b299ff;

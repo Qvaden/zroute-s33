@@ -3,6 +3,7 @@ import { byWeekStart, findCurrentWeek } from '../data/week-order.js';
 import { heroImage, heroAlt } from '../ui/hero-slot.js';
 import { HERO_SIZES, HERO_WITH_COPIES, avifSrcset, webpSrcset } from '../ui/responsive-images.js';
 import { EVENT_TYPE, pillText, isServerEvent } from '../logic/event-types.js';
+import { tagColor } from '../ui/ink.js';
 
 /* Формы слова «день» для счёта: 1 день, 2 дня, 5 дней. */
 const DAYS = ['день', 'дня', 'дней'];
@@ -165,7 +166,7 @@ function renderPreSeason(standings, allWeeks) {
           <div class="tiles">
             ${alliances
               .map(
-                (a) => `<span class="tile" style="--tag-color:${esc(a.color || '#7a8494')}">
+                (a) => `<span class="tile" style="--tag-color:${esc(tagColor(a.color))}">
                           <b>${esc(a.tag)}</b>${esc(a.name)}
                         </span>`
               )
@@ -314,7 +315,7 @@ function renderLive({ allWeeks, results, quarter, quarterStandings }, now = new 
         <span class="live__dots">${dots}</span>
         <span class="live__value">${
           leader
-            ? `<span class="tag" style="--tag-color:${esc(leader.alliance.color || '#7a8494')}">${esc(leader.alliance.tag)}</span> ${esc(leader.alliance.name)} · ${leader.points > 0 ? '+' : ''}${leader.points}`
+            ? `<span class="tag" style="--tag-color:${esc(tagColor(leader.alliance.color))}">${esc(leader.alliance.tag)}</span> ${esc(leader.alliance.name)} · ${leader.points > 0 ? '+' : ''}${leader.points}`
             : 'лидер ещё не определился'
         }</span>
         <span class="live__note">${tail}</span>
@@ -365,7 +366,7 @@ function renderRankRail(active, total) {
   const top = podium
     .map(
       (r) => `
-      <li class="rank__top rank__top--${r.place}" style="--tag-color:${esc(r.alliance.color || '#7a8494')}">
+      <li class="rank__top rank__top--${r.place}" style="--tag-color:${esc(tagColor(r.alliance.color))}">
         <a class="rank__head" href="#/alliance/${esc(r.alliance.id)}" aria-label="${esc(standingsRowLabel(r))}">
           <span class="rank__place num">${String(r.place).padStart(2, '0')}</span>
           <span class="tag">${esc(r.alliance.tag)}</span>
@@ -390,7 +391,7 @@ function renderRankRail(active, total) {
         ${tail
           .map(
             (r) => `
-          <li style="--tag-color:${esc(r.alliance.color || '#7a8494')}">
+          <li style="--tag-color:${esc(tagColor(r.alliance.color))}">
             <a href="#/alliance/${esc(r.alliance.id)}" aria-label="${esc(standingsRowLabel(r))}">
               <span class="rank__place num">${String(r.place).padStart(2, '0')}</span>
               <span class="tag">${esc(r.alliance.tag)}</span>
@@ -619,7 +620,7 @@ export function renderHome(view = {}) {
     items.length
       ? items
           .map(
-            (a) => `<span class="tile" style="--tag-color:${esc(a.color || '#7a8494')}">
+            (a) => `<span class="tile" style="--tag-color:${esc(tagColor(a.color))}">
                       <b>${esc(a.tag)}</b>${esc(a.name)}
                     </span>`
           )
@@ -639,7 +640,7 @@ export function renderHome(view = {}) {
 
   const moverRow = (r) =>
     `<li>
-       <span class="tag" style="--tag-color:${esc(r.alliance.color || '#7a8494')}">${esc(r.alliance.tag)}</span>
+       <span class="tag" style="--tag-color:${esc(tagColor(r.alliance.color))}">${esc(r.alliance.tag)}</span>
        <span style="flex:1">${esc(r.alliance.name)}</span>
        ${deltaBadge(r.delta)}
        <span class="muted">${r.place} место</span>

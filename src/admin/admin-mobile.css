@@ -158,7 +158,10 @@
     /* Скругление только сверху: окно выезжает снизу, как в приложениях. */
     border-radius: var(--r-xl) var(--r-xl) var(--r-lg) var(--r-lg);
   }
-  .adm-modal__box .adm-actions { position: sticky; bottom: 0; padding-top: var(--s-2); background: linear-gradient(transparent, #0b111a 40%); }
+  /* Подложка липкой строки кнопок — та же ступень, что у самого окна: панель в
+     дневной теме стоит на светлом фоне, и запечённый графит давал чёрную полосу
+     внизу белого окна. */
+  .adm-modal__box .adm-actions { position: sticky; bottom: 0; padding-top: var(--s-2); background: linear-gradient(transparent, var(--overlay) 40%); }
   .adm-reserved__add { max-width: none; }
   .adm-reserved__add input { height: 44px; }
   .adm-reserved__add .adm-btn { height: 44px; min-height: 44px; }

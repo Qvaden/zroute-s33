@@ -10,9 +10,11 @@
  * ПОЭТОМУ ФОРМАТИРОВАНИЕ — БЕЛЫЙ СПИСОК ТЕГОВ, А НЕ ПРИЁМНИК HTML.
  *   — всё, что не в списке (script, img, table, div, style и т.п.), выкидывается;
  *     текст внутри таких тегов сохраняется как обычный текст;
- *   — атрибуты разрешены ровно двум вещам: href у a (только через safeUrl)
- *     и style="color: …" у строчных тегов из списка (только из безопасного
- *     набора; голый span без цвета выбрасывается целиком);
+ *   — атрибуты разрешены ровно трём вещам: href у a (только через safeUrl),
+ *     style="color: …" у строчных тегов из списка (только из безопасного набора;
+ *     голый span без цвета выбрасывается целиком) и class="mdc mdc--…" у тех же
+ *     строчных тегов — это имя цвета, а не краска, поэтому оно не может ни во
+ *     что превратиться кроме одной из девяти ролей палитры;
  *   — всё прочее выходит без атрибутов вообще;
  *   — вложенность приводится к хорошо сформированной (каждый открытый тег
  *     закрывается), чтобы вёрстка не «перетекала» за пределы поста;
@@ -23,6 +25,7 @@
  * и в браузере (перед отправкой), поэтому здесь только строки и регулярки.
  */
 import { esc, safeUrl } from '../ui/helpers.js';
+import { HEX_TO_TONE, TONE_IDS } from './tones.js';
 
 const BLOCK = new Set(['p', 'h3', 'blockquote', 'pre', 'ul', 'ol', 'li']);
 const INLINE = new Set(['strong', 'b', 'em', 'i', 'u', 's', 'strike', 'sub', 'sup', 'code', 'span', 'a']);
@@ -118,6 +121,41 @@ function parseColor(style) {
   return '';
 }
 
+/** Тройной hex привести к шестизначному: палитра задана шестью, а браузер пишет любые. */
+function expandHex(v) {
+  return v.length === 4 ? `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}` : v;
+}
+
+/**
+ * Имя цвета из атрибутов тега — или пусто.
+ *
+ * Краска в посте бывает в двух видах: класс-роль (`mdc mdc--red`), который
+ * пишет теперешняя панель, и число в style, которое осталось от прежней. Второе
+ * обязано стать первым, если оно из палитры: иначе запись, сделанную ночью,
+ * светлая тема оставит нечитаемой — и наоборот. Чужое число (вставленное руками)
+ * ролью не становится: под него нет второй краски, и мы его не трогаем.
+ *
+ * Явный сброс цвета (`color: inherit`) перевешивает класс: человек стёр краску,
+ * и возвращать её из класса не за чем.
+ */
+function toneClass(attrs) {
+  const attr = (n) => (attrs ?? []).find((a) => a.name === n)?.value ?? '';
+  const style = attr('style');
+  if (/color\s*:\s*inherit\b/i.test(style)) return '';
+
+  const tokens = attr('class').trim().split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2 && tokens.every((c) => c === 'mdc' || /^mdc--[a-z]+$/.test(c))
+    && tokens.filter((c) => c !== 'mdc').length === 1) {
+    const id = /^mdc--([a-z]+)$/.exec(tokens.find((c) => c !== 'mdc'))[1];
+    if (TONE_IDS.has(id)) return `mdc mdc--${id}`;
+  }
+
+  const color = parseColor(style);
+  if (!color) return '';
+  const id = HEX_TO_TONE.get(color) ?? HEX_TO_TONE.get(expandHex(color));
+  return id ? `mdc mdc--${id}` : '';
+}
+
 /**
  * Очистка HTML по белому списку.
  * @param {string} raw
@@ -189,10 +227,11 @@ export function sanitizeHtml(raw) {
       continue;
     }
     if (name === 'span') {
-      const color = parseColor((tok.attrs ?? []).find((a) => a.name === 'style')?.value ?? '');
-      if (!color) continue;
+      const tone = toneClass(tok.attrs);
+      const color = tone ? '' : parseColor((tok.attrs ?? []).find((a) => a.name === 'style')?.value ?? '');
+      if (!tone && !color) continue;
       stack.push('span');
-      out += `<span style="color:${color}">`;
+      out += tone ? `<span class="${tone}">` : `<span style="color:${color}">`;
       continue;
     }
 
@@ -203,11 +242,17 @@ export function sanitizeHtml(raw) {
       <b style="color:…">. Разрешать только span значило бы молча выбросить
       половину цветов, которые человек видит в редакторе.
     */
-    const color = INLINE.has(name)
-      ? parseColor((tok.attrs ?? []).find((a) => a.name === 'style')?.value ?? '')
-      : '';
+    if (INLINE.has(name)) {
+      const tone = toneClass(tok.attrs);
+      const color = tone ? '' : parseColor((tok.attrs ?? []).find((a) => a.name === 'style')?.value ?? '');
+      stack.push(name);
+      if (tone) out += `<${name} class="${tone}">`;
+      else out += color ? `<${name} style="color:${color}">` : `<${name}>`;
+      continue;
+    }
+
     stack.push(name);
-    out += color ? `<${name} style="color:${color}">` : `<${name}>`;
+    out += `<${name}>`;
   }
 
   closeTo(false);

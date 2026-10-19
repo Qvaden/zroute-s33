@@ -1,5 +1,6 @@
 import { esc, formDots, plural, standingsRowLabel, unavailableNote, emptyState } from '../ui/helpers.js';
 import { formatQuarterLeft } from '../ui/quarter-timer.js';
+import { tagColor } from '../ui/ink.js';
 
 /**
  * Самостоятельная страница Кварта: топ-3 как подиум и ниже карточная доска,
@@ -144,7 +145,7 @@ function podiumCard(r, byId) {
   return `
     <a class="quart-podium-card ${medal}" href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
        aria-label="${esc(standingsRowLabel(r, { mergedTarget }))}"
-       style="--tag-color:${esc(a.color || '#7a8494')}">
+       style="--tag-color:${esc(tagColor(a.color))}">
       <span class="quart-podium-card__place">0${r.place}</span>
       <span class="quart-podium-card__medal">${r.place === 1 ? '✦' : r.place === 2 ? '◆' : '◇'}</span>
       <span class="quart-podium-card__tag">${esc(a.tag)}</span>
@@ -176,7 +177,7 @@ function quartCard(r, byId) {
     <a class="quart-card${medal}${a.active ? '' : ' quart-card--off'}"
        href="#/alliance/${esc(a.id)}" data-go="alliance-${esc(a.id)}"
        aria-label="${esc(standingsRowLabel(r, { mergedTarget }))}"
-       style="--tag-color:${esc(a.color || '#7a8494')}"
+       style="--tag-color:${esc(tagColor(a.color))}"
        data-name="${esc(a.name.toLowerCase())}"
        data-tag="${esc(a.tag.toLowerCase())}"
        data-points="${r.points}"

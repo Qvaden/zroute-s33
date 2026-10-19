@@ -1,4 +1,5 @@
 import { esc, fmtDate, plural } from '../../ui/helpers.js';
+import { tagColor } from '../../ui/ink.js';
 import { diffMarks, countMarks, marksFromRaw, nextWeek } from '../edit.js';
 import { byWeekStartDesc, findCurrentWeek } from '../../data/week-order.js';
 
@@ -88,7 +89,7 @@ export function renderWeek(view, param) {
       const state = outcome ?? 'empty';
       return `<div class="adm-cell adm-cell--${state}" data-cell="${esc(a.id)}"
                    data-cell-find="${esc(`${a.tag} ${a.name}`.toLowerCase())}"
-                   style="--tag-color:${esc(a.color || '#7a8494')}">
+                   style="--tag-color:${esc(tagColor(a.color))}">
           <span class="adm-cell__tag">${esc(a.tag)}</span>
           <span class="adm-cell__name">${esc(a.name)}</span>
           <div class="adm-marks">

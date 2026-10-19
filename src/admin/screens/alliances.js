@@ -1,4 +1,5 @@
 import { esc, plural } from '../../ui/helpers.js';
+import { tagColor } from '../../ui/ink.js';
 import { alliancesFromRaw, alliancesDiff, allianceResultsCount } from '../edit.js';
 
 /**
@@ -123,7 +124,7 @@ function row(a, canPush, winsCount, resultsCount, byId) {
       : 'распался';
 
   return `<li class="adm-ally ${a.active ? '' : 'is-gone'}" data-alliance-row="${esc(a.id)}">
-    <i class="adm-ally__color" style="background:${esc(a.color || '#7a8494')}"></i>
+    <i class="adm-ally__color" style="background:${esc(tagColor(a.color))}"></i>
     <span class="adm-ally__tag">${esc(a.tag)}</span>
     <span class="adm-ally__name">${esc(a.name)}</span>
     <span class="adm-ally__note muted">${esc(a.note || '')}</span>
@@ -185,7 +186,7 @@ function renderForm(form, canPush, raw, list) {
         </label>
         <label class="adm-field">
           <span>Цвет</span>
-          <input type="color" data-alliance-field="color" value="${esc(form.color || '#7a8494')}">
+          <input type="color" data-alliance-field="color" value="${esc(tagColor(form.color))}">
         </label>
       </div>
 

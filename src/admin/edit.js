@@ -7,6 +7,7 @@
  * единственный код в проекте, который способен испортить накопленную историю.
  */
 import { plural } from '../ui/helpers.js';
+import { NO_ALLIANCE_COLOR } from '../ui/ink.js';
 import { toDate } from '../data/adapters/_coerce.js';
 import { EVENT_TYPE, EVENT_TYPE_ORDER } from '../logic/event-types.js';
 
@@ -454,17 +455,16 @@ export function alliancesFromRaw(raw) {
 /**
  * Пустая заготовка альянса для формы.
  *
- * Цвет — тот же нейтральный оттенок, которым сайт заменяет отсутствующий
- * цвет (`a.color || '#7a8494'` в screens/week.js и в подсчёте рейтинга):
- * свежедобавленный альянс не остаётся серым сиротой, а полю есть с чего
- * начать выбор — нативный `<input type="color">` не умеет быть пустым.
+ * Цвет — общий запасной сайта (`NO_ALLIANCE_COLOR` в ui/ink.js): свежедобавленный
+ * альянс не остаётся серым сиротой, а полю есть с чего начать выбор — нативный
+ * `<input type="color">` не умеет быть пустым.
  */
 export function blankAlliance() {
   return {
     id: null,
     tag: '',
     name: '',
-    color: '#7a8494',
+    color: NO_ALLIANCE_COLOR,
     active: true,
     note: '',
     mergedInto: '',

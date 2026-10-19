@@ -1,5 +1,5 @@
 import { esc, deltaBadge, formDots, sparkline, plural, standingsRowLabel, unavailableNote, emptyState } from '../ui/helpers.js';
-import { inkOf } from '../ui/ink.js';
+import { inkOf, tagColor } from '../ui/ink.js';
 import { byWeekStart } from '../data/week-order.js';
 import { CONFIG } from '../../config.js';
 
@@ -159,12 +159,13 @@ function racePanel(list, weeks) {
         слоя данных дотягивается. Числа в атрибутах остались бы краской той
         темы, что была на экране при сборке разметки.
       */
-      const ink = inkOf(r.alliance.id, r.alliance.color || '');
+      const color = tagColor(r.alliance.color);
+      const ink = inkOf(r.alliance.id, color);
       return {
         id: r.alliance.id,
         tag: r.alliance.tag,
         name: r.alliance.name,
-        color: r.alliance.color || '',
+        color,
         ink: ink.line,
         inkLabel: ink.label,
         active: !!r.alliance.active,
@@ -190,7 +191,7 @@ function racePanel(list, weeks) {
         <button type="button" class="race__chip${l.active ? '' : ' race__chip--off'}"
                 data-race-chip="${esc(l.id)}" aria-pressed="false"
                 aria-label="${esc(l.tag)} — ${esc(l.name)}${l.active ? '' : ' · неактивный'}">
-          <i class="race__dot" style="--tag-color:${esc(l.color || 'var(--mute)')}" aria-hidden="true"></i>${esc(l.tag)}
+          <i class="race__dot" style="--tag-color:${esc(l.color)}" aria-hidden="true"></i>${esc(l.tag)}
         </button>`
     )
     .join('');
@@ -263,7 +264,7 @@ function renderEmpty(eyebrow, title, loadError) {
 
 function rowHtml(r, byId, variant = 'season', achievements) {
   const a = r.alliance;
-  const color = a.color || '#7a8494';
+  const color = tagColor(a.color);
   const isQuarter = variant === 'quarter';
   const mergedTarget = a.mergedInto ? byId.get(a.mergedInto) : null;
 

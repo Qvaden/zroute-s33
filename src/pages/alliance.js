@@ -1,5 +1,5 @@
 import { esc, fmtDate, plural, deltaBadge } from '../ui/helpers.js';
-import { inkOf } from '../ui/ink.js';
+import { inkOf, tagColor } from '../ui/ink.js';
 import { areaChart, placeChart } from '../ui/chart.js';
 import { computeAllianceHistory, computeBestStreaks } from '../logic/standings.js';
 
@@ -29,7 +29,7 @@ export function renderAlliance(view, allianceId) {
   }
 
   const a = row.alliance;
-  const color = a.color || '#7a8494';
+  const color = tagColor(a.color);
   /*
     Графики красятся контрастной краской, остальное — цветом альянса.
     `--tag-color` ниже смешивается с фоном плитки и служит меткой рядом с

@@ -950,6 +950,19 @@
   --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
   --tag-ink-keep: 70%;
 
+  /* Ряд цвета текста участника (`.mdc--*`) на студии обязан остаться ночным:
+     подложка здесь тёмная и в дневной теме, а дневные чернила на ней дают
+     1,2…1,9:1. Та же причина, что у острова справочника в refine.css. */
+  --mdc-red:    #ff6b6b;
+  --mdc-orange: #ff9a4a;
+  --mdc-gold:   #ffc93c;
+  --mdc-green:  #4fd98a;
+  --mdc-teal:   #5ce0dd;
+  --mdc-blue:   #6fa8ff;
+  --mdc-violet: #b78cff;
+  --mdc-grey:   #9aa4b2;
+  --mdc-chalk:  #ffffff;
+
   --electric: #a7a3c2;
   --violet:   #9c7cff;
   --violet-ink: #b299ff;

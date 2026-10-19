@@ -4568,13 +4568,15 @@ console.log('\nS. Чистые функции');
   equal('и ссылку подписи', raceLines[0].inkLabel, 'var(--ainkt-a1,#ade773)');
   equal('исходная краска остаётся рядом — она же запас в var()', raceLines[0].color, '#ade773');
   equal('альянс без краски получает серый запас', raceLines[1].ink, 'var(--aink-a2,#7a8494)');
+  equal('и тот же серый в поле color — драйвер не выдумывает свою краску', raceLines[1].color, '#7a8494');
   check('искра в строке рейтинга тоже красится ссылкой', /style="stroke:var\(--aink-a1,/.test(ladderHtml));
 
   const driver = await readFile('src/ui/race-controls.js', 'utf8');
   check('штрих, точка и подпись идут через style: в атрибут var() не положить',
     driver.includes(`style="stroke:' + esc(inkOf(r))`) && /style="fill:'/.test(driver) && driver.includes('esc(e.inkLabel)'));
   check('нет блока переменных — линия остаётся прежней краской, а не исчезает',
-    /r\.ink \|\| r\.color \|\| NO_COLOR/.test(driver) && /r\.inkLabel \|\| r\.color \|\| NO_COLOR/.test(driver));
+    /r\.ink \|\| r\.color;/.test(driver) && /r\.inkLabel \|\| r\.color;/.test(driver));
+  check('у драйвера нет своей краски «без альянса»: число приносит страница', !/NO_COLOR/.test(driver));
   check('чёрточка между точкой и подписью остаётся исходной краской с половинной яркостью',
     driver.includes(`stroke="' + esc(e.color) + '" stroke-width="1" opacity=".5"`));
 
@@ -13852,13 +13854,19 @@ console.log('\nAN. Доска аккаунтов');
     (chatLogicSrc.match(/syncEditorEmpty\(/g) || []).length >= 3);
 
   /* ── Что уходит в базу и что видит читатель ── */
-  const dirty = '<b>срочно</b> <span style="COLOR:#FF6B6B">горящее</span>'
+  /*
+    Цвет здесь ЧУЖОЙ палитре (`#d94fd9` нет ни в ночи, ни в дне): санитайзер
+    оставляет его как есть — краской одного числа, потому что второй половины
+    под него нет. Краску ряда он превращает в имя роли; это отдельная проверка
+    ниже и целая секция BJ.
+  */
+  const dirty = '<b>срочно</b> <span style="COLOR:#D94FD9">горящее</span>'
     + '<script>документы</script><img src="x" onerror=" украсть()">'
     + '<blockquote>цитата темы</blockquote><a href="javascript:boom()">яд</a>';
   const clean = sanitizeHtml(dirty);
   /* Браузер ставит в contenteditable <b>, канон общего списка превращает его в strong. */
   check('в базу уходит разметка, пропущенная через белый список темы',
-    clean.includes('<strong>срочно</strong>') && clean.includes('color:#ff6b6b')
+    clean.includes('<strong>срочно</strong>') && clean.includes('color:#d94fd9')
       && clean.includes('<blockquote>цитата темы</blockquote>'));
   check('опасное не уезжает в базу вместе с текстом',
     !clean.includes('<script') && !clean.includes('onerror') && !clean.includes('javascript:'));
@@ -13868,8 +13876,18 @@ console.log('\nAN. Доска аккаунтов');
     половину цветов, которые человек видел в редакторе.
   */
   check('цвет держится на любом разрешённом строчном теге, а не только на span',
-    sanitizeHtml('<b style="color: rgb(79, 217, 138)">сбор в 21:00</b>')
-      === '<strong style="color:rgb(79, 217, 138)">сбор в 21:00</strong>');
+    sanitizeHtml('<b style="color: rgb(217, 79, 217)">сбор в 21:00</b>')
+      === '<strong style="color:rgb(217, 79, 217)">сбор в 21:00</strong>');
+  /*
+    Тот же тег, но краска из ряда: в базу уходит имя роли, а не число, и
+    «жирный красный» переживает и обёртку, и перенос через границу другого
+    тега. Держит секция BJ; здесь — чтобы список не начал выбрасывать span
+    с классом.
+  */
+  check('краска ряда становится именем роли на любом строчном теге',
+    sanitizeHtml('<b style="color:#4fd98a">сбор</b>') === '<strong class="mdc mdc--green">сбор</strong>'
+      && sanitizeHtml('<span class="mdc mdc--teal">ветер</span>')
+        === '<span class="mdc mdc--teal">ветер</span>');
   check('редактор просит у браузера стили вместо <font>, которого нет в списке',
     /execCommand\('styleWithCSS', false, true\)/.test(editorSrc)
       && /execCommand\('styleWithCSS', false, false\)/.test(editorSrc));
@@ -19169,8 +19187,8 @@ console.log('\nBD. Оболочка «пусто»: восемь состоян�
   }
   check('локальные правила оставили только макет строки: выравнивание, кегль и цвет живут в оболочке',
     restated.length === 0, restated.slice(0, 4).join(' | '));
-  check('остров Кварта по-прежнему красит свою пустоту сам',
-    /\.quart-empty\s*\{[^}]*color:\s*#789078/.test(css['src/styles-v8.css'])
+  check('остров Кварта по-прежнему красит свою пустоту сам, но числом из своего ряда токенов',
+    /\.quart-empty\s*\{[^}]*color:\s*var\(--quart-quiet\)/.test(css['src/styles-v8.css'])
       && /\.quart-empty \.empty-state__title\s*\{\s*color:\s*inherit/.test(css['src/styles-v8.css']));
 
   const notWired = [];
@@ -19960,6 +19978,262 @@ console.log('\nBI. Тема: имя, первый кадр, полоса сос�
       && /toggle\.setAttribute\('aria-label', label\)/.test(main)
       && /toggle\.setAttribute\('title', label\)/.test(main),
     `в разметке: «${staticLabel}»; пар формулировок в main.js: ${labelOff ? 2 : 0}`);
+}
+
+/* ── BJ. Цвет текста участника: в базе имя роли, а не ночное число ──────────
+
+   §18 п.8 («нет случайных элементов со старыми цветами») и §5 (компоненты
+   берут токен, а не число). Девять красок панели форматирования — единственная
+   краска сайта, которую назначает сам человек, и все девять были ночные: ряд
+   подбирался «чтобы читалось на почти чёрном», а на тёплой бумаге он даёт
+   1,08…2,58:1. Исправление не может состоять в том, чтобы выдать панели
+   дневные числа: пост живёт годами, а запечённый в сохранённый HTML hex темой
+   не переопределяется. Поэтому в базу уходит ИМЯ роли, CSS даёт ему две краски,
+   а санитайзер превращает старые числа в имена — иначе заход оставил бы
+   «исправлено с сегодняшнего дня», то есть ровно то, что пункт запрещает.
+
+   Мерка — худшая ступень каждой лестницы, а не фон страницы: днём это провал
+   `--recessed` (поле ввода, цитата), ночью — верхний слой окна `--overlay`.
+   Числа берутся из токенов, а не переписаны сюда: правка ступени темы, из-за
+   которой краска ряда падает ниже 4,5, обязана уронить эту проверку.
+   ─────────────────────────────────────────────────────────────────────────── */
+console.log('\nBJ. Цвет текста участника: имя роли вместо ночного числа');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { MD_TONES, TONE_IDS, HEX_TO_TONE, toneOfValue, toneHex } =
+    await import('../src/forum/tones.js');
+  const { sanitizeHtml } = await import('../src/forum/format.js');
+  const { renderMdBar } = await import('../src/pages/forum.js');
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+  const forumCss = await readFile('src/forum.css', 'utf8');
+  const editorSrc = await readFile('src/forum/editor.js', 'utf8');
+  const { dark, light } = themeTokens(v8);
+  const bar = renderMdBar();
+  const ids = MD_TONES.map((t) => t.id);
+
+  check('ряд живёт в одном модуле: девять ролей, имена не повторяются, обе половины — hex',
+    MD_TONES.length === 9 && new Set(ids).size === 9
+      && TONE_IDS.size === 9 && ids.every((i) => TONE_IDS.has(i))
+      && MD_TONES.every((t) => /^#[0-9a-f]{6}$/.test(t.night) && /^#[0-9a-f]{6}$/.test(t.day)
+        && t.night !== t.day && /^[А-ЯЁ][а-яё]+$/.test(t.name)),
+    `${MD_TONES.length} ролей: ${ids.join(', ')}`);
+
+  check('панель отдаёт имя роли, а не краску: девять кнопок и ни одного hex в разметке',
+    ids.every((i) => bar.includes(`data-editor-color="mdc:${i}"`)
+      && bar.includes(`forum-md__color forum-md__color--${i}`))
+      && !/data-editor-color="#/.test(bar),
+    `кнопок палитры: ${(bar.match(/data-editor-color="mdc:/g) || []).length}`);
+
+  check('обе половины ряда объявлены токенами в обеих темах, а правила читают только токен',
+    ids.every((i) => dark[`--mdc-${i}`] === MD_TONES.find((t) => t.id === i).night
+      && light[`--mdc-${i}`] === MD_TONES.find((t) => t.id === i).day
+      && new RegExp(`^\\.mdc--${i}\\s*\\{\\s*color:\\s*var\\(--mdc-${i}\\);\\s*\\}$`, 'm').test(stripCss(forumCss))
+      && new RegExp(`^\\.forum-md__color--${i}\\s*\\{\\s*--swatch:\\s*var\\(--mdc-${i}\\);\\s*\\}$`, 'm').test(stripCss(forumCss))));
+
+  const floor = 4.5;
+  const dayBase = light['--recessed'];
+  const nightBase = dark['--overlay'];
+  const worst = (base, key) => MD_TONES.reduce((a, t) =>
+    (contrast(t[key], base) < contrast(a[key], base) ? t : a));
+  const wDay = worst(dayBase, 'day');
+  const wNight = worst(nightBase, 'night');
+  check(`ночные чернила дня читаются на худшей ступени светлой лестницы (провал ${dayBase}) ≥ ${floor}:1`,
+    Boolean(dayBase) && MD_TONES.every((t) => contrast(t.day, dayBase) >= floor),
+    `худшая пара — ${wDay.name} ${wDay.day} против ${dayBase}: `
+      + `${(Math.round(contrast(wDay.day, dayBase) * 100) / 100).toFixed(2)}:1`);
+  check(`дневные чернила ночи читаются на худшей ступени тёмной лестницы (окно ${nightBase}) ≥ ${floor}:1`,
+    Boolean(nightBase) && MD_TONES.every((t) => contrast(t.night, nightBase) >= floor),
+    `худшая пара — ${wNight.name} ${wNight.night} против ${nightBase}: `
+      + `${(Math.round(contrast(wNight.night, nightBase) * 100) / 100).toFixed(2)}:1`);
+
+  check('старая запись перекрашивается вместе с темой: любой hex и rgb ряда становятся именем роли',
+    MD_TONES.every((t) => {
+      const rgb = (h) => {
+        const c = h.slice(1);
+        return `rgb(${[0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16)).join(', ')})`;
+      };
+      return HEX_TO_TONE.get(t.night) === t.id && HEX_TO_TONE.get(t.day) === t.id
+        && HEX_TO_TONE.get(rgb(t.night)) === t.id && HEX_TO_TONE.get(rgb(t.day)) === t.id
+        && sanitizeHtml(`<span style="color:${t.night}">а</span>`) === `<span class="mdc mdc--${t.id}">а</span>`
+        && sanitizeHtml(`<span style="color:${rgb(t.day)}">а</span>`) === `<span class="mdc mdc--${t.id}">а</span>`;
+    }));
+  check('чужое число ролью не становится, а сброшенная краска не возвращается из класса',
+    sanitizeHtml('<span style="color:#d94fd9">чужое</span>') === '<span style="color:#d94fd9">чужое</span>'
+      /* Голый span без краски список выбрасывает — так было и до ряда ролей. */
+      && sanitizeHtml('<span class="mdc mdc--red" style="color:inherit">снято</span>') === 'снято');
+  check('под чужой класс рядом с `mdc--` краску не подставить: имена только из ряда',
+    sanitizeHtml('<span class="mdc mdc--evil">а</span>') === 'а'
+      && sanitizeHtml('<span class="evil mdc--red">а</span>') === 'а');
+
+  check('значение кнопки — имя роли; чужое значение и голое число в роль не превращаются',
+    toneOfValue('mdc:gold') === 'gold' && toneOfValue('MDC:GOLD') === 'gold'
+      && toneOfValue('gold') === '' && toneOfValue('mdc:evil') === ''
+      && toneOfValue('#ffc93c') === '' && toneOfValue(undefined) === '');
+  check('число для ввода берётся из темы, в которой человек пишет',
+    toneHex('red', 'light') === MD_TONES[0].day && toneHex('red', 'dark') === MD_TONES[0].night
+      && toneHex('red') === MD_TONES[0].night && toneHex('evil', 'light') === '');
+
+  check('редактор ставит обёртку с именем роли, а execCommand красит только когда выделения нет',
+    /const tone = toneOfValue\(value\);/.test(editorSrc)
+      && /if \(wrapTone\(editor, tone\)\) return;/.test(editorSrc)
+      && /node\.className = `mdc mdc--\$\{tone\}`;/.test(editorSrc)
+      && /toneHex\(tone, document\.documentElement\.getAttribute\('data-theme'\)\)/.test(editorSrc)
+      && /range\.extractContents\(\)/.test(editorSrc));
+
+  /* Тёмные острова (окно подбора в панели, остров справочника) ночные и в
+     дневной теме — значит ряд там обязан остаться ночным, иначе образец
+     красится дневными чернилами на ночной подложке. Секция BB сверяет имена
+     токенов острова с дневным корнем; здесь — что числа именно ночные. */
+  const islands = [
+    ['src/refine.css', ':root[data-theme="light"] .bot-hero,'],
+    ['src/admin/admin.css', '.guide-color-picker,'],
+  ];
+  for (const [file, marker] of islands) {
+    const css = stripCss(await readFile(file, 'utf8'));
+    const body = css.slice(css.indexOf('{', css.indexOf(marker)) + 1, css.indexOf('\n}', css.indexOf(marker)));
+    check(`${file}: остров задаёт ряду ночные половины, а не дневные`,
+      css.includes(marker) && MD_TONES.every((t) => {
+        const at = new RegExp(`--mdc-${t.id}:\\s*(#[0-9a-f]{6})`).exec(body)?.[1];
+        return at === t.night;
+      }),
+      MD_TONES.map((t) => `${t.id}: ${new RegExp(`--mdc-${t.id}:\\s*(#[0-9a-f]{6})`).exec(body)?.[1] ?? 'нет'}`).join(' '));
+  }
+}
+
+/* ── BK. Следы прежних красок: у каждого числа один владелец (§18.8) ─────────
+
+   Пункт 18.8 требует, чтобы после перекраски в дереве не осталось следов
+   прежней палитры. Проверка идёт не «на глаз», а по трём признакам, и каждый
+   из них уже подводил.
+
+   Первый — дубль запасного серого. «Альянс без краски» красили три числа:
+   #7a8494 на плашках, #8a93a2 в карточке альянса форума, #8b929e в подписях
+   графика. Один и тот же смысл выглядел двумя серыми на одном экране, и любой
+   перенос красок в токены их пропускал: правку делают по одному месту, а
+   таких мест было три.
+
+   Второй — числа внутри правил острова. Остров Кварта остаётся ночным и в
+   дневной теме, поэтому его литеры не ломают контраст ровно до того дня, когда
+   кто-то поднимет ступень общей лестницы: лента светлеет, остров нет, и
+   разница видна на одном экране.
+
+   Третий — краска по умолчанию у функции, рисующей график. Значение аргумента
+   диктует вызывающий код, а запечённое число в сигнатуре переживает и смену
+   темы, и перекраску ряда.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBK. Следы прежних красок: у каждого числа один владелец');
+{
+  const { readFile, readdir } = await import('node:fs/promises');
+  const walk = async (dir) => {
+    const out = [];
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) out.push(...(await walk(p)));
+      else if (/\.(js|css)$/.test(e.name)) out.push(p);
+    }
+    return out;
+  };
+  const files = await walk('src');
+  /* Числа ищутся по вычищенным комментариям: пояснение «прежний #66816a дал
+     3,85:1» — не краска, а его поиск выдал бы былое число как след. */
+  const code = {};
+  for (const f of files) code[f] = stripCss((await readFile(f, 'utf8')).replace(/^\s*\/\/.*$/gm, ''));
+
+  const stale = ['#8a93a2', '#8b929e', '#e0a33e'];
+  for (const hex of stale) {
+    const where = Object.entries(code).filter(([, t]) => t.toLowerCase().includes(hex)).map(([f]) => f);
+    check(`прежняя краска ${hex} выведена из дерева`, where.length === 0, where.join(', '));
+  }
+
+  const grey = Object.entries(code).filter(([, t]) => t.toLowerCase().includes('#7a8494')).map(([f]) => f);
+  check('запасной серый альянса живёт в двух объявленных местах: помощник и токен подложки',
+    grey.length === 2 && grey.includes('src/ui/ink.js') && grey.includes('src/styles-v8.css'), grey.join(', '));
+
+  /* Страницы, которые красят плашку альянса, обязаны звать помощника. */
+  const PAINTERS = ['src/pages/home.js', 'src/pages/ladder.js', 'src/pages/alliance.js',
+    'src/pages/quarter-final.js', 'src/pages/forum.js', 'src/admin/screens/week.js',
+    'src/admin/screens/alliances.js'];
+  const noHelper = PAINTERS.filter((f) => !/import \{[^}]*\btagColor\b[^}]*\} from '[^']*ui\/ink\.js';/.test(code[f]));
+  check('каждая, кто красит альянс, берёт запас у помощника', noHelper.length === 0, noHelper.join(', '));
+  const inline = [];
+  for (const f of PAINTERS) {
+    for (const m of code[f].matchAll(/color \|\| ['"`]#|color\s*\?\?[^)']*['"`]#/g)) inline.push(`${f}: ${m[0]}`);
+  }
+  check("в разметке больше нет запасной краски вида color || '#…'", inline.length === 0, inline.join(' | '));
+
+  const v8 = code['src/styles-v8.css'];
+  const tagRule = /\.tag\s*\{([^}]*)\}/.exec(v8)?.[1] ?? '';
+  check('запасная плашка берёт серый из --mute той же темы',
+    /var\(--tag-color,\s*var\(--mute\)\)/.test(tagRule) && !/#888/.test(tagRule), tagRule);
+  check('краски ролей вне общей лестницы объявлены один раз и читаются токеном',
+    /\.roles-panel,\.guide-extra-card\{--role-violet:#[0-9a-f]{6};--role-red:#[0-9a-f]{6}\}/.test(v8)
+      && (v8.match(/--role-violet:/g) || []).length === 1
+      && /\.role-card--violet \{ color: var\(--role-violet\)/.test(v8)
+      && /\.guide-extra-card--red \{ border-top-color: var\(--role-red\)/.test(v8));
+
+  const helpers = code['src/ui/helpers.js'];
+  check('искра по умолчанию красит currentColor, а не запечённое золото',
+    /export function sparkline\([\s\S]{0,80}color = 'currentColor'/.test(helpers));
+
+  /* Остров Кварта: правила читают только свои токены. */
+  const strays = [];
+  for (const [f, text] of Object.entries(code)) {
+    if (!f.endsWith('.css')) continue;
+    for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sel = m[1].trim();
+      if (!/\.quart[-. ]|\.quart$/.test(sel)) continue;
+      /* Считается не по телу правила целиком, а по объявлению: блок токенов
+         острова содержит и краску, и обычные свойства (`color: var(--text)`),
+         и число внутри `--quart-plate` — это как раз то место, где ему и
+         положено быть. Литерой становится только настоящая краска
+         настоящего свойства. */
+      for (const decl of m[2].split(';')) {
+        const i = decl.indexOf(':');
+        if (i < 0 || decl.trim().startsWith('--')) continue;
+        const hits = decl.slice(i + 1).match(/#[0-9a-fA-F]{3,8}\b/g);
+        if (hits) strays.push(`${f}: ${sel} · ${decl.trim().slice(0, i)} -> ${hits.join(' ')}`);
+      }
+    }
+  }
+  check('в правилах острова не осталось чисел: вся палитра в блоке токенов', strays.length === 0, strays.join(' | '));
+
+  /*
+    Контраст чернил острова. Подложек не две, а пять: верхняя пластина,
+    подложка героя, композит призовой карты и две декоративные подсветки героя.
+    Считаются они от чисел острова, а не от памяти о них, поэтому правка
+    `--quart-plate` или силы подсветки уронит проверку, а не экран.
+  */
+  const qt = {};
+  for (const m of /\.quart-page\s*\{([^}]*)\}/.exec(v8)[1].matchAll(/(--quart-[a-z-]+):\s*(#[0-9a-f]{6})/g)) qt[m[1]] = m[2];
+  const refine = code['src/refine.css'];
+  const at = refine.indexOf(':root[data-theme="light"] .quart-page {');
+  const island = refine.slice(refine.indexOf('{', at) + 1, refine.indexOf('\n}', at));
+  const comp = (fg, alpha, bg) => {
+    const c = (h, i) => parseInt(h.slice(i, i + 2), 16);
+    return '#' + [1, 3, 5].map((i) => Math.round(c(fg, i) * alpha + c(bg, i) * (1 - alpha)).toString(16).padStart(2, '0')).join('');
+  };
+  const tintOf = (name) => new RegExp(`--${name}:(\\s*)(#[0-9a-f]{6})`).exec(island.replace(/\s+/g, ''))?.[2];
+  const plateLo = qt['--quart-plate-lo'];
+  const surfaces = {
+    'пластина': qt['--quart-plate'],
+    'подложка героя': plateLo,
+    'призовая карта': comp('#0b120d', 0.65, qt['--quart-plate']),
+    'герой с лиловой подсветкой': comp(tintOf('violet'), 0.16, plateLo),
+    'герой с бирюзовой подсветкой': comp(tintOf('electric'), 0.15, plateLo),
+  };
+  const inks = ['--quart-head', '--quart-body', '--quart-quiet', '--quart-loss', '--quart-acid', '--quart-cyan'];
+  for (const name of inks) {
+    const worst = Object.entries(surfaces).reduce((a, [k, s]) => (contrast(qt[name], s) < a.v ? { k, v: contrast(qt[name], s) } : a), { k: '', v: 99 });
+    check(`${name} читается на худшей подложке острова (AA 4,5)`,
+      worst.v >= 4.5, `${worst.k}: ${(worst.v || 0).toFixed(2)}:1`);
+  }
+  check('активная кнопка ряда: тёмные чернила на лиловой плашке читаются',
+    contrast(qt['--quart-ink'], qt['--quart-acid']) >= 4.5,
+    `${contrast(qt['--quart-ink'], qt['--quart-acid']).toFixed(2)}:1`);
+
+  const mobile = code['src/admin/admin-mobile.css'];
+  check('липкая строка кнопок панели тонется в ступени окна, а не в графите',
+    /\.adm-modal__box \.adm-actions[^}]*linear-gradient\(transparent,\s*var\(--overlay\)/.test(mobile));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

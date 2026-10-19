@@ -21,7 +21,6 @@
   'use strict';
 
   var KEY = 's33-race';
-  var NO_COLOR = '#8b929e';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -39,11 +38,11 @@
     CSS-переменную задать нельзя, и paint остался бы былым HEXом при любой теме.
   */
   function inkOf(r) {
-    return r.ink || r.color || NO_COLOR;
+    return r.ink || r.color;
   }
 
   function labelInkOf(r) {
-    return r.inkLabel || r.color || NO_COLOR;
+    return r.inkLabel || r.color;
   }
 
   function plural(n, one, few, many) {
@@ -249,11 +248,16 @@
       соединяется с ней тонкой чёрточкой.
     */
     var gap = g.label + 3;
+    /*
+      `color` со страницы всегда HEX: страница подставляет общий запасной
+      (ui/ink.js, tagColor). Поэтому третьего серого у драйвера нет — без
+      импорта он не в праве выдумывать свою краску.
+    */
     var ends = rows
       .map(function (r) {
         return {
           tag: r.tag,
-          color: r.color || NO_COLOR,
+          color: r.color,
           ink: inkOf(r),
           inkLabel: labelInkOf(r),
           realY: y(r.series[r.series.length - 1]),
