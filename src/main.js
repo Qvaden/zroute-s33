@@ -1305,9 +1305,20 @@ function render() {
       Отступ берём у самой шапки, а не из числа: она липкая (`position: sticky`)
       и меняет рост при прокрутке, а заголовок панели после прыжка обязан быть
       виден целиком, а не обрезан её краем.
+
+      Цель считаем по раскладке (`offsetTop`), а не по нарисованному
+      `getBoundingClientRect`. На телефоне панели въезжают снизу с
+      `translate3d(0, 24px, 0)` (src/styles-v8.css:3054), и анимация стартует
+      как раз тогда, через них проходит прокрутка: пока летим, сосед сверху
+      поднимается на свои 24 px, и нарисованный верх панели графика оказывается
+      выше того, по которому считали. Замер по картинке ставил край карточки на
+      18 px под шапку; `offsetTop` трансформации не видит и называет то место,
+      где карточка останется, когда animation закончится.
     */
     const head = document.querySelector('.site-head');
-    const y = racePanel.getBoundingClientRect().top + window.scrollY - (head ? head.offsetHeight : 0);
+    let layoutTop = 0;
+    for (let el = racePanel; el; el = el.offsetParent) layoutTop += el.offsetTop;
+    const y = layoutTop - (head ? head.offsetHeight : 0);
     window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     const title = racePanel.querySelector('[data-race-title]');
     if (title) title.focus({ preventScroll: true });

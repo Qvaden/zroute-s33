@@ -1925,9 +1925,9 @@ function wire() {
       } else if (act === 'copy') {
         try {
           await navigator.clipboard.writeText(r.key);
-          toast('Ключ скопирован');
+          toast('Ключ скопирован', 'ok');
         } catch {
-          toast(`Ключ: ${formatRecoveryKey(r.key)}`);
+          toast(`Ключ: ${formatRecoveryKey(r.key)}`, 'ok');
         }
       }
       return;
@@ -2129,7 +2129,7 @@ function wire() {
       verifyBtn.textContent = was ? 'Снимаем…' : 'Подтверждаем…';
       try {
         await forum.setVerified(verifyBtn.dataset.profileVerify, !was);
-        toast(was ? 'Подтверждение снято.' : 'Ник подтверждён.');
+        toast(was ? 'Подтверждение снято.' : 'Ник подтверждён.', 'ok');
         await loadProfile(profileState.nick);
       } catch (err) {
         toast(String(err?.message ?? err), 'error');
@@ -3209,7 +3209,7 @@ function wire() {
           note: form.note.value,
         });
         closeModal('[data-forum-report-modal]');
-        toast(`Жалоба отправлена. ${slaPromiseLine()}`);
+        toast(`Жалоба отправлена. ${slaPromiseLine()}`, 'ok');
       } catch (err) {
         showError('[data-forum-report-error]', String(err?.message ?? err));
       }

@@ -20,7 +20,7 @@ const BADGES = {
   perfectQuarter: { id: 'perfect-quarter', icon: '✦', title: 'Идеальный Кварт', text: '4 победы из 4', tone: 'perfect' },
   undefeatedQuarter: { id: 'undefeated-quarter', icon: '🛡', title: 'Без поражений', text: 'Кварт без единого проигрыша', tone: 'shield' },
   doublePerfect: { id: 'double-perfect', icon: '✦✦', title: 'Двойная корона', text: '2 идеальных Кварта', tone: 'double' },
-  lastStand: { id: 'last-stand', icon: '🩸', title: 'Последний рывок', text: 'победа после 3 поражений подряд', tone: 'comeback' },
+  lastStand: { id: 'last-stand', icon: '🩸', title: 'Последний рывок', text: 'победа после 3 поражений подряд', tone: 'blood' },
 };
 
 function bestRun(outcomes, type) {

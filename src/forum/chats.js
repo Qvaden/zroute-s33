@@ -956,7 +956,7 @@ function wire() {
         const id = await forum.joinChat(code);
         await loadList();
         location.hash = `#/chats/${id}`;
-        toast('Вы в чате');
+        toast('Вы в чате', 'ok');
       });
       return;
     }
@@ -994,7 +994,7 @@ function wire() {
         state.dmOpen = false;
         await loadList();
         location.hash = `#/chats/${id}`;
-        toast('ЛС открыт');
+        toast('ЛС открыт', 'ok');
       });
     }
     return;
@@ -1091,9 +1091,9 @@ function wire() {
     if (copy) {
       try {
         await navigator.clipboard.writeText(copy.dataset.chatCopy);
-        toast('Ссылка скопирована');
+        toast('Ссылка скопирована', 'ok');
       } catch {
-        toast(`Код: ${state.open?.inviteCode ?? ''}`);
+        toast(`Код: ${state.open?.inviteCode ?? ''}`, 'ok');
       }
       return;
     }
@@ -1131,7 +1131,7 @@ function wire() {
         await forum.deleteChat(state.openId);
         await loadList();
         location.hash = '#/chats';
-        toast('Чат удалён навсегда');
+        toast('Чат удалён навсегда', 'ok');
       });
       return;
     }
@@ -1395,7 +1395,7 @@ function wire() {
       a.download = `chat-${state.open?.title || state.openId}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      toast('История экспортирована');
+      toast('История экспортирована', 'ok');
       return;
     }
 
@@ -1419,7 +1419,7 @@ function wire() {
         await forum.unpinChatMessage?.(state.openId);
         await loadList();
         await openChat(state.openId);
-        toast('Откреплено');
+        toast('Откреплено', 'ok');
       });
       return;
     }
@@ -1432,7 +1432,7 @@ function wire() {
         await forum.pinChatMessage?.(state.openId, msgId);
         await loadList();
         await openChat(state.openId);
-        toast('Сообщение закреплено');
+        toast('Сообщение закреплено', 'ok');
       });
       return;
     }
@@ -1497,7 +1497,7 @@ function wire() {
         const keys = sub.keys || {};
         await forum.savePushSubscription?.(sub.endpoint, keys);
         state.pushSubscribed = true;
-        toast('🔔 Push-уведомления включены');
+        toast('🔔 Push-уведомления включены', 'ok');
         paintFull();
       } catch (err) {
         toast(String(err?.message ?? err), 'error');

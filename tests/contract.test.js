@@ -4607,6 +4607,159 @@ console.log('\nS. Чистые функции');
   }
 }
 
+{
+  /* ── Стек подписей у концов линий: желоб, зазор и разъезд по вертикали ── */
+  const { readFile } = await import('node:fs/promises');
+  const driver = await readFile('src/ui/race-controls.js', 'utf8');
+
+  /*
+    ЖЕЛОБ, ЗАЗОР И РАЗЪЕЗД ПРОВЕРЯЮТСЯ ОТДЕЛЬНЫМИ ЧИСЛАМИ, А НЕ ГЛАЗАМИ.
+
+    Причина не в аккуратности: до 20.10 подписи альянсов печатались за правым
+    краем поля и наезжали друг на друга, и ни одна проверка этого не видела,
+    потому что числа сидели в драйвере, которому нужен живой DOM. Здесь те же
+    функции вырезаны из исходника и запущены с подставным замером ширины, так
+    что формулы остаются в драйвере, а проверяются отсюда.
+  */
+  const cut = (from, to) => driver.slice(driver.indexOf(from), driver.indexOf(to));
+  const constsSrc = [...driver.matchAll(/var (?:LABEL_X|LABEL_EDGE) = [\d.]+;/g)].map((m) => m[0]).join('\n');
+  const geometrySrc = cut('function geometry', 'function widestTag');
+  const stackSrc = cut('function labelGap', 'function chartMarkup');
+  const LABEL_X = Number(/var LABEL_X = ([\d.]+)/.exec(driver)[1]);
+  const LABEL_EDGE = Number(/var LABEL_EDGE = ([\d.]+)/.exec(driver)[1]);
+  check('из драйвера вырезаны обе геометрические функции',
+    !!constsSrc && /pad: \{ top: 16/.test(geometrySrc) && /ends\.sort/.test(stackSrc));
+
+  /*
+    Подставной замер: столько пикселов на букву, сколько в данный момент
+    насчитает браузер. 13,9 px на букву — это «NKVD» кеглем 15 px настоящим
+    Unbounded (55,6 px), 10,7 — тем же запасным шрифтом (42,7 px). Оба замера
+    снимались на живом поле 290 px 20.10 и именно между ними и проваливалась
+    прежняя константа.
+  */
+  const build = (pxPerChar) => new Function(`
+    ${constsSrc}
+    var widestTag = function (tags) {
+      return tags.reduce(function (w, t) { return Math.max(w, t.length * ${pxPerChar}); }, 0);
+    };
+    ${geometrySrc}
+    ${stackSrc}
+    return { geometry: geometry, labelGap: labelGap, spreadLabels: spreadLabels };
+  `)();
+
+  /*
+    ШИРИНА ЖЕЛОБА. Правило одно: правый край последней буквы обязан остаться
+    внутри поля, потому что SVG не обрезает (`overflow: visible`) и текст,
+    вышедший за границу, печатается поверх панели. Запас 58 и 70 px — прежние
+    числа из головы; они остались как ПОЛ, а не как ответ.
+  */
+  const FLOORS = [[240, 58], [340, 58], [520, 70], [1088, 70]];
+  for (const [px, подпись] of [[10.7, 'запасным шрифтом'], [13.9, 'Unbounded']]) {
+    const geo = build(px);
+    for (const [width, floor] of FLOORS) {
+      const g = geo.geometry(width, ['NKVD']);
+      const widest = 4 * px;
+      check(`подпись влезает в желоб (${width} px поля, ${подпись})`,
+        g.pad.right >= floor && g.pad.right >= Math.ceil(widest) + LABEL_X + LABEL_EDGE
+          && widest <= g.pad.right - LABEL_X,
+        `тег ${widest.toFixed(1)} px, желоб ${g.pad.right} px, места буквам ${g.pad.right - LABEL_X} px`);
+    }
+  }
+
+  const wide = build(16).geometry(340, ['ABCD']);
+  const narrow = build(5).geometry(340, ['ABCD']);
+  check('желоб считается по замеру, а не по числу букв',
+    wide.pad.right > narrow.pad.right && narrow.pad.right === 58,
+    `16 px/буква → ${wide.pad.right}, 5 px/буква → ${narrow.pad.right}`);
+
+  /*
+    ЗАЗОР ПО ВЕРТИКАЛИ БЕРЁТСЯ ОТ ВЫСОТЫ БУКВЫ, А НЕ ОТ КЕГЛЯ.
+    19 и 16 px — измеренная высота плашки подписи (`getBBox`) при кегле 15 и
+    13 на живом поле. Прежняя формула «кегль + 3» давала 18 px для кегля 15 px,
+    то есть соседние подписи наезжали друг на друга на 1 px.
+  */
+  const stack = build(13.9);
+  check('зазор больше измеренной высоты буквы: телефон',
+    stack.labelGap(15) >= 19, `зазор ${stack.labelGap(15)} px против 19 px`);
+  check('зазор больше измеренной высоты буквы: десктоп',
+    stack.labelGap(13) >= 16, `зазор ${stack.labelGap(13)} px против 16 px`);
+
+  /*
+    РАЗЪЕЗД. Первая подпись остаётся у своей точки; двигаются только те, кому
+    тесно. Прежний код после сдвига вниз утаскивал ВЕСЬ стек одним числом, и
+    верхние подписи отъезжали от своих точек на 30…36 px вверх, а чёрточки
+    тянулись через половину графика.
+  */
+  const gPhone = stack.geometry(340, ['NKVD']);
+  const gap = stack.labelGap(gPhone.label);
+  const top = gPhone.pad.top;
+  const bottom = gPhone.H - gPhone.pad.bottom;
+  const n = CONFIG.raceMaxLines;
+
+  const crowded = stack.spreadLabels(
+    Array.from({ length: n }, (_, i) => ({ tag: 'T' + i, realY: 100 })), gap, bottom);
+  check('стек из линий, пришедших на одни очки, расходится по зазору',
+    crowded.every((e, i) => i === 0 || e.labelY - crowded[i - 1].labelY >= gap),
+    crowded.map((e) => e.labelY).join(' '));
+  check('первая подпись не уезжает от своей точки, если ниже есть место',
+    crowded.every((e) => e.labelY >= e.realY), crowded.map((e) => e.labelY - e.realY).join(' '));
+  check('подписи остаются внутри поля и по порядку',
+    crowded.every((e, i) => e.labelY >= top && e.labelY <= bottom
+      && (i === 0 || e.labelY >= crowded[i - 1].labelY)));
+  check('максимальный переезд ограничен высотой стека, а не размером поля',
+    Math.max(...crowded.map((e) => Math.abs(e.labelY - e.realY))) <= (n - 1) * gap,
+    `переезд ${Math.max(...crowded.map((e) => Math.abs(e.labelY - e.realY)))} px, предел ${(n - 1) * gap} px`);
+
+  const pushed = stack.spreadLabels(
+    Array.from({ length: n }, (_, i) => ({ tag: 'T' + i, realY: bottom })), gap, bottom);
+  check('стек, прижатый к нижней границе, уходит вверх целиком, но не за поле',
+    pushed.every((e, i) => e.labelY <= bottom && e.labelY >= top
+      && (i === 0 || e.labelY - pushed[i - 1].labelY >= gap)),
+    pushed.map((e) => `${e.tag}:${e.labelY}`).join(' '));
+
+  /*
+    Проверка на одном кластере (все точки в одном месте) не различает два
+    способа вернуть стек в поле: общий сдвиг и поджим по строкам дают одно и то
+    же число. Разница видна только на настоящем россыпном наборе — таких, как
+    замеряли 20.10 на поле 290 px: четыре подписи стоят поодиночке, а четыре
+    нижние лепятся друг к другу. Общий сдвиг поднимал на 12 px ВСЕ, включая
+    верхние, которым места хватало с запасом.
+  */
+  const spread = stack.spreadLabels(
+    [30, 100, 160, 190, 200, 240, 262, 268].slice(0, n)
+      .map((y, i) => ({ tag: 'T' + i, realY: y })), gap, bottom);
+  check('подпись поднимается не выше того места, которое действительно вытесняет её хвост',
+    spread.every((e, i) => e.labelY >= Math.min(e.realY, bottom - (n - 1 - i) * gap)),
+    spread.map((e) => `${e.tag}:${e.labelY} из ${e.realY}`).join(' '));
+  check('верхние подписи россыпного набора остаются у своих точек',
+    spread.slice(0, 4).every((e) => e.labelY === e.realY),
+    spread.map((e, i) => (e.labelY === e.realY ? '·' : i + ':' + (e.realY - e.labelY))).join(''));
+
+  for (const width of [340, 1088]) {
+    const g = stack.geometry(width, ['NKVD']);
+    const band = g.H - g.pad.top - g.pad.bottom;
+    check(`предел в ${n} линий помещается в полосу поля (${width} px)`,
+      (n - 1) * stack.labelGap(g.label) <= band,
+      `стек ${(n - 1) * stack.labelGap(g.label)} px, полоса ${band} px`);
+  }
+
+  check('пустой набор не роняет разъезд', stack.spreadLabels([], gap, bottom).length === 0);
+
+  /*
+    ФОРМА ИСХОДНИКА. Тут проверяется только то, чего не выразить числом: что
+    старая формула действительно выброшена, что желоб питается замером браузера,
+    а не локальным числом, и что перерисовка после прихода шрифта на месте.
+  */
+  check('старый зазор «кегль + 3» удалён из драйвера', !/g\.label \+ 3/.test(driver));
+  check('желоб питается измерением, а не догадкой',
+    /getComputedTextLength/.test(driver) && /Math\.max\(compact \? 58 : 70, need\)/.test(driver));
+  check('геометрия получает теги, которые действительно рисуются',
+    /geometry\(width, rows\.map\(function \(r\) \{ return r\.tag; \}\)\)/.test(driver));
+  check('перерисовка по приходу шрифта подписана один раз и сбрасывает запись о поле',
+    (driver.match(/document\.fonts\.ready\.then\(/g) || []).length === 1
+      && /document\.fonts\.ready\.then\(function \(\) \{\s*\r?\n\s*last = '';/.test(driver));
+}
+
 
 {
   /* ── Уровни, достижения и репутация форума (rank.js) ── */
@@ -15998,6 +16151,19 @@ console.log('\nAP. Доступность');
   check('прыжок к графику фокусирует его заголовок',
     /takeRaceJump\(id, search\)/.test(mainJs)
       && /\[data-race-title\]/.test(mainJs) && /title\.focus\(\{ preventScroll: true \}\)/.test(mainJs));
+  /*
+    Цель прыжка берут из раскладки, а не из нарисованного прямоугольника.
+
+    Замер на 127.0.0.1:390 (../scratch/race-focus.mjs, настоящая мышь по кнопке
+    «График сезона»): пока прокрутка летела, панели над целью доезжали снизу со
+    своего `translate3d(0, 24px, 0)`, и край карточки останавливался на 18 px
+    под липкой шапкой. `offsetTop` трансформации не видит, поэтому порядок
+    «сумма offsetTop минус высота шапки» держит цель там, где панель окажется
+    после анимации.
+  */
+  check('прыжок считает цель по раскладке, а не по картинке',
+    /for \(let el = racePanel; el; el = el\.offsetParent\) layoutTop \+= el\.offsetTop/.test(mainJs)
+      && !/const y = racePanel\.getBoundingClientRect\(\)/.test(mainJs));
   check('прыжок к графику не прокручивает страницу вверх и не дублирует голос',
     /if \(!keepScroll && !racePanel\) window\.scrollTo\(0, 0\)/.test(mainJs)
       && /if \(!byHeading && !racePanel\) announceRoute\(id\)/.test(mainJs));
@@ -17787,12 +17953,12 @@ console.log('\nAW. AA у токенов обеих тем');
       || `кегль метки ${eyebrow} px, пар ${badgePairs.length}, худшая ${badgePairs.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`);
 
   /*
-     Значки достижений. Дневная пара нужна НЕ всем восьми: шесть из них эмодзи
-     (🔥 ⚡ 👑 🏅 🛡 🩸), их рисует системный шрифт значков и `--achievement-color`
-     им не красит букву — число работает только подкраской плашки. Требуем пару
-     ровно для тех тонах, где иконка — символ из интерфейсного шрифта, и берём
-     этот список из модуля достижений, а не из головы: добавят текстовый значок
-     без дневной пары — проверка встанет.
+     Значки достижений, первая мера — чернила символа. Дневная пара обязательна
+     для всех девяти тонов (это вторая проверка, ниже), но число 3:1 имеет смысл
+     только там, где иконка — символ из интерфейсного шрифта: `↗`, `✦`, `✦✦`.
+     Остальные шесть — эмодзи, их рисует системный шрифт значков и
+     `--achievement-color` букву не красит, так что контраст глифа неизмерим;
+     у эмодзи это же число работает подкраской плашки.
 
      Порог здесь 3:1: значок — не подпись, это начертательная краска плашки
      (бриф §13), и держит она норму графики, а не текста.
@@ -17833,9 +17999,44 @@ console.log('\nAW. AA у токенов обеих тем');
     `значков-символов ${glyphTones.length} (${glyphTones.join(', ')}), пар ${achPairs.length}: `
       + (achPairs.filter(([, c]) => c < 3).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
         || `худшая ${achPairs.reduce((a, b) => (b[1] < a[1] ? b : a))[0]}`));
-  check('дневных пар у значков ровно столько, сколько символьных: эмодзи красит шрифт, а не CSS',
-    Object.keys(achDay).length === glyphTones.length,
-    `в CSS дневных правил ${Object.keys(achDay).length} (${Object.keys(achDay).join(', ')}), символьных значков ${glyphTones.length}`);
+
+  /*
+     20.10. Дневное число нужно НЕ только символьным значкам. Эмодзи красит
+     системный шрифт, и контраст буквы им неизмерим — это было верно и раньше.
+     Но `--achievement-color` у эмодзи работает в другом месте: он подкрашивает
+     плашку (`color-mix(… N %, transparent)`), и вот она-то не живётся одним
+     числом в обе стороны: ночной hex на бумаге даёт подкраску, неотличимую от
+     пустого места, а на самой тёмной ночной ступени тот же hex при 16 % тонул
+     до 1,09…1,17:1. Отсюда вторая мера: плашка обязана быть заметной на своей
+     карточке в каждой теме. Порог 1,2:1 назван в проверке явно и стандартом не
+     является: 1.4.11 требует 3:1 для значимой графики, а плашка смысла не
+     несёт — название и описание читаются текстом рядом. Проценты и числа
+     берутся из правил CSS, поэтому проверка падает, когда кто-то опустит подмес
+     или уберёт дневное число; измеренная худшая пара ряда — 1,26:1 (ночной
+     красный над `--overlay`).
+  */
+  const allTones = [...new Set([...achSrc.matchAll(/tone:\s*'([\w-]+)'/g)].map((m) => m[1]))];
+  const plateSeen = [];
+  for (const [theme, t, pick] of [['тёмная', dark, achNight], ['светлая', light, achDay]]) {
+    if (!t) continue;
+    for (const tone of allTones) {
+      const paint = resolveTone(t, pick[tone]);
+      if (!paint) continue;
+      for (const s of surfaces) {
+        plateSeen.push([`${theme}: плашка ${tone} над ${s}`, ratio(srgbMix(paint, iconShare, t[s]), t[s])]);
+      }
+    }
+  }
+  check('у каждого тона награды есть и ночное, и дневное число: плашка не живёт одним числом в двух темах',
+    allTones.length === 9 && allTones.every((tone) => achNight[tone] && achDay[tone])
+      && Object.keys(achNight).length === allTones.length && Object.keys(achDay).length === allTones.length,
+    `тонов ${allTones.length} (${allTones.join(', ')}), ночных правил ${Object.keys(achNight).length}, дневных ${Object.keys(achDay).length}`);
+  check('плашка значка заметна на своей карточке: 9 тонов × 6 ступеней × 2 темы выше 1,2:1',
+    plateSeen.length === 108 && plateSeen.every(([, c]) => c >= 1.2),
+    `пар ${plateSeen.length}, `
+      + (plateSeen.filter(([, c]) => c < 1.2).map((f) => `${f[0]} — ${f[1].toFixed(2)}:1`).join('; ')
+        || `худшая ${plateSeen.reduce((a, b) => (b[1] < a[1] ? b : a))[0]} — `
+          + plateSeen.reduce((a, b) => (b[1] < a[1] ? b : a))[1].toFixed(2) + ':1'));
 
   /*
      Литерал ночной палитры в правиле, которое работает в обеих темах, — это
@@ -19304,12 +19505,90 @@ console.log('\nBE. Короткое сообщение собрано в оди�
     bare(CHATS) === 0 && bare(MOUNT) === 0,
     `без тона осталось: чат ${bare(CHATS)}, лента ${bare(MOUNT)}`);
   check('полоса знает три тона, красит их CSS, а вызывающий код не носит hex',
-    /export function toast\(message, kind = 'ok'\)/.test(TOAST)
+    /export function toast\(message, kind\)/.test(TOAST)
       && /forum-toast--\$\{kind\}/.test(TOAST)
       && !/#[0-9a-f]{3,8}\b/i.test(TOAST)
       && /\.forum-toast--error\s*\{[^}]*--toast-tone/.test(FORUM_CSS)
       && /\.forum-toast--warn\s*\{[^}]*--toast-tone/.test(FORUM_CSS),
     `вызовов с тоном: ${toned(CHATS) + toned(MOUNT)}`);
+
+  /*
+    Остаток, записанный 19.10 вечером: 13 полос из 39 не назвали тон и жили
+    зелёным по умолчанию. Цвет сам им не врал — все тринадцать говорят
+    «готово», — но молчание в аргументе было дырявой договорённостью:
+    следующий, кто напишет toast('База не приняла') без второго аргумента,
+    получит зелёный отказ, и ни одна проверка этого не заметит. Значение по
+    умолчанию убрано из сигнатуры, тон назван у каждого вызова, и правило
+    «отказ обязан быть красным» записано здесь.
+
+    Разбор аргументов идёт balanced-скобками, а не по одной строке: вызовы
+    2607 и 2633 в mount.js переезжают на вторую строку, и проверка по строке
+    посчитала бы их вызовами без тона.
+  */
+  const { readdir } = await import('node:fs/promises');
+  const jsFiles = [];
+  const walk = async (dir) => {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const full = `${dir}/${e.name}`;
+      if (e.isDirectory()) await walk(full);
+      else if (full !== 'src/ui/toast.js' && e.name.endsWith('.js')) jsFiles.push(full);
+    }
+  };
+  await walk('src');
+
+  const toastCalls = (src) => {
+    const res = [];
+    const re = /(?<![A-Za-z0-9_$.])toast\(/g;
+    let m;
+    while ((m = re.exec(src))) {
+      let i = m.index + m[0].length;
+      let depth = 1;
+      let str = null;
+      const args = [''];
+      const put = (c) => { args[args.length - 1] += c; };
+      for (; i < src.length; i++) {
+        const c = src[i];
+        if (str) {
+          put(c);
+          if (c === '\\') { put(src[++i]); continue; }
+          if (c === str) str = null;
+          continue;
+        }
+        if (c === '"' || c === "'" || c === '`') { str = c; put(c); continue; }
+        if (c === '(' || c === '[' || c === '{') { depth++; put(c); continue; }
+        if (c === ')' || c === ']' || c === '}') {
+          if (c === ')' && depth === 1) break;
+          depth--; put(c);
+          continue;
+        }
+        if (c === ',' && depth === 1) { args.push(''); continue; }
+        put(c);
+      }
+      res.push({ args: args.map((a) => a.replace(/\s+/g, ' ').trim()) });
+    }
+    return res;
+  };
+
+  const every = [];
+  for (const f of jsFiles) {
+    const src = await readFile(f, 'utf8');
+    for (const c of toastCalls(src)) every.push({ f, args: c.args });
+  }
+  const untuned = every.filter((c) => c.args.length < 2);
+  const foreign = every.filter((c) => c.args.length >= 2 && !/^'(ok|warn|error)'$/.test(c.args[1]));
+  check('тон назван у каждой полосы сайта: вызовов без второго аргумента нет',
+    untuned.length === 0 && every.length > 30,
+    `вызовов ${every.length}, без тона ${untuned.length}: ${untuned.map((c) => c.f).join(', ') || 'нет'}`);
+  check('тон выбирает имя из трёх, а не сочиняет четвёртое',
+    foreign.length === 0,
+    foreign.map((c) => `${c.f} ${c.args[1]}`).join('; ') || `имена у всех ${every.length}`);
+
+  const negation = /(?<![А-Яа-яЁё])не(?![А-Яа-яЁё])/u;
+  const greenFail = every.filter((c) => c.args[1] === "'ok'"
+    && (negation.test(c.args[0]) || /error|\berr\b/i.test(c.args[0])));
+  check('ни один отказ не раскрашен зелёным: текст со стоящим «не» и сообщение об ошибке требуют error или warn',
+    greenFail.length === 0,
+    greenFail.map((c) => `${c.f}: ${c.args[0].slice(0, 48)}`).join('; ') || `зелёных подтверждений ${every.filter((c) => c.args[1] === "'ok'").length}`);
 }
 
 /* ── BF. Мера ряда: доли колонки — целые числа из двенадцати ─────────────────

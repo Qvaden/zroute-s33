@@ -22,6 +22,14 @@
 
   var KEY = 's33-race';
 
+  /*
+    Подпись ставится в LEFT_X пикселах правее последней точки, а до правого
+    края поля остаётся RIGHT_EDGE — чтобы буква не упиралась в границу панели.
+    Оба числа входят в ширину желоба, который `geometry` вычитает из поля.
+  */
+  var LABEL_X = 11;
+  var LABEL_EDGE = 6;
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -169,17 +177,97 @@
     return Math.max(240, Math.min(760, win - 64));
   }
 
-  function geometry(width) {
+  function geometry(width, tags) {
     var compact = width < 520;
+    var label = compact ? 15 : 13;
+    /*
+      ЖЕЛОБ ПОД ПОДПИСЬ СЧИТАЕТСЯ ПО ИЗМЕРЕННОЙ ШИРИНЕ.
+
+      До 20.10 правый отступ поля был числом из головы (58 и 70), и подпись
+      ставилась на фиксированные 11 px правее последней точки. Замер на живом
+      поле сказал другое: тег из четырёх букв кеглем 15 px в Unbounded весит
+      55,6 px, а желоба ему доставалось 47 — то есть «NKVD» печатался за правый
+      край поля на 8,6 px, а SVG обрезки не боится (`overflow: visible`) и
+      выпускал текст за границу панели. Ширина берётся у самого браузера,
+      потому что посчитать её по числу букв нельзя: решение принимает шрифт, а
+      он у заголовков и у подписей разный.
+    */
+    var need = Math.ceil(widestTag(tags, label)) + LABEL_X + LABEL_EDGE;
     return {
       W: width,
       // На телефоне поле выше: строк меньше, зато каждая читается.
       H: compact ? 300 : 264,
-      pad: { top: 16, right: compact ? 58 : 70, bottom: 30, left: compact ? 30 : 40 },
-      label: compact ? 15 : 13,
+      pad: { top: 16, right: Math.max(compact ? 58 : 70, need), bottom: 30, left: compact ? 30 : 40 },
+      label: label,
       tick: compact ? 12 : 11,
       stroke: compact ? 2.2 : 2.6,
     };
+  }
+
+  /**
+   * Самый широкий тег из нарисованных, в пикселах того же шрифта, что и
+   * подпись. Узел живёт вне макета и живёт только время измерения.
+   */
+  function widestTag(tags, fontSize) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden';
+    var widest = 0;
+    tags.forEach(function (tag) {
+      var t = document.createElementNS(NS, 'text');
+      t.setAttribute('class', 'race__label');
+      t.setAttribute('font-size', String(fontSize));
+      t.textContent = tag;
+      svg.appendChild(t);
+    });
+    document.body.appendChild(svg);
+    Array.prototype.forEach.call(svg.childNodes, function (t) {
+      widest = Math.max(widest, t.getComputedTextLength());
+    });
+    svg.remove();
+    return widest;
+  }
+
+  /*
+    РАЗЪЕЗД ПОДПИСЕЙ ПО ВЕРТИКАЛИ.
+
+    Подписи стоят в столбце у правого края, и две линии, пришедшие на почти
+    одинаковые очки, печатались бы друг на друге. Раньше зазор брали как
+    «кегль + 3», то есть 18 px для 15 px, и это была ошибка в формуле, а не в
+    числе: измеренная высота строки Unbounded того же кегля — 19 px, поэтому
+    соседние подписи наезжали друг на друга на 1,25 px, а на телефоне так
+    стояли все семь. Зазор берётся от высоты плашки буквы, а не от кегля.
+
+    Второй пропуск был в том, как пачка возвращалась в поле: весь стек сдвигался
+    вверх одним числом, и верхние подписи уезжали от своих точек на 30…36 px,
+    а чёрточки тянулись через половину графика. Здесь стек поджимается снизу
+    вверх по одному месту, поэтому каждая подпись остаётся у своей точки ровно
+    настолько, насколько это возможно.
+  */
+  function labelGap(fontSize) {
+    return Math.round(fontSize * 1.35);
+  }
+
+  function spreadLabels(ends, gap, bottom) {
+    ends.sort(function (a, b) { return a.realY - b.realY; });
+    for (var i = 0; i < ends.length; i++) {
+      ends[i].labelY = i === 0 ? ends[i].realY : Math.max(ends[i].realY, ends[i - 1].labelY + gap);
+    }
+    if (!ends.length) return ends;
+    /*
+      Нижний край. Поджимается не весь стек одним числом (так верхние подписи
+      уезжали от своих точек на 30…36 px и чёрточки тянулись через половину
+      поля), а каждая строка по очереди — насколько её действительно вытесняет
+      соседка снизу.
+    */
+    if (ends[ends.length - 1].labelY > bottom) {
+      for (var k = ends.length - 1; k >= 0; k--) {
+        ends[k].labelY = Math.min(ends[k].labelY, bottom - (ends.length - 1 - k) * gap);
+      }
+    }
+    return ends;
   }
 
   /**
@@ -241,19 +329,16 @@
       .join('');
 
     /*
-      Подписи у концов линий обязаны разъезжаться по вертикали.
-      Два альянса часто заканчивают сезон с одинаковыми очками, и без
-      разведения их теги печатаются друг поверх друга. Точка остаётся на
-      настоящем месте, сдвигается только подпись — и, если сдвинули, точка
-      соединяется с ней тонкой чёрточкой.
+      Подписи у концов линий: разъезд по вертикали описан в `spreadLabels`
+      выше. Точка остаётся на настоящем месте, сдвигается только подпись — и,
+      если сдвинули, точка соединяется с ней тонкой чёрточкой.
     */
-    var gap = g.label + 3;
     /*
       `color` со страницы всегда HEX: страница подставляет общий запасной
       (ui/ink.js, tagColor). Поэтому третьего серого у драйвера нет — без
       импорта он не в праве выдумывать свою краску.
     */
-    var ends = rows
+    var ends = spreadLabels(rows
       .map(function (r) {
         return {
           tag: r.tag,
@@ -262,16 +347,7 @@
           inkLabel: labelInkOf(r),
           realY: y(r.series[r.series.length - 1]),
         };
-      })
-      .sort(function (a, b) { return a.realY - b.realY; });
-
-    ends.forEach(function (e, k) {
-      e.labelY = k === 0 ? e.realY : Math.max(e.realY, ends[k - 1].labelY + gap);
-    });
-
-    // Если пачка вылезла за нижний край поля — поджать её целиком вверх.
-    var overflow = ends.length ? ends[ends.length - 1].labelY - (g.H - g.pad.bottom) : 0;
-    if (overflow > 0) ends.forEach(function (e) { e.labelY -= overflow; });
+      }), labelGap(g.label), g.H - g.pad.bottom);
 
     var lastX = x(n - 1);
     var labels = ends
@@ -289,7 +365,7 @@
             ? '<line x1="' + (lastX + 3).toFixed(1) + '" y1="' + e.realY.toFixed(1) + '" x2="' + (lastX + 8).toFixed(1) +
               '" y2="' + e.labelY.toFixed(1) + '" stroke="' + esc(e.color) + '" stroke-width="1" opacity=".5"/>'
             : '') +
-          '<text x="' + (lastX + 11).toFixed(1) + '" y="' + (e.labelY + g.label * 0.35).toFixed(1) +
+          '<text x="' + (lastX + LABEL_X).toFixed(1) + '" y="' + (e.labelY + g.label * 0.35).toFixed(1) +
           '" class="race__label" style="fill:' + esc(e.inkLabel) + '" font-size="' + g.label + '">' + esc(e.tag) + '</text>';
       })
       .join('');
@@ -367,7 +443,7 @@
     data.lines.forEach(function (l) { byId[l.id] = l; });
     var rows = ids.map(function (id) { return byId[id]; }).filter(Boolean);
 
-    if (plot) plot.innerHTML = rows.length ? chartMarkup(rows, data.weeks, geometry(width)) : '';
+    if (plot) plot.innerHTML = rows.length ? chartMarkup(rows, data.weeks, geometry(width, rows.map(function (r) { return r.tag; }))) : '';
     var empty = panel.querySelector('[data-race-empty]');
     if (empty) empty.hidden = rows.length !== 0;
 
@@ -474,6 +550,26 @@
     поэтому одного прогона на старте мало. main.js дёргает эту функцию после
     каждой отрисовки — тем же списком хуков, что и фильтры рейтинга.
   */
+  /*
+    ЖЕЛОБ ПЕРЕСЧИТЫВАЕТСЯ, КОГДА ШРИФТ ПРИШЁЛ.
+
+    Первый прогон бывает раньше, чем догрузится Unbounded (шрифт приходит с
+    Google Fonts, и в `link` стоит `display=optional` — браузер не ждёт, а
+    рисует запасным). Разница не косметическая: самый широкий тег из семи,
+    «NKVD» кеглем 15 px, в настоящем Unbounded занят 55,6 px, а тем же кодом
+    без шрифта — 42,7 px.
+    Разница в 13 px ровно та, из-за которой подпись вылезала за край: желоб,
+    прикинутый до загрузки, оказывается тесен, когда буквы всё-таки пришли.
+    `document.fonts.ready` резолвится один раз за заход, поэтому перерисовка
+    не превращается в цикл.
+  */
+  if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+    document.fonts.ready.then(function () {
+      last = '';
+      apply();
+    });
+  }
+
   window.__raceApply = apply;
 
   if (document.readyState === 'loading') {

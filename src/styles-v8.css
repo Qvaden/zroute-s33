@@ -2692,7 +2692,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 /* ── Достижения альянса ─────────────────────────────────────────────────── */
 .achievement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s-1); }
 .achievement { display: flex; align-items: center; gap: var(--s-2); min-height: 62px; padding: var(--s-2) var(--s-2); border: 1px solid var(--line); border-radius: var(--r-sm);  }
-.achievement__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: var(--r); background: color-mix(in srgb, var(--achievement-color) 16%, transparent); color: var(--achievement-color); font-size: 19px; }
+.achievement__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: var(--r); background: color-mix(in srgb, var(--achievement-color) 24%, transparent); color: var(--achievement-color); font-size: 19px; }
 .achievement b, .achievement small { display: block; }
 .achievement b { color: var(--text); font-size: var(--fs-meta); }
 .achievement small { margin-top: var(--s-fine); color: var(--dim); font-size: var(--fs-eyebrow); }
@@ -2708,25 +2708,50 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .achievement--veteran { --achievement-color: #c8d0dc; }
 .achievement--shield { --achievement-color: #7ec8ff; }
 .achievement--double { --achievement-color: #ff9ee7; }
+.achievement--blood { --achievement-color: #e8455f; }
 
 /*
-  Дневные значки — только три, и это не недосмотр, а свойство самих символов.
-  `↗`, `✦` и `✦✦` рисуются шрифтом интерфейса, поэтому берут `--achievement-color`
-  прямо и обязаны держать норму значка — 3:1. Ночные числа на светлой
-  карточке её не давали: `#a7a3c2` ложился на плашку из этих же 16 % тона и
-  оставлял 2,10:1, `#ff9ee7` — 1,61:1, а `var(--accent)` — 2,69:1, то есть
-  половина достижений на странице альянса превращалась в бледное пятно.
+  Дневная половина той же палитры — у всех девяти тонов, и с 20.10 это
+  правило, а не исключение. Раньше дневных чисел касались только три значка
+  (`↗`, `✦`, `✦✦`): их рисует шрифт интерфейса, краска буквы берётся из
+  `--achievement-color`, и ночные числа на светлой карточке давали 2,10…2,69:1
+  — половина достижений превращалась в бледное пятно. Проверяются они и
+  сейчас по норме значка (3:1, бриф §13 про начертательную краску).
 
-  Остальные шесть значков — эмодзи (🔥 ⚡ 👑 🏅 🛡 🩸): их красит системный
-  шрифт значков, а не CSS, поэтому контраст им не измеряют и числа не правят.
-  Их `--achievement-color` остаётся ночным и работает только подкраской
-  плашки и тенью при наведении.
+  Остальные шесть — эмодзи (🔥 ⚡ 👑 🏅 🛡 🩸): их красит системный шрифт
+  значков, поэтому контраст самой буквы им не измеряют и не могут измерить.
+  Но `--achievement-color` у эмодзи работает в другом месте — как подкраска
+  плашки (`color-mix(… 24 %, transparent)`), и вот она-то одним числом не
+  живётся в обе стороны. Днём ночные hex на песке исчезали: #ffd166 в 16 %
+  от песка давал ровно то, что пустое место. Ночью те же 16 % оказывались
+  слишком тонкими на самой тёмной ступени: #ff5a36 в 16 % над #05070c —
+  1,17:1, а #c2364b — 1,09…1,12:1, то есть плашка и там, и там читалась как
+  ничего. Поэтому поднято подмешивание (16 % → 24 %, цифра стоит в правиле
+  выше и проверку читается оттуда же) и добавлено дневное число для каждого
+  тона. Худшая пара ряда — 1,26:1 (ночной красный над верхней ступенью).
+  Порог 1,2 назван в проверке и WCAG-нормой не является: 1.4.11 требует 3:1
+  для значимой графики, а плашка смысла не несёт — название и описание
+  читаются текстом рядом.
 
-  Дневная половина той же палитры: `--violet` для сиреневого камбэка,
-  `--accent-ink` для брендового `✦` (тот же оранжевый, сожжённый до чернил),
-  а для двойной короны числа в лестнице нет — розовый оттуда уходит либо в
-  бордо, либо в фиолет, и то и другое уже занято соседней наградой, поэтому
-  оставлен литерал #8a2f6f: 4,59:1 на плашке в худшей ступени дня. */
+  «Последний рывок» (🩸) до этого ехал тоном `comeback` и имел фиолетовую
+  плашку в обеих темах: тон у награды теперь свой. Ночное число для него —
+  #e8455f, а не соседний сигнальный #d33f4f: у красного на 24 % худшая
+  ступень ночного ряда выходит 1,26:1, у #d33f4f — ниже 1,2, а эмодзи
+  крови не требует контраста глифа, так что краска свободна в верхнем
+  диапазоне.
+
+  Дневные числа взяты из уже существующей дневной лестницы, а не сочинены:
+  `--mdc-orange`, `--mdc-gold`, `--gold`, `--silver`, `--mdc-blue`,
+  `--mdc-red` — те же тона, что ночные, только в глубокой половине ряда.
+  Для двойной короны числа в лестнице нет: розовый оттуда уходит либо в
+  бордо, либо в фиолет, и то и другое занято соседней наградой, поэтому
+  оставлен литерал #8a2f6f — 4,59:1 на плашке в худшей ступени дня. */
+:root[data-theme="light"] .achievement--fire { --achievement-color: var(--mdc-orange); }
+:root[data-theme="light"] .achievement--gold { --achievement-color: var(--mdc-gold); }
+:root[data-theme="light"] .achievement--crown { --achievement-color: var(--gold); }
+:root[data-theme="light"] .achievement--veteran { --achievement-color: var(--silver); }
+:root[data-theme="light"] .achievement--shield { --achievement-color: var(--mdc-blue); }
+:root[data-theme="light"] .achievement--blood { --achievement-color: var(--mdc-red); }
 :root[data-theme="light"] .achievement--comeback { --achievement-color: var(--violet); }
 :root[data-theme="light"] .achievement--perfect { --achievement-color: var(--accent-ink); }
 :root[data-theme="light"] .achievement--double { --achievement-color: #8a2f6f; }
