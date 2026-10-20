@@ -2330,24 +2330,26 @@ export function renderPostCard(p, s) {
             ${esc(timeAgo(p.createdAt))}${p.editedAt ? ' · изменён' : ''}
           </time>
         </div>
-        <span class="forum-post__cat">${esc(categoryLabel(p.category))}</span>
-        ${p.pinned ? '<span class="forum-post__pin" title="Закреплён">📌</span>' : ''}
-        ${
-          inTrail
-            ? '<span class="forum-post__trail" title="Вы участвовали: ваш пост, реакция или голос в опросе">Ваш след</span>'
-            : ''
-        }
-        ${
-          unread > 0
-            ? `<span class="forum-post__new" title="Новых ответов с вашего последнего входа">${
-                `${unread} ${pluralWord(unread, 'новый ответ', 'новых ответа', 'новых ответов')}`
-              }</span>`
-            : ''
-        }
-        ${expiryBadge(p)}
-        ${eventBadge(p)}
-        ${barterBadge(p)}
-        ${accountBadge(p)}
+        <span class="forum-post__flags">
+          <span class="forum-post__cat">${esc(categoryLabel(p.category))}</span>
+          ${p.pinned ? '<span class="forum-post__pin" title="Закреплён">📌</span>' : ''}
+          ${
+            inTrail
+              ? '<span class="forum-post__trail" title="Вы участвовали: ваш пост, реакция или голос в опросе">Ваш след</span>'
+              : ''
+          }
+          ${
+            unread > 0
+              ? `<span class="forum-post__new" title="Новых ответов с вашего последнего входа">${
+                  `${unread} ${pluralWord(unread, 'новый ответ', 'новых ответа', 'новых ответов')}`
+                }</span>`
+              : ''
+          }
+          ${expiryBadge(p)}
+          ${eventBadge(p)}
+          ${barterBadge(p)}
+          ${accountBadge(p)}
+        </span>
       </header>
 
       ${

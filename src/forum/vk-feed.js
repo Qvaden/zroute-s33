@@ -484,6 +484,14 @@ export function readVkWallRendered(html, cfg = VK, now = Date.now()) {
  */
 const MD_POST_LINK = /\[([^\]\n]{1,60})\]\(https:\/\/vk\.com\/wall-(\d+)_(\d+)\)/g;
 const MD_AUTHOR_HEAD = /^#{5,6} \[[^\]]*\]\([^)]*\)/gm;
+/*
+  Любой заголовок, а не только строка автора. Дверь отдаёт стену двумя вида:
+  в одном перед первым постом стоит `##### [Группа](ссылка)`, в другом —
+  `### Z-Route: Redemption` без ссылки. Второй вид и есть та форма, из-за
+  которой 15.10 на сайт вышла заметка с заголовком «Title: …»: рез по строке
+  автора не отрезал ничего, и шапка страницы стала текстом поста.
+*/
+const MD_ANY_HEAD = /^#{1,6} .*$/gm;
 
 /**
  * Что в куске разметки не является текстом поста: кнопки интерфейса, счётчик
@@ -497,17 +505,41 @@ function mdNoise(line) {
     || /people reacted|\d+ people/i.test(line)
     || /^\d+$/.test(line)
     || /^\d+:\d{1,2}$/.test(line)
-    || /^\[\d+\]$/.test(line);
+    || /^\[\d+\]$/.test(line)
+    /*
+      Шапка самой страницы: строки читалки и меню стены. Ссылки к этому моменту
+      уже вырезаны, поэтому «1. Music» — это бывший пункт `[Music](…)`, а
+      «Community posts 124» — бывший заголовок-ссылка. В нормальном ответе двери
+      всё это отсекает рез по заголовку; список стоит второй сетью на случай,
+      когда заголовка перед первым постом нет вовсе.
+    */
+    || /^(Title|URL Source|Markdown Content):/i.test(line)
+    || /^(Sign in|Sign up|search posts|community posts|all posts|back to page)$/i.test(line)
+    || /^\*?\s*(sign in )?sign (in )?up$/i.test(line)
+    || /^community posts \d+$/i.test(line)
+    || /^\*?\s*(search\s+)?clear field(\s+search)?$/i.test(line)
+    || /^(find posts by date\s*)?reset search$/i.test(line)
+    || /^\d+\.\s+(music|videos|communities|mini apps|games|yandex browser|mobile app|information about content)$/i.test(line)
+    /*
+      Строки-маркеры: «*», «* * *» — бывшие разделители меню, текст которых был
+      картинкой и исчез вместе со ссылкой. И навигация стены: пункты слипаются
+      в одну строку, когда ссылки стояли подряд без пробела, поэтому «back to
+      page» ищем подстрокой — в текстах русской группы такой английской метки
+      не бывает.
+    */
+    || /^[\s*]*\*[\s*]*$/.test(line)
+    || /back to page/i.test(line);
 }
 
 /** Кусок разметки → текст той записи, чья ссылка стоит в конце куска. */
-function mdPostText(chunk) {
-  MD_AUTHOR_HEAD.lastIndex = 0;
-  let head = MD_AUTHOR_HEAD.exec(chunk);
+function mdPostText(chunk, anyHead = false) {
+  const re = anyHead ? MD_ANY_HEAD : MD_AUTHOR_HEAD;
+  re.lastIndex = 0;
+  let head = re.exec(chunk);
   let cut = 0;
   while (head) {
     cut = head.index + head[0].length;
-    head = MD_AUTHOR_HEAD.exec(chunk);
+    head = re.exec(chunk);
   }
   return chunk
     .slice(cut)
@@ -535,9 +567,17 @@ export function readVkWallMarkdown(md, cfg = VK, now = Date.now()) {
 
   const posts = [];
   let from = 0;
+  let first = true;
   for (const mark of dated) {
-    const lines = vkPostToLines(mdPostText(source.slice(from, mark.start)));
+    /*
+      У первого куска рез ставится по любому заголовку: до первой записи идёт
+      шапка страницы, и её вид зависит от двери. У остальных кусков строка
+      автора (`##### [Группа]`) стоит обязательно, а заголовок внутри текста
+      поста — нет, поэтому там правило прежнее: резать только по автору.
+    */
+    const lines = vkPostToLines(mdPostText(source.slice(from, mark.start), first));
     from = mark.end;
+    first = false;
     if (!lines.length) continue;
     const id = `${owner}_${mark.num}`;
     posts.push({ id, atMs: mark.at.atMs, atExact: mark.at.exact, url: vkPostUrl(id, cfg), lines });
