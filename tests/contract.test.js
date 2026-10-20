@@ -11643,7 +11643,7 @@ console.log('\nAM. Фид магазина: обновление и событи
      планировщика (значение со спецсимволом не имеет права подставляться в
      команду).
   ───────────────────────────────────────────────────────────────────────── */
-  const forgetSrc = await readFile('supabase/20261020-feed-forget-mark.sql', 'utf8');
+  const forgetSrc = await readFile('supabase/applied/20261020-feed-forget-mark.sql', 'utf8');
   check('снятие отметки — именованная definer-дверь, а не политика на запись',
     /create or replace function public\.forum_forget_feed_mark\(p_key text\)/.test(forgetSrc)
       && forgetSrc.includes('language plpgsql security definer')
@@ -11686,9 +11686,10 @@ console.log('\nAM. Фид магазина: обновление и событи
     docsSrc.includes('forum_forget_feed_mark')
       && docsSrc.includes('20261020-feed-forget-mark.sql')
       && !/у фида есть оба нужных хода/.test(docsSrc));
-  check('шаг стоит в очереди и назван непрогнанным: реестр не врал бы о прогнанном',
+  check('шаг назван прогнанным и уехавшим в applied/: реестр не врал бы о очереди',
     readmeSrc.replace(/\s+/g, ' ').includes(
-      '`20261020-feed-forget-mark.sql` — **ещё не прогнан, лежит наверху.**'));
+      '`20261020-feed-forget-mark.sql` (прогнан 20.10.2026, там же)')
+      && !/ещё не прогнан|лежит наверху/.test(readmeSrc));
   check('документы хостинга называют режим уборки и обе его двери',
     hostingSrc.includes('forum_forget_feed_mark') && hostingSrc.includes('forum_delete_update_note')
       && hostingSrc.includes('режим уборки'));
