@@ -11631,6 +11631,68 @@ console.log('\nAM. Фид магазина: обновление и событи
   check('в списке событий нет ни архивной колонки, ни второго joins ради ника убравшего',
     !/archiv/i.test(listViewSql) && !/left join public\.forum_profiles p_arch/.test(finalFlat));
 
+  /* ── 5.1 Уборка: снять отметку фида было нечем, поэтому завели дверь ────────
+
+     Мусорная заметка 15.10 осталась висеть в списке, и её нельзя было убрать
+     «обеим ходом», как писали документы: второй ход отсутствовал. Таблица
+     отметок заведена без единой политики на запись нарочно, поэтому снятие
+     ключа обязано было стать именованной definer-дверью — иначе через месяц
+     молчание фида объясняли бы чем угодно, кроме удалённой отметки. Проверяем
+     то, что в этом ходе нельзя отдать на отмажку: роль, ровно одна строка,
+     названный вслух заголовок, порядок двух шагов и то, как уборка доезжает до
+     планировщика (значение со спецсимволом не имеет права подставляться в
+     команду).
+  ───────────────────────────────────────────────────────────────────────── */
+  const forgetSrc = await readFile('supabase/20261020-feed-forget-mark.sql', 'utf8');
+  check('снятие отметки — именованная definer-дверь, а не политика на запись',
+    /create or replace function public\.forum_forget_feed_mark\(p_key text\)/.test(forgetSrc)
+      && forgetSrc.includes('language plpgsql security definer')
+      && !/for (insert|update|delete)/i.test(forgetSrc));
+  check('дверь спрашивает роль и отказывает на пустом ключе, а не на пустом месте',
+    forgetSrc.includes('if not public.forum_is_staff() then')
+      && forgetSrc.includes("raise exception 'Ключ отметки не назван'"));
+  check('ровно одна отметка по ключу, а её название уходит в журнал',
+    /delete from public\.forum_feed_marks\s+where feed_key = p_key\s+returning title into v_title;/.test(forgetSrc)
+      && forgetSrc.includes("raise exception 'Отметка не найдена'")
+      && /return v_title;/.test(forgetSrc));
+  check('гостю дверь закрыта, вошедшему открыта — как соседним ходам фида',
+    forgetSrc.includes('revoke all on function public.forum_forget_feed_mark(text) from public, anon;')
+      && forgetSrc.includes('grant execute on function public.forum_forget_feed_mark(text) to authenticated;'));
+  check('уборка зовётся двумя флажками и в этом режиме магазины не читаются',
+    scriptSrc.includes("flagList('--снять-заметку')")
+      && scriptSrc.includes("flagList('--забыть-отметку')")
+      && /if \(CLEANING\) \{[\s\S]{0,200}process\.exit\(await cleanup\(\)\)/.test(scriptSrc)
+      && scriptSrc.indexOf('if (CLEANING) {') < scriptSrc.indexOf('const play = playPageUrl(STORE);'));
+  const cleanupFn = scriptSrc.slice(scriptSrc.indexOf('async function cleanup()'),
+    scriptSrc.indexOf('async function login()'));
+  check('порядок уборки жёсткий: заметка уходит раньше, чем снят её ключ',
+    scriptSrc.indexOf('async function cleanup()') > 0
+      && inOrder(cleanupFn, ['rpc/forum_delete_update_note', 'rpc/forum_forget_feed_mark']));
+  check('без входа бота база не тронута и прогон красный',
+    /if \(!token\) \{[\s\S]{0,120}say\(`Бот не вошёл[\s\S]{0,120}return 1;/.test(cleanupFn));
+  check('сорванный шаг видно: отказ базы по любой строке — красный код, а не тишина',
+    cleanupFn.includes('failed += 1;') && /return failed \? 1 : 0;/.test(cleanupFn));
+  check('ручная уборка доезжает до скрипта переменными окружения, а не вставкой в команду',
+    flowSrc.includes('FEED_DROP_NOTE: ${{ github.event.inputs.drop_note }}')
+      && flowSrc.includes('FEED_FORGET_KEY: ${{ github.event.inputs.forget_key }}')
+      && !/node scripts\/store-feed\.mjs.*\$\{\{/.test(flowSrc));
+  check('флажки собираются списком и разворачиваются в кавычках',
+    flowSrc.includes('args+=("--снять-заметку=$FEED_DROP_NOTE")')
+      && flowSrc.includes('node scripts/store-feed.mjs "${args[@]}"'));
+  check('оба поля ручного запуска — строки, пустые по умолчанию: пусто значит обычный обход',
+    /drop_note:\n\s+description: '[^']+'\n\s+type: string\n\s+default: ''/.test(flowSrc)
+      && /forget_key:\n\s+description: '[^']+'\n\s+type: string\n\s+default: ''/.test(flowSrc));
+  check('документы называют новую дверь, а не прежний несуществующий ход',
+    docsSrc.includes('forum_forget_feed_mark')
+      && docsSrc.includes('20261020-feed-forget-mark.sql')
+      && !/у фида есть оба нужных хода/.test(docsSrc));
+  check('шаг стоит в очереди и назван непрогнанным: реестр не врал бы о прогнанном',
+    readmeSrc.replace(/\s+/g, ' ').includes(
+      '`20261020-feed-forget-mark.sql` — **ещё не прогнан, лежит наверху.**'));
+  check('документы хостинга называют режим уборки и обе его двери',
+    hostingSrc.includes('forum_forget_feed_mark') && hostingSrc.includes('forum_delete_update_note')
+      && hostingSrc.includes('режим уборки'));
+
   /* ── 6. Граница «кто ходит наружу» ── */
   check('в разборе страницы нет ни одного обращения наружу',
     !/fetch\(|XMLHttpRequest|import\(|require\(/.test(feedSrc));

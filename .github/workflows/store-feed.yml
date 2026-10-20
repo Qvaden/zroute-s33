@@ -60,6 +60,14 @@ on:
         description: 'сухой: только показать найденное, в базу не писать'
         type: boolean
         default: false
+      drop_note:
+        description: 'уборка: id заметки, которую убрать из списка (пусто — обычный обход)'
+        type: string
+        default: ''
+      forget_key:
+        description: 'уборка: ключ отметки фида, который снять (vk:… или play:…)'
+        type: string
+        default: ''
 
 # Два одновременных запуска написали бы одну и ту же заметку дважды: база
 # такие дубли ловит, но лишний запрос и лишняя оговорка в состоянии никому не
@@ -90,7 +98,23 @@ jobs:
         env:
           STORE_FEED_NICK: ${{ secrets.STORE_FEED_NICK }}
           STORE_FEED_PASSWORD: ${{ secrets.STORE_FEED_PASSWORD }}
+          # Ручная уборка приезжает переменными окружения, а не вставкой прямо
+          # в команду: `${{ }}` подставляется в текст скрипта до того, как его
+          # увидит shell, и значение со спецсимволом исполнилось бы как код.
+          # Через env значение читается shell'ом как строка и остаётся строкой.
+          FEED_DROP_NOTE: ${{ github.event.inputs.drop_note }}
+          FEED_FORGET_KEY: ${{ github.event.inputs.forget_key }}
         run: |
+          args=()
+          [ -n "$FEED_DROP_NOTE" ] && args+=("--снять-заметку=$FEED_DROP_NOTE")
+          [ -n "$FEED_FORGET_KEY" ] && args+=("--забыть-отметку=$FEED_FORGET_KEY")
+
+          if [ ${#args[@]} -gt 0 ]; then
+            echo "Ручная уборка: магазины не читаются, база правится входом бота."
+            node scripts/store-feed.mjs "${args[@]}"
+            exit $?
+          fi
+
           if [ "${{ github.event.inputs.dry }}" = "true" ]; then
             echo "Запуск вручную с флажком «сухой»: база не тронута."
             node scripts/store-feed.mjs
