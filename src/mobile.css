@@ -357,7 +357,7 @@ html {
 .tl__row::-webkit-details-marker { display: none; }
 
 /*
-  Раскрывающийся хвост: тонкий уголок в углу записи, без кружка «плюс».
+  РАСКРЫВАЮЩИЙСЯ ХВОСТ: тонкий уголок в углу записи, без кружка «плюс».
   О его существовании говорят наклон у стрелки и цвет при открытии.
 */
 .tl__chev {
@@ -370,6 +370,56 @@ html {
   transition: transform .18s var(--ease), color .18s var(--ease);
 }
 .tl__details[open] .tl__chev { transform: rotate(180deg); color: var(--accent-ink); }
+
+/*
+  КОММЕНТАРИИ НА ТЕЛЕФОНЕ.
+
+  Блок комментариев — часть записи, и на телефоне он обязан занимать всю
+  ширину записи, а не треть её: раньше запись была строкой (`display:flex`),
+  и блок вставал рядом с заголовком, сужался и вылезал за экран по высоте.
+
+  Форма ответа на телефоне — в столбик: поле и кнопка в строке не помещаются,
+  а кнопка «Отправить» уезжает за край.
+*/
+.tl__comments-box {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.tl__comment-form {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tl__comment-form input {
+  width: 100%;
+  min-width: 0;
+  /* 16 px на телефоне: меньше — браузер зумит страницу при фокусе. */
+  font-size: 16px;
+}
+
+.tl__comment-form button {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: var(--s-1) var(--s-3);
+}
+
+.tl__comment-retry {
+  min-height: 40px;
+  padding: var(--s-1) var(--s-2);
+}
+
+.tl__comment-head {
+  gap: var(--s-1) var(--s-2);
+}
+
+.tl__comment-del {
+  min-width: 32px;
+  min-height: 32px;
+  padding: var(--s-1);
+}
 
 @media (max-width: 420px) {
   .tl__group-name { font-size: var(--fs-meta); }

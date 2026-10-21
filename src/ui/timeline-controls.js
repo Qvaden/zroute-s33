@@ -18,6 +18,25 @@ import { forum } from '../forum/index.js';
 (function () {
   'use strict';
 
+  /*
+    ЭКРАНИРОВАНИЕ — СВОЁ, А НЕ ИЗ helpers.js.
+
+    Файл намеренно живёт без import (кроме форума) и вставляется в собранное
+    превью как есть, поэтому свои помощники у него свои. Без них текст
+    комментария, ник автора и адрес картинки попадали в разметку сырыми:
+    ник из базы — это строка, которую вводит человек.
+  */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /* То же для значения атрибута: кавычка внутри значения закрыла бы его. */
+  function escAttr(s) {
+    return esc(s);
+  }
+
   var currentType = 'all';
   var currentYear = 'all';
   var currentMonth = null;
@@ -47,41 +66,123 @@ import { forum } from '../forum/index.js';
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
-  /** Рендер комментариев под событием. */
+  /**
+   * Рендер комментариев под событием.
+   *
+   * ИД СОБЫТИЯ БЕРЁТСЯ ИЗ САМОГО БЛОКА, а не из аргумента: блок помечен
+   * `data-tl-comments-box="<id>"`, и раньше код читал несуществующее
+   * `dataset.tlCommentsFor` — получался `undefined` в атрибуте формы, и
+   * отправка комментария уходила в никуда. Аргумент `eventId` оставлен
+   * только как запасной путь: блок — единственный, кто знает свой id.
+   */
+  function eventIdOf(box) {
+    return (box && box.dataset.tlCommentsBox) || '';
+  }
+
+  function commentForm(eventId) {
+    return '<form class="tl__comment-form" data-tl-comment-form="' + escAttr(eventId) + '">' +
+      '<input name="body" placeholder="Напишите комментарий…" maxlength="2000" required>' +
+      '<button type="submit">Отправить</button>' +
+    '</form>';
+  }
+
   function renderEventComments(box, eventId, list) {
     if (!box) return;
+    var id = eventId || eventIdOf(box);
     if (!Array.isArray(list) || !list.length) {
-      box.innerHTML = '<p class="muted" style="margin:var(--s-fine) 0;font-size:11px">Комментариев нет. Будь первым!</p>' +
-        '<form class="tl__comment-form" data-tl-comment-form="' + box.dataset.tlCommentsFor + '">' +
-          '<input name="body" placeholder="Напишите комментарий…" maxlength="2000" required>' +
-          '<button type="submit">Отправить</button>' +
-        '</form>';
+      box.innerHTML = '<p class="tl__comment-note">Комментариев нет. Будь первым!</p>' +
+        commentForm(id);
       return;
     }
     box.innerHTML =
       '<ol class="tl__comments-list">' +
         list.map(function (c) {
-          var deleted = c.deleted ? '<span class="muted" style="font-size:11px">(удалено)</span>' : '';
           var time = c.createdAt ? new Date(c.createdAt).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
           return '<li class="tl__comment">' +
-            '<span class="tl__comment-avatar" style="background:' + (c.authorAvatar ? 'url(' + c.authorAvatar + ')' : 'linear-gradient(135deg, #3a3a4a, #1f1f2f)') + '">' +
-              (c.authorAvatar ? '<img src="' + c.authorAvatar + '" alt="">' : c.authorNick.charAt(0).toUpperCase()) +
+            '<span class="tl__comment-avatar">' +
+              (c.authorAvatar
+                ? '<img src="' + escAttr(c.authorAvatar) + '" alt="">'
+                : esc(c.authorNick ? c.authorNick.charAt(0).toUpperCase() : '?')) +
             '</span>' +
             '<div class="tl__comment-body">' +
               '<div class="tl__comment-head">' +
-                '<a class="tl__comment-nick" href="#/user/' + encodeURIComponent(c.authorNick) + '">' + c.authorNick + '</a>' +
-                '<span class="tl__comment-time">' + time + '</span>' +
-                '<button type="button" class="tl__comment-del" data-tl-comment-del="' + c.id + '" title="Удалить">✕</button>' +
+                '<a class="tl__comment-nick" href="#/user/' + encodeURIComponent(c.authorNick || '') + '">' + esc(c.authorNick || '—') + '</a>' +
+                '<span class="tl__comment-time">' + esc(time) + '</span>' +
+                '<button type="button" class="tl__comment-del" data-tl-comment-del="' + escAttr(c.id) + '" title="Удалить">✕</button>' +
               '</div>' +
-              '<p class="tl__comment-text">' + (c.deleted ? '<em>Комментарий удалён</em>' : c.body) + '</p>' +
+              '<p class="tl__comment-text">' + (c.deleted ? '<em>Комментарий удалён</em>' : esc(c.body)) + '</p>' +
             '</div>' +
           '</li>';
         }).join('') +
       '</ol>' +
-      '<form class="tl__comment-form" data-tl-comment-form="' + box.dataset.tlCommentsFor + '">' +
-        '<input name="body" placeholder="Напишите комментарий…" maxlength="2000" required>' +
-        '<button type="submit">Отправить</button>' +
-      '</form>';
+      commentForm(id);
+  }
+
+  /**
+   * Состояния блока комментариев.
+   *
+   * Раньше их было два: «Загружаем…» и результат. Отказа запроса человек не
+   * видел вовсе — смена вкладки или обрыв связи оставляли «Загружаем…»
+   * навсегда, и блок выглядел поломанным.
+   *
+   * Теперь состояний три, и каждое говорит, что делать дальше:
+   *   загрузка — идёт запрос (индикатор);
+   *   ошибка    — запрос не прошёл, есть кнопка «Попробовать снова»;
+   *   успех    — комментарии на месте.
+   */
+  function renderCommentsLoading(box) {
+    box.innerHTML = '<p class="tl__comment-note tl__comment-note--wait">Загружаем…</p>';
+    box.setAttribute('aria-busy', 'true');
+  }
+
+  function renderCommentsError(box, message) {
+    box.removeAttribute('aria-busy');
+    box.innerHTML =
+      '<p class="tl__comment-note tl__comment-note--err">' +
+        esc(message || 'Не удалось загрузить комментарии.') +
+      '</p>' +
+      '<button type="button" class="tl__comment-retry" data-tl-comments-retry="' +
+        escAttr(eventIdOf(box)) + '">Попробовать снова</button>';
+  }
+
+  /**
+   * Загрузка комментариев записи.
+   *
+   * Четыре состояния, и ни одно не оставляет человека перед надписью
+   * «Загружаем…» навсегда:
+   *   идёт запрос — индикатор и aria-busy;
+   *   успех       — комментарии;
+   *   отказ       — понятное сообщение и кнопка «Попробовать снова»;
+   *   повтор      — тот же запрос ещё раз.
+   *
+   * Гонка учтена: человек может нажать «Комментарии» дважды или уйти со
+   * страницы, пока идёт запрос. Ответ приходит в тот же блок, поэтому
+   * блок сверяет, что он всё ещё тот же и всё ещё открыт, — иначе поздний
+   * ответ переписал бы уже свёрнутый блок.
+   */
+  function loadEventComments(box, eventId) {
+    box.classList.add('is-loaded');
+    box.classList.remove('is-error');
+    renderCommentsLoading(box);
+
+    forum.listEventComments(eventId).then(function (list) {
+      // Блок могли свернуть или открыть другой, пока шёл запрос.
+      if (!box.isConnected || box.dataset.tlCommentsBox !== eventId) return;
+      box.removeAttribute('aria-busy');
+      box.classList.remove('is-error');
+      renderEventComments(box, eventId, list);
+    }).catch(function (err) {
+      if (!box.isConnected || box.dataset.tlCommentsBox !== eventId) return;
+      box.removeAttribute('aria-busy');
+      box.classList.add('is-error');
+      var message = String(err && err.message ? err.message : '');
+      renderCommentsError(
+        box,
+        message && message !== 'Failed to fetch'
+          ? message
+          : 'Не удалось загрузить комментарии — проверьте связь.'
+      );
+    });
   }
 
   /** Попадает ли месяц вида «2026-09» в выбранный год и месяц. */
@@ -381,25 +482,35 @@ import { forum } from '../forum/index.js';
     }
 
     /* ── Комментарии к событиям ─────────────────────────────────────── */
+    /*
+      Кнопка «Комментарии» и кнопка «Попробовать снова» работают по одному
+      правилу: обе зовут одну и ту же загрузку, обе берут id из своего блока.
+
+      Раньше id брался из `dataset.tlCommentsFor` блока — атрибута такого
+      у блока нет, он помечен `data-tl-comments-box`, и в форму уходил
+      `undefined`. Теперь id берётся из блока по-настоящему, и нажатие
+      открывает комментарии ИМЕННО той записи, у которой нажали: блок
+      ищется по id из кнопки, а не «первый на странице».
+    */
     var commentToggle = e.target.closest('[data-tl-comments-for]');
-    if (commentToggle) {
-      var eventId = commentToggle.dataset.tlCommentsFor;
-      if (!eventId) return;
-      var box = document.querySelector('[data-tl-comments-box="' + CSS.escape(eventId) + '"]');
+    var commentRetry = e.target.closest('[data-tl-comments-retry]');
+    if (commentToggle || commentRetry) {
+      var src = commentToggle || commentRetry;
+      var wantedId = src.dataset.tlCommentsFor || src.dataset.tlCommentsRetry;
+      if (!wantedId) return;
+      var box = document.querySelector('[data-tl-comments-box="' + CSS.escape(wantedId) + '"]');
       if (!box) return;
-      // Повторный клик — свернуть
-      if (box.classList.contains('is-loaded')) {
+
+      // Повторный клик по «Комментарии» — свернуть. Кнопка «Попробовать
+      // снова» не сворачивает: человек просит повторить запрос.
+      if (commentToggle && box.classList.contains('is-loaded') && !box.classList.contains('is-error')) {
         box.innerHTML = '';
-        box.classList.remove('is-loaded');
+        box.classList.remove('is-loaded', 'is-error');
+        box.removeAttribute('aria-busy');
         return;
       }
-      box.classList.add('is-loaded');
-      box.innerHTML = '<p class="muted" style="margin:var(--s-fine) 0;font-size:11px">Загружаем…</p>';
-      forum.listEventComments(eventId).then(function (list) {
-        renderEventComments(box, eventId, list);
-      }).catch(function () {
-        box.innerHTML = '<p class="muted" style="margin:var(--s-fine) 0;font-size:11px">Не удалось загрузить.</p>';
-      });
+
+      loadEventComments(box, wantedId);
       return;
     }
 
@@ -426,18 +537,38 @@ import { forum } from '../forum/index.js';
     if (!form) return;
     e.preventDefault();
     var eventId = form.dataset.tlCommentForm;
+    /* Запись без id — отправлять некуда: раньше здесь уходил `undefined`. */
+    if (!eventId) return;
     var input = form.querySelector('input[name="body"]');
     if (!input || !input.value.trim()) return;
     var btn = form.querySelector('button[type="submit"]');
+    var box = form.closest('[data-tl-comments-box]');
     if (btn) btn.disabled = true;
     forum.addEventComment(eventId, input.value).then(function () {
       input.value = '';
-      var box = form.closest('[data-tl-comments-box]');
       return forum.listEventComments(eventId).then(function (list) {
-        renderEventComments(box, eventId, list);
+        if (box && box.isConnected) renderEventComments(box, eventId, list);
       });
     }).catch(function (err) {
-      alert(String(err?.message ?? err));
+      /*
+        Отказ показываем в блоке, а не в системном окне: человек на телефоне
+        не видит, что именно сломалось, и окно перебивает вёрстку. Текст
+        ошибки базы полезен — он называет причину.
+      */
+      var message = String(err && err.message ? err.message : '');
+      if (box && box.isConnected) {
+        box.classList.add('is-error');
+        box.insertAdjacentHTML(
+          'afterbegin',
+          '<p class="tl__comment-note tl__comment-note--err">' +
+            esc(message && message !== 'Failed to fetch'
+              ? message
+              : 'Не удалось отправить комментарий — проверьте связь.') +
+          '</p>'
+        );
+      } else {
+        alert(message || 'Не удалось отправить комментарий.');
+      }
     }).finally(function () {
       if (btn) btn.disabled = false;
     });

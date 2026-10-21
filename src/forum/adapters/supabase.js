@@ -2011,12 +2011,31 @@ export async function chatLeaderboard() {
 
 /* ── Комментарии к летописи ────────────────────────────────────────────── */
 
+/*
+  Комментарии к летописи.
+
+  Читаем представление forum_event_comment_list, а не таблицу: в таблице нет
+  колонки с аватаром, и страница показывала первую букву ника даже у человека
+  с аватаром. Представление берёт аватар из профиля по author_id
+  (supabase/applied/20261021-event-comment-avatar.sql).
+
+  Миграция может быть ещё не применена, и тогда представления нет. Отказ
+  должен быть ПОНЯТНЫМ, а не «пустой список»: страница покажет сообщение
+  с кнопкой «Попробовать снова», и в нём будет назван SQL-файл.
+
+  Проверка представления делается ОДИН раз: после первого отказа помним, что
+  его нет, и пойдём в таблицу. Иначе каждый клик по «Комментарии» писал бы
+  в консоль браузера по 404 — а это шум, который выглядит как поломка.
+*/
+let hasEventCommentView = null;
+
 function eventCommentOut(row) {
   return {
     id: row.id,
     eventId: row.event_id,
     authorId: row.author_id,
     authorNick: row.author_nick || '',
+    authorAvatar: row.author_avatar || '',
     body: row.body,
     deleted: Boolean(row.deleted),
     deletedReason: row.deleted_reason || '',
@@ -2025,10 +2044,77 @@ function eventCommentOut(row) {
 }
 
 export async function listEventComments(eventId) {
+  if (hasEventCommentView !== false) {
+    try {
+      const rows = await rest(
+        `/forum_event_comment_list?select=*&event_id=eq.${encodeURIComponent(eventId)}&order=created_at.asc`
+      );
+      hasEventCommentView = true;
+      return (Array.isArray(rows) ? rows : []).map(eventCommentOut);
+    } catch (err) {
+      const message = String(err?.message ?? err);
+      if (!/forum_event_comment_list|does not exist|PGRST205/i.test(message)) throw err;
+      // Представления нет — запоминаем и читаем таблицу.
+      hasEventCommentView = false;
+    }
+  }
+
   const rows = await rest(
     `/forum_event_comments?select=*&event_id=eq.${encodeURIComponent(eventId)}&order=created_at.asc`
-  );
-  return (Array.isArray(rows) ? rows : []).map(eventCommentOut);
+  ).catch(() => {
+    throw new Error(
+      'Не хватает представления forum_event_comment_list — ' +
+        'примените supabase/applied/20261021-event-comment-avatar.sql'
+    );
+  });
+  const list = (Array.isArray(rows) ? rows : []).map(eventCommentOut);
+  /*
+    Аватара в таблице нет, а показывать его надо. Берём из профилей — одним
+    запросом на всех авторов списка и с кэшем: список перечитывают после
+    каждого ответа, и без кэша на каждый чих шёл бы запрос.
+  */
+  const avatars = await eventCommentAvatars(list.map((c) => c.authorNick));
+  for (const c of list) {
+    if (!c.authorAvatar && avatars[c.authorNick]) c.authorAvatar = avatars[c.authorNick];
+  }
+  return list;
+}
+
+/**
+ * Аватар автора комментария — по id, из профиля.
+ *
+ * Таблица forum_event_comments аватара не хранит, поэтому первый запрос
+ * комментариев не даёт картинки. Брать её из профиля можно двумя способами:
+ * спрашивать базу ещё раз (дополнительный запрос на каждый список) или
+ * взять из уже загруженного профиля. Второй путь дешевле, но профиль есть не
+ * всегда, поэтому третий — спросить один раз всех авторов комментариев.
+ *
+ * Функция кэширует ответ: список комментариев открывают и перечитывают
+ * после каждого ответа, и без кэша на каждый чих уходил бы запрос.
+ */
+const avatarCache = new Map();
+
+export async function eventCommentAvatars(nicks) {
+  const wanted = [...new Set((nicks || []).map((n) => String(n || '').trim()).filter(Boolean))];
+  if (!wanted.length) return {};
+  const missing = wanted.filter((n) => !avatarCache.has(n));
+  if (missing.length) {
+    try {
+      const rows = await rest(
+        `/forum_users?select=nick,avatar_url&nick=in.(${missing.map((n) => `"${n.replace(/"/g, '')}"`).join(',')})`
+      );
+      for (const row of Array.isArray(rows) ? rows : []) {
+        avatarCache.set(String(row.nick || ''), row.avatar_url || '');
+      }
+      // Нет аватара — тоже запоминаем, чтобы не спрашивать снова.
+      for (const n of missing) if (!avatarCache.has(n)) avatarCache.set(n, '');
+    } catch {
+      for (const n of missing) if (!avatarCache.has(n)) avatarCache.set(n, '');
+    }
+  }
+  const out = {};
+  for (const n of wanted) out[n] = avatarCache.get(n) || '';
+  return out;
 }
 
 export async function addEventComment(eventId, body) {

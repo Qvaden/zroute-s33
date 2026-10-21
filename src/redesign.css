@@ -2304,8 +2304,19 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stats{
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat{
+  /*
+    Показатель — КОЛОНКА, а не строка. В базовом слое `.tl__stat` стоял
+    `display: flex`, и цифра с подписью вставали рядом: «4Столицы взято».
+    Подпись должна идти под цифрой, а колонка — тянуться на всю ширину
+    ячейки, иначе на телефоне она сжимается до двух слов.
+  */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   padding: 14px 20px 14px 0;
   border: 0;
+  min-width: 0;
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat + .tl__stat{
@@ -2385,14 +2396,32 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .verdict__dates{
   font-size: 10px;
 }
 
-html body:not([data-route="forum"]):not([data-route="bot"]) .wl__item,
 html body:not([data-route="forum"]):not([data-route="bot"]) .tl__item{
+  /*
+    ЗАПИСЬ — КОЛОНКА.
+
+    В базовом слое `.tl__item` стоял `display: flex`, и всё, что в записи
+    лежит рядом с заголовком, вставало в одну строку с ним: кнопка
+    «Комментарии» и блок под ней. Отсюда на телефоне блок комментариев
+    получал ширину в одну треть экрана и высоту в несколько экранов — а
+    человек видел «сжатый» список, который не помещался в карточку.
+
+    Теперь запись — колонка: точка и заголовок рядом, кнопка и развёрнутые
+    комментарии — под ними, на всю ширину. Точка с заголовком по-прежнему
+    стоят в строке (за это отвечает `.tl__body` с точкой рядом), а всё
+    остальное идёт вниз.
+  */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   padding: 14px 0;
   border: 0;
   border-bottom: 1px solid var(--line-soft);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  min-width: 0;
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .tl__item:hover{

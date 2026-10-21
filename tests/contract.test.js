@@ -1392,6 +1392,9 @@ console.log('\nL. Летопись сервера: захватили, защи�
     await import('../src/logic/event-types.js');
   const { renderTimeline } = await import('../src/pages/timeline.js');
   const tlScript = await readFile('src/ui/timeline-controls.js', 'utf8');
+  const tlV8 = await readFile('src/styles-v8.css', 'utf8');
+  const tlMobile = await readFile('src/mobile.css', 'utf8');
+  const tlRedesign = await readFile('src/redesign.css', 'utf8');
 
   /*
     РАЗДЕЛЕНИЕ ОБЯЗАННОСТЕЙ, КОТОРОЕ ЭТОТ РАЗДЕЛ ОХРАНЯЕТ.
@@ -1534,6 +1537,59 @@ console.log('\nL. Летопись сервера: захватили, защи�
   check('заголовок вердикта берёт название записи',
     noServer.includes('<h2 class="verdict__text">т</h2>'));
   check('но лента событий рисуется', noServer.includes('data-tl-list'));
+
+  /*
+    КОММЕНТАРИИ К ЗАПИСЯМ ЛЕТОПИСИ.
+
+    Здесь был настоящий полом: блок комментариев помечен
+    `data-tl-comments-box="<id>"`, а скрипт читал `dataset.tlCommentsFor` —
+    атрибута, которого у блока нет. В форму уходило `undefined`, и отправка
+    комментария уходила в никуда. Проверки ниже ловят именно это.
+
+    И три состояния блока, потому что «Загружаем…» навсегда — это не
+    «загрузка», а поломка: человек не понимает, что произошло, и не может
+    повторить попытку.
+  */
+  check('у каждой записи есть свой блок комментариев',
+    (html.match(/data-tl-comments-box="/g) || []).length === 4
+      && (html.match(/data-tl-comments-for="/g) || []).length === 4);
+  check('блок комментариев помечен своим id, а не чужим',
+    /data-tl-comments-box="e1"/.test(html) && /data-tl-comments-for="e1"/.test(html));
+  check('id записи берётся из самого блока, а не из несуществующего атрибута',
+    tlScript.includes('eventIdOf') && tlScript.includes('dataset.tlCommentsBox')
+      && !/box\.dataset\.tlCommentsFor/.test(tlScript));
+  check('форма комментария получает id той же записи',
+    /data-tl-comment-form="'\s*\+\s*escAttr\(/.test(tlScript)
+      && !/data-tl-comment-form="' \+ box\.dataset\.tlCommentsFor/.test(tlScript));
+  check('загрузка показывает индикатор и снимает его по окончании',
+    tlScript.includes('renderCommentsLoading') && tlScript.includes('aria-busy')
+      && tlScript.includes("removeAttribute('aria-busy')"));
+  check('отказ показывает сообщение и кнопку «Попробовать снова»',
+    tlScript.includes('renderCommentsError') && tlScript.includes('data-tl-comments-retry')
+      && tlScript.includes('Попробовать снова'));
+  check('кнопка повтора зовёт ту же загрузку, а не новый запрос из ниоткуда',
+    /data-tl-comments-retry/.test(tlScript) && tlScript.includes('loadEventComments'));
+  check('поздний ответ не переписывает уже свёрнутый блок',
+    tlScript.includes('box.isConnected') && tlScript.includes('box.dataset.tlCommentsBox !== eventId'));
+  check('текст комментария экранируется',
+    tlScript.includes('esc(c.body)') && !/\+ c\.body \+/.test(tlScript));
+
+  /*
+    МОБИЛЬНАЯ ВЁРСТКА ЗАПИСИ И КОММЕНТАРИЕВ.
+
+    Запись была строкой (`display:flex`), и кнопка «Комментарии» с блоком
+    под ней вставали рядом с заголовком: на телефоне блок получал треть
+    экрана и высоту в несколько экранов. Теперь запись — колонка, а блок
+    занимает всю её ширину.
+  */
+  check('запись ленты — колонка, а не строка',
+    /\.tl__item\{[^}]*flex-direction:\s*column/.test(tlRedesign) || /\.tl__item \{[^}]*flex-direction: column/.test(tlRedesign));
+  check('блок комментариев не уже своей записи',
+    /\.tl__comments-box \{[^}]*width: 100%/.test(tlV8) && /\.tl__comments-box \{[^}]*max-width: 100%/.test(tlV8));
+  check('форма комментария на телефоне в столбик',
+    /\.tl__comment-form \{[^}]*flex-direction: column/.test(tlMobile));
+  check('показатель — колонка: цифра над подписью, а не рядом',
+    /\.tl__stat\{[^}]*flex-direction:\s*column/.test(tlRedesign) || /\.tl__stat \{[^}]*flex-direction: column/.test(tlRedesign));
 
   /* ── Календарь ── */
   const cal = renderTimeline({
