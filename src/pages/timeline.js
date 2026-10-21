@@ -77,6 +77,14 @@ export function renderTimeline({ events, loadError = '' } = {}) {
   const trophies = captures.length ? renderTrophies(captures, sorted) : '';
 
   return `
+    <section class="tl-page">
+      <span class="eyebrow">Летопись</span>
+      <h1 class="tl-page__title">Хроника сервера 33</h1>
+      <p class="guide__sub">
+        Кто забирал Столицы, сколько держал и что ещё происходило на сервере.
+        Записи идут от свежих к старым и раскрываются нажатием.
+      </p>
+    </section>
     ${renderServerSection(sorted)}
     ${trophies}
     ${renderFilters(sorted)}
@@ -187,7 +195,7 @@ function renderServerSection(list) {
     </button>`;
 
   return `
-    <section class="hero hero--tl">
+    <section class="tl-now">
       <span class="eyebrow">Что делал сервер</span>
 
       ${cards}
@@ -259,9 +267,9 @@ function renderTrophies(captures, all) {
     .join('');
 
   return `
-    <section class="hero hero--tl">
+    <section class="tl-trophies">
       <span class="eyebrow">Хроника завоеваний</span>
-      <h1 class="tl__title">Чьи Столицы забрали</h1>
+      <h2 class="tl-trophies__title">Чьи Столицы забрали</h2>
 
       <div class="tl__stats">
         ${stats

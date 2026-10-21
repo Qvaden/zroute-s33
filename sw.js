@@ -1,4 +1,4 @@
-﻿/*
+/*
   Service worker: только для установки на телефон и работы без связи.
 
   СТРАТЕГИЯ — СЕТЬ ВСЕГДА ПЕРВАЯ. Кэш используется исключительно как запас,
@@ -27,7 +27,7 @@
   старая копия стилей осталась бы лежать рядом с новой. Офлайн показывает
   ровно то, что человек видел в последний раз, — пусть тогда уже последнее.
 */
-const CACHE = 'zroute-s33-v118';
+const CACHE = 'zroute-s33-v121';
 
 /*
   Минимум для первого офлайн-открытия. Остальное список не держит: см.
@@ -109,19 +109,19 @@ const NETWORK_WAIT_MS = 5000;
 const OFFLINE_HTML = '<!doctype html><html lang="ru"><meta charset="utf-8">'
   + '<meta name="viewport" content="width=device-width,initial-scale=1">'
   + '<title>Сервер 33 — нет связи</title>'
-  + '<body style="margin:0;padding:32px 20px;background:#101418;color:#f4f6f9;'
+  + '<body style="margin:0;padding:32px 20px;background:#111419;color:#f2f4f7;'
   + 'font:16px/1.6 system-ui,sans-serif">'
   + '<h1 style="font-size:20px;margin:0 0 12px">Сайт не открылся</h1>'
-  + '<p style="margin:0 0 8px;color:#99a1ad">Нет связи с хостингом, и сохранённой '
+  + '<p style="margin:0 0 8px;color:#8a939f">Нет связи с хостингом, и сохранённой '
   + 'копии страницы на этом устройстве ещё нет — её нечем заменить.</p>'
-  + '<p style="margin:0 0 20px;color:#99a1ad">Обычно помогает сменить сеть: '
+  + '<p style="margin:0 0 20px;color:#8a939f">Обычно помогает сменить сеть: '
   + 'мобильный интернет вместо гостевого Wi-Fi, или наоборот.</p>'
   + '<p style="margin:0 0 20px"><a href="https://qvaden.github.io/zroute-s33/" '
-  + 'style="color:#ff6a2b">Открыть запасной адрес сайта</a>'
-  + '<span style="color:#99a1ad"> — то же содержимое с GitHub, если основной '
+  + 'style="color:#ff6b50">Открыть запасной адрес сайта</a>'
+  + '<span style="color:#8a939f"> — то же содержимое с GitHub, если основной '
   + 'домен не открывается.</span></p>'
   + '<button type="button" onclick="location.reload()" style="padding:10px 18px;'
-  + 'border:0;border-radius:8px;background:#ff6a2b;color:#fff;font:inherit">Повторить</button>'
+  + 'border:0;border-radius:8px;background:#ff6b50;color:#17181b;font:inherit">Повторить</button>'
   + '</body>';
 
 self.addEventListener('install', (event) => {

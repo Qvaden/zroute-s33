@@ -189,7 +189,7 @@ function renderForumHead() {
   return `
     <div class="forum-head__id">
       <span class="eyebrow">Форум сервера 33</span>
-      <h1 class="forum-head__title">Обсуждения сообщества</h1>
+      <h1 class="forum-head__title">Обсуждения <span>сообщества</span></h1>
       <p class="forum-head__note">
         Новости, разбор VS, летопись захватов, альянсы и свободные темы.
       </p>
@@ -2312,27 +2312,13 @@ export function renderPostCard(p, s) {
   return `
     <article class="panel forum-post ${p.pinned ? 'forum-post--pinned' : ''}${inTrail ? ' forum-post--trail' : ''}${unread > 0 ? ' forum-post--unread' : ''}" data-forum-post="${esc(p.id)}">
       <header class="forum-post__head">
-        ${avatarHtml(p.authorNick, p.authorAvatar)}
-        <div class="forum-post__by">
-          <b>${nickLink(p.authorNick)}${
-            p.authorIsBlogger
-              ? `<a class="role-badge role-badge--blogger" href="#/user/${esc(encodeURIComponent(p.authorNick))}"
-                   title="Ведёт блог — загляните" role="img" aria-label="Блогер">✍️<b>блогер</b></a>`
-              : ''
-          }${
-            roleBadge({ role: p.authorRole }, { short: true })
-          }${
-            verifiedBadge(p.authorIsVerified)
-          }${serverBadge(p.authorServer)}${
-            p.authorAlliance ? ` ${allianceCard(p.authorAlliance, s.alliances)}` : ''
-          }</b>
-          <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
-            ${esc(timeAgo(p.createdAt))}${p.editedAt ? ' · изменён' : ''}
-          </time>
-        </div>
+        <span class="forum-post__cat">${esc(categoryLabel(p.category))}</span>
+        <time datetime="${esc(p.createdAt.toISOString())}" title="${esc(fullTime(p.createdAt))}">
+          ${esc(timeAgo(p.createdAt))}${p.editedAt ? ' · изменён' : ''}
+        </time>
+        <span class="forum-post__id">№${esc(String(p.id).slice(0, 8))}</span>
         <span class="forum-post__flags">
-          <span class="forum-post__cat">${esc(categoryLabel(p.category))}</span>
-          ${p.pinned ? '<span class="forum-post__pin" title="Закреплён">📌</span>' : ''}
+          ${p.pinned ? '<span class="forum-post__pin" title="Закреплён">Закреплено</span>' : ''}
           ${
             inTrail
               ? '<span class="forum-post__trail" title="Вы участвовали: ваш пост, реакция или голос в опросе">Ваш след</span>'
@@ -2392,66 +2378,86 @@ export function renderPostCard(p, s) {
       }
 
       <footer class="forum-post__foot">
-        ${renderReactions('post', p, s)}
-        <a class="forum-post__comments" href="#/forum/${esc(p.id)}">
-          💬 ${p.commentCount ? esc(plural(p.commentCount, 'ответ', 'ответа', 'ответов')) : 'ответить'}
-        </a>
-        <span class="forum-post__views">👁 ${Number(p.views || 0)}</span>
-        ${renderSaveButton(p, s)}
-        <span class="forum-post__acts">
-          ${
-            isMine
-              ? `<button type="button" class="forum-act" data-forum-edit="${esc(p.id)}">Редактировать</button>`
-              : ''
-          }
-          ${
-            /*
-              Редкие действия собраны в меню «⋯»: у автора-модератора их
-              набиралось пять в одну строку, и на телефоне кнопки уезжали
-              за край карточки. Кнопки остаются в разметке — просто сложены.
-            */
-            (canModerate || canReply || (s.me && !isMine))
-              ? `<details class="forum-act-menu">
-                <summary class="forum-act" title="Ещё действия" aria-label="Ещё действия с постом">⋯</summary>
-                <div class="forum-act-menu__list">
-                  ${
-                    canModerate
-                      ? `<button type="button" class="forum-act" data-forum-pin="${esc(p.id)}"
-                                 aria-pressed="${p.pinned ? 'true' : 'false'}"
-                                 title="${p.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">${
-                            p.pinned ? 'Открепить' : 'Закрепить'
-                          }</button>`
-                      : ''
-                  }
-                  ${
-                    canReply
-                      ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
-                                 title="Вставить текст поста в ответ">Цитировать</button>`
-                      : ''
-                  }
-                  ${
-                    s.me
-                      ? `<button type="button" class="forum-act" data-forum-subscribe="${esc(p.id)}"
-                                 data-forum-subscribed="${p.subscribed ? '1' : ''}"
-                                 title="Получать уведомления о новых комментариях">${p.subscribed ? 'Отписаться' : 'Подписаться'}</button>`
-                      : ''
-                  }
-                  ${
-                    s.me && !isMine
-                      ? `<button type="button" class="forum-act" data-forum-report="post:${esc(p.id)}">Пожаловаться</button>`
-                      : ''
-                  }
-                  ${
-                    isMine || canModerate
-                      ? `<button type="button" class="forum-act forum-act--danger" data-forum-del-post="${esc(p.id)}"
-                                 title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
-                      : ''
-                  }
-                </div>
-              </details>`
-              : ''
-          }
-        </span>
+        <div class="forum-post__author">
+          ${avatarHtml(p.authorNick, p.authorAvatar)}
+          <div class="forum-post__by">
+            <b>${nickLink(p.authorNick)}${
+              p.authorIsBlogger
+                ? `<a class="role-badge role-badge--blogger" href="#/user/${esc(encodeURIComponent(p.authorNick))}"
+                     title="Ведёт блог — загляните" role="img" aria-label="Блогер">✍️<b>блогер</b></a>`
+                : ''
+            }${
+              roleBadge({ role: p.authorRole }, { short: true })
+            }${
+              verifiedBadge(p.authorIsVerified)
+            }${serverBadge(p.authorServer)}${
+              p.authorAlliance ? ` ${allianceCard(p.authorAlliance, s.alliances)}` : ''
+            }</b>
+          </div>
+        </div>
+
+        <div class="forum-post__tools">
+          ${renderReactions('post', p, s)}
+          <a class="forum-post__comments" href="#/forum/${esc(p.id)}">
+            💬 ${p.commentCount ? esc(plural(p.commentCount, 'ответ', 'ответа', 'ответов')) : 'ответить'}
+          </a>
+          <span class="forum-post__views">👁 ${Number(p.views || 0)}</span>
+          ${renderSaveButton(p, s)}
+          <span class="forum-post__acts">
+            ${
+              isMine
+                ? `<button type="button" class="forum-act" data-forum-edit="${esc(p.id)}">Редактировать</button>`
+                : ''
+            }
+            ${
+              /*
+                Редкие действия собраны в меню «⋯»: у автора-модератора их
+                набиралось пять в одну строку, и на телефоне кнопки уезжали
+                за край карточки. Кнопки остаются в разметке — просто сложены.
+              */
+              (canModerate || canReply || (s.me && !isMine))
+                ? `<details class="forum-act-menu">
+                  <summary class="forum-act" title="Ещё действия" aria-label="Ещё действия с постом">⋯</summary>
+                  <div class="forum-act-menu__list">
+                    ${
+                      canModerate
+                        ? `<button type="button" class="forum-act" data-forum-pin="${esc(p.id)}"
+                                   aria-pressed="${p.pinned ? 'true' : 'false'}"
+                                   title="${p.pinned ? 'Открепить — убрать из топа ленты' : 'Закрепить — держать сверху ленты'}">${
+                              p.pinned ? 'Открепить' : 'Закрепить'
+                            }</button>`
+                        : ''
+                    }
+                    ${
+                      canReply
+                        ? `<button type="button" class="forum-act" data-forum-quote="post:${esc(p.id)}"
+                                   title="Вставить текст поста в ответ">Цитировать</button>`
+                        : ''
+                    }
+                    ${
+                      s.me
+                        ? `<button type="button" class="forum-act" data-forum-subscribe="${esc(p.id)}"
+                                   data-forum-subscribed="${p.subscribed ? '1' : ''}"
+                                   title="Получать уведомления о новых комментариях">${p.subscribed ? 'Отписаться' : 'Подписаться'}</button>`
+                        : ''
+                    }
+                    ${
+                      s.me && !isMine
+                        ? `<button type="button" class="forum-act" data-forum-report="post:${esc(p.id)}">Пожаловаться</button>`
+                        : ''
+                    }
+                    ${
+                      isMine || canModerate
+                        ? `<button type="button" class="forum-act forum-act--danger" data-forum-del-post="${esc(p.id)}"
+                                   title="${isMine && !canModerate ? 'Удалить свой пост' : 'Удалить с указанием причины'}">Удалить</button>`
+                        : ''
+                    }
+                  </div>
+                </details>`
+                : ''
+            }
+          </span>
+        </div>
       </footer>
 
       ${isOpen ? renderComments(p, s) : ''}

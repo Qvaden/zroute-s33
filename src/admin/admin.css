@@ -920,32 +920,32 @@
 */
 .guide-color-picker,
 .guide-color-modal__dialog {
-  --recessed:  #05070c;
-  --bg:        #0a0e15;
-  --surface:   #10161f;
-  --raised:    #171f2b;
-  --raised-2:  #1f2936;
-  --overlay:   #26313f;
-  --line:      #29323f;
-  --line-soft: #1a2331;
+  --recessed:  #0b0e13;
+  --bg:        #111419;
+  --surface:   #161a20;
+  --raised:    #1b2027;
+  --raised-2:  #222831;
+  --overlay:   #252b34;
+  --line:      #2b313a;
+  --line-soft: #20252c;
 
   --text:      #f2f4f7;
-  --dim:       #b4bcc8;
-  --mute:      #929cad;
-  --silver:    #b3bcc9;
-  --link:      #7fb2ff;
+  --dim:       #b7bec8;
+  --mute:      #8a939f;
+  --silver:    #b8c0ca;
+  --link:      #9ab8e8;
   --blogger:   #31c5b5;
 
-  --accent:    #ff5a36;
-  --accent-dk: #e0453a;
-  --accent-ink: #ff5a36;
-  --on-accent: #0a0e15;
+  --accent:    #ff6b50;
+  --accent-dk: #e85a40;
+  --accent-ink: #ff6b50;
+  --on-accent: #17181b;
   --on-role:   #0a0e15;
-  --gold:      #d9a94a;
-  --gold-ink:  #d9a94a;
-  --bronze:    #c18c62;
-  --win:       #46b87f;
-  --loss:      #f2555f;
+  --gold:      #d8b26a;
+  --gold-ink:  #d8b26a;
+  --bronze:    #c99a72;
+  --win:       #56c596;
+  --loss:      #ff6b6b;
   --win-ink:  color-mix(in oklab, var(--win) 85%, var(--text));
   --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
   --tag-ink-keep: 70%;
@@ -963,9 +963,9 @@
   --mdc-grey:   #9aa4b2;
   --mdc-chalk:  #ffffff;
 
-  --electric: #a7a3c2;
-  --violet:   #9c7cff;
-  --violet-ink: #b299ff;
+  --electric: #9ea8b6;
+  --violet:   #b49cff;
+  --violet-ink: #c6b6ff;
   --electric-ink: #081011;
   --electric-hi:  #b9fff4;
   --soft-ok:   #9be9bd;
@@ -977,18 +977,18 @@
   --shade: var(--recessed);
   --tint:  var(--text);
 
-  --accent-plate: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, var(--tint)), var(--accent));
-  --accent-plate-line: color-mix(in srgb, var(--accent) 70%, var(--tint));
+  --accent-plate: linear-gradient(135deg, #ff7a61, var(--accent));
+  --accent-plate-line: var(--accent-dk);
   --danger-plate: linear-gradient(135deg, color-mix(in srgb, var(--loss) 70%, var(--tint)), var(--loss));
   --danger-plate-line: color-mix(in srgb, var(--loss) 70%, var(--tint));
   --shimmer: color-mix(in srgb, var(--tint) 34%, transparent);
 
   --plate-grad: linear-gradient(168deg, var(--raised-2), var(--surface) 72%);
-  --sheen: inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent);
+  --sheen: none;
   --scrim: rgba(4,7,12,.74);
-  --shadow-1: 0 1px 2px rgba(0,0,0,.45);
-  --shadow:   inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -16px rgba(0,0,0,.72);
-  --shadow-3: 0 34px 78px -30px rgba(0,0,0,.9), 0 6px 18px -10px rgba(0,0,0,.6);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.28);
+  --shadow:   0 1px 2px rgba(0,0,0,.24);
+  --shadow-3: 0 28px 70px -34px rgba(0,0,0,.72);
 
   color-scheme: dark;
   color: var(--text);

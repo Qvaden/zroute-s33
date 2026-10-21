@@ -20459,7 +20459,7 @@ console.log('\nBH. Мёртвых объявлений в каскаде нет,
         mobile-fix-final.css), потому что порядок каскада держит доказательство
         нейтральности: он сверен именно для этих шести и пяти файлов. */
   equal('каскад сайта остаётся ряд из шести слоёв в заданном порядке', SITE,
-    ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css', 'src/refine.css', 'src/handbook.css']);
+    ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css', 'src/refine.css', 'src/handbook.css', 'src/redesign.css']);
   equal('каскад панели остаётся ряд из пяти слоёв без форумных заплаток', ADMIN,
     ['src/styles-v8.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css', 'src/controls.css', 'src/refine.css']);
 

@@ -1,0 +1,5095 @@
+/*
+  Z ROUTE: REDEMPTION — слой нового продуктового языка.
+
+  Он грузится после styles-v8 / forum / mobile / controls / refine: здесь
+  живут решения, которые обязаны выиграть каскад. Токены обеих тем остаются
+  в styles-v8.css, а этот слой раскладывает оболочку, форум и узкие экраны.
+  Никаких неоновых пятен, стекла и градиентных карточек: бумага, графит и
+  один сигнальный коралл.
+*/
+
+/* ── Оболочка ────────────────────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+html body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html body::before,
+html body::after{ display: none; }
+
+html h1,
+html h2,
+html h3,
+html h4{
+  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+
+html .panel{
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+html .panel::before{ display: none; }
+
+/* Убираем блики, которые принадлежали прежнему «командному центру». */
+html button::after,
+html .nav__link::after,
+html .seg__btn::after,
+html .cal__btn::after,
+html .tile::after,
+html .tl__gallery a::after,
+html .brand__num::after{ display: none !important; }
+
+html .site-head{
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  box-shadow: none !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+html .site-head:hover,
+html .site-head.is-scrolled{
+  border-bottom-color: var(--line);
+  box-shadow: none !important;
+}
+
+html .site-head__inner{
+  max-width: none;
+  height: 60px;
+  padding: 0 20px;
+  gap: 16px;
+}
+@media (min-width: 760px) {
+  html .site-head__inner{ padding: 0 32px; }
+}
+
+html .brand{ gap: 10px; padding: 0; }
+
+html .brand__num{
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.04em;
+}
+
+html .brand:hover .brand__num{ transform: none; }
+
+html .brand__text b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+html .brand__text small{
+  color: var(--mute);
+  font-family: Inter, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+html .head__where{ gap: 12px; }
+
+html .head__where b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+html .head__where span{
+  color: var(--mute);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .head__where::before{
+  content: '/';
+  color: var(--accent);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+html .theme-toggle{
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-xs);
+  border-color: var(--line);
+  background: transparent;
+  color: var(--mute);
+}
+
+html .theme-toggle:hover{
+  border-color: var(--dim);
+  background: transparent;
+  color: var(--text);
+}
+
+/* Левая колонка — оглавление, а не набор капсул. */
+html .side{
+  width: 240px;
+  gap: 0;
+  padding: 18px 16px 16px;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+}
+
+html .brand--side{
+  padding: 0 8px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+html .side .nav{
+  gap: 2px;
+  margin-top: 18px;
+}
+
+html .side .nav__link{
+  position: relative;
+  min-height: 34px;
+  padding: 7px 10px 7px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+html .side .nav__link:hover{
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
+  transform: none;
+}
+
+html .side .nav__link.is-active{
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+html .side .nav__link.is-active::before{
+  content: '';
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 2px;
+  border-radius: 0;
+  background: var(--accent);
+}
+
+html .nav__group{
+  margin: 18px 10px 6px 14px;
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+html .nav__group:first-child{ margin-top: 0; }
+
+html .side .nav__link--primary{ font-size: 13px; font-weight: 600; }
+
+html .nav__badge{
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 9px;
+}
+
+html .side .nav__link.is-active .nav__badge{
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html .side__foot{
+  padding: 14px 8px 0;
+  border-top-color: var(--line);
+}
+
+html .side__note{ font-size: 10px; letter-spacing: .02em; }
+
+@media (min-width: 1040px) {
+  html :root{ --side-w: 240px; }
+
+html body{ padding-left: 240px; }
+}
+
+/* ── Форум: шапка ────────────────────────────────────────────────────────── */
+html #app:has(.forum-layout){
+  max-width: 1480px;
+  padding-top: 36px;
+}
+
+html .forum-layout{
+  --forum-col: 316px;
+  gap: 0 40px;
+}
+@media (min-width: 1440px) {
+  html .forum-layout{ --forum-col: 336px; }
+}
+
+html .forum-head{
+  padding: 0 0 30px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0;
+}
+
+html .forum-head__id{
+  position: relative;
+  padding-left: 24px;
+  border-left: 2px solid var(--accent);
+}
+
+html .forum-head__id::before{
+  content: 'COMMUNITY / 01';
+  display: block;
+  margin-bottom: 14px;
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+
+html .forum-head__id .eyebrow{
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--accent-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+html .forum-head__title{
+  max-width: 14ch;
+  font-size: clamp(34px, 4.3vw, 58px);
+  font-weight: 600;
+  letter-spacing: -.055em;
+  line-height: .98;
+}
+
+html .forum-head__title span{
+  display: block;
+  color: var(--mute);
+}
+
+html .forum-head__note{
+  max-width: 46ch;
+  margin: 18px 0 0;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+html .forum-account{
+  align-self: start;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+html .forum-me{
+  gap: 12px;
+}
+
+html .forum-me__ava .forum-ava,
+html .forum-me__ava img{
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-xs);
+}
+
+html .forum-me__body b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+html .forum-me__body small{ color: var(--mute); font-size: 10px; }
+
+html .forum-bell{
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-xs);
+  border-color: var(--line);
+  background: transparent;
+}
+
+html .forum-authbox{
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+html .forum-authbox__sum{ padding: 14px 16px; }
+
+html .forum-authbox__sum-name b{ font-size: 13px; }
+
+html .forum-authbox__sum small{ font-size: 11px; }
+
+html .forum-authbox[open] .forum-authbox__sum{ border-bottom: 1px solid var(--line); }
+
+html .forum-auth{ padding: 16px; }
+
+/* ── Форум: лента и управление ───────────────────────────────────────────── */
+html .forum-main{ min-width: 0; }
+
+html .ctl--forum{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 16px;
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+html .forum-search{
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-search svg{
+  width: 16px;
+  height: 16px;
+  color: var(--mute);
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+}
+
+html .forum-search input{
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+}
+
+html .forum-search input::placeholder{ color: var(--mute); }
+
+html .forum-search:focus-within{ border-bottom-color: var(--accent); }
+
+html .ctl--forum > .seg--cat{ grid-column: 1; }
+
+html .ctl--forum .seg{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+html .ctl--forum .seg__btn{
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+html .ctl--forum .seg__btn:hover{
+  border-color: var(--line);
+  color: var(--text);
+  background: transparent;
+}
+
+html .ctl--forum .seg__btn.is-on{
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+}
+
+html .ctl--forum .seg--sort{
+  grid-column: 2;
+  justify-self: end;
+  margin-left: 0;
+}
+
+html .ctl--forum .seg--saved{ grid-column: 1 / -1; }
+
+html .ctl--forum .pick{ display: none; }
+
+html .forum-tag-filter{
+  grid-column: 1 / -1;
+  gap: 4px;
+  width: auto;
+  margin: 0;
+}
+
+html .forum-tag-filter .forum-tag,
+html .forum-post__tags .forum-tag{
+  min-height: 24px;
+  padding: 3px 2px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .forum-tag-filter .forum-tag:hover,
+html .forum-post__tags .forum-tag:hover{
+  border-bottom-color: var(--dim);
+  color: var(--text);
+  background: transparent;
+}
+
+html .forum-tag-filter .forum-tag.is-on{
+  border-bottom-color: var(--accent);
+  background: transparent;
+  color: var(--accent-ink);
+}
+
+/* ── Лента: непрерывный редакционный список ──────────────────────────────── */
+html .forum-feed{
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+html .forum-feed > .forum-post{
+  display: block;
+  margin: 0;
+  padding: 24px 0 26px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .forum-feed > .forum-post:hover{
+  background: color-mix(in srgb, var(--text) 1.6%, transparent);
+  transform: none;
+}
+
+html .forum-post--pinned,
+html .forum-post--trail{
+  border-color: var(--line);
+  background: transparent;
+}
+
+html .forum-post--pinned .forum-post__head::before{
+  content: '';
+  width: 14px;
+  height: 2px;
+  background: var(--accent);
+  flex: none;
+}
+
+html .forum-post--unread .forum-post__title{ font-weight: 600; }
+
+html .forum-post__head{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+html .forum-post__flags{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+html .forum-post__cat{
+  padding: 0 8px 0 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--accent-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+html .forum-post__head time{
+  color: var(--mute);
+  font-size: 10px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+html .forum-post__id{
+  color: var(--mute);
+  font-family: 'Space Grotesk', monospace;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .forum-post__pin,
+html .forum-post__trail,
+html .forum-post__new{
+  padding: 2px 6px;
+  border-radius: var(--r-hair);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+html .forum-post__trail,
+html .forum-post__new{
+  border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--line));
+  background: transparent;
+  color: var(--accent-ink);
+}
+
+html .forum-post__pin{
+  border: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 9px;
+}
+
+html .forum-post__title{
+  max-width: 30ch;
+  margin: 0 0 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(21px, 2.4vw, 30px);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+html .forum-post__title a:hover{ color: var(--accent-ink); }
+
+html .forum-post__body{
+  max-width: 68ch;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+html .forum-post__tags{ gap: 6px; margin: 0 0 10px; }
+
+html .forum-post__foot{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+html .forum-post__author{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+html .forum-post__author .forum-ava{
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-xs);
+}
+
+html .forum-post__by b{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+html .forum-post__by .forum-nick{ color: var(--text); }
+
+html .forum-post__by small,
+html .forum-post__by time{ color: var(--mute); font-size: 10px; }
+
+html .forum-post__tools{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+html .forum-post__tools .forum-react{ gap: 2px; }
+
+html .forum-post__tools .forum-react__btn{
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--mute);
+  font-size: 11px;
+}
+
+html .forum-post__tools .forum-react__btn:hover{
+  border-color: var(--line);
+  color: var(--text);
+}
+
+html .forum-post__tools .forum-react__btn.is-on{
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  background: transparent;
+  color: var(--accent-ink);
+}
+
+html .forum-post__comments,
+html .forum-post__views,
+html .forum-save,
+html .forum-act{
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--mute);
+  font-size: 11px;
+}
+
+html .forum-post__comments:hover,
+html .forum-save:hover,
+html .forum-act:hover{
+  border-color: var(--line);
+  color: var(--text);
+}
+
+html .forum-post__acts{ margin-left: 0; }
+
+html .forum-act-menu__list{ border-radius: var(--r-xs); }
+
+html .forum-post__expand{
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ── Форум: служебные полосы ─────────────────────────────────────────────── */
+html .forum-welcome,
+html .forum-starter{
+  margin: 0;
+  padding: 16px 0 16px 18px;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-welcome__mark{ display: none; }
+
+html .forum-welcome__body b{ font-family: 'Space Grotesk', sans-serif; font-size: 14px; }
+
+html .forum-welcome__body p{ max-width: 62ch; margin-top: 4px; }
+
+html .forum-welcome .forum-btn{ align-self: start; }
+
+html .forum-composer{
+  margin: 18px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: transparent;
+}
+
+html .forum-composer__summary{
+  min-height: 48px;
+  padding: 12px 14px;
+  background: transparent;
+}
+
+html .forum-composer__summary b{ font-size: 13px; }
+
+html .forum-composer__plus{
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-hair);
+  background: transparent;
+  color: var(--accent-ink);
+}
+
+html .forum-composer[open] .forum-composer__summary{ border-bottom: 1px solid var(--line); }
+
+html .forum-composer form{ padding: 16px 14px; }
+
+html .forum-empty,
+html .forum-feed__error{
+  margin: 0;
+  padding: 32px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Правая колонка: контекст без карточек ───────────────────────────────── */
+html @media (min-width: 1180px){
+  .forum-side {
+    top: 60px;
+    max-height: calc(100vh - 76px);
+    padding: 0;
+    gap: 0;
+  }
+}
+
+html .forum-side > .panel,
+html .forum-side > .hero{
+  margin: 0;
+  padding: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .forum-side > .panel:last-child{ border-bottom: 1px solid var(--line); }
+
+html .forum-side > .hero::after{ display: none; }
+
+html .forum-side .eyebrow{
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+html .forum-side .panel__head h2,
+html .forum-side .forum-chron__title{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+}
+
+html .forum-side .forum-chron__stats{
+  gap: 0;
+  margin: 14px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+html .forum-side .forum-chron__stat{
+  padding: 10px 8px;
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-side .forum-chron__stat b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+html .forum-side .forum-chron__stat span{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .forum-side .forum-chron__feed{ gap: 0; }
+
+html .forum-side .forum-chron__item{
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+html .forum-side .forum-chron__more{
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+html .forum-side .forum-lead__row,
+html .forum-side .forum-rules__summary{ border-radius: 0; }
+
+/* ── Узкий экран ─────────────────────────────────────────────────────────── */
+html @media (max-width: 1179px){
+  .forum-layout {
+    display: block;
+  }
+  .forum-head {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 24px;
+  }
+  .forum-account { max-width: 520px; }
+  .forum-side {
+    margin-top: 32px;
+    padding: 0;
+  }
+}
+
+@media (max-width: 759px) {
+  html #app:has(.forum-layout){ padding-top: 22px; }
+
+html .site-head__inner{ height: 56px; padding: 0 16px; }
+
+html .forum-head__id{ padding-left: 16px; }
+
+html .forum-head__title{
+    max-width: 12ch;
+    font-size: clamp(31px, 9vw, 40px);
+    line-height: 1;
+  }
+
+html .forum-head__id::before{ margin-bottom: 10px; font-size: 8px; }
+
+html .forum-head__note{ margin-top: 14px; font-size: 13px; }
+
+html .forum-layout{ gap: 0; }
+
+html .forum-head__id{ border-left-width: 2px; }
+
+html .ctl--forum{
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px 0;
+  }
+
+html .ctl--forum > .seg--cat{ display: none; }
+
+html .ctl--forum .pick{
+    display: flex;
+    grid-column: 1;
+    justify-self: start;
+  }
+
+html .ctl--forum .seg--sort{
+    grid-column: 1;
+    justify-self: start;
+  }
+
+html .ctl--forum .seg--saved,
+html .forum-tag-filter{ grid-column: 1; }
+
+html .forum-tag-filter{
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+html .forum-tag-filter::-webkit-scrollbar{ display: none; }
+
+html .forum-tag-filter .forum-tag{ flex: 0 0 auto; }
+
+html .forum-feed > .forum-post{ padding: 20px 0 22px; }
+
+html .forum-post__head{ gap: 6px 8px; margin-bottom: 10px; }
+
+html .forum-post__id{ display: none; }
+
+html .forum-post__cat{ font-size: 9px; }
+
+html .forum-post__head time{ font-size: 9px; }
+
+html .forum-post__title{
+    max-width: none;
+    margin-bottom: 10px;
+    font-size: clamp(20px, 5.7vw, 25px);
+    line-height: 1.16;
+  }
+
+html .forum-post__body{ font-size: 14px; line-height: 1.6; }
+
+html .forum-post__foot{
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 12px;
+  }
+
+html .forum-post__tools{
+    justify-content: flex-start;
+    gap: 4px;
+  }
+
+html .forum-post__tools .forum-react__btn{ padding: 4px 6px; }
+
+html .forum-post__views{ display: none; }
+
+html .forum-composer{ margin-top: 14px; }
+
+html .forum-side{ margin-top: 24px; }
+
+html .tabbar{
+    border-top-color: var(--line);
+    background: color-mix(in srgb, var(--bg) 96%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+html .tabbar__link.is-active::before,
+html .is-side-open .tabbar__more::before{
+    background: var(--accent);
+  }
+}
+
+@media (max-width: 390px) {
+  html .forum-head__title{ font-size: 30px; }
+
+html .forum-post__flag,
+html .forum-post__pin{ display: none; }
+
+html .forum-post__tools .forum-react{ width: 100%; }
+}
+
+/* ── Форум: раскрытая тема, ответы и окна ───────────────────────────────── */
+/*
+  Лента заканчивается там, где начинается разговор. Раскрытый пост не получает
+  вторую карточку: ниже идёт продолжение той же публикации, отделённое линией.
+  Ответы — не мини-карточки, а строки с общей осью аватара.
+*/
+html .forum-post:has(.forum-thread){
+  padding-bottom: 38px;
+}
+
+html .forum-post:has(.forum-thread) .forum-post__title{
+  max-width: 34ch;
+  font-size: clamp(25px, 3.1vw, 38px);
+  line-height: 1.08;
+}
+
+html .forum-post:has(.forum-thread) .forum-post__body{
+  max-width: 72ch;
+  color: var(--text);
+}
+
+html .forum-thread{
+  margin: 28px 0 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+}
+
+html .forum-thread__title{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 0;
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+html .forum-thread__title::after{
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-soft);
+}
+
+html .forum-thread__list{
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+html .forum-comment{
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 14px;
+  margin: 0;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-comment:last-child{
+  border-bottom: 0;
+}
+
+html .forum-comment .forum-ava{
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-xs);
+}
+
+html .forum-comment--none{
+  display: block;
+  padding: 20px 0;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+html .forum-comment__body{
+  min-width: 0;
+}
+
+html .forum-comment__head{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 0 7px;
+}
+
+html .forum-comment__head b{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+html .forum-comment__head time{
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .forum-comment__body p{
+  max-width: 68ch;
+  margin: 0 0 8px;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+html .forum-comment__body :last-child{
+  margin-bottom: 0;
+}
+
+html .forum-comment__foot{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+html .forum-comment__foot .forum-react__btn,
+html .forum-comment__foot .forum-act{
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html .forum-comment__foot .forum-react__btn:hover,
+html .forum-comment__foot .forum-act:hover{
+  border-color: var(--line);
+  color: var(--text);
+}
+
+html .forum-thread__list > .forum-comment:last-of-type + .forum-reply{
+  margin-top: 10px;
+}
+
+html .forum-reply{
+  margin: 0;
+  padding: 22px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+}
+
+html .forum-reply .forum-editor{
+  min-height: 88px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: var(--recessed);
+  color: var(--text);
+}
+
+html .forum-reply .forum-editor:focus{
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+html .forum-reply .forum-md{
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-reply__actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+html .forum-reply__actions .forum-btn{
+  min-height: 38px;
+  padding: 8px 16px;
+}
+
+html .forum-reply__locked{
+  margin: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 12px;
+}
+
+/* Опрос — часть публикации, а не отдельная карточка. */
+html .forum-poll{
+  margin: 22px 0 4px;
+  padding: 16px 0 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-poll__head{
+  margin-bottom: 12px;
+}
+
+html .forum-poll__question{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+}
+
+html .forum-poll__total{
+  margin-left: auto;
+  color: var(--mute);
+  font-size: 10px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+html .forum-poll__options{
+  gap: 3px;
+}
+
+html .forum-poll__opt{
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+}
+
+html .forum-poll__opt:hover{
+  border-color: var(--line-soft);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+}
+
+html .forum-poll__opt.is-on{
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: transparent;
+}
+
+html .forum-poll__bar{
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+html .forum-poll__num{
+  font-size: 10px;
+}
+
+html .forum-poll__hint{
+  margin-top: 10px;
+  color: var(--mute);
+  font-size: 11px;
+}
+
+/* Окна жалобы и удаления: документ поверх страницы, не всплывающая карточка. */
+html .forum-modal{
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+html .forum-modal__box{
+  max-width: 540px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+html .forum-modal__box h3{
+  margin: 0 0 20px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+}
+
+html .forum-modal__rules{
+  gap: 0;
+  margin-bottom: 20px;
+  border-top: 1px solid var(--line);
+}
+
+html .forum-modal__rule{
+  gap: 12px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .forum-modal__rule:hover{
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+
+html .forum-modal__rule:has(input:checked){
+  border-color: var(--line-soft);
+  background: transparent;
+}
+
+html .forum-modal__rule input{
+  accent-color: var(--accent);
+}
+
+html .forum-modal__rule b{
+  font-size: 12px;
+  font-weight: 600;
+}
+
+html .forum-modal__rule small{
+  color: var(--mute);
+  font-size: 11px;
+}
+
+html .forum-modal__actions{
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+html .forum-modal__actions .forum-btn{
+  min-height: 40px;
+  padding: 8px 16px;
+}
+
+html .forum-modal .forum-field{
+  margin-top: 14px;
+}
+
+html .forum-modal .forum-field input{
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: var(--bg);
+}
+
+html .forum-modal .forum-field input:focus{
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+/* ── Не-форум: редакционная система страниц ─────────────────────────────── */
+/*
+  Форум задал язык: крупный заголовок, спокойные линии, metadata вторична,
+  поверхности не спорят с содержимым. Этот блок переносит ту же систему на
+  рейтинг, летопись, календарь, турниры и остальные разделы. Селекторы уже
+  начинаются с html: новый слой обязан выигрывать каскад без !important.
+*/
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero{
+  min-height: 0;
+  padding: 0 0 28px;
+  margin: 0 0 24px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero::before,
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero::after,
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__media{
+  display: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__top{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 32px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__ident{
+  min-width: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__week{
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 14px 0 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__word{
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__num{
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(56px, 6.5vw, 80px);
+  font-weight: 600;
+  letter-spacing: -.075em;
+  line-height: .86;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__dates{
+  margin-top: 14px;
+  color: var(--mute);
+  font-size: 11px;
+  letter-spacing: .06em;
+  line-height: 1.55;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__sep{
+  margin: 0 6px;
+  color: var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 22px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__cta{
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__cta--primary{
+  border-bottom-color: var(--accent);
+  color: var(--accent-ink);
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__cta:hover{
+  border-bottom-color: var(--text);
+  background: transparent;
+  color: var(--text);
+  transform: none;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud{
+  margin: 0;
+  padding: 0 0 0 24px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 18px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source-label{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source-value{
+  color: var(--dim);
+  font-size: 11px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stats{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat{
+  padding: 0;
+  border: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat dt{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat dd{
+  margin: 4px 0 0;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+  line-height: 1;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat dd.is-word{
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader{
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 28px 0 0;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader__crown{
+  display: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader__body{
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader__label{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader__name{
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader__meta{
+  color: var(--mute);
+  font-size: 11px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .leader__pts{
+  color: var(--gold-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore__cell{
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 18px 0;
+  border: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore__cell + .weekscore__cell{
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore__cell b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore__cell span{
+  color: var(--mute);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .who{
+  margin-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .who__summary{
+  padding: 14px 0;
+  color: var(--mute);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .who__hint{
+  margin-left: 10px;
+  font-weight: 400;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .split{
+  gap: 32px;
+  padding: 0 0 20px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .split__title{
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .split__count{
+  color: var(--text);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .split__bar{
+  background: var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tiles{
+  gap: 6px;
+  margin-top: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tile{
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .who__more{
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--accent-ink);
+  font-size: 11px;
+}
+
+/* Панели перестают быть одинаковыми карточками: это поверхности-разделы. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel{
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel::before{
+  display: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel:hover{
+  border-color: var(--line);
+  box-shadow: none;
+  transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel__head{
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel__head p{
+  max-width: 68ch;
+  margin-top: 6px;
+  color: var(--mute);
+  font-size: 12px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel__title,
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel__head h1{
+  margin: 4px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(32px, 4vw, 46px);
+  font-weight: 600;
+  letter-spacing: -.055em;
+  line-height: .98;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel__head h2{
+  margin: 4px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+  line-height: 1.05;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .eyebrow{
+  color: var(--accent-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) #app > .panel:not(.chat-empty):first-child{
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) #app > .panel:not(.chat-empty):first-child > .panel__head{
+  padding-bottom: 18px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .home__row{
+  align-items: start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel--utility{
+  padding: 24px;
+}
+
+/* Управление: поиск и фильтры — строка инструмента, а не набор капсул. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .ctl{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .search{
+  display: flex;
+  flex: 1 1 240px;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .search:focus-within{
+  border-bottom-color: var(--accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .search input{
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  outline: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .search input::placeholder{
+  color: var(--mute);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .seg{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .seg__btn{
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .seg__btn:hover{
+  border-color: var(--dim);
+  background: transparent;
+  color: var(--text);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .seg__btn.is-on{
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .pick{
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .pick__btn{
+  min-height: 34px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .pick__menu{
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: var(--overlay);
+  box-shadow: var(--shadow-3);
+}
+
+/* Рейтинг: таблица читается как турнирная ведомость, а не как карточки. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad{
+  border-top: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__head{
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__row{
+  min-height: 48px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color .14s ease;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__row:hover{
+  border-color: var(--line-soft);
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+  transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__place b{
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__name{
+  font-size: 13px;
+  font-weight: 500;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__pts{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .lad__count{
+  margin-top: 10px;
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .panel--race{
+  margin-top: 24px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .race__summary{
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* Летопись: дата — якорь, событие — строка на оси. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero--tl{
+  padding-top: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero--tl .tl__title{
+  max-width: 18ch;
+  margin: 8px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(34px, 4.4vw, 54px);
+  font-weight: 600;
+  letter-spacing: -.06em;
+  line-height: .96;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide__sub{
+  max-width: 58ch;
+  margin-top: 14px;
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stats{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 24px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat{
+  padding: 14px 20px 14px 0;
+  border: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat + .tl__stat{
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat span{
+  display: block;
+  margin-top: 4px;
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .trophies{
+  gap: 8px;
+  margin-top: 16px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .trophy{
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .trophy__num{
+  color: var(--gold-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .verdict{
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .verdict__week{
+  font-size: 9px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .verdict__week b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .verdict__text{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -.025em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .verdict__dates{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wl__item,
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__item{
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__item:hover{
+  border-color: var(--line-soft);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+  transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__dot{
+  width: 6px;
+  height: 6px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__item .tl__title{
+  font-size: 14px;
+  font-weight: 600;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__type{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__meta{
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__comments-toggle{
+  margin-left: 22px;
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__year{
+  margin-top: 24px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__group-head{
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__group-name{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl__group-count{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+/* Календарь и турниры: повестка, а не карточки. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal-tabs{
+  gap: 4px;
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal-tab{
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal-tab.is-active{
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal-day{
+  margin-top: 24px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal-day__head{
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .evt-card{
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .evt-card__title{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -.025em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .evt-card__meta{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .evt-card__side{
+  align-items: flex-end;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .evt-link{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal-none{
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--mute);
+  font-size: 12px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tour-list{
+  margin-top: 12px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tour-card{
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tour-score{
+  gap: 16px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tour-side b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tour-gen{
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Пустые состояния и одинокие панели не изображают дашборд. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .chat-empty{
+  width: min(620px, 100%);
+  margin: 40px auto;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .chat-empty .panel__head,
+html body:not([data-route="forum"]):not([data-route="bot"]) .chat-empty h1{
+  border: 0;
+}
+
+@media (max-width: 1023px) {
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hero__top{
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hud{
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stats{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .home__row--lead{
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hero__num{
+    font-size: 56px;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stats{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .leader{
+    flex-wrap: wrap;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .leader__pts{
+    margin-left: auto;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .panel{
+    padding: 18px;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stats{
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .tl__stat + .tl__stat{
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .evt-card{
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .evt-card__side{
+    grid-column: 2;
+    align-items: flex-start;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore{
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .weekscore__cell + .weekscore__cell{
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* Главная: текущая неделя — строка состояния, рейтинг — ведомость. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .live{
+  padding: 24px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__row{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__item{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__item + .live__item{
+  padding-left: 20px;
+  border-left: 1px solid var(--line-soft);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__label{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__value{
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+  line-height: 1.2;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__note{
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__more{
+  color: var(--accent-ink);
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__dots{
+  gap: 3px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__dot{
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  background: var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .live__dot.is-on{
+  background: var(--accent);
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__top{
+  margin: 0;
+  padding: 13px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__top:hover{
+  border-color: var(--line-soft);
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+  transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__head{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__place{
+  min-width: 28px;
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__top:first-child .rank__place{
+  color: var(--accent-ink);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__name{
+  overflow: hidden;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__pts{
+  margin-left: auto;
+  color: var(--win);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__facts{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 5px 0 0 36px;
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__facts .tag{
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .rank__more{
+  color: var(--accent-ink);
+  font-size: 10px;
+}
+
+/* Хронология: страница получает собственный заголовок и спокойный маршрут. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-page{
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-page__title{
+  max-width: 16ch;
+  margin: 8px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(38px, 5vw, 58px);
+  font-weight: 600;
+  letter-spacing: -.065em;
+  line-height: .94;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-now{
+  padding: 20px 0 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-now .verdict{
+  padding-top: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-now .verdict__text{
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-now .verdict__week b{
+  font-size: 42px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal{
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal__label{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal__row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal__btn{
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal__btn:hover{
+  border-color: var(--dim);
+  background: transparent;
+  color: var(--text);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .cal__btn.is-on{
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wks{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wks > li{
+  margin: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wk{
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wks__more{
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-trophies{
+  margin-top: 4px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .tl-trophies__title{
+  margin: 6px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 600;
+  letter-spacing: -.045em;
+  line-height: 1;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .ctl--tl{
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .seg--type{
+  gap: 4px;
+}
+
+@media (max-width: 900px) {
+  html body:not([data-route="forum"]):not([data-route="bot"]) .live__row{
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .live__item{
+    padding: 14px 0;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .live__item + .live__item{
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .rank__facts{
+    margin-left: 0;
+  }
+}
+
+/* Светлая тема: бумага без миллиметровки и без залитых пунктов меню. */
+:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"]){
+  background: var(--bg);
+}
+
+:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"])::before{
+  background: none;
+}
+
+:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"])::after{
+  opacity: 0;
+}
+
+:root[data-theme="light"] .nav__link.is-active{
+  border-radius: 0;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  color: var(--accent-ink);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+:root[data-theme="light"] .nav__link.is-active:hover{
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-ink);
+}
+
+/* Гайды: фильтры и справочник живут в той же сетке линий, что и форум. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-cats{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 18px 0 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-chip{
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-chip:hover{
+  border-color: var(--dim);
+  background: transparent;
+  color: var(--text);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-chip.is-on{
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-search,
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-search{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 560px;
+  min-height: 38px;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-search:focus-within,
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-search:focus-within{
+  border-bottom-color: var(--accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-search input,
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-search input{
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  outline: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-list{
+  margin: 10px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-card{
+  display: block;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-card:hover{
+  border-color: var(--line-soft);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+  transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-card__cat,
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-card__by{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-card__title{
+  display: block;
+  margin: 4px 0 2px;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-handbook{
+  margin-top: 34px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .guide-handbook > .panel__head{
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-grid{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 16px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile{
+  padding: 14px 16px 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile a{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 100%;
+  color: var(--text);
+  text-decoration: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -.025em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile__kind{
+  color: var(--accent-ink);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile__lead{
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Аккаунты: витрина наследует коралл и графит, а не живёт отдельной биржей. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-hero{
+  align-items: start;
+  gap: 24px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-eyebrow{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-eyebrow__dot{
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-hero__cta{
+  min-height: 32px;
+  padding: 0 0 3px;
+  border: 0;
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-ink);
+  box-shadow: none;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-hero__cta:hover{
+  border-color: var(--text);
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  transform: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stats{
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stat{
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stat + .accounts-stat{
+  border-left: 1px solid var(--line);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stat b{
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stat span{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-notice{
+  margin: 0 0 8px;
+  padding: 12px 16px;
+  border: 0;
+  border-left: 2px solid var(--gold);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-controls{
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-chip{
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-chip.is-on{
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-search{
+  flex: 1 1 260px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-search input{
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  outline: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-controls__sold{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-empty{
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-xs);
+  background: transparent;
+}
+
+@media (max-width: 1023px) {
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hb-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  html body:not([data-route="forum"]):not([data-route="bot"]) .hb-grid{
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-hero{
+    display: flex;
+    flex-direction: column;
+  }
+  html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stats{
+    width: 100%;
+  }
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile a{
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hb-tile a:hover{
+  border: 0;
+  color: var(--accent-ink);
+  transform: none;
+}
+
+:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"]) .hero{
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"]) .hero__num{
+  background: none;
+  color: var(--text);
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+}
+
+:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"]) .leader{
+  background: transparent;
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-stat dd{
+  margin: 4px 0 0;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+  line-height: 1.1;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .accounts-hero__cta{
+  align-self: flex-start;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel{
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel .wk__num,
+html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel .wk__what{
+  color: var(--on-accent);
+}
+
+@media (max-width: 759px) {
+  html .president-board{
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 8px 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--bg);
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 767px) {
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__row{
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "place ident wl"
+      "place form pts";
+    align-items: center;
+    gap: 6px 10px;
+    min-height: 0;
+    padding: 12px 0;
+  }
+
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__place{
+    grid-area: place;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    align-self: start;
+  }
+
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__ident{
+    grid-area: ident;
+    flex-wrap: wrap;
+    gap: 5px 7px;
+  }
+
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__form{
+    grid-area: form;
+  }
+
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__wl{
+    grid-area: wl;
+    justify-self: end;
+  }
+
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__pts{
+    grid-area: pts;
+    justify-self: end;
+    margin-left: 0;
+  }
+
+  html body:not([data-route="forum"]):not([data-route="bot"]) .lad__spark{
+    display: none;
+  }
+}
+
+/* ── Кварт: тот же редакционный язык, но отдельный тёмный остров ──────────── */
+/*
+  Кварт остаётся самостоятельным зачётом и тёмной сценой: контракт держит его
+  палитру отдельно от темы. Меняется композиция — вместо витрины с бликами и
+  подъёмом карточек идёт плоская турнирная таблица с крупным счётом.
+*/
+html body[data-route="quarter"] .quart-page{
+  padding: 0;
+  background: var(--bg);
+}
+
+html .quart-hero{
+  min-height: 0;
+  margin: 0;
+  padding: 30px 0 24px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-hero::before,
+html .quart-hero__glow{
+  display: none;
+}
+
+html .quart-hero__top{
+  align-items: flex-end;
+  gap: 28px;
+}
+
+html .quart-hero__copy{
+  min-width: 0;
+}
+
+html .quart-kicker{
+  color: var(--quart-quiet);
+  font-size: 9px;
+  letter-spacing: .18em;
+}
+
+html .quart-kicker i{
+  width: 18px;
+  height: 1px;
+  background: var(--quart-acid);
+  box-shadow: none;
+}
+
+html .quart-hero h1{
+  max-width: 12ch;
+  margin: 12px 0 10px;
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(36px, 6vw, 64px);
+  font-weight: 600;
+  line-height: .98;
+  letter-spacing: -.06em;
+  text-transform: uppercase;
+}
+
+html .quart-hero__copy p{
+  max-width: 54ch;
+  margin: 0;
+  color: var(--quart-body);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+html .quart-dial{
+  min-width: 0;
+  padding: 4px 0 4px 20px;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--quart-head) 18%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-dial span{
+  color: var(--quart-quiet);
+  font-size: 8px;
+  letter-spacing: .18em;
+}
+
+html .quart-dial b{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.06em;
+}
+
+html .quart-dial small{
+  color: var(--quart-quiet);
+  font-size: 9px;
+}
+
+html .quart-hero__bottom{
+  margin-top: 24px;
+  padding-top: 13px;
+  border-top: 1px solid color-mix(in srgb, var(--quart-head) 10%, transparent);
+}
+
+html .quart-hero__bottom > span:first-child{
+  color: var(--quart-body);
+  font-size: 11px;
+}
+
+html .quart-hero__countdown{
+  color: var(--quart-quiet);
+  font-size: 10px;
+}
+
+html .quart-countdown-num{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+html .quart-hero__legend{
+  gap: 4px;
+}
+
+html .quart-led{
+  width: 18px;
+  height: 2px;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--quart-quiet) 45%, transparent);
+  box-shadow: none;
+}
+
+html .quart-led--on{
+  background: var(--quart-acid);
+  box-shadow: none;
+}
+
+html .quart-podium{
+  margin: 0;
+  padding: 28px 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-podium::before{
+  display: none;
+}
+
+html .quart-podium__heading{
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+
+html .quart-podium__heading h2{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+
+html .quart-section-label,
+html .quart-podium__note{
+  color: var(--quart-quiet);
+  font-size: 9px;
+  letter-spacing: .15em;
+}
+
+html .quart-podium__grid{
+  gap: 0;
+  border-top: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
+}
+
+html .quart-podium-card{
+  min-height: 0;
+  padding: 16px;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--quart-head) 10%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-podium-card:last-child{
+  border-right: 0;
+}
+
+html .quart-podium-card:hover{
+  transform: none;
+  border-color: color-mix(in srgb, var(--quart-head) 10%, transparent);
+  box-shadow: none;
+}
+
+html .quart-podium-card--gold{
+  border-top: 2px solid var(--quart-acid);
+  background: transparent;
+}
+
+html .quart-podium-card--silver{
+  border-top: 2px solid var(--quart-cyan);
+  background: transparent;
+}
+
+html .quart-podium-card--bronze{
+  border-top: 2px solid color-mix(in srgb, var(--quart-quiet) 55%, transparent);
+}
+
+html .quart-podium-card__medal{
+  display: none;
+}
+
+html .quart-podium-card__place{
+  color: var(--quart-quiet);
+  font-size: 9px;
+  letter-spacing: .14em;
+}
+
+html .quart-podium-card__tag{
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--tag-color, var(--quart-acid)) 70%, var(--quart-head));
+  font-size: 9px;
+}
+
+html .quart-podium-card b{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+
+html .quart-podium-card__meta{
+  color: var(--quart-quiet);
+  font-size: 10px;
+}
+
+html .quart-podium-card strong{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html .quart-board{
+  margin: 0;
+  padding: 28px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-board::after{
+  display: none;
+}
+
+html .quart-board__head{
+  align-items: baseline;
+  margin-bottom: 0;
+}
+
+html .quart-board__head h2{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+
+html .quart-board__head p{
+  max-width: 42ch;
+  margin: 6px 0 0;
+  color: var(--quart-quiet);
+  font-size: 11px;
+}
+
+html .quart-controls{
+  margin: 18px 0 0;
+  padding: 0 0 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
+}
+
+html .quart-controls .search{
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 18%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .quart-controls .search input{
+  color: var(--quart-head);
+}
+
+html .quart-controls .seg{
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .quart-controls .seg__btn{
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--quart-quiet);
+  font-size: 10px;
+}
+
+html .quart-controls .seg__btn.is-on{
+  background: transparent;
+  color: var(--quart-head);
+  box-shadow: inset 0 -1px 0 var(--quart-acid);
+}
+
+html .quart-grid{
+  gap: 0;
+  border-top: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
+}
+
+html .quart-card{
+  min-height: 0;
+  padding: 16px;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--quart-head) 8%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 8%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-card:nth-child(4n){
+  border-right: 0;
+}
+
+html .quart-card:hover{
+  transform: none;
+  border-color: color-mix(in srgb, var(--quart-head) 8%, transparent);
+  background: color-mix(in srgb, var(--quart-head) 3%, transparent);
+  box-shadow: none;
+}
+
+html .quart-card--m1{
+  border-top: 2px solid var(--quart-acid);
+  background: transparent;
+  box-shadow: none;
+}
+
+html .quart-card--m2{
+  border-top: 2px solid var(--quart-cyan);
+}
+
+html .quart-card--m3{
+  border-top: 2px solid color-mix(in srgb, var(--quart-quiet) 55%, transparent);
+}
+
+html .quart-card--off{
+  opacity: .42;
+}
+
+html .quart-card__rank{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+html .quart-card__tag{
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--tag-color, var(--quart-acid)) 70%, var(--quart-head));
+  font-size: 9px;
+}
+
+html .quart-card__streak-slot{
+  color: var(--quart-quiet);
+}
+
+html .quart-streak--win{
+  color: var(--quart-acid);
+}
+
+html .quart-streak--loss{
+  color: var(--quart-loss);
+}
+
+html .quart-card__name{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+}
+
+html .quart-card__form .dot{
+  width: 5px;
+  height: 12px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html .quart-card__bottom strong{
+  color: var(--quart-head);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html .quart-card__bottom strong small{
+  color: var(--quart-quiet);
+  font-family: Inter, sans-serif;
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+
+html .quart-count{
+  margin-top: 16px;
+  color: var(--quart-quiet);
+  font-size: 10px;
+}
+
+/* ── О проекте: документ с нумерацией, а не набор плиток ─────────────────── */
+html body[data-route="about"] .about-page{
+  counter-reset: about-section about-card;
+}
+
+html .about-page .about-panel{
+  margin: 0;
+  padding: 30px 0 34px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .about-page .about-panel:first-child{
+  padding-top: 10px;
+}
+
+html .about-page .about-panel + .about-panel{
+  counter-increment: about-section;
+}
+
+html .about-page .about-panel > h1{
+  max-width: 14ch;
+  margin: 10px 0 18px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(42px, 6.5vw, 72px);
+  font-weight: 600;
+  line-height: .98;
+  letter-spacing: -.065em;
+}
+
+html .about-page .about-panel > h1::before{
+  content: '33 /';
+  display: block;
+  margin-bottom: 12px;
+  color: var(--accent-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .18em;
+}
+
+html .about-page .about-panel > h2{
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  max-width: 30ch;
+  margin: 0 0 16px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(23px, 3vw, 32px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -.04em;
+}
+
+html .about-page .about-panel > h2::before{
+  content: counter(about-section, decimal-leading-zero);
+  flex: none;
+  color: var(--accent-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+}
+
+html .about-page .about-panel p{
+  max-width: 72ch;
+  margin: 0 0 12px;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+html .about-page .about-panel p:last-child{
+  margin-bottom: 0;
+}
+
+html .about-page .about-panel a{
+  color: var(--accent-ink);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+html .about-page .about-panel a:hover{
+  border-bottom-color: var(--accent);
+}
+
+html .about-page .about-grid{
+  counter-reset: about-card;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 20px 0 18px;
+  border-top: 1px solid var(--line);
+}
+
+html .about-page .about-card{
+  counter-increment: about-card;
+  min-width: 0;
+  padding: 16px 18px 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .about-page .about-card:nth-child(3n){
+  padding-right: 0;
+}
+
+html .about-page .about-card h3{
+  margin: 0 0 8px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+}
+
+html .about-page .about-card h3::before{
+  content: counter(about-card, decimal-leading-zero) ' / ';
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .1em;
+}
+
+html .about-page .about-card h3 a{
+  border-bottom: 0;
+  color: var(--text);
+}
+
+html .about-page .about-card h3 a:hover{
+  color: var(--accent-ink);
+}
+
+html .about-page .about-card p{
+  margin: 0;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+html .about-page .about-panel--privacy{
+  margin: 24px 0;
+  padding: 22px 0 22px 20px;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+/* ── Обновления: журнал изменений, а не лента карточек ───────────────────── */
+html body[data-route="updates"] .upd-page{
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .upd-page > .panel__head{
+  margin: 0;
+  padding: 8px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+html .upd-page > .panel__head h1{
+  max-width: 18ch;
+  margin: 8px 0 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(34px, 5vw, 56px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+
+html .upd-page > .panel__head p{
+  max-width: 66ch;
+  margin: 0;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+html .upd-page .feed{
+  margin: 30px 0 0;
+}
+
+html .upd-page .feed__head{
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 10px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+}
+
+html .upd-page .feed__head::before{
+  content: '01';
+  color: var(--accent-ink);
+  font-size: 9px;
+  letter-spacing: .12em;
+}
+
+html .upd-page .feed__hint{
+  max-width: 70ch;
+  margin: 0 0 16px;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+html .upd-page .feed-list{
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+html .upd-page .feed-card{
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .upd-page .feed-card__phase{
+  grid-row: 1 / 4;
+  align-self: start;
+  padding-top: 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+html .upd-page .feed-card__title{
+  grid-column: 2;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.015em;
+}
+
+html .upd-page .feed-card__when,
+html .upd-page .feed-card__left{
+  grid-column: 3;
+  justify-self: end;
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+html .upd-page .feed-card__text{
+  grid-column: 2 / 4;
+  max-width: 72ch;
+  margin: 2px 0 0;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+html .upd-page .feed-card__source,
+html .upd-page .feed-card__action{
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+
+html .upd-page .feed-card__action{
+  color: var(--mute);
+}
+
+html .upd-page .feed__error,
+html .upd-page .feed__run,
+html .upd-page .feed-none{
+  margin: 10px 0 0;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+html .upd-page .upd-new{
+  margin: 20px 0 0;
+}
+
+html .upd-page .upd-form{
+  margin: 24px 0 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+}
+
+html .upd-page .upd-form__lead{
+  max-width: 72ch;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+html .upd-page .upd-field{
+  margin-bottom: 14px;
+}
+
+html .upd-page .upd-field > small{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html .upd-page .upd-field input,
+html .upd-page .upd-field textarea,
+html .upd-page .upd-field select{
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: var(--bg);
+}
+
+html .upd-page .upd-field input:focus,
+html .upd-page .upd-field textarea:focus,
+html .upd-page .upd-field select:focus{
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+html .upd-page .upd-card{
+  display: block;
+  margin: 0;
+  padding: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .upd-page .upd-card__head{
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+html .upd-page .upd-kind{
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+html .upd-page .upd-card__date,
+html .upd-page .upd-card__version{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .upd-page .upd-card__title{
+  max-width: 38ch;
+  margin: 0 0 8px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+
+html .upd-page .upd-card__text{
+  max-width: 72ch;
+  margin: 0 0 14px;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.68;
+}
+
+html .upd-page .upd-card__foot{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+html .upd-page .upd-card__source,
+html .upd-page .upd-card__by,
+html .upd-page .upd-card__action{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html .upd-page .upd-card__source{
+  color: var(--accent-ink);
+}
+
+html .upd-page .upd-page__foot{
+  margin: 28px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+html .upd-page .upd-page__foot p{
+  max-width: 74ch;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ── Детальный гайд: аналитика, роли и дополнительные блоки ──────────────── */
+html body[data-route="guide"] .hero--guide{
+  min-height: 0;
+  margin: 0;
+  padding: 24px 0 22px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="guide"] .hero--guide::before,
+html body[data-route="guide"] .hero--guide::after{
+  display: none;
+}
+
+html body[data-route="guide"] .hero--guide .tl__title{
+  max-width: 18ch;
+  margin: 8px 0 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(34px, 5.2vw, 58px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+
+html body[data-route="guide"] .guide__sub,
+html body[data-route="guide"] .guide__lead{
+  max-width: 64ch;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+html body[data-route="guide"] .proofs{
+  gap: 0;
+  margin: 24px 0 30px;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="guide"] .proof{
+  padding: 16px 18px 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body[data-route="guide"] .proof__label{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+html body[data-route="guide"] .proof__row{
+  font-size: 11px;
+}
+
+html body[data-route="guide"] .proof__val{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+html body[data-route="guide"] .proof__bar{
+  height: 6px;
+  border-radius: 0;
+}
+
+html body[data-route="guide"] .roles-panel{
+  margin: 30px 0 0;
+  padding: 24px 22px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
+}
+
+html body[data-route="guide"] .roles-grid{
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="guide"] .role-card{
+  min-height: 0;
+  padding: 18px 16px;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="guide"] .role-card:hover{
+  transform: none;
+  border-color: var(--line-soft);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  box-shadow: none;
+}
+
+html body[data-route="guide"] .role-card::after{
+  display: none;
+}
+
+html body[data-route="guide"] .role-card__tag{
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 9px;
+  letter-spacing: .12em;
+}
+
+html body[data-route="guide"] .role-card__icon{
+  font-size: 21px;
+  filter: none;
+}
+
+html body[data-route="guide"] .role-card h3{
+  margin: 18px 0 6px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+}
+
+html body[data-route="guide"] .role-card__intro{
+  min-height: 0;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+html body[data-route="guide"] .role-card ul{
+  font-size: 11px;
+}
+
+html body[data-route="guide"] .roles-notice{
+  margin-top: 20px;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body[data-route="guide"] .roles-notice__mark{
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--accent-ink);
+  border: 1px solid var(--line);
+}
+
+html body[data-route="guide"] .guide-extra-grid{
+  gap: 0;
+  margin: 24px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="guide"] .guide-extra-card{
+  padding: 22px 20px;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-top: 2px solid var(--extra-color, var(--accent));
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
+}
+
+html body[data-route="guide"] .guide-extra-card:nth-child(2n){
+  border-right: 0;
+}
+
+html body[data-route="guide"] .guide-extra-card h2{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+
+html body[data-route="guide"] .guide-extra-card .prose{
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+html body[data-route="guide"] .cards{
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="guide"] .card{
+  padding: 18px 16px;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+/* ── Альянс: профиль команды и сезонная хроника ─────────────────────────── */
+html body[data-route="alliance"] .back{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  color: var(--mute);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html body[data-route="alliance"] .ally{
+  margin: 0;
+  padding: 0 0 26px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="alliance"] .ally__head{
+  align-items: flex-start;
+  gap: 18px;
+}
+
+html body[data-route="alliance"] .ally__tag{
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 50%, var(--line));
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: color-mix(in srgb, var(--tag-color) 64%, var(--text));
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+}
+
+html body[data-route="alliance"] .ally__name{
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: 600;
+  line-height: .96;
+  letter-spacing: -.06em;
+}
+
+html body[data-route="alliance"] .ally__sub{
+  margin-top: 8px;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+html body[data-route="alliance"] .ally__stats{
+  gap: 0;
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+html body[data-route="alliance"] .stat{
+  padding: 12px 10px 12px 0;
+  border-right: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body[data-route="alliance"] .stat:last-child{
+  border-right: 0;
+}
+
+html body[data-route="alliance"] .stat__label{
+  color: var(--mute);
+  font-size: 8px;
+  letter-spacing: .14em;
+}
+
+html body[data-route="alliance"] .stat__value{
+  margin-top: 6px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body[data-route="alliance"] .achievements-panel{
+  margin: 0;
+  padding: 28px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="alliance"] .achievement-grid{
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="alliance"] .achievement{
+  min-height: 0;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="alliance"] .achievement__icon{
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-xs);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--achievement-color) 45%, var(--line));
+  font-size: 16px;
+}
+
+html body[data-route="alliance"] .achievement b{
+  font-size: 12px;
+}
+
+html body[data-route="alliance"] .ch{
+  margin-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+html body[data-route="alliance"] .ch__grid{
+  stroke: var(--line);
+  opacity: .8;
+}
+
+html body[data-route="alliance"] .ch__ytick,
+html body[data-route="alliance"] .ch__xtick{
+  fill: var(--mute);
+  font-size: 9px;
+}
+
+html body[data-route="alliance"] .ch__legend{
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html body[data-route="alliance"] .vs{
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="alliance"] .vs__row{
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+html body[data-route="alliance"] .vs__row--win{
+  border-left-color: color-mix(in srgb, var(--win) 55%, transparent);
+}
+
+html body[data-route="alliance"] .vs__row--loss{
+  border-left-color: color-mix(in srgb, var(--loss) 55%, transparent);
+}
+
+html body[data-route="alliance"] .vs__row--none{
+  border-left-color: var(--line);
+}
+
+html body[data-route="alliance"] .vs__badge{
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+html body[data-route="alliance"] .vs__badge--win{
+  color: var(--win-ink);
+}
+
+html body[data-route="alliance"] .vs__badge--loss{
+  color: var(--loss-ink);
+}
+
+html body[data-route="alliance"] .vs__total{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ── Профиль участника ──────────────────────────────────────────────────── */
+html body[data-route="user"] .hero.forum-profile{
+  min-height: 0;
+  margin: 0;
+  padding: 26px 0 24px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="user"] .hero.forum-profile::before,
+html body[data-route="user"] .hero.forum-profile::after{
+  display: none;
+}
+
+html body[data-route="user"] .forum-profile__top{
+  align-items: flex-start;
+  gap: 20px;
+}
+
+html body[data-route="user"] .forum-profile__nick{
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(38px, 5.5vw, 64px);
+  font-weight: 600;
+  line-height: .98;
+  letter-spacing: -.06em;
+}
+
+html body[data-route="user"] .forum-profile__meta{
+  gap: 6px;
+  margin-top: 10px;
+}
+
+html body[data-route="user"] .forum-profile__role,
+html body[data-route="user"] .forum-profile__ally{
+  padding: 3px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+html body[data-route="user"] .forum-profile__about{
+  max-width: 64ch;
+  margin-top: 14px;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+html body[data-route="user"] .forum-profile__stats{
+  gap: 0;
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+html body[data-route="user"] .forum-profile__stats > *{
+  padding: 12px 10px 12px 0;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+html body[data-route="user"] .forum-rank,
+html body[data-route="user"] .forum-rep,
+html body[data-route="user"] .forum-ghlog,
+html body[data-route="user"] .forum-blog{
+  margin: 0;
+  padding: 26px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="user"] .forum-rank__bar{
+  height: 4px;
+  border-radius: 0;
+  background: var(--line-soft);
+}
+
+html body[data-route="user"] .forum-rank__fill{
+  border-radius: 0;
+  background: var(--accent);
+}
+
+html body[data-route="user"] .forum-rank__ach{
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: transparent;
+}
+
+html body[data-route="user"] .forum-rep__points{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body[data-route="user"] .forum-profile__posts{
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="user"] .forum-profile__posts li{
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+/* ── Telegram-бот: тёмная сцена без неона ───────────────────────────────── */
+html body[data-route="bot"] .bot-hero{
+  min-height: 0;
+  margin: 0;
+  padding: 34px 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--bg);
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-hero__orb{
+  display: none;
+}
+
+html body[data-route="bot"] .bot-hero__top{
+  gap: 24px;
+}
+
+html body[data-route="bot"] .bot-hero .tl__title{
+  max-width: 15ch;
+  margin: 10px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(38px, 5.6vw, 64px);
+  font-weight: 600;
+  line-height: .98;
+  letter-spacing: -.06em;
+}
+
+html body[data-route="bot"] .bot-hero .tl__title em{
+  color: var(--accent-ink);
+  font-style: normal;
+}
+
+html body[data-route="bot"] .bot-hero__lead{
+  max-width: 58ch;
+  margin-top: 18px;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+html body[data-route="bot"] .bot-hero__lead strong{
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+html body[data-route="bot"] .bot-hero__signal{
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+html body[data-route="bot"] .bot-hero__signal i{
+  width: 28px;
+  height: 1px;
+  background: var(--line);
+  opacity: 1;
+}
+
+html body[data-route="bot"] .bot-hero__bottom{
+  position: static;
+  max-width: none;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="bot"] .bot-stat{
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html body[data-route="bot"] .bot-stat b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body[data-route="bot"] .bot-stat span{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+html body[data-route="bot"] .bot-launch{
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-cta{
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-cta:hover{
+  transform: none;
+  background: var(--accent-dk);
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-section{
+  margin-top: 30px;
+}
+
+html body[data-route="bot"] .bot-feature-grid{
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="bot"] .bot-feature{
+  min-height: 0;
+  padding: 20px 16px;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: var(--bg);
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-feature:hover{
+  transform: none;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-feature__index{
+  color: var(--mute);
+  font-size: 9px;
+}
+
+html body[data-route="bot"] .bot-feature__icon{
+  margin: 22px 0 14px;
+  color: var(--accent-ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+}
+
+html body[data-route="bot"] .bot-feature h3{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+html body[data-route="bot"] .bot-feature p{
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+html body[data-route="bot"] .bot-promise{
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body[data-route="bot"] .bot-promise__line{
+  width: 1px;
+  height: 54px;
+  background: var(--accent);
+}
+
+html body[data-route="bot"] .bot-promise h2{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(24px, 3.4vw, 36px);
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+html body[data-route="bot"] .bot-promise p{
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+html body[data-route="bot"] .bot-final{
+  margin-top: 26px;
+  padding: 32px 0 10px;
+  border-top: 1px solid var(--line);
+}
+
+html body[data-route="bot"] .bot-final h2{
+  max-width: 18ch;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(28px, 4.4vw, 48px);
+  font-weight: 600;
+  letter-spacing: -.05em;
+}
+
+html body[data-route="bot"] .bot-final em{
+  color: var(--accent-ink);
+}
+
+/* ── Справочник: статья как документ ────────────────────────────────────── */
+html body[data-route="handbook"] .hb-page{
+  min-width: 0;
+}
+
+html .hb-page .hb-crumbs{
+  gap: 6px;
+  margin: 0 0 18px;
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+html .hb-page .hb-crumbs a{
+  color: var(--mute);
+}
+
+html .hb-page .hb-crumbs a:hover{
+  color: var(--accent-ink);
+}
+
+html .hb-page > .panel{
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html .hb-page .panel__head{
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+html .hb-page .panel__head h1{
+  max-width: 22ch;
+  margin: 8px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(32px, 4.8vw, 52px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+
+html .hb-page .hb-text{
+  max-width: 72ch;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+html .hb-page .hb-text h2,
+html .hb-page .hb-text h3{
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -.025em;
+}
+
+html .hb-page .hb-fig{
+  margin: 22px 0;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .hb-page .hb-fig figcaption{
+  padding: 10px 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--mute);
+  font-size: 10px;
+}
+
+html .hb-page .hb-siblings{
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+html .hb-page .hb-siblings a{
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+html .hb-page .hb-siblings a:hover{
+  color: var(--accent-ink);
+}
+
+/* ── Узкие экраны для новых блоков ───────────────────────────────────────── */
+@media (max-width: 1023px){
+  html .about-page .about-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html .about-page .about-card:nth-child(3n){
+    padding-right: 18px;
+  }
+
+  html .about-page .about-card:nth-child(2n){
+    padding-right: 0;
+  }
+
+  html body[data-route="guide"] .roles-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html body[data-route="bot"] .bot-feature-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px){
+  html .forum-thread{
+    margin-top: 22px;
+  }
+
+  html .forum-post:has(.forum-thread) .forum-post__title{
+    font-size: clamp(24px, 7vw, 30px);
+  }
+
+  html .forum-comment{
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 10px;
+    padding: 16px 0;
+  }
+
+  html .forum-comment .forum-ava{
+    width: 26px;
+    height: 26px;
+  }
+
+  html .forum-reply{
+    padding-top: 18px;
+  }
+
+  html .forum-poll{
+    margin-top: 18px;
+  }
+
+  html .forum-modal{
+    padding: 12px;
+  }
+
+  html .forum-modal__box{
+    max-height: calc(100dvh - 24px);
+    padding: 18px;
+  }
+
+  html .forum-modal__box h3{
+    margin-bottom: 16px;
+    font-size: 20px;
+  }
+
+  html .forum-modal__actions{
+    flex-direction: column-reverse;
+  }
+
+  html .forum-modal__actions .forum-btn{
+    width: 100%;
+  }
+
+  html .quart-hero{
+    padding: 22px 0 20px;
+  }
+
+  html .quart-hero__top{
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  html .quart-hero h1{
+    max-width: 11ch;
+    font-size: clamp(34px, 10vw, 48px);
+  }
+
+html .quart-dial{
+  min-width: 88px;
+  max-width: 200px;
+  padding-left: 14px;
+}
+
+  html .quart-dial b{
+    font-size: 32px;
+  }
+
+  html .quart-hero__bottom{
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  html .quart-podium__grid{
+    grid-template-columns: 1fr;
+  }
+
+  html .quart-podium-card{
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 10%, transparent);
+  }
+
+  html .quart-podium-card:last-child{
+    border-bottom: 0;
+  }
+
+  html .quart-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html .quart-card:nth-child(4n){
+    border-right: 1px solid color-mix(in srgb, var(--quart-head) 8%, transparent);
+  }
+
+  html .quart-card:nth-child(2n){
+    border-right: 0;
+  }
+
+  html .quart-controls{
+    gap: 10px;
+  }
+
+  html .about-page .about-panel{
+    padding: 24px 0 26px;
+  }
+
+  html .about-page .about-panel > h1{
+    font-size: clamp(38px, 11vw, 52px);
+  }
+
+  html .about-page .about-grid{
+    grid-template-columns: 1fr;
+  }
+
+  html .about-page .about-card,
+  html .about-page .about-card:nth-child(3n),
+  html .about-page .about-card:nth-child(2n){
+    padding-right: 0;
+  }
+
+  html .about-page .about-panel--privacy{
+    margin: 18px 0;
+    padding-left: 14px;
+  }
+
+  html .upd-page > .panel__head h1{
+    font-size: clamp(32px, 9vw, 44px);
+  }
+
+  html .upd-page .feed-card{
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 4px 10px;
+  }
+
+  html .upd-page .feed-card__phase{
+    grid-row: 1 / 3;
+  }
+
+  html .upd-page .feed-card__when,
+  html .upd-page .feed-card__left{
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  html .upd-page .feed-card__text{
+    grid-column: 2;
+  }
+
+  html .upd-page .feed-card__source,
+  html .upd-page .feed-card__action{
+    grid-column: 2;
+  }
+
+  html .upd-page .upd-form{
+    padding: 16px;
+  }
+
+  html body[data-route="guide"] .hero--guide .tl__title{
+    font-size: clamp(30px, 9vw, 44px);
+  }
+
+  html body[data-route="guide"] .proof{
+    padding-right: 0;
+  }
+
+  html body[data-route="guide"] .roles-panel{
+    padding: 18px 14px;
+  }
+
+  html body[data-route="guide"] .roles-grid,
+  html body[data-route="guide"] .guide-extra-grid,
+  html body[data-route="guide"] .cards{
+    grid-template-columns: 1fr;
+  }
+
+  html body[data-route="guide"] .role-card,
+  html body[data-route="guide"] .guide-extra-card,
+  html body[data-route="guide"] .card{
+    border-right: 0;
+    padding-right: 0;
+    padding-left: 0;
+    background: transparent;
+  }
+
+  html body[data-route="alliance"] .ally__head{
+    gap: 12px;
+  }
+
+  html body[data-route="alliance"] .ally__name{
+    font-size: clamp(36px, 11vw, 48px);
+  }
+
+  html body[data-route="alliance"] .ally__stats{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html body[data-route="alliance"] .stat{
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  html body[data-route="user"] .forum-profile__top{
+    gap: 14px;
+  }
+
+  html body[data-route="user"] .forum-profile__nick{
+    font-size: clamp(34px, 10vw, 46px);
+  }
+
+  html body[data-route="user"] .forum-profile__stats{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html body[data-route="bot"] .bot-hero{
+    padding: 22px 16px 18px;
+  }
+
+  html body[data-route="bot"] .bot-hero__bottom{
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  html body[data-route="bot"] .bot-feature-grid{
+    grid-template-columns: 1fr;
+  }
+
+  html body[data-route="bot"] .bot-feature,
+  html body[data-route="bot"] .bot-feature:nth-child(2n){
+    border-right: 0;
+  }
+
+  html body[data-route="bot"] .bot-promise{
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  html body[data-route="bot"] .bot-promise__line{
+    width: 54px;
+    height: 1px;
+  }
+
+  html .hb-page .hb-text{
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 479px){
+  html .quart-grid{
+    grid-template-columns: 1fr;
+  }
+
+  html .quart-card,
+  html .quart-card:nth-child(2n),
+  html .quart-card:nth-child(4n){
+    border-right: 0;
+  }
+
+  html .forum-comment__head time{
+    width: 100%;
+  }
+
+  html .forum-modal__rule{
+    gap: 8px;
+  }
+
+  html body[data-route="bot"] .bot-cta{
+    width: 100%;
+    justify-content: center;
+  }
+}

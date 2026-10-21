@@ -1106,11 +1106,13 @@ function render() {
     unmountUpdates();
     unmountAccounts();
     renderNav('forum');
+    document.body.dataset.route = 'user';
     app.innerHTML = '';
     mountUser(app, decodeURIComponent(param));
     path = '/user';
   } else {
     const route = ROUTES.find((r) => r.id === id) ?? ROUTES[0];
+    document.body.dataset.route = route.id;
     renderNav(route.navAs || route.id);
 
     if (route.id === 'chats') {

@@ -48,7 +48,7 @@
     оставляла чёрную полосу над бежевой страницей.
   -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#0a0e15">
+  <meta name="theme-color" content="#111419">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -128,7 +128,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=120">
+  <link rel="modulepreload" href="./src/main.js?v=122">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
@@ -177,6 +177,12 @@
     правило «подпись под картинкой» не должно перебиваться соседним слоем.
   -->
   <link rel="stylesheet" href="./src/handbook.css?v=11">
+  <!--
+    Новый продуктовый язык Z Route: токены, оболочка и форум. Слой лежит
+    последним, потому что он обязан перебивать и базовые карточки, и
+    мобильную плотность. Справочник и краски альянсов остаются своими.
+  -->
+  <link rel="stylesheet" href="./src/redesign.css?v=3">
   <!--
     Краски альянсов, доведённые до контраста. Пустой блок — это нормально.
 
@@ -452,7 +458,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=120"></script>
+  <script type="module" src="./src/main.js?v=122"></script>
 
   <script>
     /*

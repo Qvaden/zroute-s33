@@ -56,8 +56,8 @@
   бы блёклые линии.
 */
 export const INK = {
-  light: { surface: '#f2eee8', ink: '#221f1a', stroke: 3, label: 4.5, fade: 0.85 },
-  dark: { surface: '#26303d', ink: '#f2f4f7', stroke: 3, label: 4.5, fade: 0.85 },
+  light: { surface: '#efefe9', ink: '#202124', stroke: 3, label: 4.5, fade: 0.85 },
+  dark: { surface: '#292f38', ink: '#f2f4f7', stroke: 3, label: 4.5, fade: 0.85 },
 };
 
 /* Краска «альянс без краски»: тот же серый, что подставляют страницы. */

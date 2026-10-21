@@ -1,8 +1,5 @@
 import { esc } from './helpers.js';
 
-let uid = 0;
-const nextId = () => `g${++uid}`;
-
 /**
  * Большой график накопленных очков одного альянса, с заливкой под линией.
  *
@@ -58,7 +55,6 @@ export function areaChart(series, weeks, color, opts = {}) {
 
   const line = series.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const area = `${PAD.left},${y(min + pad).toFixed(1)} ${line} ${(PAD.left + plotW).toFixed(1)},${y(min + pad).toFixed(1)}`;
-  const gid = nextId();
 
   const ref = reference
     ? `<polyline points="${reference.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"
@@ -70,14 +66,11 @@ export function areaChart(series, weeks, color, opts = {}) {
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img"
            aria-label="Накопленные очки по неделям">
         <defs>
-          <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   style="stop-color:${esc(color)}" stop-opacity=".34"/>
-            <stop offset="100%" style="stop-color:${esc(color)}" stop-opacity="0"/>
-          </linearGradient>
+          <linearGradient id="ch__grad"><stop offset="0%" style="stop-color:${esc(color)}"/></linearGradient>
         </defs>
         ${grid}
         ${xLabels}
-        <polygon points="${area}" fill="url(#${gid})"/>
+        <polygon class="ch__area" points="${area}" style="fill:${esc(color)}" opacity=".1"/>
         ${ref}
         <polyline points="${line}" fill="none" stroke-width="2.8"
           stroke-linejoin="round" stroke-linecap="round" class="ch__line"
