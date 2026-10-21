@@ -2638,6 +2638,31 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 
 /*
+  ВТОРИЧНАЯ КНОПКА В ДНЕВНОЙ ТЕМЕ ОСТАЁТСЯ ВТОРИЧНОЙ.
+
+  Правило выше красит в заливку все кнопки форума, потому что в ночной теме
+  заливка и есть primary. Но «Отмена», «Понятно» и «Зарегистрироваться» —
+  вторичные действия, и в дневной теме они выглядели бы главным действием
+  рядом с настоящей главной кнопкой: заливка индиго, белая подпись.
+
+  Поэтому вторичной кнопке возвращают её собственную одежду: тихая
+  поверхность, нейтральная граница, чернила темы. Главная кнопка при этом
+  остаётся единственной залитой.
+*/
+:root[data-theme="light"] .forum-btn--ghost {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  border-color: var(--line);
+  box-shadow: none;
+}
+:root[data-theme="light"] .forum-btn--ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+  box-shadow: none;
+}
+
+/*
   КНОПКА УДАЛЕНИЯ НЕ ДОЛЖНА СТАНОВИТЬСЯ ОРАНЖЕВОЙ.
 
   Только что написанное правило сильнее всего, что стоит в `forum.css`: у него

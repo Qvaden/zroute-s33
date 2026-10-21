@@ -115,12 +115,28 @@ html .head__nav{
     display: flex;
     align-items: center;
     gap: 2px;
-    margin-left: 12px;
+    margin-left: 8px;
+  }
+
+  /*
+    МАРКА В ШАПКЕ. На широком экране слово «Сервер 33 / Z Route: Redemption»
+    стоит в боковой колонке — она начинается ровно под шапкой, и обе метки
+    читаются как один угол. В шапку возвращается только знак «33»: полное
+    слово там не поместилось бы рядом с навигацией, президентской плашкой и
+    строкой «где я», а шапка перегружать нельзя.
+  */
+  html .brand--head{
+    display: flex;
+    margin-right: 4px;
+  }
+
+  html .brand--head .brand__text{
+    display: none;
   }
 }
 
 html .head__nav__link{
-  padding: 7px 12px;
+  padding: 7px 10px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--dim);
@@ -566,6 +582,68 @@ html .forum-tag-filter .forum-tag.is-on{
   color: var(--accent-ink);
 }
 
+/* ── Шрифтовая система: один набор на весь интерфейс ──────────────────────── */
+/*
+  В базовом слое на метках и подписях стоял Unbounded 700–800: это тяжёлый
+  дисплейный шрифт, и на кегле 12–13 px он читался как вывеска, а не как
+  подпись. Бриф просит заголовки «плотные, выразительные, но без чрезмерной
+  жирности» — значит тяжесть остаётся только там, где она действительно нужна
+  (крупные числа), а мелкие метки переходят на тот же Space Grotesk, что и
+  остальной интерфейс.
+
+  Подписи альянсов и даты — как раз «технические данные», и моноширинный
+  шрифт для них уместен; поэтому метки тегов и даты летописи идут моно, а
+  названия разделов и числа — Space Grotesk 600.
+
+  Значок в графике (`.race__label`) остаётся как был: геометрия подписи
+  считается особым замером в драйвере, и подменять шрифт там — значило бы
+  врать в расчёте.
+*/
+html .president-board__alliance,
+html .side__title,
+html .chron__title,
+html .community__topic,
+html .split__count,
+html .c-win,
+html .c-loss,
+html .forum-rules__mark,
+html .quart-podium-card__place{
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+}
+
+html .president-board__alliance{
+  font-size: 12px;
+}
+
+html .chron__title,
+html .community__topic{
+  font-size: 18px;
+  letter-spacing: -.03em;
+}
+
+html .tag,
+html .quart-card__tag,
+html .quart-podium-card__tag,
+html .tile b,
+html .forum-alliance-card b{
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+html .lad__wl{
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+}
+
+html .wk__num,
+html .tl__year span{
+  font-family: var(--font-mono);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
 /* ── Лента: непрерывный редакционный список ──────────────────────────────── */
 html .forum-feed{
   gap: 0;
@@ -639,6 +717,27 @@ html .forum-post__head time{
   letter-spacing: .07em;
   text-transform: uppercase;
 }
+
+/*
+  Метка встречи — ровно тот случай, для которого оранжевый и остаётся в
+  палитре: это игровое событие, а не элемент интерфейса. Подписью служит
+  `--accent-orange-ink` (6,13:1 на своей плашке в ночи, 5,63:1 днём).
+*/
+html .forum-post__event{
+  border-color: color-mix(in srgb, var(--accent-orange) 45%, var(--line));
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--accent-orange) 12%, transparent);
+  color: var(--accent-orange-ink);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+html .forum-post__event--past{
+  border-color: var(--line);
+  background: transparent;
+  color: var(--mute);
+}
+
 
 html .forum-post__id{
   color: var(--mute);
@@ -2135,6 +2234,7 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .lad__row:hover{
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .lad__place b{
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -.04em;
