@@ -86,7 +86,7 @@
 .hb-none { font-size: var(--fs-small); color: var(--mute); margin: var(--s-1) 0; }
 
 /* ── «Такого гайда нет» ──────────────────────────────────────────────────── */
-.hb-page > .panel__head .back { font-size: var(--fs-small); color: var(--accent-ink); text-decoration: none; display: inline-block; margin-top: var(--s-1); }
+.hb-page > .panel__head .back { font-size: var(--fs-small); color: var(--accent-ink); text-decoration: none; display: inline-block; margin-top: var(--s-1); padding: var(--s-1) 0; }
 .hb-page > .panel__head .back:hover { text-decoration: underline; }
 .hb-page > .panel__head code { font-size: var(--fs-meta); opacity: .75; }
 

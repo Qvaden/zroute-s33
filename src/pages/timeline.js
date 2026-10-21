@@ -331,7 +331,8 @@ function renderEventGallery(event) {
   const images = eventImages(event);
   if (!images.length) return '';
   return `<div class="tl__gallery" data-tl-gallery>
-    ${images.map((url, i) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"><img class="tl__img" src="${esc(url)}" alt="${esc(event.title)} — фото ${i + 1}" loading="lazy"></a>`).join('')}
+    ${images.map((url, i) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"
+          aria-label="${esc(event.title)} — фото ${i + 1} (открыть в новой вкладке)"><img class="tl__img" src="${esc(url)}" alt="${esc(event.title)} - фото ${i + 1}" loading="lazy"></a>`).join('')}
   </div>`;
 }
 

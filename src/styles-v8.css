@@ -1426,6 +1426,10 @@ h1,h2,h3,h4 {
 .rank__all {
   display: inline-block;
   margin-top: var(--s-3);
+  /* Зона нажатия — не 24 px, а 44: ссылка мелкая, но попасть пальцем в
+     подпись под таблицей надо. Высота задаётся не подчёркиванием, а рамкой
+     с нулевой шириной: текст не смещается, а зона растёт. */
+  padding: var(--s-2) 0;
   font-size: var(--fs-meta); font-weight: 700;
   color: var(--accent-ink);
   text-decoration: none;
@@ -1479,6 +1483,12 @@ h1,h2,h3,h4 {
 .chron__read { margin-top: var(--s-2); }
 .chron__read summary {
   cursor: pointer;
+  /* Раскрытие — отдельный контрол, и зона нажатия у него не меньше 24 px
+     (WCAG 2.2, SC 2.5.8): подпись мелкая, а целиться в неё приходится
+     пальцем. */
+  display: inline-block;
+  min-height: 24px;
+  padding: var(--s-1) 0;
   font-size: var(--fs-meta); font-weight: 700;
   color: var(--accent-ink);
   list-style: none;
@@ -1520,6 +1530,7 @@ h1,h2,h3,h4 {
 .chron__all {
   display: inline-block;
   margin-top: var(--s-3);
+  padding: var(--s-2) 0;
   font-size: var(--fs-meta); font-weight: 700;
   color: var(--accent-ink);
   text-decoration: none;
@@ -1554,7 +1565,17 @@ h1,h2,h3,h4 {
   font-size: var(--fs-meta); color: var(--mute);
 }
 .community__cat { color: var(--accent-ink); font-weight: 700; }
-.community__nick { color: var(--dim); text-decoration: none; }
+.community__nick {
+  /*
+    Ник автора в строке темы — ссылка, но отдельный контрол: под ним палец
+    должен попадать, а не промахиваться мимо строки. Зона растёт полем с
+    отрицательным отступом: буквы остаются на своей базовой линии, а палец
+    попадает в 44 px (WCAG 2.2, SC 2.5.8).
+  */
+  padding: var(--s-2) 0;
+  margin: calc(-1 * var(--s-2)) 0;
+  color: var(--dim); text-decoration: none;
+}
 .community__nick:hover { text-decoration: underline; }
 
 .community__pulse {
@@ -1568,6 +1589,7 @@ h1,h2,h3,h4 {
 .community__all {
   display: inline-block;
   margin-top: var(--s-3);
+  padding: var(--s-2) 0;
   font-size: var(--fs-meta); font-weight: 700;
   color: var(--accent-ink);
   text-decoration: none;
@@ -1895,7 +1917,11 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
    не россыпью карточек.
 */
 .back {
- margin-bottom: var(--s-2);
+  /* Ссылка «назад» — отдельный контрол, а не слово в потоке: зона нажатия
+     не меньше 24 px (WCAG 2.2, SC 2.5.8). Поле с отрицательным отступом
+     даёт нужную высоту, не меняя `display` (его задаёт forum.css) и не
+     трогая отступ, который уже объявлен ниже по каскаду. */
+  padding: var(--s-1) 0;
   font-size: var(--fs-body); font-weight: 500; color: var(--dim); text-decoration: none;
   transition: color var(--t-fast) var(--ease);
 }
@@ -3542,6 +3568,10 @@ summary.tl__row { cursor: pointer; }
 .wks__more {
   display: inline-flex;
   align-items: center;
+  /* Зона нажатия не меньше 24 px по короткой стороне (WCAG 2.2, SC 2.5.8):
+     у пункта «показать все» подпись мелкая, а целиться в неё приходится
+     пальцем на телефоне. */
+  min-height: 24px;
   margin: var(--s-2) 0 0;
   padding: var(--s-fine) var(--s-2);
   background: transparent;

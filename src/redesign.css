@@ -5112,6 +5112,11 @@ html .hb-page .hb-siblings a{
   background: transparent;
   color: var(--dim);
   font-size: 12px;
+  /* Зона нажатия: пункт списка — отдельный контрол, и под ним палец должен
+     попадать (WCAG 2.2, SC 2.5.8). Поле с отрицательным отступом даёт
+     24 px, не растягивая строку списка. */
+  padding: var(--s-2) 0;
+  margin: calc(-1 * var(--s-2)) 0;
 }
 
 html .hb-page .hb-siblings a:hover{

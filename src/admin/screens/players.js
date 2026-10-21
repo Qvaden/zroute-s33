@@ -87,28 +87,29 @@ export function renderPlayers(view) {
       </section>`;
   }
 
-  if (forum.me.role !== 'admin') {
-    return `
-      <section class="panel">
-        <header class="panel__head">
-          <span class="eyebrow">Форум</span>
-          <h1 class="adm-h1">Игроки</h1>
-        </header>
-        <p class="adm-lead">
-          Вы вошли как <b>${esc(forum.me.nick)}</b> (${esc(roleLabel(forum.me))}).
-          Роли назначает и заявки на восстановление доступа подтверждает только
-          владелец — это единственная граница между вами.
-        </p>
-      </section>`;
-  }
-
   if (!forum.users) {
     return '<div class="loading">Читаем список игроков…</div>';
   }
 
-  const rows = forum.users.map((u) => renderRow(u, forum.me)).join('');
-  const leaders = renderLeaders(forum.users);
-  const recoveries = renderRecoveries(forum.recoveries);
+  /*
+    МОДЕРАТОР ВИДИТ СПИСОК, НО НЕ УПРАВЛЯЕТ ЛЮДЬМИ.
+
+    Право читать профили у модератора есть — политика forum_users_read в базе
+    отдаёт их всякому, кто проходит forum_is_staff(). Право МЕНЯТЬ роли,
+    выдавать награду репутацией и подтверждать заявки на доступ база оставила
+    владельцу (site_set_moderator, forum_grant_reputation, forum_review_recovery
+    требуют forum_is_admin()).
+
+    Поэтому модератору показываем ровно то, что он вправе знать: кто на
+    форуме, с каким статусом и в каком альянсе, — и ни одной кнопки, которая
+    упёрлась бы в отказ базы. Раньше модератор вместо списка получал
+    объяснение, что список ему не положен: право на чтение у него было, а
+    панель его не использовала.
+  */
+  const isOwner = forum.me.role === 'admin';
+  const rows = forum.users.map((u) => renderRow(u, forum.me, isOwner)).join('');
+  const leaders = isOwner ? renderLeaders(forum.users) : '';
+  const recoveries = isOwner ? renderRecoveries(forum.recoveries) : '';
   const moderators = forum.users.filter((u) => u.role === 'moderator').length;
   const verified = forum.users.filter((u) => u.isVerified).length;
 
@@ -119,9 +120,11 @@ export function renderPlayers(view) {
         <h1 class="adm-h1">Игроки</h1>
         <p class="adm-lead">
           ${esc(String(forum.users.length))} ${esc(peopleWord(forum.users.length))} на форуме.
-          Здесь назначают модераторов, подтверждают ники, выдают награды
-          репутацией, решают заявки на восстановление доступа, закрывают
-          возможность писать и удаляют чужие аккаунты.
+          ${
+            isOwner
+              ? 'Здесь назначают модераторов, подтверждают ники, выдают награды репутацией, решают заявки на восстановление доступа, закрывают возможность писать и удаляют чужие аккаунты.'
+              : `Вы вошли как <b>${esc(forum.me.nick)}</b> (${esc(roleLabel(forum.me))}). Список виден целиком: разбирая жалобу, модератор должен знать, кто перед ним и с каким статусом. Управлять людьми — назначать роли, выдавать награду репутацией, подтверждать заявки на доступ — может только владелец, и решает это база, а не панель.`
+          }
         </p>
       </header>
 
@@ -197,11 +200,22 @@ export function renderPlayers(view) {
       </div>
     </section>
 
-    ${renderLeaderModal()}
+    ${
+      /*
+        Окна приходят только под те действия, которые у этого человека есть.
+        Модалка без кнопки, которая её открывает, — просто лишний код в DOM:
+        модератору показывать окно удаления аккаунта незачем, он туда и не
+        попадёт, а «на всякий случай» в разметке означает, что в разметке есть
+        право, которого нет.
+      */
+      isOwner
+        ? `${renderLeaderModal()}
     ${renderRenameModal()}
     ${renderRepModal()}
-    ${renderRestrictModal()}
-    ${renderDeleteModal()}`;
+    ${renderDeleteModal()}`
+        : ''
+    }
+    ${renderRestrictModal()}`;
 }
 
 /**
@@ -316,10 +330,10 @@ function renderLeaders(users) {
 }
 
 /** Одна строка списка. */
-function renderRow(user, me) {
+function renderRow(user, me, isOwner = true) {
   const isMe = user.id === me.id;
   const muted = user.mutedUntil && user.mutedUntil > new Date();
-  const isOwner = user.role === 'admin';
+  const isOwnerUser = user.role === 'admin';
   const isModerator = user.role === 'moderator';
 
   const status = user.banned
@@ -354,7 +368,7 @@ function renderRow(user, me) {
         ${
           isMe
             ? '<span class="muted">это вы</span>'
-            : isOwner
+            : isOwnerUser
               ? '<span class="muted">владелец</span>'
               : `
                 ${
@@ -373,40 +387,70 @@ function renderRow(user, me) {
                   ''
                 }
                 <div class="adm-player__roles" role="group" aria-label="Роль и статус игрока">
-                  <button type="button" class="adm-btn adm-pill adm-toggle${isModerator ? ' is-on' : ''}"
+                  ${
+                    /*
+                      Кнопки различаются по тому, кому база их отдаёт, а не по
+                      «удобству»:
+
+                      — подтверждение ника forum_set_verified пускает и модератора
+                        (forum_is_staff), поэтому кнопка есть у обоих;
+                      — роль и лидерство меняет только владелец
+                        (site_set_moderator, forum_set_leader требуют
+                        forum_is_admin), модератору эти кнопки не показываем:
+                        право, которого нет, не показывается;
+                      — блогер — метка, её меняет владелец.
+                    */
+                    isOwner
+                      ? `<button type="button" class="adm-btn adm-pill adm-toggle${isModerator ? ' is-on' : ''}"
                           data-player-moderator="${esc(user.nick)}"
                           data-player-allow="${isModerator ? '' : '1'}"
                           title="${esc(modTitle)}">Модератор</button>
-                  <button type="button" class="adm-btn adm-pill adm-toggle${user.isBlogger ? ' is-on' : ''}"
+                         <button type="button" class="adm-btn adm-pill adm-toggle${user.isBlogger ? ' is-on' : ''}"
                           data-player-blogger="${esc(user.id)}"
                           data-player-nick="${esc(user.nick)}"
                           data-player-blog="${user.isBlogger ? '1' : ''}"
                           title="${esc(blogTitle)}">Блогер</button>
-                  <button type="button" class="adm-btn adm-pill adm-toggle${user.isLeader ? ' is-on' : ''}"
+                         <button type="button" class="adm-btn adm-pill adm-toggle${user.isLeader ? ' is-on' : ''}"
                           data-player-leader="${esc(user.id)}"
                           data-player-nick="${esc(user.nick)}"
                           data-player-alliance="${esc(user.allianceTag || '')}"
                           data-player-lead="${user.isLeader ? '1' : ''}"
-                          title="${esc(leaderTitle)}">Лидер</button>
+                          title="${esc(leaderTitle)}">Лидер</button>`
+                      : ''
+                  }
                   <button type="button" class="adm-btn adm-pill adm-toggle${user.isVerified ? ' is-on' : ''}"
                           data-player-verify="${esc(user.id)}"
                           data-player-nick="${esc(user.nick)}"
                           data-player-ver="${user.isVerified ? '1' : ''}"
                           title="${esc(verTitle)}">Проверен</button>
                 </div>
-                <details class="adm-menu" data-player-menu name="player-menu">
+                ${
+                  /*
+                    Запрет писать база модератору разрешает: триггер forum_users_guard
+                    снимает бан и тишину только у того, кто не проходит
+                    forum_is_staff(). Поэтому кнопка есть у обоих — и только
+                    у владельца остаётся редкое и опасное.
+                  */
+                  `<button type="button" class="adm-btn adm-pill adm-toggle${muted || user.banned ? ' is-on' : ''}"
+                          data-player-restrict="${esc(user.id)}"
+                          data-player-nick="${esc(user.nick)}"
+                          title="${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}">Запрет</button>`
+                }
+                ${
+                  isOwner
+                    ? `<details class="adm-menu" data-player-menu name="player-menu">
                   <summary class="adm-menu__btn" title="Ещё действия" aria-label="Ещё действия">⋯</summary>
                   <div class="adm-menu__list">
                     <button type="button" class="adm-menu__item"
                             data-player-rename="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Переименовать</button>
                     <button type="button" class="adm-menu__item"
                             data-player-rep="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Награда репутацией</button>
-                    <button type="button" class="adm-menu__item"
-                            data-player-restrict="${esc(user.id)}" data-player-nick="${esc(user.nick)}">${user.banned || muted ? 'Изменить запрет' : 'Запретить писать'}</button>
                     <button type="button" class="adm-menu__item adm-menu__item--danger"
                             data-player-delete="${esc(user.id)}" data-player-nick="${esc(user.nick)}">Удалить навсегда</button>
                   </div>
                 </details>`
+                    : ''
+                }`
         }
       </div>
     </div>`;

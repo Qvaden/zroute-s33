@@ -19,10 +19,13 @@ import { siteServer } from '../src/data/server.js';
 import { renderShell } from '../src/admin/shell.js';
 import { renderOverview } from '../src/admin/screens/overview.js';
 import { renderWeek } from '../src/admin/screens/week.js';
+import { renderQuarter } from '../src/admin/screens/quarter.js';
 import { renderAlliances } from '../src/admin/screens/alliances.js';
 import { renderEvents } from '../src/admin/screens/events.js';
+import { renderGuideRoles } from '../src/admin/screens/guide-roles.js';
+import { renderPresident } from '../src/admin/screens/president.js';
 
-const SCREEN_IDS = ['overview', 'week', 'alliances', 'events'];
+const SCREEN_IDS = ['overview', 'week', 'quarter', 'alliances', 'events', 'guidePage', 'president'];
 
 // Первый аргумент может быть и экраном, и именем файла — различаем по списку
 // экранов, иначе «week» без второго аргумента стал бы именем выходного файла.
@@ -88,8 +91,11 @@ const view = {
 const SCREENS = [
   { id: 'overview', label: 'Обзор', html: renderOverview(view) },
   { id: 'week', label: 'Неделя', html: renderWeek(view, null) },
+  { id: 'quarter', label: 'Кварт', html: renderQuarter(view) },
   { id: 'alliances', label: 'Альянсы', html: renderAlliances(view) },
   { id: 'events', label: 'Хронология', html: renderEvents(view) },
+  { id: 'guidePage', label: 'Малым алам', html: renderGuideRoles(view) },
+  { id: 'president', label: 'Президент', html: renderPresident(view) },
 ];
 
 // Те же таблицы стилей и в том же порядке, что admin.html грузит на боевую
@@ -114,6 +120,7 @@ const html = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Панель · Сервер 33 · превью</title>
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="./public/icons/icon-32.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -165,6 +172,18 @@ document.addEventListener('click', function (e) {
 
 await mkdir(outFile.split('/').slice(0, -1).join('/') || '.', { recursive: true });
 await writeFile(outFile, html, 'utf8');
+
+/*
+  Иконки рядом с превью — те же, что у сайта. Без них браузер просит
+  /favicon.ico и получает 404: в консоли превью это выглядит поломкой,
+  хотя сломан только значок вкладки.
+*/
+{
+  const { cp } = await import('node:fs/promises');
+  const dir = outFile.split('/').slice(0, -1).join('/') || '.';
+  await mkdir(`${dir}/public/icons`, { recursive: true });
+  await cp('public/icons', `${dir}/public/icons`, { recursive: true, force: true });
+}
 
 console.log(`Готово: ${outFile}`);
 console.log(`Экранов: ${SCREENS.length}, данные выдуманные (data/demo.json).`);

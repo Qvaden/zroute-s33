@@ -10,7 +10,8 @@
  * Запуск:  node scripts/build-preview.mjs [стартовая-страница] [файл]
  * Пример:  node scripts/build-preview.mjs ladder dist/preview-ladder.html
  */
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, cp } from 'node:fs/promises';
+import { join } from 'node:path';
 import { CONFIG } from '../config.js';
 import { loadAll } from '../src/data/index.js';
 import {
@@ -391,6 +392,28 @@ ${skipped.length
 
 await mkdir('dist', { recursive: true });
 await writeFile(outFile, html, 'utf8');
+
+/*
+  КАРТИНКИ РЯДОМ С КОПИЕЙ.
+
+  Собранная копия показывает герой и карточки альянсов, а файлы лежат в
+  public/. Без копирования превью ссылалось на ./public/hero/oblika-1120.avif,
+  которого рядом с dist/preview.html не было: картинка на месте была, а
+  путь вёл в пустоту, и копия показывала битый кадр вместо своего.
+
+  Копируются только картинки — ровно те, что нужны странице. Остальное
+  (справочник, гайды, загруженные игроками файлы) в копии не нужно: там
+  свои адреса, и их содержимое меняется каждый день.
+*/
+{
+  const images = ['public/hero'];
+  for (const dir of images) {
+    const to = join('dist', dir);
+    await mkdir(to, { recursive: true });
+    await cp(dir, to, { recursive: true, force: true });
+  }
+}
+
 console.log(
   `Готово: ${outFile} (${(html.length / 1024).toFixed(0)} КБ), ` +
     `страниц: ${PAGES.length}, стартовая: ${startId}`

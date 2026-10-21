@@ -148,10 +148,27 @@ const SCREENS = [
     data/live.json через GitHub, а эти разговаривают с базой форума. Токен
     GitHub над форумом не властен вообще — права там проверяет сама база.
   */
-  { id: 'moderation', label: 'Жалобы', render: renderModeration },
-  { id: 'players', label: 'Игроки', render: renderPlayers },
-  { id: 'chats', label: 'Чаты', render: renderChatsAdmin },
+  { id: 'moderation', label: 'Жалобы', render: renderModeration, need: 'moderate' },
+  { id: 'players', label: 'Игроки', render: renderPlayers, need: 'moderate' },
+  { id: 'chats', label: 'Чаты', render: renderChatsAdmin, need: 'moderate' },
 ];
+
+/*
+  Кто какие экраны видит.
+
+  Меню панели показывало ВСЕ вкладки любому вошедшему, и вкладка без права
+  вела в пустоту: человек вправе читать, но не вправе менять — а экран
+  молчал про это или отвечал отказом базы. Право, которого нет, не
+  показывается пунктом меню.
+
+  Форумные экраны (Жалобы, Игроки, Чаты) читает и меняет модерация — это
+  forum_is_staff() в базе. Остальные экраны открыты любому, кто вошёл: читать
+  итоги, альянсы и летопись может и редактор без права публикации.
+*/
+function visibleScreens() {
+  const staff = canModerate(account);
+  return SCREENS.filter((s) => !s.need || s.need === 'moderate' || staff);
+}
 
 const root = document.getElementById('admin');
 
@@ -219,6 +236,47 @@ function render() {
   const screenChanged = screen.id !== lastScreenId;
   lastScreenId = screen.id;
 
+  /*
+    Прямой адрес недоступного экрана — не повод показывать его.
+
+    Пункт меню модератору без права не выводится, но адрес можно вписать
+    руками или оставить ссылку из чужого браузера. Тогда человек попадал на
+    пустую вкладку, а отказ приходил только после нажатия кнопки. Здесь
+    экран не показывается вовсе, и панель говорит, куда человек попал и
+    куда ему можно.
+  */
+  const allowed = visibleScreens().some((s) => s.id === screen.id);
+  if (!allowed) {
+    const first = visibleScreens()[0] ?? SCREENS[0];
+    root.innerHTML = renderShell({
+      screens: visibleScreens(),
+      activeId: first.id,
+      inner: `
+        <section class="panel error">
+          <h1 class="adm-h1">Этот раздел вам не открыт</h1>
+          <p class="adm-lead">
+            Раздел «${esc(SCREENS.find((s) => s.id === screen.id)?.label ?? '—')}»
+            читает и меняет модерация форума. Вы вошли как
+            <b>${esc(account?.nick ?? '—')}</b> (${esc(roleLabel(account))}) —
+            этого права у вас нет.
+          </p>
+          <div class="adm-actions">
+            <a class="adm-btn adm-btn--primary" href="#/${first.id}">К доступным разделам</a>
+          </div>
+        </section>`,
+      login: account?.nick ?? '',
+      role: roleLabel(account),
+      /*
+        Публиковать здесь нечего: раздел закрыт. Право на публикацию панель
+        спрашивает в одном месте (mayEdit), и второй вызов означал бы
+        «спросили дважды» — а ответ здесь был бы тот же.
+      */
+      canPush: false,
+      server: panelServer(),
+      theme: adminTheme,
+    });
+    return;
+  }
   // Неделя — единственный экран с состоянием, поэтому оно готовится здесь,
   // а сам экран остаётся чистой функцией от данных.
   if (screen.id === 'week') {
@@ -266,7 +324,7 @@ function render() {
   }
 
   root.innerHTML = renderShell({
-    screens: SCREENS,
+    screens: visibleScreens(),
     activeId: screen.id,
     inner: screen.render(view, param),
     login: account?.nick ?? '',
@@ -1422,19 +1480,30 @@ async function loadForumScreen(screenId) {
 
   try {
     if (screenId === 'players') {
-      // Игроки — вкладка владельца: только он управляет людьми. Модератору
-      // тащить весь список бессмысленно — ему он всё равно не покажется.
-      if (canManagePeople(account)) {
+      /*
+        Список игроков читает вся модерация: политика forum_users_read в базе
+        отдаёт профили и модератору (`forum_is_staff()`), и право это нужно —
+        модератор разбирает жалобы и должен видеть, кто перед ним и с каким
+        статусом. Раньше список грузился только владельцу, и модератор видел
+        пустой экран с объяснением, что список ему не положен: право на
+        чтение у него было, а панель его не использовала.
+
+        Заявки на восстановление доступа — другое дело: их подтверждает
+        владелец, и модератору они показываться не должны.
+      */
+      if (canModerate(account)) {
         view.forum.users = await forum.listUsers();
         /*
           Заявки грузятся своим отдельным броском и своей ошибкой не роняют
           вкладку: без миграции 20260925-self-recovery.sql список игроков нужен
           владельцу по-прежнему, а блок заявок просто показывает «недоступно».
         */
-        try {
-          view.forum.recoveries = await forum.listRecoveryRequests();
-        } catch {
-          view.forum.recoveries = null;
+        if (canManagePeople(account)) {
+          try {
+            view.forum.recoveries = await forum.listRecoveryRequests();
+          } catch {
+            view.forum.recoveries = null;
+          }
         }
       }
     } else if (screenId === 'chats') {

@@ -3697,6 +3697,63 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
       forum: { configured: true, me: { id: 'u9', nick: 'Кто-то', role: 'moderator' }, users: [], recoveries: [] },
     })));
 
+  /*
+    СПИСОК ИГРОКОВ МОДЕРАТОРУ ВИДЕН.
+
+    Право читать профили у модератора есть: политика forum_users_read в базе
+    отдаёт их всякому, кто проходит forum_is_staff(). Раньше панель грузила
+    список только владельцу, и модератор вместо списка получал объяснение,
+    что список ему не положен — право на чтение было, а панель его не
+    использовала. Теперь модератор видит список.
+
+    И одновременно НЕ видит того, что база оставила владельцу: назначение
+    ролей, лидерства, переименование, удаление и награда репутацией требуют
+    forum_is_admin(). Право, которого нет, не показывается кнопкой.
+  */
+  const modPlayersHtml = renderPlayers({
+    forum: {
+      configured: true,
+      me: { id: 'u9', nick: 'Модератор', role: 'moderator' },
+      users: [
+        { id: 'u9', nick: 'Модератор', role: 'moderator', createdAt: new Date(), banned: false, mutedUntil: null },
+        { id: 'u2', nick: 'Игрок', role: 'member', createdAt: new Date(), banned: false, mutedUntil: null },
+      ],
+      recoveries: [],
+    },
+  });
+  check('модератору виден список игроков',
+    /data-player="u2"/.test(modPlayersHtml) && /Игрок/.test(modPlayersHtml));
+  check('модератору не показывается назначение ролей и лидерства',
+    !/data-player-moderator=/.test(modPlayersHtml) && !/data-player-leader=/.test(modPlayersHtml));
+  check('модератору не показываются переименование, награда и удаление',
+    !/data-player-rename=/.test(modPlayersHtml)
+      && !/data-player-rep=/.test(modPlayersHtml)
+      && !/data-player-delete=/.test(modPlayersHtml));
+  check('модератору доступны то действия, что база ему отдаёт: проверка ника и запрет',
+    modPlayersHtml.includes('data-player-verify="u2"')
+      && modPlayersHtml.includes('data-player-restrict="u2"'));
+  check('модератору не достаётся блок заявок на восстановление',
+    !/data-recovery-review/.test(modPlayersHtml) && !/adm-recoveries/.test(modPlayersHtml));
+
+  /*
+    МЕНЮ ПАНЕЛИ ПОКАЗЫВАЕТ ТОЛЬКО ДОСТУПНЫЕ РАЗДЕЛЫ.
+
+    Форумные экраны (Жалобы, Игроки, Чаты) читает и меняет модерация — это
+    forum_is_staff() в базе. Показывать их человеку без этого права значило
+    вести его в пустоту: пункт меню есть, а за ним отказ. Право, которого
+    нет, не показывается пунктом меню.
+  */
+  const { visibleScreens } = await import('../src/admin/main.js').then((m) => m)
+    .catch(() => ({}));
+  const adminMainSrc = await readFile('src/admin/main.js', 'utf8');
+  check('меню панели фильтруется по праву модерации',
+    /function visibleScreens\(\)/.test(adminMainSrc)
+      && /need: 'moderate'/.test(adminMainSrc)
+      && /screens: visibleScreens\(\)/.test(adminMainSrc));
+  check('прямой адрес закрытого раздела не открывает его, а объясняет',
+    /Этот раздел вам не открыт/.test(adminMainSrc)
+      && /const allowed = visibleScreens\(\)\.some/.test(adminMainSrc));
+
   const playersHtml = renderPlayers({
     forum: {
       configured: true,
@@ -4340,6 +4397,25 @@ console.log('\nS. Чистые функции');
   check('копия: отказ называет файлы в сборочном логе',
     /console\.log\([^)]*skipped/.test(buildSrc)
       && /ВНИМАНИЕ/.test(buildSrc));
+  /*
+    КАРТИНКИ РЯДОМ С КОПИЕЙ.
+
+    Копия показывает герой и карточки альянсов, а картинки лежат в public/.
+    Без копирования превью ссылалось на ./public/hero/oblika-1120.avif —
+    файла рядом с dist/preview.html не было, и копия показывала битый кадр
+    вместо своего. Проверка смотрит на диск: папка с картинками должна быть
+    рядом с копией.
+  */
+  try {
+    const { stat } = await import('node:fs/promises');
+    const heroCopied = await stat('dist/public/hero').then(() => true).catch(() => false);
+    check('копия: картинки героя лежат рядом с ней, а не по пути в пустоту',
+      heroCopied
+        && /await cp\(dir, to, \{ recursive: true, force: true \}\)/.test(buildSrc)
+        && /public\/hero/.test(buildSrc));
+  } catch {
+    /* dist/ нет — сборка ещё не запускалась, проверять нечего. */
+  }
 }
 {
   /* ── краски альянсов, доведённые до контраста (src/ui/ink.js) ── */
