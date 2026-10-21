@@ -920,32 +920,36 @@
 */
 .guide-color-picker,
 .guide-color-modal__dialog {
-  --recessed:  #0b0e13;
-  --bg:        #111419;
-  --surface:   #161a20;
-  --raised:    #1b2027;
+  --recessed:  #090b0f;
+  --bg:        #10141a;
+  --surface:   #151a21;
+  --raised:    #1c222b;
   --raised-2:  #222831;
   --overlay:   #252b34;
-  --line:      #2b313a;
+  --line:      #272e38;
   --line-soft: #20252c;
 
-  --text:      #f2f4f7;
-  --dim:       #b7bec8;
-  --mute:      #8a939f;
+  --text:      #f1f5f9;
+  --dim:       #94a3b8;
+  --mute:      #8695ab;
   --silver:    #b8c0ca;
-  --link:      #9ab8e8;
+  --link:      #a5b4fc;
   --blogger:   #31c5b5;
 
-  --accent:    #ff6b50;
-  --accent-dk: #e85a40;
-  --accent-ink: #ff6b50;
-  --on-accent: #17181b;
-  --on-role:   #0a0e15;
+  --accent:    #6165f0;
+  --accent-dk: #5f63ec;
+  --accent-hi: #818cf8;
+  --accent-ink: #6165f0;
+  --on-accent: #ffffff;
+  --on-role:   #090b0f;
+  --accent-orange:     #f97316;
+  --accent-orange-ink: #f97316;
+  --on-orange:         #090b0f;
   --gold:      #d8b26a;
   --gold-ink:  #d8b26a;
   --bronze:    #c99a72;
-  --win:       #56c596;
-  --loss:      #ff6b6b;
+  --win:       #22c55e;
+  --loss:      #ef4444;
   --win-ink:  color-mix(in oklab, var(--win) 85%, var(--text));
   --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
   --tag-ink-keep: 70%;
@@ -977,7 +981,7 @@
   --shade: var(--recessed);
   --tint:  var(--text);
 
-  --accent-plate: linear-gradient(135deg, #ff7a61, var(--accent));
+  --accent-plate: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 88%, var(--shade)));
   --accent-plate-line: var(--accent-dk);
   --danger-plate: linear-gradient(135deg, color-mix(in srgb, var(--loss) 70%, var(--tint)), var(--loss));
   --danger-plate-line: color-mix(in srgb, var(--loss) 70%, var(--tint));

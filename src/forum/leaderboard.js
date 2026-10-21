@@ -61,3 +61,35 @@ export function leaderboardOf(posts, { period = 'all' } = {}) {
     .slice(0, 10)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }
+
+/**
+ * ДОСКА РАЗДЕЛОВ — тот же приём, что у лидерборда: посты → ряд разделов.
+ *
+ * Считает по переданной выборке, поэтому честность счёта — дело вызывающего:
+ * он знает, какое окно ленты прислал, и подписывает его под доской.
+ *
+ * Внутри раздела: сколько тем, сколько на них ответов и кто писал последним.
+ * Ответы берутся из `commentCount` темы — это то же число, что показывает
+ * карточка поста, а не отдельный запрос.
+ */
+export function categoryStats(posts) {
+  const by = new Map();
+  if (!Array.isArray(posts)) return by;
+  for (const p of posts) {
+    if (!p || p.deleted) continue;
+    const id = String(p.category || '');
+    if (!id) continue;
+    let row = by.get(id);
+    if (!row) {
+      row = { id, count: 0, replies: 0, last: null };
+      by.set(id, row);
+    }
+    row.count += 1;
+    row.replies += Number(p.commentCount || 0);
+    const t = new Date(p.createdAt).getTime();
+    if (Number.isFinite(t) && (!row.last || t > row.last.at)) {
+      row.last = { nick: p.authorNick || '—', at: t };
+    }
+  }
+  return by;
+}

@@ -659,7 +659,11 @@ export function renderHome(view = {}) {
       ${heroMedia()}
       <div class="hero__top">
         <div class="hero__ident">
-          <span class="eyebrow">Итоги недели</span>
+          <span class="hero__brandline">
+            <b>Сервер 33</b>
+            <i aria-hidden="true">·</i>
+            <span>Z Route : Redemption</span>
+          </span>
           <h1 class="hero__week">
             <span class="hero__word">Неделя</span>
             <span class="hero__num num">${week.number}</span>
@@ -669,6 +673,11 @@ export function renderHome(view = {}) {
             <span class="hero__sep">·</span>
             ${entered}
           </div>
+          <p class="hero__lead">
+            Портал сообщества 33 сервера: рейтинг альянсов по итогам VS, летопись
+            захватов, форум игроков и справочник гайдов — в одном месте и по
+            одним и тем же данным.
+          </p>
           <div class="hero__actions">
             <a class="hero__cta hero__cta--primary" href="#/ladder">Весь рейтинг<span aria-hidden="true"> →</span></a>
             <a class="hero__cta hero__cta--ghost" href="#/ladder?race=1">График сезона</a>

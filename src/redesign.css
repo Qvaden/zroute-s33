@@ -819,6 +819,108 @@ html .forum-side .forum-chron__title{
   letter-spacing: -.03em;
 }
 
+/* ── Доска разделов: как в современном community-продукте ────────────────── */
+html .forum-cats{
+  padding: 0 0 4px;
+}
+
+html .forum-cats__head{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+html .forum-cats__head b{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+html .forum-cats__head span{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+html .forum-cats__list{
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+html .forum-cat{
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 8px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+html .forum-cat:hover{
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
+  border-left-color: var(--accent);
+}
+
+html .forum-cat.is-on{
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+html .forum-cat__name{
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+html .forum-cat.is-on .forum-cat__name{
+  color: var(--accent-ink);
+}
+
+html .forum-cat__hint{
+  color: var(--mute);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+html .forum-cat__nums{
+  margin-top: 3px;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+html .forum-cat__nums i{
+  color: var(--mute);
+  font-style: normal;
+}
+
+html .forum-cat__last{
+  color: var(--mute);
+  font-size: 9px;
+  letter-spacing: .02em;
+}
+
+html .forum-cat__last b{
+  color: var(--dim);
+  font-weight: 600;
+}
+
+
 html .forum-side .forum-chron__stats{
   gap: 0;
   margin: 14px 0;
@@ -1398,6 +1500,42 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .hero__top{
 html body:not([data-route="forum"]):not([data-route="bot"]) .hero__ident{
   min-width: 0;
 }
+
+/*
+  Строка бренда: «Сервер 33 · Z Route : Redemption». Это не украшение, а
+  ответ на вопрос «что это вообще» — и микро-лейбл, который держит имя
+  проекта рядом с номером недели. Оранжевый здесь точечен: он принадлежит
+  игре, а не интерфейсу.
+*/
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__brandline{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mute);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__brandline b{
+  color: var(--accent-orange-ink);
+  font-weight: 700;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__brandline i{
+  color: var(--line);
+  font-style: normal;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hero__lead{
+  max-width: 56ch;
+  margin: 14px 0 0;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .hero__week{
   display: flex;
@@ -2384,7 +2522,7 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .live__dot{
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .live__dot.is-on{
-  background: var(--accent);
+  background: var(--accent-orange);
   box-shadow: none;
 }
 
@@ -4592,10 +4730,10 @@ html body[data-route="bot"] .bot-launch{
 html body[data-route="bot"] .bot-cta{
   min-height: 42px;
   padding: 10px 16px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-orange);
   border-radius: var(--r-xs);
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--accent-orange);
+  color: var(--on-orange);
   font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -4604,7 +4742,7 @@ html body[data-route="bot"] .bot-cta{
 
 html body[data-route="bot"] .bot-cta:hover{
   transform: none;
-  background: var(--accent-dk);
+  background: color-mix(in srgb, var(--accent-orange) 84%, var(--text));
   box-shadow: none;
 }
 

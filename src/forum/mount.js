@@ -35,7 +35,7 @@ import { normalizeQuietWindow, parseQuietTime, saveQuietWindow } from './quiet.j
 import { slaPromiseLine } from './sla.js';
 import { editorFor, applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { esc } from '../ui/helpers.js';
-import { leaderboardOf } from './leaderboard.js';
+import { leaderboardOf, categoryStats } from './leaderboard.js';
 import {
   createRecoveryKey, hashRecoveryKey, saveRecovery, loadRecovery, clearRecovery, formatRecoveryKey,
 } from './recovery.js';
@@ -1095,6 +1095,13 @@ async function loadFeedExtras(token) {
           week: leaderboardOf(wide.posts ?? [], { period: 'week' }),
           all: leaderboardOf(wide.posts ?? [], { period: 'all' }),
         };
+        /*
+          Та же выборка считает доску разделов: раздел, число тем и ответов и
+          последняя активность в нём. Отдельного запроса на каждый раздел не
+          делаем — база всё равно не отдаёт точного числа тем, а лишние
+          восемь запросов на страницу ничего бы не добавили.
+        */
+        state.cats = categoryStats(wide.posts ?? []);
       } catch {
         /* лидерборд переживает и старый */
       }

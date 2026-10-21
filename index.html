@@ -48,7 +48,7 @@
     оставляла чёрную полосу над бежевой страницей.
   -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#111419">
+  <meta name="theme-color" content="#10141a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -128,11 +128,11 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=122">
+  <link rel="modulepreload" href="./src/main.js?v=123">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=optional" rel="stylesheet"></noscript>
 
-  <link rel="stylesheet" href="./src/styles-v8.css?v=24">
+  <link rel="stylesheet" href="./src/styles-v8.css?v=25">
   <!--
     Форум и боковые вкладки — отдельным файлом.
 
@@ -141,7 +141,7 @@
     окончательно неразбираемым: у форума своя, независимая от рейтинга
     и хронологии, задача, и его правки не должны задевать таблицы.
   -->
-  <link rel="stylesheet" href="./src/forum.css?v=63">
+  <link rel="stylesheet" href="./src/forum.css?v=64">
   <!--
     Телефон — последним слоем.
 
@@ -150,7 +150,7 @@
     экрана обязаны быть последним словом, а не спорить со слоями,
     накопившимися в styles-v8.css за шесть версий.
   -->
-  <link rel="stylesheet" href="./src/mobile.css?v=44">
+  <link rel="stylesheet" href="./src/mobile.css?v=45">
   <!--
     Элементы ввода — последним слоем, и здесь, и в панели.
 
@@ -163,12 +163,12 @@
     Один файл на сайт и панель: правила для select уже лежали в четырёх местах
     admin.css и спорили друг с другом.
   -->
-  <link rel="stylesheet" href="./src/controls.css?v=8">
+  <link rel="stylesheet" href="./src/controls.css?v=9">
   <!--
     Слой отделки — самым последним. Плотность, две колонки форума и единые
     состояния кнопок на весь сайт; подробности в самом файле.
   -->
-  <link rel="stylesheet" href="./src/refine.css?v=53">
+  <link rel="stylesheet" href="./src/refine.css?v=54">
   <!--
     Справочник официальных гайдов — своим файлом и после слоя отделки.
 
@@ -176,13 +176,13 @@
     последним: картинки и подписи в гайдах игры важнее общей плотности, и
     правило «подпись под картинкой» не должно перебиваться соседним слоем.
   -->
-  <link rel="stylesheet" href="./src/handbook.css?v=11">
+  <link rel="stylesheet" href="./src/handbook.css?v=12">
   <!--
     Новый продуктовый язык Z Route: токены, оболочка и форум. Слой лежит
     последним, потому что он обязан перебивать и базовые карточки, и
     мобильную плотность. Справочник и краски альянсов остаются своими.
   -->
-  <link rel="stylesheet" href="./src/redesign.css?v=3">
+  <link rel="stylesheet" href="./src/redesign.css?v=4">
   <!--
     Краски альянсов, доведённые до контраста. Пустой блок — это нормально.
 
@@ -458,7 +458,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=122"></script>
+  <script type="module" src="./src/main.js?v=123"></script>
 
   <script>
     /*

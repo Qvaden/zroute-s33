@@ -95,6 +95,8 @@ export function renderForum(view, state = {}) {
     query: '',
     editingPostId: null,
     hot: [],
+    /** Счёт по разделам: темы, ответы и последняя активность в окне ленты. */
+    cats: new Map(),
     lead: [],
     leadPeriod: 'week',
     /** Push-настройки форума: приходит ли уведомление о новом посте и об ответе. */
@@ -166,6 +168,7 @@ export function renderForum(view, state = {}) {
         ${renderFeed(s)}
       </div>
       <aside class="forum-side" aria-label="Сводка и правила">
+        ${renderCategoryBoard(s)}
         ${renderChronicleBand(view?.events ?? [])}
         ${renderWeekTheme(view)}
         ${renderQuarterBanner(view)}
@@ -522,6 +525,63 @@ function renderServerActivity(view, s) {
           ${act.map((d) => `<span>${DAY_SHORT[d.day.getDay()]}</span>`).join('')}
         </div>
       </div>` : ''}
+    </section>`;
+}
+
+/**
+ * ДОСКА РАЗДЕЛОВ — как в современном community-продукте.
+ *
+ * Что показывает: у каждого раздела — название, короткое пояснение, счёт тем
+ * и ответов и последняя активность. Всё это уже лежит в руках страницы:
+ * лента форума приносит раздел у каждой темы, число ответов и автора с
+ * временем.
+ *
+ * ЧЕСТНОСТЬ СЧЁТА. Точного числа тем база не отдаёт: лента знает лишь «есть
+ * ли ещё страница». Поэтому счёт здесь — по последним 300 темам ленты, и
+ * подпись под доской говорит об этом прямо. Придуманное «1.2K сообщений»
+ * было бы правдой только наполовину, а наполовину правда в интерфейсе хуже
+ * простого отсутствия числа.
+ *
+ * Разделы настоящие: те, что живут в `CATEGORIES`. Нажатие на карточку
+ * выбирает раздел тем же фильтром, что и кнопки над лентой, — второй путь
+ * не заводим.
+ */
+function renderCategoryBoard(s) {
+  const stats = s.cats instanceof Map ? s.cats : null;
+  if (!stats || !stats.size) return '';
+  const rows = CATEGORIES.map((c) => ({ c, row: stats.get(c.id) })).filter((x) => x.row);
+  if (!rows.length) return '';
+  const on = s.category && s.category !== 'all' ? s.category : '';
+  return `
+    <section class="forum-cats" data-forum-cats aria-label="Разделы форума">
+      <header class="forum-cats__head">
+        <b>Разделы форума</b>
+        <span class="muted">счёт по последним 300 темам ленты</span>
+      </header>
+      <ul class="forum-cats__list">
+        ${rows
+          .map(
+            ({ c, row }) => `<li>
+              <button type="button" class="forum-cat${on === c.id ? ' is-on' : ''}"
+                      data-forum-cat="${esc(c.id)}"
+                      aria-pressed="${on === c.id ? 'true' : 'false'}">
+                <span class="forum-cat__name">${esc(c.label)}</span>
+                <span class="forum-cat__hint">${esc(c.hint)}</span>
+                <span class="forum-cat__nums">
+                  ${esc(plural(row.count, 'тема', 'темы', 'тем'))}
+                  <i aria-hidden="true">·</i>
+                  ${esc(plural(row.replies, 'ответ', 'ответа', 'ответов'))}
+                </span>
+                <span class="forum-cat__last">
+                  ${row.last
+                    ? `последнее: <b>${esc(row.last.nick || '—')}</b> · ${esc(timeAgo(new Date(row.last.at)))}`
+                    : 'пока тихо'}
+                </span>
+              </button>
+            </li>`
+          )
+          .join('')}
+      </ul>
     </section>`;
 }
 
