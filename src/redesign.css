@@ -105,6 +105,54 @@ html .brand__text small{
 
 html .head__where{ gap: 12px; }
 
+/* ── Верхняя навигация: четыре раздела, к которым ходят чаще всего ──────── */
+html .head__nav{
+  display: none;
+}
+
+@media (min-width: 1040px) {
+  html .head__nav{
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 12px;
+  }
+}
+
+html .head__nav__link{
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+html .head__nav__link:hover{
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+html .head__nav__link.is-active{
+  color: var(--accent-hi);
+  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-weight: 600;
+}
+
+/*
+  В дневной теме активный пункт читается тёмным: светлый индиго на бумаге дал бы
+  0,42:1. Подписью бренда здесь работает `--accent-ink` — тот же тёмный тон,
+  что и на кнопке.
+*/
+:root[data-theme="light"] .head__nav__link.is-active{
+  color: var(--accent-ink);
+}
+
+
 html .head__where b{
   font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
@@ -163,6 +211,9 @@ html .side .nav{
 
 html .side .nav__link{
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-height: 34px;
   padding: 7px 10px 7px 14px;
   border: 0;
@@ -173,6 +224,30 @@ html .side .nav__link{
   font-weight: 500;
   letter-spacing: -.005em;
   transition: color 160ms ease, background 160ms ease;
+}
+
+/*
+  Значок раздела: тот же тонкий контур, что у значков в шапке и в поле поиска.
+  Он держит ритм колонки и помогает читать список боковым зрением.
+*/
+html .side .nav__icon{
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--mute);
+  transition: color 160ms ease;
+}
+
+html .side .nav__link:hover .nav__icon{
+  color: var(--dim);
+}
+
+html .side .nav__link.is-active .nav__icon{
+  color: var(--accent-hi);
+}
+
+:root[data-theme="light"] .side .nav__link.is-active .nav__icon{
+  color: var(--accent-ink);
 }
 
 html .side .nav__link:hover{
@@ -567,10 +642,9 @@ html .forum-post__head time{
 
 html .forum-post__id{
   color: var(--mute);
-  font-family: 'Space Grotesk', monospace;
-  font-size: 10px;
-  letter-spacing: .06em;
-  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0;
 }
 
 html .forum-post__pin,
@@ -1644,16 +1718,28 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source-value{
   font-size: 11px;
 }
 
+/*
+  Показатели — небольшие premium-карточки: тёмная поверхность, тонкая
+  граница, спокойный hover. Никакого декоративного шума: цифра и подпись, всё.
+*/
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stats{
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 24px;
+  gap: 8px;
   margin: 0;
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat{
-  padding: 0;
-  border: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat:hover{
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+  background: var(--raised);
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__stat dt{
@@ -3335,7 +3421,7 @@ html .quart-dial span{
 
 html .quart-dial b{
   color: var(--quart-head);
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-mono);
   font-size: 44px;
   font-weight: 600;
   line-height: 1;

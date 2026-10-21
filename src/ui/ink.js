@@ -57,7 +57,7 @@
 */
 export const INK = {
   light: { surface: '#eff0ed', ink: '#202124', stroke: 3, label: 4.5, fade: 0.85 },
-  dark: { surface: '#292f38', ink: '#f1f5f9', stroke: 3, label: 4.5, fade: 0.85 },
+  dark: { surface: '#232932', ink: '#f1f5f9', stroke: 3, label: 4.5, fade: 0.85 },
 };
 
 /* Краска «альянс без краски»: тот же серый, что подставляют страницы. */

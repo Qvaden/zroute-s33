@@ -130,7 +130,7 @@
   background: var(--accent);
   border-color: var(--accent);
 }
-.adm-btn--primary:hover { background: var(--accent-dk); border-color: var(--accent-dk); color: var(--on-accent); }
+.adm-btn--primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); color: var(--on-accent-hi); }
 
 /* ── Каркас ───────────────────────────────────────────────────────────────── */
 .adm-main {
@@ -920,14 +920,14 @@
 */
 .guide-color-picker,
 .guide-color-modal__dialog {
-  --recessed:  #090b0f;
-  --bg:        #10141a;
-  --surface:   #151a21;
-  --raised:    #1c222b;
-  --raised-2:  #222831;
+  --recessed:  #06080b;
+  --bg:        #090b0f;
+  --surface:   #10141a;
+  --raised:    #151a21;
+  --raised-2:  #1c222b;
   --overlay:   #252b34;
   --line:      #272e38;
-  --line-soft: #20252c;
+  --line-soft: #1a2028;
 
   --text:      #f1f5f9;
   --dim:       #94a3b8;
@@ -941,6 +941,7 @@
   --accent-hi: #818cf8;
   --accent-ink: #6165f0;
   --on-accent: #ffffff;
+  --on-accent-hi: #090b0f;
   --on-role:   #090b0f;
   --accent-orange:     #f97316;
   --accent-orange-ink: #f97316;

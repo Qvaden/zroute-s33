@@ -392,6 +392,41 @@ function parseHash() {
 */
 const NAV_TITLES = ['Общение', 'Сервер', 'Справка'];
 
+/*
+  ИКОНКИ РАЗДЕЛОВ — ОДИН НАБОР, ТОНКАЯ ОБВОДКА.
+
+  Все иконки нарисованы одним почерком: 24×24, обводка 1.6 px, скруглённые
+  концы, без заливки. Смешивать стили нельзя: ряд из пятнадцати иконок, взятых
+  из разных наборов, читается как «штучная сборка», а не как продукт.
+
+  Иконка декоративна: название раздела стоит рядом текстом, поэтому значок
+  скрыт от программы экрана (`aria-hidden`) — иначе она читала бы каждую
+  подпись дважды.
+*/
+const NAV_ICONS = {
+  forum: '<path d="M20 4H4v11h3v4l5-4h8z"/><path d="M8 9h8M8 12h4"/>',
+  chats: '<path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/>',
+  tournaments: '<path d="M4 20h16M7 20v-6M12 20V5M17 20v-9"/>',
+  guides: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v14H6.5A2.5 2.5 0 0 0 4 19.5Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H19v4H6.5"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  updates: '<path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/>',
+  accounts: '<path d="M3 7h18v12H3z"/><path d="M3 11h18M8 15h4"/>',
+  handbook: '<path d="M4 4h7a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4Z"/><path d="M20 4h-7a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h7Z"/>',
+  home: '<path d="M4 19V9l8-5 8 5v10"/><path d="M9 19v-6h6v6"/>',
+  quarter: '<path d="M12 3v18M5 8h14M6.5 8l-2.5 6h5ZM17.5 8l-2.5 6h5Z"/>',
+  ladder: '<path d="M4 20h16M7 20v-6M12 20V5M17 20v-9"/>',
+  timeline: '<path d="M5 4v16"/><path d="M5 8h9M5 13h13M5 18h6"/>',
+  guide: '<path d="M12 3 4 7v5c0 4.4 3.4 8.5 8 9 4.6-.5 8-4.6 8-9V7Z"/><path d="M9 12l2 2 4-4"/>',
+  bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8.5 14h.01M15.5 14h.01M9 17h6"/>',
+  about: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+};
+
+function navIcon(id) {
+  const path = NAV_ICONS[id];
+  if (!path) return '';
+  return `<svg class="nav__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+}
+
 function renderNav(activeId) {
   /* Какую вкладку подсветить, когда страница открыта: у раздела без своего
      пункта меню (`hidden`) это чужая вкладка — `navAs`. */
@@ -404,7 +439,7 @@ function renderNav(activeId) {
   */
   const link = (r) => `<a href="#/${r.id}" class="nav__link ${navId(r) === activeId ? 'is-active' : ''}${
       r.primary ? ' nav__link--primary' : ''
-    }"${navId(r) === activeId ? ' aria-current="page"' : ''}>${r.label}${
+    }"${navId(r) === activeId ? ' aria-current="page"' : ''}>${navIcon(r.id)}<span>${r.label}</span>${
       r.id === 'chats' ? '<span class="nav__badge" data-nav-chats-badge hidden></span>' : ''
     }</a>`;
   /*
@@ -429,7 +464,28 @@ function renderNav(activeId) {
   ).join('');
   paintHeadWhere(activeId);
   syncTabbar(activeId);
+  syncHeadNav(activeId);
   refreshChatsBadge();
+}
+
+/*
+  ВЕРХНЯЯ НАВИГАЦИЯ ШАПКИ: тот же раздел, что и в колонке, но коротким путём.
+
+  Пункты статичны (в разметке), поэтому активный подсвечивает модуль — тем же
+  идентификатором, что и меню: страница справочника принадлежит вкладке
+  «Гайдов», и подсветка должна встать на «Гайды», а не на саму страницу.
+*/
+function syncHeadNav(activeId) {
+  const nav = document.querySelector('.head__nav');
+  if (!nav) return;
+  nav.querySelectorAll('a[href]').forEach((link) => {
+    const id = link.getAttribute('href').replace(/^#\/?/, '');
+    const route = ROUTES.find((r) => r.id === id);
+    const on = route ? (route.navAs || route.id) === activeId : false;
+    link.classList.toggle('is-active', on);
+    if (on) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
 }
 
 /*
