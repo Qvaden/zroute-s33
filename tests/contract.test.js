@@ -16366,8 +16366,8 @@ console.log('\nAO. Раздел — страница');
   check('под пальцем кнопка «Написать пост» остаётся 44 px',
     /@media \(hover: none\) and \(pointer: coarse\)/.test(redesignSrc)
       && /\.forum-composer__summary\{ min-height: 44px; \}/.test(redesignSrc));
-  check('блок профиля стал ниже, аватар ужат',
-    /padding: var\(--s-2\) 0/.test(ruleBody(redesignSrc, 'html .forum-me{'))
+  check('блок профиля стал ниже, аватар ужат, но рамка не липнет к краям',
+    /padding: var\(--s-2\);/.test(ruleBody(redesignSrc, 'html .forum-me{'))
       && /width: 32px;/.test(ruleBody(redesignSrc, 'html .forum-me__ava .forum-ava,')));
   check('композер отделён от границы шапки шагом шкалы, а не висит на ней',
     /margin: var\(--s-3\) 0/.test(ruleBody(redesignSrc, 'html .forum-composer{')));
