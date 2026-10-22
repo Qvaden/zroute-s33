@@ -34,6 +34,7 @@ import path from 'node:path';
 
 import { esc } from '../src/ui/helpers.js';
 import { HANDBOOK, HANDBOOK_ROOTS } from '../src/handbook/guides.js';
+import { seoFor, seoIndex } from '../src/handbook/seo.js';
 import {
   HANDBOOK_COUNT,
   handbookLead,
@@ -79,20 +80,6 @@ const SECTION_LINKS = [
 
 const plain = (s) => String(s ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-const clip = (s, max) => (s.length > max ? `${s.slice(0, max).replace(/\s+\S*$/, '')}…` : s);
-
-/**
- * Описание страницы — та же первая строка гайда, что стоит подписью под
- * плиткой на сайте: в выдаче человек должен читать то же слово, что увидит,
- * когда придёт.
- */
-function descriptionFor(node) {
-  const lead = handbookLead(node);
-  const title = plain(node.title);
-  if (!lead) return clip(`${title} — справочник Z Route: Redemption на сервере 33.`, 158);
-  return clip(`${title} — ${lead}`, 158);
-}
-
 /**
  * Ссылки вида «фрагмент» из общей разметки превращает в адреса документов.
  *
@@ -121,13 +108,13 @@ function toSiteLinks(html, depth) {
  * отсутствует: выдуманную дату поисковик прочёл бы как свежесть правила,
  * которого в игре уже может не быть.
  */
-function jsonLd({ node, url, description, view }) {
+function jsonLd({ node, url, heading, description, view }) {
   const site = { '@type': 'WebSite', name: view.siteName, url: `${view.origin}/` };
   const publisher = { '@type': 'Organization', name: view.siteName };
   const body = node
     ? {
         '@type': 'Article',
-        headline: plain(node.title),
+        headline: heading,
         description,
         articleSection: plain(node.section) || 'Справочник',
         image: [view.ogImage],
@@ -138,7 +125,7 @@ function jsonLd({ node, url, description, view }) {
       }
     : {
         '@type': 'CollectionPage',
-        name: 'Справочник официальных гайдов Z Route: Redemption',
+        name: heading,
         description,
         url,
         isPartOf: site,
@@ -156,7 +143,7 @@ function jsonLd({ node, url, description, view }) {
  * ровно там, где её начинает читать робот, у которого модулей нет. Лёгкость
  * страницы — не экономия, а её смысл.
  */
-function pageHtml({ node, depth, view, pageUrl, title, description, bodyHtml }) {
+function pageHtml({ node, depth, view, pageUrl, title, heading, description, bodyHtml }) {
   const nav = [
     `<a href="${depth.book}" aria-current="page">Справочник</a>`,
     ...SECTION_LINKS.map((l) => `<a href="${depth.root}#/${l.to}">${esc(l.label)}</a>`),
@@ -222,7 +209,7 @@ ${parent ? `<link rel="up" href="${esc(depth.node(parent.id))}">` : ''}
 <meta property="og:locale" content="ru_RU">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
-${jsonLd({ node, url: pageUrl, description, view })}
+${jsonLd({ node, url: pageUrl, heading, description, view })}
 </script>
 </head>
 <body>
@@ -271,7 +258,7 @@ function branchList(node) {
  * дерево, обязана видеть все адреса, иначе гайд без ссылки снаружи остаётся
  * существующим, но недостижимым.
  */
-function indexBodyHtml() {
+function indexBodyHtml(seo) {
   const groups = HANDBOOK_ROOTS.map((id) => handbookNode(id))
     .filter(Boolean)
     .map((root) => `
@@ -284,13 +271,15 @@ function indexBodyHtml() {
   return `
     <section class="panel hb-page">
       <header class="panel__head">
-        <span class="eyebrow">Справочник</span>
-        <h1>Официальные гайды Z Route: Redemption</h1>
-        <p class="muted">${HANDBOOK_COUNT.guides} правил и разборов игры, перенесённых из бота
-          без правок, — каждый отдельной страницей, чтобы на него можно было дать ссылку
-          и найти его в поиске. Разделов: ${HANDBOOK_COUNT.sections}.</p>
-        <p class="muted">Гайды участников сервера, вопросы и обсуждение —
-          <a href="#/guides">на вкладке «Гайды»</a>.</p>
+        <span class="eyebrow">Гайды</span>
+        <h1>${esc(seo.heading)}</h1>
+        <p class="muted">${HANDBOOK_COUNT.guides} официальных правил и разборов игры,
+          перенесённых из бота без правок: события, герои, отряды, исследования, альянс
+          и советы новичкам. Каждый гайд — отдельной страницей, чтобы на него можно было
+          дать ссылку и найти его в поиске.</p>
+        <p class="muted">Нужен быстрый ответ? <a href="../#/guides">Откройте поиск по справочнику</a> —
+          он ищет по тексту правил и подписям к скриншотам. Гайды участников сервера,
+          вопросы и обсуждение — там же, на вкладке «Гайды».</p>
       </header>
       ${renderSections()}
     </section>
@@ -322,8 +311,7 @@ export async function buildAll() {
   const pages = [];
 
   const indexUrl = `${view.origin}/${DIR}/`;
-  const indexDescription = `${HANDBOOK_COUNT.guides} правил и разборов игры по разделам: события, `
-    + 'исследования, альянсы, тактика. Каждый гайд — отдельной страницей.';
+  const indexSeo = seoIndex(HANDBOOK_COUNT.guides);
   pages.push({
     file: `${DIR}/index.html`,
     url: indexUrl,
@@ -332,16 +320,18 @@ export async function buildAll() {
       depth: DEPTH.index,
       view,
       pageUrl: indexUrl,
-      title: 'Справочник официальных гайдов Z Route: Redemption · Сервер 33',
-      description: indexDescription,
+      title: indexSeo.title,
+      heading: indexSeo.heading,
+      description: indexSeo.description,
       // Одна перепись на всё тело страницы: и плитки разделов, и каталог
       // ссылаются фрагментами, как их рисует общий рендерер.
-      bodyHtml: toSiteLinks(indexBodyHtml(), DEPTH.index),
+      bodyHtml: toSiteLinks(indexBodyHtml(indexSeo), DEPTH.index),
     }),
   });
 
   for (const node of HANDBOOK) {
     const url = `${view.origin}/${DIR}/${node.id}/`;
+    const seo = seoFor(node);
     pages.push({
       file: `${DIR}/${node.id}/index.html`,
       url,
@@ -350,9 +340,10 @@ export async function buildAll() {
         depth: DEPTH.node,
         view,
         pageUrl: url,
-        title: `${plain(node.title)} · справочник Z Route: Redemption`,
-        description: descriptionFor(node),
-        bodyHtml: toSiteLinks(renderHandbook({ guideId: node.id }), DEPTH.node),
+        title: seo.title,
+        heading: seo.heading,
+        description: seo.description,
+        bodyHtml: toSiteLinks(renderHandbook({ guideId: node.id, heading: seo.heading }), DEPTH.node),
       }),
     });
   }

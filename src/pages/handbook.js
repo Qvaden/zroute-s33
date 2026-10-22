@@ -399,13 +399,14 @@ export function renderHandbook(state = {}) {
 
   const parent = parentId.has(node.id) ? byId.get(parentId.get(node.id)) : null;
   const siblings = (parent ? parent.children : []).filter((sid) => sid !== node.id && byId.has(sid));
+  const heading = state.heading ? String(state.heading) : node.title;
 
   return `
     <section class="panel hb-page hb-page--node">
       ${breadcrumbs(node)}
       <header class="panel__head">
         <span class="eyebrow">${node.children.length ? 'Раздел справочника' : 'Официальный гайд'}</span>
-        <h1>${esc(node.title)}</h1>
+        <h1>${esc(heading)}</h1>
       </header>
 
       ${childTiles(node)}
