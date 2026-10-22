@@ -1465,7 +1465,7 @@ h1,h2,h3,h4 {
 }
 .chron__cat { color: var(--accent-ink); }
 .chron__verdict {
-  padding: var(--s-hair) var(--s-1);
+  padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--text) 4%, transparent);
@@ -2045,7 +2045,7 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .tag {
   display: inline-block;
   font-family: Unbounded, sans-serif; font-size: var(--fs-meta); font-weight: 800; letter-spacing: .03em;
-  padding: var(--s-hair) var(--s-1); border-radius: var(--r-sm);
+  padding: var(--s-fine) var(--s-1); border-radius: var(--r-sm);
   color: color-mix(in oklab, var(--tag-color, var(--dim)) var(--tag-ink-keep), var(--text));
   /* Запасная серая плашка берётся из --mute той же темы: прежний #888 был
      ночным нейтральным и на светлой бумаге давал грязное пятно. */

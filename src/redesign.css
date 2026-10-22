@@ -783,7 +783,7 @@ html .forum-post__id{
 html .forum-post__pin,
 html .forum-post__trail,
 html .forum-post__new{
-  padding: 2px 6px;
+  padding: 4px 7px;
   border-radius: var(--r-hair);
   font-size: 9px;
   font-weight: 600;
@@ -2077,7 +2077,7 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .who{
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .who__summary{
-  padding: 14px 0;
+  padding: 14px var(--s-2);
   color: var(--mute);
   font-size: 10px;
   font-weight: 600;
@@ -2196,7 +2196,7 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .eyebrow{
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) #app > .panel:not(.chat-empty):first-child{
-  padding: 0;
+  padding: 0 0 24px;
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;

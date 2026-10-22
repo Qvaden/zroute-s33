@@ -16380,6 +16380,30 @@ console.log('\nAO. Раздел — страница');
       && /gap: var\(--s-2\)/.test(ruleBody(redesignSrc, 'html .forum-side .forum-chron__item{')));
 
   /*
+    ВОЗДУХ У ЛИНИЙ.
+
+    Первая панель страницы — не карточка, а раздел: рамки по бокам сняты,
+    остаётся линия снизу. Без нижнего поля последняя строка («24 активных
+    альянса…», «Открытых заявок нет…») садилась на эту линию вплотную.
+    Сводка «Кто именно» потеряла боковые поля вместе с рамкой и начинала
+    текст у самой черты. Плашки-пилюли с вертикальным зазором в 2 px
+    оставляли буквам 1–2 px до обводки — теперь у всех ступень --s-fine.
+  */
+  const forumSrc = await readFile('src/forum.css', 'utf8');
+  check('первая панель-раздел дышит снизу, а не печатает текст на линии',
+    /padding: 0 0 24px/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) #app > .panel:not(.chat-empty):first-child{')));
+  check('сводка «Кто именно» отступает от боковой черты',
+    /padding: 14px var\(--s-2\)/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .who__summary{')));
+  check('пилюли держат буквы на расстоянии от обводки',
+    /padding: var\(--s-fine\) var\(--s-1\)/.test(ruleBody(v8, '.tag {'))
+      && /padding: var\(--s-fine\) var\(--s-1\)/.test(ruleBody(v8, '.chron__verdict {'))
+      && /padding: var\(--s-fine\) var\(--s-1\)/.test(ruleBody(mobile, '.tl__group-count {'))
+      && /padding: var\(--s-fine\) var\(--s-1\)/.test(ruleBody(forumSrc, '.upd-card__version {'))
+      && /padding: 4px 7px/.test(ruleBody(redesignSrc, 'html .forum-post__pin,'))
+      && /padding: var\(--s-fine\) var\(--s-1\)/
+        .test((mobile.match(/\.forum-post__by \.role-badge,[\s\S]*?\}/) || [''])[0]));
+
+  /*
     Карточка альянса собрана по той же шкале, что и строка рейтинга.
 
     Номер места в карточке — тот же формат «#NN», что в колонке списка: два

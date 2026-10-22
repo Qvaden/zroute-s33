@@ -3343,7 +3343,7 @@
 .upd-card__date { font-size: var(--fs-meta); color: var(--dim); }
 .upd-card__version {
   margin-left: auto;
-  padding: var(--s-hair) var(--s-1);
+  padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   font-size: var(--fs-eyebrow);

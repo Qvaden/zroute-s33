@@ -323,7 +323,7 @@ html {
   папка с одной записью и папка с двадцатью выглядят иначе.
 */
 .tl__group-count {
-  padding: var(--s-hair) var(--s-1);
+  padding: var(--s-fine) var(--s-1);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   color: var(--mute);
@@ -999,7 +999,7 @@ html {
 .forum-post__by .role-badge b,
 .forum-comment__head .role-badge b { display: none; }
 .forum-post__by .role-badge,
-.forum-comment__head .role-badge { padding: var(--s-hair) var(--s-fine); }
+.forum-comment__head .role-badge { padding: var(--s-fine) var(--s-1); }
 
 /*
   Владелец. Единственная метка с заметным свечением — и это осознанно:
