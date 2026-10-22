@@ -408,27 +408,52 @@ html .forum-account{
 }
 
 html .forum-me{
-  gap: 12px;
+  /*
+    Шапка человека — одна строка, а не блок. Раньше аватарка 38 px и отступы
+    съедали высоту, ради которой человек прокручивал до кнопки «Написать пост».
+    Теперь аватарка 32 px, зазор меньше, и строка занимает ровно столько,
+    сколько нужно подписям.
+  */
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
 }
 
 html .forum-me__ava .forum-ava,
 html .forum-me__ava img{
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-xs);
+}
+
+/*
+  Под пальцем зона больше кружка: сам аватар остаётся 32 px, но кликабельная
+  зона — 44 px (та же планка, что у остальных действий форума). Без этого
+  правило с `html .` перебивало бы тач-планку, и на телефоне аватар и
+  колокольчик стали бы мельче цели.
+*/
+@media (hover: none) and (pointer: coarse) {
+  html .forum-me__ava .forum-ava,
+  html .forum-me__ava img{
+    width: 30px;
+    height: 30px;
+  }
+  html .forum-bell{
+    width: 44px;
+    height: 44px;
+  }
 }
 
 html .forum-me__body b{
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 html .forum-me__body small{ color: var(--mute); font-size: 10px; }
 
 html .forum-bell{
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-xs);
   border-color: var(--line);
   background: transparent;
@@ -477,7 +502,16 @@ html .forum-search{
   background: transparent;
 }
 
+/*
+  Лупа поиска форума — в потоке, а не поверх поля. Базовое правило
+  `.search svg` делает значок абсолютным, и здесь он ложился ровно на
+  «Найти запись…»: иконка и первая буква занимали одно место. Строка
+  поиска — флекс с зазором 10 px, поэтому значку достаточно вернуться в
+  поток, и отступ у поля больше не нужен.
+*/
 html .forum-search svg{
+  position: static;
+  flex: none;
   width: 16px;
   height: 16px;
   color: var(--mute);
@@ -913,23 +947,59 @@ html .forum-welcome__body p{ max-width: 62ch; margin-top: 4px; }
 html .forum-welcome .forum-btn{ align-self: start; }
 
 html .forum-composer{
-  margin: 18px 0 0;
+  /*
+    Кнопка «Написать пост» — вход в главное действие форума, и она должна
+    быть видна сразу: раньше блок профиля и сама кнопка съедали весь первый
+    экран, и до ленты человек доходил только прокруткой.
+
+    Отсюда три решения: блок прижат к ленте (отступ сверху — крошечный, снизу
+    — заметный), кнопка ниже, чем была, и помечена индиго-рамкой с мягким
+    свечением — при меньшей высоте она обязана остаться заметной.
+  */
+  margin: var(--s-1) 0 var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: transparent;
 }
 
 html .forum-composer__summary{
-  min-height: 48px;
-  padding: 12px 14px;
+  min-height: 40px;
+  padding: var(--s-1) var(--s-2);
   background: transparent;
+  align-items: center;
+}
+
+/*
+  Под пальцем кнопка выше: 44 px — та же планка, что у остальных действий
+  форума (см. refine.css). Здесь она была бы 40 px, и на телефоне палец
+  промахивался мимо кнопки чаще, чем попадал. Правило с `html .` сильнее
+  тач-планки, поэтому возвращаем её здесь явно.
+*/
+@media (hover: none) and (pointer: coarse) {
+  html .forum-composer__summary{ min-height: 44px; }
 }
 
 html .forum-composer__summary b{ font-size: 13px; }
 
+/*
+  Рамка и свечение — только у закрытой кнопки. Открытая форма и так занимает
+  весь экран, и светящаяся рамка под ней ничего не добавляет.
+*/
+html .forum-composer:not([open]) .forum-composer__summary{
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+html .forum-composer:not([open]) .forum-composer__summary:hover{
+  border-color: var(--accent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 52%, transparent);
+}
+
 html .forum-composer__plus{
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border: 1px solid var(--line);
   border-radius: var(--r-hair);
   background: transparent;
@@ -1120,15 +1190,41 @@ html .forum-side .forum-chron__stat span{
   text-transform: uppercase;
 }
 
-html .forum-side .forum-chron__feed{ gap: 0; }
+/*
+  Сводка сервера — список строк, а не слипшаяся лента плашек. Раньше пункты
+  шли инлайн с нулевым зазором, и конец одного («взяли 42») встречался с
+  началом следующего («3 окт») без единого просвета. Теперь каждый пункт —
+  своя строка: дата слева, исход справа, между ними воздух и черта.
+*/
+html .forum-side .forum-chron__feed{
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
 
 html .forum-side .forum-chron__item{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+  width: 100%;
   padding: 8px 0;
   border: 0;
   border-bottom: 1px solid var(--line-soft);
   border-radius: 0;
   background: transparent;
   font-size: 11px;
+}
+
+html .forum-side .forum-chron__when{
+  flex: none;
+  padding-right: var(--s-2);
+  border-right: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+html .forum-side .forum-chron__what{
+  min-width: 0;
+  text-align: right;
 }
 
 html .forum-side .forum-chron__more{
@@ -1796,13 +1892,30 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .hud{
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  /* Блок прижат к верхней кромке своего столбца: раньше он стоял
+     `display: block`, и метрики под «Источником» уезжали вниз от декоративной
+     линии. Теперь колонка — флекс, и верхние края блоков совпадают. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source{
+  /*
+    «Источник» и его значение — ОДНА строка, а не две. Раньше правило
+    перебивало базовое (`display:flex` + `align-items:baseline`) на колонку,
+    и блок становился вдвое выше: карточки метрик уезжали вниз от
+    декоративной линии, и между ними проваливалась пустая полоса.
+  */
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0 0 18px;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source-label{
@@ -1810,11 +1923,14 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source-label{
   font-size: 9px;
   letter-spacing: .16em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source-value{
   color: var(--dim);
   font-size: 11px;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 /*
@@ -2125,13 +2241,29 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .search{
   background: transparent;
 }
 
+/*
+  Иконка лупы — абсолютная, поэтому из потока она выпадает и поле её не
+  обтекает: текст начинался прямо под иконкой, и «Найти альянс…» читалось
+  как «Найти◆альянс». Отступ слева — ровно под иконку, и она встаёт по
+  центру строки, а не по её верху.
+*/
+html body:not([data-route="forum"]):not([data-route="bot"]) .search svg{
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+}
+
 html body:not([data-route="forum"]):not([data-route="bot"]) .search:focus-within{
   border-bottom-color: var(--accent);
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .search input{
   width: 100%;
-  padding: 8px 0;
+  /* Отступ слева освобождает место иконке: 14 px значка + воздух после него. */
+  padding: var(--s-2) 0 var(--s-2) var(--s-5);
   border: 0;
   background: transparent;
   color: var(--text);
@@ -2912,13 +3044,27 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .wks > li{
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .wk{
   display: inline-flex;
-  gap: 6px;
-  padding: 5px 8px;
+  /*
+    Дата и исход — две отдельные мысли, и между ними нужен воздух. Шесть
+    пикселей на наборе «10 окт» + «взяли 42» читались как «10 октвзяли 42»:
+    глаз не находит, где кончилась дата.
+  */
+  gap: var(--s-2);
+  padding: 5px var(--s-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--r-xs);
   background: transparent;
   color: var(--dim);
   font-size: 10px;
+}
+
+/*
+  Разделитель внутри плашки: вертикальная черта между датой и исходом.
+  Читается быстрее пустого места и не съедает высоту плашки.
+*/
+html body:not([data-route="forum"]):not([data-route="bot"]) .wk__num{
+  padding-right: var(--s-2);
+  border-right: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
 }
 
 html body:not([data-route="forum"]):not([data-route="bot"]) .wks__more{
@@ -3399,6 +3545,12 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel{
 html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel .wk__num,
 html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel .wk__what{
   color: var(--on-accent);
+}
+
+/* На залитой плашке разделитель тоже должен быть светлым: тёмная черта на
+   индиго читалась бы грязным пятном, а не разделителем. */
+html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel .wk__num{
+  border-right-color: color-mix(in srgb, var(--on-accent) 40%, transparent);
 }
 
 @media (max-width: 759px) {

@@ -1746,7 +1746,7 @@ h1,h2,h3,h4 {
   display: flex; align-items: center;
 }
 .search svg {
-  position: absolute; left: 12px; width: 15px; height: 15px;
+  position: absolute; left: 12px; width: 18px; height: 18px;
   fill: none; stroke: var(--mute); stroke-width: 2; stroke-linecap: round;
   pointer-events: none;
 }
@@ -1760,6 +1760,7 @@ h1,h2,h3,h4 {
   background: var(--recessed);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
+  /* Слева — место под иконку лупы: 14 px значка и воздух после него. */
   padding: var(--s-1) var(--s-3) var(--s-1) var(--s-5);
   outline: none;
 }
@@ -2190,7 +2191,12 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .wk {
   display: flex;
   align-items: baseline;
-  gap: var(--s-1);
+  /*
+    Дата и исход стоят в одной строке, и между ними должен быть ВОЗДУХ.
+    Раньше зазор был 4 px — на наборе «10 окт» + «взяли 42» это читалось как
+    «10 октвзяли 42», а у длинных подписей («взяли 48») — тем более.
+  */
+  gap: var(--s-2);
   padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
   background: var(--raised);
   border: 1px solid var(--line);
@@ -2202,7 +2208,14 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 .wk:hover { background: var(--raised-2); }
 .wk--win.is-sel { color: var(--win); }
 .wk--loss.is-sel { color: var(--loss); }
-.wk__num { font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-small); color: var(--dim); }
+.wk__num {
+  font-family: Unbounded, sans-serif; font-weight: 700; font-size: var(--fs-small);
+  color: var(--dim);
+  /* Дата и исход — две мысли, а не одно слово: тонкая вертикальная черта
+     между ними читается быстрее, чем пустой зазор, и не даёт им слипться. */
+  padding-right: var(--s-2);
+  border-right: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
 .wk__what { color: var(--mute); }
 .wk__what b { color: var(--dim); }
 .wk--win { border-color: color-mix(in srgb, var(--win) 34%, transparent); }

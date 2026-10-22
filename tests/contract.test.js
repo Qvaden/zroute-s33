@@ -16319,6 +16319,67 @@ console.log('\nAO. Раздел — страница');
       && /\.lad__row\s*\{[^}]*grid-template-columns: 52px 1fr auto;/.test(mobile));
 
   /*
+    ЧЕТЫРЕ ПРАВКИ ВЁРСТКИ.
+
+    1. ПОЛЕ ПОИСКА. Иконка лупы стояла поверх текста: она абсолютная, из
+       потока выпадает, а поле её не обтекало. Лечится отступом слева и
+       центрированием значка по вертикали.
+
+    2. ПЛАШКИ ДАТЫ И ИСХОДА. В шапке хронологии дата («10 окт») и исход
+       («взяли 42») стояли в одной строке с зазором в 4 px — глаз читал их как
+       одно слово. Теперь между ними воздух и тонкая черта.
+
+    3. МЕТРИКИ. «Источник» и его значение — одна строка; правило разбивало
+       подпись на колонку, блок становился вдвое выше, и карточки метрик
+       уезжали вниз от декоративной линии.
+
+    4. ПРОФИЛЬ И КНОПКА «НАПИСАТЬ ПОСТ». Блок профиля и кнопка съедали
+       первый экран: до ленты было нужно доскроллить. Профиль стал ниже,
+       кнопка — 40 px с индиго-рамкой и мягким свечением, и на телефоне
+       под пальцем остаётся общая планка 44 px.
+  */
+  const redesignSrc = await readFile('src/redesign.css', 'utf8');
+  /* Комментарии внутри правил мешают регуляркам — берём только тела правил. */
+  const ruleBody = (src, selector) => {
+    const i = src.indexOf(selector);
+    if (i < 0) return '';
+    const body = src.slice(i).replace(/\/\*[\s\S]*?\*\//g, '');
+    const m = /\{([^}]*)\}/.exec(body);
+    return m ? m[1] : '';
+  };
+  check('иконка поиска не налезает на текст: поле отступлено слева, значок по центру',
+    /\.search input\s*\{[^}]*padding:[^;]*var\(--s-5\)/.test(v8)
+      && /position: absolute/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .search svg{'))
+      && /top: 50%/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .search svg{'))
+      && /transform: translateY\(-50%\)/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .search svg{')));
+  check('дата и исход в плашке разделены воздухом и чертой',
+    /gap: var\(--s-2\)/.test(ruleBody(v8, '.wk {'))
+      && /border-right: 1px solid/.test(ruleBody(v8, '.wk__num {'))
+      && /gap: var\(--s-2\)/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .wk{')));
+  check('«Источник» и его значение стоят в одной строке, а не в двух',
+    /flex-direction: row/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source{'))
+      && /align-items: baseline/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source{')));
+  check('кнопка «Написать пост» ниже, с индиго-рамкой и мягким свечением',
+    /min-height: 40px/.test(ruleBody(redesignSrc, 'html .forum-composer__summary{'))
+      && /border: 1px solid color-mix\(in srgb, var\(--accent\)/.test(ruleBody(redesignSrc, 'html .forum-composer:not([open]) .forum-composer__summary{'))
+      && /box-shadow: 0 0 12px/.test(ruleBody(redesignSrc, 'html .forum-composer:not([open]) .forum-composer__summary{')));
+  check('под пальцем кнопка «Написать пост» остаётся 44 px',
+    /@media \(hover: none\) and \(pointer: coarse\)/.test(redesignSrc)
+      && /\.forum-composer__summary\{ min-height: 44px; \}/.test(redesignSrc));
+  check('блок профиля стал ниже, аватар ужат',
+    /padding: var\(--s-2\) 0/.test(ruleBody(redesignSrc, 'html .forum-me{'))
+      && /width: 32px;/.test(ruleBody(redesignSrc, 'html .forum-me__ava .forum-ava,')));
+  check('композер прижат к ленте, а не висит над ней',
+    /margin: var\(--s-1\) 0 var\(--s-2\)/.test(ruleBody(redesignSrc, 'html .forum-composer{')));
+  check('лупа в поиске форума стоит в потоке, а не поверх плейсхолдера',
+    /position: static/.test(ruleBody(redesignSrc, 'html .forum-search svg{'))
+      && /flex: none/.test(ruleBody(redesignSrc, 'html .forum-search svg{')));
+  check('сводка сервера разделяет дату и исход, а не слипает соседние записи',
+    /flex-direction: column/.test(ruleBody(redesignSrc, 'html .forum-side .forum-chron__feed{'))
+      && /justify-content: space-between/.test(ruleBody(redesignSrc, 'html .forum-side .forum-chron__item{'))
+      && /gap: var\(--s-2\)/.test(ruleBody(redesignSrc, 'html .forum-side .forum-chron__item{')));
+
+  /*
     Карточка альянса собрана по той же шкале, что и строка рейтинга.
 
     Номер места в карточке — тот же формат «#NN», что в колонке списка: два
