@@ -16369,8 +16369,8 @@ console.log('\nAO. Раздел — страница');
   check('блок профиля стал ниже, аватар ужат',
     /padding: var\(--s-2\) 0/.test(ruleBody(redesignSrc, 'html .forum-me{'))
       && /width: 32px;/.test(ruleBody(redesignSrc, 'html .forum-me__ava .forum-ava,')));
-  check('композер прижат к ленте, а не висит над ней',
-    /margin: var\(--s-1\) 0 var\(--s-2\)/.test(ruleBody(redesignSrc, 'html .forum-composer{')));
+  check('композер отделён от границы шапки шагом шкалы, а не висит на ней',
+    /margin: var\(--s-3\) 0/.test(ruleBody(redesignSrc, 'html .forum-composer{')));
   check('лупа в поиске форума стоит в потоке, а не поверх плейсхолдера',
     /position: static/.test(ruleBody(redesignSrc, 'html .forum-search svg{'))
       && /flex: none/.test(ruleBody(redesignSrc, 'html .forum-search svg{')));
