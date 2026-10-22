@@ -388,7 +388,8 @@
     Ряды, где число колонок задаёт объём данных, в мере не участвуют и остаются
     на auto-fit / auto-fill: `.server-stats__grid`, `.trophies`,
     `.achievement-grid`, `.tl__gallery`, `.accounts-fields`, `.accounts-grid`,
-    `.adm-players`, `.sk--tile`, `.hb-grid`, `.hb-siblings ul`. Их содержимое
+    `.adm-players`, `.sk--tile`, `.hb-grid`, `.hb-siblings ul`,
+    `.forum-snap__shots`, `.forum-snap__more ul`. Их содержимое
     приходит с сервера, и жёсткие двенадцать колонок оставили бы пустые клетки
     в последнем ряду, когда карточек, скажем, семь.
 

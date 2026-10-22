@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Снимки форума и гайдов для поисковиков.
+
+  Это отдельный список, а не продолжение sitemap.xml: справочник собирается
+  из неизменного дерева, а темы появляются и удаляются в базе. Разные источники
+  — разные файлы, чтобы пересборка одного не затирала другой.
+
+  Здесь только страницы с index,follow. Темы из «Флудилки», объявления об
+  аккаунтах и короткие записи остаются доступными по прямой ссылке, но в
+  выдачу не просятся.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://zroutehub.bond/forum/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/forum/07cb504b-4bdc-41c4-bdec-6c94d35ec4cd/</loc>
+  </url>
+  <url>
+    <loc>https://zroutehub.bond/forum/5cdd9f06-5cd7-438b-9d82-0dac68b9f899/</loc>
+  </url>
+</urlset>

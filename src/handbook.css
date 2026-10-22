@@ -126,9 +126,54 @@
    пересказа одного правила читались бы как спор. */
 .hb-catalog__lead { color: var(--mute); font-size: var(--fs-meta); }
 
+/* ── Снимки форума и гайдов ──────────────────────────────────────────────── */
+/*
+  Статическая копия темы живёт на тех же правилах, что справочник, но это не
+  статья: у неё есть автор, ответы и картинки. Ниже только то, чего в
+  справочнике нет, — остальное берут .hb-page и .hb-text.
+*/
+.forum-snap { min-width: 0; }
+.forum-snap__body { margin-top: var(--s-3); }
+.forum-snap__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-3); margin: var(--s-2) 0 0; color: var(--mute); font-size: var(--fs-meta); line-height: 1.5; }
+.forum-snap__meta > span { display: inline-flex; align-items: center; gap: var(--s-fine); }
+.forum-snap__author { display: inline-flex; align-items: center; gap: var(--s-1); min-width: 0; }
+.forum-snap__author a { color: var(--text); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.forum-snap__author a:hover { color: var(--accent-ink); text-decoration: underline; }
+.forum-snap__ava { display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--mute); font-size: var(--fs-eyebrow); font-weight: 700; }
+.forum-snap__ava img { width: 100%; height: 100%; object-fit: cover; }
+
+.forum-snap__tags { display: flex; flex-wrap: wrap; gap: var(--s-fine); margin: var(--s-1) 0 0; }
+.forum-snap__tag { padding: var(--s-hair) var(--s-1); border: 1px solid var(--line-soft); border-radius: var(--r-pill); color: var(--mute); font-size: var(--fs-eyebrow); letter-spacing: .04em; text-transform: uppercase; }
+
+.forum-snap__shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s-1); margin: var(--s-3) 0; }
+.forum-snap__shots a { display: block; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: color-mix(in srgb, var(--text) 4%, transparent); }
+.forum-snap__shots img { display: block; width: 100%; height: auto; max-height: 520px; object-fit: contain; }
+
+.forum-snap__cta { margin: var(--s-3) 0; }
+.forum-snap__cta .forum-btn { display: inline-flex; align-items: center; text-decoration: none; }
+
+.forum-snap__comments { margin-top: var(--s-4); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.forum-snap__comments h2,
+.forum-snap__more h2 { margin: 0 0 var(--s-2); font-family: 'Space Grotesk', sans-serif; font-size: var(--fs-card); letter-spacing: -.02em; }
+.forum-snap__comment { padding: var(--s-2) 0; border-top: 1px solid var(--line-soft); }
+.forum-snap__comment:first-of-type { border-top: 0; }
+.forum-snap__comment-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-1); color: var(--mute); font-size: var(--fs-meta); }
+.forum-snap__comment-body { margin: var(--s-1) 0 0; color: var(--dim); }
+.forum-snap__comment-body p:last-child { margin-bottom: 0; }
+
+.forum-snap__more { margin-top: var(--s-4); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.forum-snap__more ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-1) var(--s-3); margin: 0; padding: 0; list-style: none; }
+.forum-snap__more li { padding: var(--s-hair) 0; font-size: var(--fs-small); }
+.forum-snap__more a { color: var(--accent-ink); text-decoration: none; }
+.forum-snap__more a:hover { text-decoration: underline; }
+
+.forum-snap__note { margin: var(--s-3) 0 0; color: var(--mute); font-size: var(--fs-meta); line-height: 1.5; }
+
 /* ── Адаптив: плитка на телефоне в одну колонку ──────────────────────────── */
 @media (max-width: 519px) {
   .hb-grid { grid-template-columns: 1fr; }
   .hb-siblings ul { grid-template-columns: 1fr; }
   .hb-catalog__lead { display: block; }
+  .forum-snap__shots { grid-template-columns: 1fr; }
+  .forum-snap__comment-head { align-items: flex-start; }
 }

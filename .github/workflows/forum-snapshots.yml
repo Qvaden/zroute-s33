@@ -1,0 +1,67 @@
+name: Снимки форума для поиска
+
+# Раз в час собирает forum/<id>/ и guides/<slug>/ из публичной базы.
+#
+# Зачем отдельный workflow. Снимок — не украшение, а адрес: если тема
+# появилась, а страницы нет, поисковик о ней не узнает, и ссылка в переписке
+# покажет общую картинку сайта. Собирать вручную значит забыть на третий день.
+#
+# Почему раз в час, а не на каждый пост. Бесплатные минуты GitHub — общий
+# ресурс, а поиск не гонится за минутой: тема, которой нет в индексе сутки,
+# не потеряет читателя. Чаще часа — трата, реже — снимок начнёт отставать от
+# модерации.
+#
+# Почему не в backup-from-db.yml. У того своё расписание и свой смысл:
+# data/live.json — резервная копия рейтинга. Смешать две работы в одну значит
+# сломать обе разом, когда одна упадёт.
+
+on:
+  schedule:
+    # :27 — между резервной копией (:05) и фидом магазина (:17),
+    # чтобы три задания не спорили за один push.
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: forum-snapshots
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  snapshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Ключ берётся из config.js: это публичный anon-ключ, он не секрет.
+      # Сеть GitHub до Supabase доходит — это уже доказано backup-from-db.yml.
+      - name: Собрать снимки тем и гайдов
+        run: node scripts/build-forum-pages.mjs
+
+      - name: Закоммитить только при изменениях
+        run: |
+          paths="forum sitemap-forum.xml"
+          # Каталог гайдов нужен и после последней публикации: если он исчез,
+          # удаления старых страниц тоже должны попасть в коммит.
+          if [ -d guides ] || [ -n "$(git ls-files -- guides)" ]; then
+            paths="$paths guides"
+          fi
+
+          # status, а не diff: новые страницы ещё не отслеживаются, и diff
+          # молча пропустил бы их. Пустой вывод — единственный признак покоя.
+          if [ -z "$(git status --porcelain -- $paths)" ]; then
+            echo "Снимки не изменились, коммит не нужен."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- $paths
+          git commit -m "content(forum): снимки тем и гайдов $(date -u '+%d.%m.%Y %H:%M UTC')"
+          git push

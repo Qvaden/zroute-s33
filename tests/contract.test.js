@@ -21024,6 +21024,229 @@ console.log('\nBK. Следы прежних красок: у каждого ч�
     /\.adm-modal__box \.adm-actions[^}]*linear-gradient\(transparent,\s*var\(--overlay\)/.test(mobile));
 }
 
+/* ── BL. Снимки форума отдельными страницами ────────────────────────────────
+
+   Форум живёт во фрагменте адреса, и поисковик видит одну страницу на весь
+   сайт. Поэтому темы и гайды дополнительно собираются в forum/<id>/ и
+   guides/<slug>/ скриптом build-forum-pages.mjs. Здесь проверяется не база,
+   а уже собранные файлы: адрес, canonical, один H1, описание, картинка для
+   пересылки, разметка для поиска и отсутствие модулей приложения. Тест
+   нарочно не ходит в сеть: он должен падать на расхождении файлов, а не на
+   спящей бесплатной базе.
+───────────────────────────────────────────────────────────────────────────── */
+console.log('\nBL. Снимки форума отдельными страницами');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { existsSync, readdirSync } = await import('node:fs');
+  const { renderGuide, safeSlug } = await import('../scripts/build-forum-pages.mjs');
+  const unescapeAttr = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  const generator = await readFile('scripts/build-forum-pages.mjs', 'utf8');
+  const handbook = await readFile('src/handbook.css', 'utf8');
+  const robots = await readFile('robots.txt', 'utf8');
+  const manifest = JSON.parse(await readFile('forum/_manifest.json', 'utf8'));
+  const sitemap = await readFile('sitemap-forum.xml', 'utf8');
+  const indexHtml = await readFile('index.html', 'utf8');
+
+  check('генератор знает маркер, проверку и защиту от обнуления',
+    generator.includes('zroute-static-community')
+      && generator.includes('--check')
+      && generator.includes('--force')
+      && generator.includes('0.5'),
+    'в скрипте нет маркера, режима проверки или порога 50 %');
+
+  check('манифест перечисляет темы и гайды массивами',
+    Array.isArray(manifest.topics) && Array.isArray(manifest.guides),
+    'topics или guides не массив');
+
+  check('в манифесте нет времени сборки: повторный прогон не должен давать дифф',
+    !('generatedAt' in manifest) && !('builtAt' in manifest) && !('date' in manifest));
+
+  const entries = [
+    ...manifest.topics.map((entry) => ({ ...entry, kind: 'topic' })),
+    ...manifest.guides.map((entry) => ({ ...entry, kind: 'guide' })),
+  ];
+  const fileFor = (url) => {
+    const pathname = decodeURIComponent(new URL(url).pathname).replace(/^\/+|\/+$/g, '');
+    return pathname ? `${pathname}/index.html` : 'index.html';
+  };
+
+  check('каждый адрес манифеста — свой домен и существующий файл',
+    entries.every((entry) => new URL(entry.url).origin === manifest.origin && existsSync(fileFor(entry.url))),
+    entries.filter((entry) => new URL(entry.url).origin !== manifest.origin || !existsSync(fileFor(entry.url)))
+      .map((entry) => entry.url).join(' | '));
+
+  const pages = [];
+  for (const entry of entries) {
+    const html = await readFile(fileFor(entry.url), 'utf8');
+    pages.push({ entry, html });
+  }
+
+  const broken = [];
+  const badMarker = [];
+  const badCanonical = [];
+  const badH1 = [];
+  const badDescription = [];
+  const badImage = [];
+  const badRobots = [];
+  const badJson = [];
+  const badCta = [];
+  const badAssets = [];
+  const absolute = [];
+  const moduleScript = [];
+  const badVersions = [];
+
+  const indexCss = new Map([...indexHtml.matchAll(/href="\.\/(src\/[^"]+\.css\?v=\d+)"/g)]
+    .map((m) => [m[1].split('?')[0], m[1]]));
+
+  for (const { entry, html } of pages) {
+    if (!html.includes('<meta name="generator" content="zroute-static-community">')) badMarker.push(entry.url);
+    if (!html.includes(`<link rel="canonical" href="${entry.url}">`)) badCanonical.push(entry.url);
+    if (!html.includes(`<meta property="og:url" content="${entry.url}">`)) badCanonical.push(entry.url);
+    if ((html.match(/<h1[\s>]/g) || []).length !== 1) badH1.push(entry.url);
+    const description = unescapeAttr(/<meta name="description" content="([^"]*)">/.exec(html)?.[1] ?? '');
+    if (!description || description.length > 160) badDescription.push(`${entry.url}: ${description.length}`);
+    const image = unescapeAttr(/<meta property="og:image" content="([^"]*)">/.exec(html)?.[1] ?? '');
+    if (!/^https:\/\//.test(image)) badImage.push(entry.url);
+    const robotsMeta = /<meta name="robots" content="([^"]*)">/.exec(html)?.[1] ?? '';
+    if (entry.indexed !== robotsMeta.startsWith('index')) badRobots.push(`${entry.url}: ${robotsMeta}`);
+    if (entry.indexed) {
+      const ld = /<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/.exec(html)?.[1];
+      let parsed = null;
+      try { parsed = JSON.parse(ld); } catch { /* ниже это и проверится */ }
+      if (!parsed || !parsed['@type']) badJson.push(entry.url);
+    }
+    const cta = entry.kind === 'topic' ? `#/forum/${entry.id}` : `#/guides/${entry.slug}`;
+    if (!html.includes(cta)) badCta.push(entry.url);
+    if (/(?:href|src)="\/(?!\/)/.test(html)) absolute.push(entry.url);
+    if (/<script\s+[^>]*\bsrc=/.test(html)) moduleScript.push(entry.url);
+
+    const css = new Map([...html.matchAll(/href="((?:\.\.\/)+src\/[^"]+\.css\?v=\d+)"/g)]
+      .map((m) => [`src/${m[1].split('src/')[1].split('?')[0]}`, `src/${m[1].split('src/')[1]}`]));
+    for (const [file, versioned] of css) {
+      if (indexCss.get(file) !== versioned) badVersions.push(`${entry.url}: ${file}`);
+    }
+
+    for (const m of html.matchAll(/(?:href|src)="((?:\.\.\/)+[^"#]+)"/g)) {
+      const rel = m[1].split('?')[0];
+      if (rel.endsWith('/')) continue;
+      const resolved = new URL(rel, `https://example.test/${fileFor(entry.url)}`).pathname.replace(/^\//, '');
+      if (!existsSync(resolvePath(resolved))) badAssets.push(`${entry.url} -> ${rel}`);
+    }
+  }
+
+  function resolvePath(pathname) {
+    return decodeURIComponent(pathname);
+  }
+
+  check('у каждой страницы есть маркер генератора', badMarker.length === 0, badMarker.join(' | '));
+  check('canonical и og:url каждой страницы — её собственный адрес',
+    badCanonical.length === 0, badCanonical.join(' | '));
+  check('на каждой странице ровно один H1', badH1.length === 0, badH1.join(' | '));
+  check('у каждой страницы непустое описание не длиннее 160 знаков',
+    badDescription.length === 0, badDescription.join(' | '));
+  check('у каждой страницы абсолютная картинка для пересылки', badImage.length === 0, badImage.join(' | '));
+  check('robots страницы совпадает с решением манифеста', badRobots.length === 0, badRobots.join(' | '));
+  check('у каждой индексируемой страницы читается JSON-LD', badJson.length === 0, badJson.join(' | '));
+  check('каждая страница ведёт обратно в живое обсуждение', badCta.length === 0, badCta.join(' | '));
+  check('ни одного корне-абсолютного пути: зеркало в подпапке', absolute.length === 0, absolute.join(' | '));
+  check('в снимках нет модулей приложения', moduleScript.length === 0, moduleScript.join(' | '));
+  check('снимки ссылаются на стили теми же версиями, что и страница',
+    badVersions.length === 0, badVersions.join(' | '));
+  check('каждая относительная ссылка и картинка ведёт в существующий файл',
+    badAssets.length === 0, badAssets.slice(0, 12).join(' | '));
+
+  check('классы снимков описаны в styles справочника',
+    ['.forum-snap', '.forum-snap__meta', '.forum-snap__shots', '.forum-snap__comments', '.forum-snap__more']
+      .every((selector) => handbook.includes(selector)));
+
+  const catalogHtml = await readFile('forum/index.html', 'utf8');
+  check('каталог тем существует и ведёт на каждую индексируемую тему',
+    catalogHtml.includes('zroute-static-community')
+      && (catalogHtml.match(/<h1[\s>]/g) || []).length === 1
+      && manifest.topics.filter((entry) => entry.indexed)
+        .every((entry) => catalogHtml.includes(`./${entry.id}/`)),
+    'каталог не найден, потерял H1 или ссылку на тему');
+  check('каталог не уводит в SPA якорем внутри самого снимка',
+    !catalogHtml.includes('href="#/')
+      && catalogHtml.includes('href="../#/forum"'),
+    'ссылка #/forum с /forum/ останется на снимке и не откроет живой форум');
+
+  /* Гайдов в базе сейчас нет, но ветка страницы должна быть проверена хотя бы
+     на выдуманном гайде: иначе первая публикация проверит её в бою. */
+  const guideView = {
+    origin: manifest.origin,
+    cssLinks: [...indexCss.values()],
+    fontCss: 'https://fonts.googleapis.com/css2?family=Inter&display=optional',
+    themeColor: '#090b0f',
+    ogImage: `${manifest.origin}/public/og.png`,
+    siteName: 'Сервер 33 · Z Route: Redemption',
+  };
+  check('slug гайда допускает кириллицу, но не путь наружу',
+    safeSlug('тестовый-гайд') === 'тестовый-гайд'
+      && safeSlug('../../admin') === ''
+      && safeSlug('я') === '');
+  const guideUrl = `${manifest.origin}/guides/${encodeURIComponent('тестовый-гайд')}/`;
+  const guidePage = renderGuide({
+    id: '00000000-0000-4000-8000-000000000000',
+    slug: 'тестовый-гайд',
+    title: 'Тестовый гайд',
+    body: '<p>Достаточно длинный текст, чтобы страница не выглядела пустой.</p>',
+    bodyText: 'Достаточно длинный текст, чтобы страница не выглядела пустой.',
+    authorNick: 'Тестер',
+    category: 'strategy',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    attachments: [],
+    indexed: true,
+  }, { view: guideView, root: '../../', url: guideUrl, guides: [] });
+  check('страница гайда собирается: canonical, H1, JSON-LD и путь назад',
+    guidePage.includes(`<link rel="canonical" href="${guideUrl}">`)
+      && guidePage.includes(`<meta property="og:url" content="${guideUrl}">`)
+      && (guidePage.match(/<h1[\s>]/g) || []).length === 1
+      && guidePage.includes(`#/guides/${encodeURIComponent('тестовый-гайд')}`)
+      && guidePage.includes('"@type": "Article"'));
+
+  const workflow = await readFile('.github/workflows/forum-snapshots.yml', 'utf8');
+  check('снимки обновляются по расписанию и коммитятся только при изменениях',
+    /cron:\s*'/.test(workflow)
+      && workflow.includes('node scripts/build-forum-pages.mjs')
+      && workflow.includes('git status --porcelain')
+      && workflow.includes('git add -A -- $paths')
+      && workflow.includes('git ls-files -- guides'));
+
+  const expectedUrls = [
+    `${manifest.origin}/forum/`,
+    ...manifest.topics.filter((entry) => entry.indexed).map((entry) => entry.url),
+    ...(manifest.guides.length ? [`${manifest.origin}/guides/`] : []),
+    ...manifest.guides.filter((entry) => entry.indexed).map((entry) => entry.url),
+  ];
+  const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  check('sitemap-forum.xml собран из индексируемых страниц',
+    JSON.stringify(sitemapUrls) === JSON.stringify(expectedUrls),
+    `в файле: ${sitemapUrls.join(' | ')}`);
+  check('в sitemap-forum.xml нет повторов и адресов без слеша',
+    new Set(sitemapUrls).size === sitemapUrls.length && sitemapUrls.every((url) => url.endsWith('/')));
+  check('robots называет обе карты: справочник и снимки',
+    robots.includes('Sitemap: https://zroutehub.bond/sitemap.xml')
+      && robots.includes('Sitemap: https://zroutehub.bond/sitemap-forum.xml'));
+
+  const topicDirs = existsSync('forum')
+    ? readdirSync('forum', { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+    : [];
+  const expectedTopicDirs = manifest.topics.map((entry) => entry.id);
+  check('в каталоге forum нет снимков, которых больше нет в базе',
+    topicDirs.every((dir) => expectedTopicDirs.includes(dir)),
+    topicDirs.filter((dir) => !expectedTopicDirs.includes(dir)).join(' | '));
+
+  if (manifest.guides.length) {
+    const guideDirs = readdirSync('guides', { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    const expectedGuideDirs = manifest.guides.map((entry) => entry.slug);
+    check('в каталоге guides нет снимков, которых больше нет в базе',
+      guideDirs.every((dir) => expectedGuideDirs.includes(dir)),
+      guideDirs.filter((dir) => !expectedGuideDirs.includes(dir)).join(' | '));
+  }
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

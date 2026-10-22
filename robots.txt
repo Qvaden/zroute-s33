@@ -6,10 +6,12 @@
 # не должно: панель управления, сырые данные, служебные скрипты, тесты и
 # внутренние документы разработки.
 #
-# Исключение — справочник: каждый его гайд лежит отдельным файлом
-# (handbook/<узел>/) и в выдаче существует сам по себе. Полный список таких
-# адресов — в sitemap.xml; он пишется scripts/build-handbook-pages.mjs, а не
-# ведётся руками.
+# Исключение — справочник и снимки форума: каждый гайд справочника лежит
+# отдельным файлом (handbook/<узел>/), каждая публичная тема — в forum/<id>/,
+# гайд участника — в guides/<slug>/. У них два списка, потому что и источники
+# разные: sitemap.xml пишет scripts/build-handbook-pages.mjs из дерева,
+# sitemap-forum.xml — scripts/build-forum-pages.mjs из базы. Руками не
+# ведутся ни тот, ни другой.
 
 User-agent: *
 Disallow: /admin.html
@@ -22,3 +24,4 @@ Disallow: /package.json
 Disallow: /render.yaml
 
 Sitemap: https://zroutehub.bond/sitemap.xml
+Sitemap: https://zroutehub.bond/sitemap-forum.xml

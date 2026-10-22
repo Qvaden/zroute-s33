@@ -5,6 +5,8 @@
   "scripts": {
     "test": "node tests/contract.test.js",
     "preview": "node scripts/build-preview.mjs",
-    "migrate": "node scripts/migrate-to-supabase.mjs"
+    "migrate": "node scripts/migrate-to-supabase.mjs",
+    "snapshots": "node scripts/build-forum-pages.mjs",
+    "snapshots:check": "node scripts/build-forum-pages.mjs --check"
   }
 }
