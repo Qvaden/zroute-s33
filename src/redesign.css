@@ -1065,7 +1065,7 @@ html .forum-side .forum-chron__title{
 
 /* ── Доска разделов: как в современном community-продукте ────────────────── */
 html .forum-cats{
-  padding: 0 0 4px;
+  padding: var(--s-2) 0 4px;
 }
 
 html .forum-cats__head{
@@ -3189,7 +3189,7 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .hb-search{
   gap: 8px;
   max-width: 560px;
   min-height: 38px;
-  margin: 14px 0 0;
+  margin: 14px 0 var(--s-2);
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--line);
