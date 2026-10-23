@@ -202,6 +202,11 @@ const ROUTES = [
     id: 'bot', label: 'Бот в ТГ', group: 'Справка', tag: 'тексты игры в чате', render: renderBot,
     title: 'Бот в Telegram · Z Route',
     desc: 'Telegram-бот со справочником по игре: те же разделы и тексты, что на сайте, только прямо в чате.',
+   },
+  {
+    id: 'promocodes', label: 'Промокоды', group: 'Справка', tag: 'актуальные промокоды',
+    title: 'Промокоды · Сервер 33',
+    desc: 'Актуальные промокоды для сервера 33 Z Route: Redemption. Проверяем работоспособность и обновляем список регулярно.',
   },
   {
     id: 'about', label: 'О проекте', group: 'Справка', tag: 'как это устроено', render: renderAbout,
@@ -417,7 +422,8 @@ const NAV_ICONS = {
   ladder: '<path d="M4 20h16M7 20v-6M12 20V5M17 20v-9"/>',
   timeline: '<path d="M5 4v16"/><path d="M5 8h9M5 13h13M5 18h6"/>',
   guide: '<path d="M12 3 4 7v5c0 4.4 3.4 8.5 8 9 4.6-.5 8-4.6 8-9V7Z"/><path d="M9 12l2 2 4-4"/>',
-  bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8.5 14h.01M15.5 14h.01M9 17h6"/>',
+   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8.5 14h.01M15.5 14h.01M9 17h6"/>',
+  promocodes: '<path d="M12 2a3 3 0 0 1 3 3v14a3 3 0 1 1-6 0V5a3 3 0 0 1 3-3zm-2 5a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm4 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0z"/>',
   about: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
 };
 
@@ -429,7 +435,7 @@ function navIcon(id) {
 
 function renderNav(activeId) {
   /* Какую вкладку подсветить, когда страница открыта: у раздела без своего
-     пункта меню (`hidden`) это чужая вкладка — `navAs`. */
+      пункта меню (`hidden`) это чужая вкладка — `navAs`. */
   const navId = (r) => r.navAs || r.id;
 
   /*
@@ -460,7 +466,8 @@ function renderNav(activeId) {
   */
   nav.innerHTML = NAV_TITLES.map(
     (title) => `<span class="nav__group">${title}</span>${
-      shown.filter((r) => r.group === title).map(link).join('')}`
+      shown.filter((r) => r.group === title).map(link).join('')}
+    }`
   ).join('');
   paintHeadWhere(activeId);
   syncTabbar(activeId);

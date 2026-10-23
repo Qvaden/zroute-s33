@@ -1,0 +1,53 @@
+.promocodes-list {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.promocode-card {
+  padding: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.promocode-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-text);
+  font-weight: 600;
+  color: var(--accent);
+  word-break: break-all;
+  padding: var(--s-hair) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.promocode-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-hair);
+  font-size: var(--fs-meta);
+  color: var(--dim);
+}
+
+.promocode-status.active {
+  color: var(--win);
+}
+
+.promocode-status.inactive {
+  color: var(--loss);
+}
+
+.promocode-source {
+  font-size: var(--fs-meta);
+  color: var(--mute);
+  margin-top: auto;
+}
+
+.promocode-date {
+  font-size: var(--fs-meta);
+  color: var(--dim);
+  text-align: right;
+}
