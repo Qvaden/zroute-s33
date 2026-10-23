@@ -1903,6 +1903,11 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .hud{
   justify-content: flex-start;
 }
 
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud::before,
+html body:not([data-route="forum"]):not([data-route="bot"]) .hud::after{
+  content: none;
+}
+
 html body:not([data-route="forum"]):not([data-route="bot"]) .hud__source{
   /*
     «Источник» и его значение — ОДНА строка, а не две. Раньше правило
