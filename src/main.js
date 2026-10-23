@@ -465,9 +465,7 @@ function renderNav(activeId) {
     Внутри группы порядок тот же, что в ROUTES: частое выше редкого.
   */
   nav.innerHTML = NAV_TITLES.map(
-    (title) => `<span class="nav__group">${title}</span>${
-      shown.filter((r) => r.group === title).map(link).join('')}
-    }`
+    (title) => `<span class="nav__group">${title}</span>${shown.filter((r) => r.group === title).map(link).join('')}`
   ).join('');
   paintHeadWhere(activeId);
   syncTabbar(activeId);
