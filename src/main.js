@@ -204,7 +204,7 @@ const ROUTES = [
     desc: 'Telegram-бот со справочником по игре: те же разделы и тексты, что на сайте, только прямо в чате.',
    },
   {
-    id: 'promocodes', label: 'Промокоды', group: 'Справка', tag: 'актуальные промокоды',
+    id: 'promocodes', label: 'Промокоды', group: 'Справка', tag: 'актуальные промокоды', render: renderPromocodes,
     title: 'Промокоды · Сервер 33',
     desc: 'Актуальные промокоды для сервера 33 Z Route: Redemption. Проверяем работоспособность и обновляем список регулярно.',
   },
@@ -1318,21 +1318,27 @@ function render() {
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
-      app.innerHTML = route.id === 'quarter'
-        ? route.render({
-            standings: view.quarterStandings,
-            quarter: view.quarter,
-            /*
-              Кварт собирается из двух полей, а не из whole view, поэтому про
-              аварию ему приходится напоминать отдельно: без этой строки пустой
-              экран Кварта рассказывал бы про невнесённые итоги даже тогда,
-              когда итоги внесены и просто непрочитаны.
-            */
-            loadError: view.loadError,
+      if (route.id === 'quarter') {
+        app.innerHTML = route.render({
+          standings: view.quarterStandings,
+          quarter: view.quarter,
+          loadError: view.loadError,
+        });
+      } else if (route.id === 'bot') {
+        app.innerHTML = route.render();
+      } else if (route.id === 'promocodes') {
+        fetch('./src/pages/promocodes/index.html')
+          .then(response => response.text())
+          .then(html => {
+            app.innerHTML = html;
           })
-        : route.id === 'bot'
-          ? route.render()
-          : route.render(view);
+          .catch(error => {
+            console.error('Ошибка загрузки страницы промокодов:', error);
+            app.innerHTML = '<p class="muted">Ошибка загрузки страницы промокодов. Попробуйте позже.</p>';
+          });
+      } else {
+        app.innerHTML = route.render(view);
+      }
       // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
       // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
       for (const fn of [window.__ladderApply, window.__timelineApply, window.__raceApply]) {
