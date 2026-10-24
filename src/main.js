@@ -18,14 +18,6 @@ import { renderGuide } from './pages/guide.js';
 import { renderBot } from './pages/bot.js';
 import { renderAbout } from './pages/about.js';
 import { renderAlliance } from './pages/alliance.js';
-import { renderPromocodes } from './pages/promocodes.js';
-
-    .then(response => response.text())
-    .then(html => html)
-    .catch(error => {
-      console.error('Ошибка загрузки страницы промокодов:', error);
-      return '<p class="muted">Ошибка загрузки страницы промокодов. Попробуйте позже.</p>';
-    });
 import { computeAchievements } from './logic/achievements.js';
 import { esc } from './ui/helpers.js';
 import { allianceInkCss } from './ui/ink.js';
@@ -1326,15 +1318,27 @@ function render() {
       unmountGuides();
       unmountCalendar();
       unmountUpdates();
-      app.innerHTML = route.id === 'quarter'
-        ? route.render({
-            standings: view.quarterStandings,
-            quarter: view.quarter,
-            loadError: view.loadError,
+      if (route.id === 'quarter') {
+        app.innerHTML = route.render({
+          standings: view.quarterStandings,
+          quarter: view.quarter,
+          loadError: view.loadError,
+        });
+      } else if (route.id === 'bot') {
+        app.innerHTML = route.render();
+      } else if (route.id === 'promocodes') {
+        fetch('./src/pages/promocodes/index.html')
+          .then(response => response.text())
+          .then(html => {
+            app.innerHTML = html;
           })
-        : route.id === 'bot'
-          ? route.render()
-          : route.render(view);
+          .catch(error => {
+            console.error('Ошибка загрузки страницы промокодов:', error);
+            app.innerHTML = '<p class="muted">Ошибка загрузки страницы промокодов. Попробуйте позже.</p>';
+          });
+      } else {
+        app.innerHTML = route.render(view);
+      }
       // Страницы рисуются строками разом, а фильтры живут в отдельных скриптах.
       // Без этого вызова состояние кнопок разойдётся с тем, что видно на экране.
       for (const fn of [window.__ladderApply, window.__timelineApply, window.__raceApply]) {
