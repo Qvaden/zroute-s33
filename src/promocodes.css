@@ -32,14 +32,6 @@
   color: var(--dim);
 }
 
-.promocode-status.active {
-  color: var(--win);
-}
-
-.promocode-status.inactive {
-  color: var(--loss);
-}
-
 .promocode-source {
   font-size: var(--fs-meta);
   color: var(--mute);
