@@ -1,0 +1,65 @@
+name: Промокоды — ежедневный обход
+
+# Читает две открытые страницы с кодами и обновляет promocodes.json.
+#
+# ЗАЧЕМ ОТДЕЛЬНАЯ ЗАДАЧА. Браузер посетителя не может сходить на чужой сайт:
+# это запрещено правилами браузера, а если бы и было разрешено — чужой текст
+# попал бы на страницу без проверки. Поэтому обход делает GitHub, а сайт
+# читает уже готовый файл из репозитория.
+#
+# ПОЧЕМУ РАЗ В СУТКИ. Новые коды у игры появляются не каждый час, а лишний
+# коммит в истории — шум, по которому потом не найти настоящую правку. Раз в
+# сутки хватает: страница показывает дату проверки и не обещает секундной
+# свежести.
+#
+# ЧТО ПРИ СБОЕ ИСТОЧНИКА. Скрипт не переписывает список целиком: коды, которых
+# не было в ответе, сохраняют прежнюю отметку. Если не ответил ни один сайт,
+# файл не трогается вовсе, и прогон падает красным — это видно в Actions.
+
+on:
+  schedule:
+    # 04:23 UTC. Минута не круглая: в :00 и :30 очередь планировщика GitHub
+    # длиннее, и запуск легко сдвигается на десятки минут.
+    - cron: '23 4 * * *'
+  # Правка самого разбора проверяется сразу, а не на следующее утро.
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/promo-codes.yml'
+      - 'scripts/fetch-promo-codes.mjs'
+  workflow_dispatch:
+
+# Два запуска одновременно писали бы файл наперегонки.
+concurrency:
+  group: promo-codes
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  codes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Зависимостей у проекта нет: скрипт живёт на одном Node.
+      - name: Прочитать сайты и обновить promocodes.json
+        run: node scripts/fetch-promo-codes.mjs
+
+      - name: Закоммитить, если список изменился
+        run: |
+          if git diff --quiet -- promocodes.json; then
+            echo "Изменений нет, коммит не нужен."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add promocodes.json
+          git commit -m "промокоды: обход $(date -u '+%d.%m.%Y')"
+          git push

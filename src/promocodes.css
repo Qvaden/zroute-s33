@@ -1,16 +1,68 @@
-.promocodes-list {
+.promo-intro {
   display: grid;
   gap: var(--s-2);
+}
+
+.promo-intro h1 {
   margin: 0;
 }
 
+.promo-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.promo-stat {
+  display: grid;
+  gap: var(--s-hair);
+  min-width: 7rem;
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+.promo-stat b {
+  font-size: var(--fs-stat-sm);
+  line-height: 1;
+  color: var(--accent-ink);
+}
+
+.promo-stat span {
+  font-size: var(--fs-meta);
+  color: var(--dim);
+}
+
+.promocodes-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .promocode-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
   padding: var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--surface);
+}
+
+.promocode-card--inactive {
+  opacity: .72;
+}
+
+.promocode-card__top {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--s-1);
 }
 
@@ -18,28 +70,51 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: var(--fs-text);
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-ink);
   word-break: break-all;
-  padding: var(--s-hair) 0;
-  border-bottom: 1px solid var(--line);
 }
 
 .promocode-status {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--s-hair);
   font-size: var(--fs-meta);
   color: var(--dim);
+  white-space: nowrap;
 }
 
-.promocode-source {
+.promocode-status--active {
+  color: var(--win);
+}
+
+.promocode-status--inactive {
+  color: var(--loss);
+}
+
+.promocode-dot {
+  width: .5em;
+  height: .5em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.promocode-rewards {
+  margin: 0;
+  font-size: var(--fs-text);
+  color: var(--text);
+}
+
+.promocode-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-1);
+  margin-top: auto;
   font-size: var(--fs-meta);
   color: var(--mute);
-  margin-top: auto;
 }
 
 .promocode-date {
-  font-size: var(--fs-meta);
   color: var(--dim);
-  text-align: right;
+  white-space: nowrap;
+  margin-left: auto;
 }

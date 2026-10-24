@@ -1771,3 +1771,34 @@ body.guide-color-modal-open{overflow:hidden}
 @keyframes adm-boot-spin { to { transform: rotate(1turn); } }
 @keyframes adm-boot-scan { from { transform: translateX(-105%); } to { transform: translateX(245%); } }
 @media (prefers-reduced-motion: reduce) { .adm-boot__mark i, .adm-boot__rail i { animation: none; } .adm-boot__rail i { transform: translateX(70%); } }
+
+/* ── Промокоды: ручные записи ───────────────────────────────────────────────
+   Форма и список живут на одном экране: добавление — это одна строка полей,
+   и отдельное окно заставляло бы открывать его ради каждой правки. */
+
+.promo-admin__form { margin-bottom: var(--s-3); }
+.promo-admin__form .adm-field { margin-bottom: 0; }
+.promo-admin__grid { display: grid; grid-template-columns: minmax(0, 1fr) 160px 170px; gap: var(--s-2); }
+.promo-admin__wide { grid-column: 1 / -1; }
+
+.promo-admin__list { display: grid; }
+.promo-admin__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
+  border-top: 1px solid var(--line);
+}
+.promo-admin__code { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--accent-ink); overflow-wrap: anywhere; }
+.promo-admin__state--on { color: var(--win); border-color: color-mix(in srgb, var(--win) 40%, transparent); }
+.promo-admin__rewards { color: var(--text); font-size: var(--fs-meta); min-width: 0; overflow-wrap: anywhere; }
+.promo-admin__date { color: var(--dim); font-size: var(--fs-meta); white-space: nowrap; }
+.promo-admin__acts { display: flex; gap: var(--s-1); }
+
+@media (max-width: 639px) {
+  .promo-admin__grid { grid-template-columns: 1fr; }
+  .promo-admin__row { grid-template-columns: 1fr auto; }
+  .promo-admin__rewards, .promo-admin__date { grid-column: 1 / -1; }
+  .promo-admin__acts { grid-column: 1 / -1; }
+}

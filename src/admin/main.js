@@ -64,6 +64,7 @@ import {
 } from '../db/account.js';
 import {
   readDataset, recentChanges, uploadPhoto, setModerator, nextAllianceNumber,
+  listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode,
 } from './store.js';
 /*
   ЦЕЛЬ ПАНЕЛИ — КАКОЙ СЕРВЕР ОНА ПРАВИТ.
@@ -132,6 +133,7 @@ import { renderPresident } from './screens/president.js';
 import { renderPlayers, renderSectionMuteRows, renderRepGrantRows } from './screens/players.js';
 import { renderModeration } from './screens/moderation.js';
 import { renderChatsAdmin } from './screens/chats.js';
+import { renderPromocodesAdmin, blankPromoCode } from './screens/promocodes.js';
 import { forum, forumReady } from '../forum/index.js';
 import { deletionReason, categoryLabel } from '../forum/rules.js';
 
@@ -151,6 +153,7 @@ const SCREENS = [
   { id: 'moderation', label: 'Жалобы', render: renderModeration, need: 'moderate' },
   { id: 'players', label: 'Игроки', render: renderPlayers, need: 'moderate' },
   { id: 'chats', label: 'Чаты', render: renderChatsAdmin, need: 'moderate' },
+  { id: 'promocodes', label: 'Промокоды', render: renderPromocodesAdmin },
 ];
 
 /*
@@ -322,6 +325,7 @@ function render() {
   if (screen.id === 'players' || screen.id === 'moderation' || screen.id === 'chats') {
     loadForumScreen(screen.id);
   }
+  if (screen.id === 'promocodes') loadPromoScreen();
 
   root.innerHTML = renderShell({
     screens: visibleScreens(),
@@ -1467,6 +1471,51 @@ function removeGuideRole(index) {
  * оказаться ему недоступны. Отказ приходит из базы; проверки ниже нужны
  * только чтобы не показывать кнопку, которая заведомо откажет.
  */
+/**
+ * Ручные промокоды читаются своим запросом.
+ *
+ * Экран нельзя рисовать вместе с остальными: список лежит в базе, а не в
+ * data/live.json, и ожидание ответа задерживало бы открытие панели. Форма
+ * живёт в состоянии `view.promo`, поэтому правка переживает перерисовку.
+ */
+async function loadPromoScreen(force = false) {
+  if (!force && (view.promo?.loaded || view.promo?.loading)) return;
+
+  view.promo = {
+    loading: true,
+    loaded: false,
+    items: [],
+    error: '',
+    form: blankPromoCode(),
+    result: '',
+  };
+  render();
+
+  try {
+    view.promo.items = await listPromoCodes();
+    view.promo.loaded = true;
+    view.promo.error = '';
+  } catch (err) {
+    view.promo.error = String(err?.message ?? err);
+  } finally {
+    view.promo.loading = false;
+  }
+  render();
+}
+
+async function reloadPromoCodes(message) {
+  try {
+    view.promo.items = await listPromoCodes();
+    view.promo.loaded = true;
+    view.promo.loading = false;
+    view.promo.error = '';
+    view.promo.result = message;
+  } catch (err) {
+    view.promo.error = String(err?.message ?? err);
+  }
+  render();
+}
+
 async function loadForumScreen(screenId) {
   // Уже загружено — второй запрос при каждой перерисовке не нужен.
   if (view.forum?.loadedFor === screenId) return;
@@ -1764,6 +1813,38 @@ async function deleteByReport({ reportId, ruleId, targetType, targetId }) {
 /* ── События ── */
 
 document.addEventListener('submit', async (e) => {
+  /* ── Промокоды: добавить или сохранить ── */
+  const promoForm = e.target.closest('[data-promo-form]');
+  if (promoForm) {
+    e.preventDefault();
+    if (!view?.promo) return;
+
+    const id = String(promoForm.elements.id?.value ?? '');
+    const entered = {
+      id,
+      code: String(promoForm.elements.code?.value ?? ''),
+      status: String(promoForm.elements.status?.value ?? 'active'),
+      rewards: String(promoForm.elements.rewards?.value ?? ''),
+      added_on: String(promoForm.elements.added_on?.value ?? ''),
+    };
+
+    /*
+      Поля остаются на экране до ответа базы: при отказе человек должен
+      видеть то, что напечатал, а не пустую форму и угадывание причины.
+    */
+    view.promo.form = entered;
+    try {
+      if (id) await updatePromoCode(id, entered);
+      else await createPromoCode(entered);
+      view.promo.form = blankPromoCode();
+      await reloadPromoCodes(`<b>${id ? 'Код обновлён.' : 'Код добавлен.'}</b> Он появится на странице промокодов при следующем открытии.`);
+    } catch (err) {
+      view.promo.result = `<span class="adm-error">${esc(err?.message ?? err)}</span>`;
+      render();
+    }
+    return;
+  }
+
   /* ── Форум: запрет писать ── */
   const restrictForm = e.target.closest('[data-restrict-form]');
   if (restrictForm) {
@@ -1994,6 +2075,59 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (!e.target.closest) return;
+
+  /* ── Промокоды: правка, отмена, удаление, повтор ── */
+  if (e.target.closest('[data-promo-reload]')) {
+    if (view?.promo) view.promo.loaded = false;
+    loadPromoScreen(true);
+    return;
+  }
+
+  const promoEdit = e.target.closest('[data-promo-edit]');
+  if (promoEdit) {
+    const item = view?.promo?.items?.find((row) => row.id === promoEdit.dataset.promoEdit);
+    if (item) {
+      view.promo.form = {
+        id: item.id,
+        code: item.code,
+        status: item.status,
+        rewards: item.rewards ?? '',
+        added_on: String(item.added_on ?? '').slice(0, 10),
+      };
+      view.promo.result = '';
+      render();
+      revealForm('[data-promo-form]');
+    }
+    return;
+  }
+
+  if (e.target.closest('[data-promo-cancel]')) {
+    if (view?.promo) {
+      view.promo.form = blankPromoCode();
+      view.promo.result = '';
+      render();
+    }
+    return;
+  }
+
+  const promoDelete = e.target.closest('[data-promo-delete]');
+  if (promoDelete) {
+    const code = promoDelete.dataset.promoCode || 'этот код';
+    if (!confirm(`Удалить «${code}» из ручного списка? Автоматическая запись, если она есть, снова станет видна.`)) return;
+    try {
+      await deletePromoCode(promoDelete.dataset.promoDelete);
+      if (view?.promo?.form?.id === promoDelete.dataset.promoDelete) {
+        view.promo.form = blankPromoCode();
+      }
+      await reloadPromoCodes(`<b>Код «${esc(code)}» удалён.</b>`);
+    } catch (err) {
+      if (view?.promo) {
+        view.promo.result = `<span class="adm-error">${esc(err?.message ?? err)}</span>`;
+        render();
+      }
+    }
+    return;
+  }
 
   /*
     Меню действий игрока: клик мимо открытого «⋯» закрывает его, а открытие

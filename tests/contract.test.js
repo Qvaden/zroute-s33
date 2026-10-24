@@ -20688,9 +20688,11 @@ console.log('\nBH. Мёртвых объявлений в каскаде нет,
 
   /* 2. §19 запрещает плодить заплаточные слои (styles-v9.css, fix.css,
         mobile-fix-final.css), потому что порядок каскада держит доказательство
-        нейтральности: он сверен именно для этих шести и пяти файлов. */
-  equal('каскад сайта остаётся ряд из шести слоёв в заданном порядке', SITE,
-    ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css', 'src/refine.css', 'src/handbook.css', 'src/redesign.css']);
+        нейтральности: он сверен именно для этих файлов. promocodes.css —
+        не заплатка, а страничный файл вкладки, как handbook.css: свои классы
+        с префиксом и место после общих слоёв. */
+  equal('каскад сайта: базовые слои и страничные файлы в заданном порядке', SITE,
+    ['src/styles-v8.css', 'src/forum.css', 'src/mobile.css', 'src/controls.css', 'src/refine.css', 'src/handbook.css', 'src/redesign.css', 'src/promocodes.css']);
   equal('каскад панели остаётся ряд из пяти слоёв без форумных заплаток', ADMIN,
     ['src/styles-v8.css', 'src/admin/admin.css', 'src/admin/admin-mobile.css', 'src/controls.css', 'src/refine.css']);
 
@@ -21245,6 +21247,199 @@ console.log('\nBL. Снимки форума отдельными страниц
       guideDirs.every((dir) => expectedGuideDirs.includes(dir)),
       guideDirs.filter((dir) => !expectedGuideDirs.includes(dir)).join(' | '));
   }
+}
+
+/* ── BB. Промокоды: вкладка читает свежий список, а не заглушку ───────────────
+
+   Вкладка уже ломалась молча: маршрут тянул HTML-файл, которого в репозитории
+   больше нет, а тесты этого не видели. Здесь проверяется не вёрстка, а
+   договорённость между списком, страницей и маршрутом.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBB. Промокоды');
+{
+  const { readFile } = await import('node:fs/promises');
+  let page = null;
+  try {
+    page = await import('../src/pages/promocodes.js');
+  } catch {
+    // Отсутствие модуля — это и есть падение, его покажет check ниже.
+  }
+  check('модуль страницы промокодов отдаёт renderPromocodes и readPromocodes',
+    typeof page?.renderPromocodes === 'function' && typeof page?.readPromocodes === 'function');
+
+  const json = JSON.parse(await readFile('promocodes.json', 'utf8'));
+  const codes = typeof page?.readPromocodes === 'function' ? page.readPromocodes(json) : [];
+  const active = codes.filter((c) => c.status === 'active').length;
+
+  check('promocodes.json хранит список в поле codes',
+    Array.isArray(json.codes) && json.codes.length > 0);
+  check('счётчики promocodes.json сходятся со списком',
+    json.total === json.codes.length && json.active === active && json.inactive === codes.length - active,
+    `в файле ${json.total}/${json.active}/${json.inactive}, в списке ${json.codes.length}/${active}/${codes.length - active}`);
+  check('в списке нет пустых и повторяющихся кодов',
+    codes.length === new Set(codes.map((c) => c.code)).size && codes.every((c) => c.code),
+    codes.filter((c, i) => !c.code || codes.findIndex((x) => x.code === c.code) !== i).map((c) => c.code).join(', '));
+  check('у каждого кода есть рабочий статус и дата проверки',
+    codes.every((c) => (c.status === 'active' || c.status === 'inactive') && /^\d{4}-\d{2}-\d{2}$/.test(c.date)),
+    codes.filter((c) => !/^\d{4}-\d{2}-\d{2}$/.test(c.date)).map((c) => c.code).join(', '));
+
+  equal('старая форма списка (просто массив) тоже читается',
+    page?.readPromocodes([{ code: 'X', status: 'active' }])?.length, 1);
+  equal('записи без кода отбрасываются',
+    page?.readPromocodes({ codes: [{ code: 'X' }, {}, { code: '  ' }] })?.length, 1);
+  equal('неизвестный статус считается нерабочим',
+    page?.readPromocodes([{ code: 'X', status: 'maybe' }])?.[0]?.status, 'inactive');
+
+  const shell = typeof page?.renderPromocodes === 'function' ? page.renderPromocodes() : '';
+  check('страница сразу рисует контейнер списка', shell.includes('id="promocodes-list"'));
+
+  const mainSrc = await readFile('src/main.js', 'utf8');
+  check('маршрут промокодов больше не тянет удалённый HTML-файл',
+    !mainSrc.includes('src/pages/promocodes/index.html'));
+  check('маршрут промокодов отдаёт renderPromocodes',
+    /import\s*\{[^}]*renderPromocodes[^}]*\}\s*from\s*'\.\/pages\/promocodes\.js'/.test(mainSrc)
+      && /render:\s*renderPromocodes/.test(mainSrc));
+
+  const indexSrc = await readFile('index.html', 'utf8');
+  check('стили промокодов подключены к сайту', indexSrc.includes('src/promocodes.css?v='));
+
+  /*
+    ИСТОЧНИКИ НЕ ПОКАЗЫВАЕМ. Названия чужих сайтов на странице читаются как
+    реклама, а не как справка. Внутри разбора они остаются — там они нужны,
+    чтобы понять, откуда взялся код; на экран не попадают ни строкой.
+  */
+  const pageSrc = await readFile('src/pages/promocodes.js', 'utf8');
+  check('публичная страница не выводит названия сайтов-источников',
+    !/promo-sources|promocode-source|Источники:/.test(pageSrc)
+      && !/item\.source/.test(pageSrc));
+  check('в автоматическом списке нет поля source',
+    json.codes.every((item) => !('source' in item)));
+
+  /* Ручные записи из панели важнее автоматических — включая «не работает». */
+  const merged = page?.mergePromocodes?.(
+    [{ code: 'X', status: 'active', date: '2026-10-01', rewards: 'старое' }],
+    [{ code: 'X', status: 'inactive', date: '2026-10-24', rewards: 'новое' }]
+  ) ?? [];
+  equal('ручная запись перекрывает автоматическую', merged.length, 1);
+  equal('ручная отметка «не работает» сильнее чужого «активен»', merged[0]?.status, 'inactive');
+  equal('ручные награды не теряются', merged[0]?.rewards, 'новое');
+  equal('новый ручной код появляется рядом с автоматическими',
+    page?.mergePromocodes?.([{ code: 'A', status: 'active' }], [{ code: 'B', status: 'active' }])?.length, 2);
+
+  /* ── Разбор чужих страниц ───────────────────────────────────────────────── */
+
+  let parser = null;
+  try {
+    parser = await import('../scripts/fetch-promo-codes.mjs');
+  } catch {
+    // Отсутствие модуля покажет check ниже.
+  }
+  check('модуль разбора отдаёт обе функции и слияние',
+    typeof parser?.parseGamesInstel === 'function'
+      && typeof parser?.parseZrouteGuide === 'function'
+      && typeof parser?.mergeCodes === 'function');
+
+  const gamesFixture = `
+    <div class="promocode">
+      <div class="promocode-top">
+        <div class="promocode-added" data-added="18.10.2026">Добавлен</div>
+        <div class="promocode-expires status-active" data-expires="26.10.2026">Активный</div>
+      </div>
+      <div class="promocode-description">1 000 алмазов, 30 сундуков &amp; 60 ускорений</div>
+      <div class="promocode-row"><div class="promocode-value" data-code="NEW1">NEW1</div></div>
+    </div>
+    <div class="promocode">
+      <div class="promocode-top"><div class="promocode-added" data-added="02.10.2026"></div></div>
+      <div class="promocode-description">300 алмазов</div>
+      <div class="promocode-row"><div class="promocode-value" data-code="NEW2">NEW2</div></div>
+    </div>
+    <div class="expired-card"><div class="expired-card__code">OLD1</div></div>`;
+  const gamesParsed = parser?.parseGamesInstel?.(gamesFixture) ?? { active: [], inactive: [] };
+  equal('разбор games-instel находит рабочие коды', gamesParsed.active.length, 2);
+  equal('разбор games-instel находит выбывшие коды', gamesParsed.inactive.length, 1);
+  equal('дата из карточки переводится в ГГГГ-ММ-ДД', gamesParsed.active[0]?.date, '2026-10-18');
+  equal('награды очищаются от разметки и сущностей',
+    gamesParsed.active[0]?.rewards, '1 000 алмазов, 30 сундуков & 60 ускорений');
+
+  const guideFixture = `
+    <li class="zr-code-row"><code>WORK1</code><span class="zr-badge zr-badge--active">Active</span></li>
+    <li class="zr-code-row"><code>GONE1</code><span class="zr-badge zr-badge--ended">Ended</span></li>`;
+  const guideParsed = parser?.parseZrouteGuide?.(guideFixture) ?? { active: [], inactive: [] };
+  equal('разбор zrouteguide отделяет рабочий код', guideParsed.active[0]?.code, 'WORK1');
+  equal('разбор zrouteguide отделяет выбывший код', guideParsed.inactive[0]?.code, 'GONE1');
+
+  const keepRich = parser?.mergeCodes?.({
+    previous: [{ code: 'NEW1', status: 'active', date: '2026-10-01', rewards: 'старые награды' }],
+    active: [{ code: 'NEW1', date: '2026-10-18', rewards: '' }],
+    today: '2026-10-24',
+  }) ?? [];
+  equal('слияние берёт свежую дату и не теряет награды', keepRich[0]?.date, '2026-10-18');
+  equal('слияние сохраняет награды прежней записи', keepRich[0]?.rewards, 'старые награды');
+
+  const missed = parser?.mergeCodes?.({
+    previous: [{ code: 'OLD2', status: 'active', date: '2026-09-01', rewards: '' }],
+    active: [],
+    inactive: [],
+    sourcesOk: true,
+    today: '2026-10-24',
+  }) ?? [];
+  equal('код, пропавший из обоих списков, становится выбывшим', missed[0]?.status, 'inactive');
+  const missedAfterFail = parser?.mergeCodes?.({
+    previous: [{ code: 'OLD2', status: 'active', date: '2026-09-01', rewards: '' }],
+    active: [],
+    inactive: [],
+    sourcesOk: false,
+    today: '2026-10-24',
+  }) ?? [];
+  equal('при сбое источника прежняя отметка не меняется', missedAfterFail[0]?.status, 'active');
+
+  /* ── Ручное управление в панели ─────────────────────────────────────────── */
+
+  const storeSrc = await readFile('src/admin/store.js', 'utf8');
+  check('ручные промокоды пишутся через общий файл записи панели',
+    /export async function listPromoCodes/.test(storeSrc)
+      && /export async function createPromoCode/.test(storeSrc)
+      && /export async function updatePromoCode/.test(storeSrc)
+      && /export async function deletePromoCode/.test(storeSrc)
+      && storeSrc.includes('site_promo_codes'));
+  check('запись ручного кода защищена уникальностью и правом сайта',
+    storeSrc.includes('Такой код уже есть') && storeSrc.includes('модератор сайта'));
+
+  let promoAdmin = null;
+  try {
+    promoAdmin = await import('../src/admin/screens/promocodes.js');
+  } catch {
+    // Отсутствие экрана покажет check ниже.
+  }
+  const promoShell = promoAdmin?.renderPromocodesAdmin?.({
+    promo: { items: [], form: promoAdmin?.blankPromoCode?.(), loading: false, error: '', result: '' },
+  }) ?? '';
+  check('экран панели рисует форму и список',
+    promoShell.includes('data-promo-form') && promoShell.includes('Добавленные вручную'));
+  const adminMainSrc = await readFile('src/admin/main.js', 'utf8');
+  check('панель перечисляет экран промокодов',
+    /id:\s*'promocodes',\s*label:\s*'Промокоды'/.test(adminMainSrc)
+      && /renderPromocodesAdmin/.test(adminMainSrc));
+
+  const migration = await readFile('supabase/20261024-promo-codes.sql', 'utf8');
+  check('миграция заводит таблицу с одним кодом на строку',
+    /create table if not exists public\.site_promo_codes/.test(migration)
+      && /unique index[\s\S]*upper\(code\)/.test(migration));
+  check('миграция закрывает запись правом редактора сайта',
+    /enable row level security/.test(migration)
+      && (migration.match(/public\.site_can_edit\(\)/g) ?? []).length >= 3);
+  check('читать промокоды может гость',
+    /for select using \(true\)/.test(migration));
+
+  const workflow = await readFile('.github/workflows/promo-codes.yml', 'utf8');
+  check('обход промокодов запускается по расписанию и вручную',
+    /cron:\s*'23 4 \* \* \*'/.test(workflow) && /workflow_dispatch:/.test(workflow));
+  check('обход коммитит только обновлённый список',
+    workflow.includes('node scripts/fetch-promo-codes.mjs')
+      && workflow.includes('git diff --quiet -- promocodes.json')
+      && workflow.includes('git add promocodes.json'));
+  check('обход не просит служебных секретов',
+    !/secrets\./.test(workflow) && /contents:\s*write/.test(workflow));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

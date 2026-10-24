@@ -128,7 +128,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=127">
+  <link rel="modulepreload" href="./src/main.js?v=128">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;700;800&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;700;800&display=optional" rel="stylesheet"></noscript>
 
@@ -183,6 +183,8 @@
     мобильную плотность. Справочник и краски альянсов остаются своими.
   -->
   <link rel="stylesheet" href="./src/redesign.css?v=11">
+  <!-- Карточки вкладки промокодов: свои классы с префиксом promo-, ни с кем не спорят. -->
+  <link rel="stylesheet" href="./src/promocodes.css?v=2">
   <!--
     Краски альянсов, доведённые до контраста. Пустой блок — это нормально.
 
@@ -481,7 +483,7 @@
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=127"></script>
+  <script type="module" src="./src/main.js?v=128"></script>
 
   <script>
     /*

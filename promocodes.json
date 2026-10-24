@@ -1,20 +1,284 @@
-[
-  {
-    "code": "ZROUTE2023",
-    "status": "active",
-    "source": "Официальный сайт",
-    "date": "2023-10-15"
-  },
-  {
-    "code": "OLDCODE123",
-    "status": "inactive",
-    "source": "Старый источник",
-    "date": "2023-05-20"
-  },
-  {
-    "code": "NEWDEAL456",
-    "status": "active",
-    "source": "Партнёрская программа",
-    "date": "2023-11-01"
-  }
-]
+{
+  "updated": "2026-10-24T17:18:23.533Z",
+  "total": 46,
+  "active": 29,
+  "inactive": 17,
+  "codes": [
+    {
+      "code": "26CHOCO",
+      "status": "active",
+      "date": "2026-07-07",
+      "rewards": "200 алмазов, 50 выносливости и 15 ускорений по 1 минуты"
+    },
+    {
+      "code": "DC75KJDR",
+      "status": "active",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC80KVSN",
+      "status": "active",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC85KBRTY",
+      "status": "active",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC90KVSM",
+      "status": "active",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "LOUNGE619",
+      "status": "active",
+      "date": "2026-04-07",
+      "rewards": "200 алмазов, 50 выносливости и 50 ускорений по 1 минуты"
+    },
+    {
+      "code": "OKTOBER26",
+      "status": "active",
+      "date": "2026-09-20",
+      "rewards": "300 алмазов, 10 ресурсных сундуков и 25 ускорений по 1 минуты"
+    },
+    {
+      "code": "VK110KQBR",
+      "status": "active",
+      "date": "2026-09-23",
+      "rewards": "1 000 алмазов, 30 ресурсных сундуков, 60 ускорений по 1 минуты, 8 билетов призыва выжившего и 100 выносливости"
+    },
+    {
+      "code": "VK120KDRF",
+      "status": "active",
+      "date": "2026-10-15",
+      "rewards": "1 000 алмазов, 30 ресурсных сундуков, 60 ускорений по 1 минуты, 8 билетов призыва выжившего и 100 выносливости"
+    },
+    {
+      "code": "WELCOME26",
+      "status": "active",
+      "date": "2026-04-07",
+      "rewards": "1 билет призыва выжившего и 10 ресурсных сундуков"
+    },
+    {
+      "code": "WFD2026ZR",
+      "status": "active",
+      "date": "2026-10-18",
+      "rewards": "1 000 алмазов, 30 ресурсных сундуков, 60 ускорений по 1 минуты, 8 билетов призыва выжившего и 100 выносливости"
+    },
+    {
+      "code": "ZR26ALLY",
+      "status": "active",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "ZR26PLAY",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "300 алмазов, 25 ускорений по 1 минуты и 10 ресурсных сундуков"
+    },
+    {
+      "code": "ZRDAD26",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "300 алмазов, 25 ускорений по 1 минуты и 10 ресурсных сундуков"
+    },
+    {
+      "code": "ZRR0ZWEN",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRR2026",
+      "status": "active",
+      "date": "2026-04-07",
+      "rewards": "200 алмазов, 5 ресурсных сундуков и 10 ускорений по 1 минуты"
+    },
+    {
+      "code": "ZRR2573Q",
+      "status": "active",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "ZRR2NX6Q",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRR2PDVQ",
+      "status": "active",
+      "date": "2026-09-18",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRR4XTW7",
+      "status": "active",
+      "date": "2026-09-18",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRR6666",
+      "status": "active",
+      "date": "2026-04-07",
+      "rewards": "200 алмазов, 10 ресурсных сундуков и 15 ускорений по 1 минуты"
+    },
+    {
+      "code": "ZRR999",
+      "status": "active",
+      "date": "2026-04-07",
+      "rewards": "200 алмазов, 10 ресурсных сундуков, 2 сундука с опытом и 15 ускорений по 1 минуты"
+    },
+    {
+      "code": "ZRRC7WES",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRRFT9BM",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRRKR617",
+      "status": "active",
+      "date": "2026-06-29",
+      "rewards": "300 алмазов, 10 ресурсных сундуков и 25 ускорений по 1 минуты"
+    },
+    {
+      "code": "ZRRLW2AC",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "200 алмазов 10 ресурсных сундуков и 50 ускорений по 1 минуты"
+    },
+    {
+      "code": "ZRRVJ4YD",
+      "status": "active",
+      "date": "2026-08-08",
+      "rewards": "300 алмазов"
+    },
+    {
+      "code": "ZRSURV26",
+      "status": "active",
+      "date": "2026-10-02",
+      "rewards": "200 алмазов, 10 ресурсных сундуков и 25 ускорений по 1 минуты"
+    },
+    {
+      "code": "ZRTSML09",
+      "status": "active",
+      "date": "2026-09-23",
+      "rewards": "200 алмазов, 50 выносливости и 15 ускорений по 1 минуты"
+    },
+    {
+      "code": "26SCHOOL",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC45KIGS",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC50KURM",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC55KQEU",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC60KHAX",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC65KZPW",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC6KFEO",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC70KMFT",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "VK100KLYS",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "VK10KYUT",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "VK12KDGH",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "VK15KOKL",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "VK20KDSM",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "VK90KPJD",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "ZRR100S",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "ZRRUSG26",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "ZRYOUTH26",
+      "status": "inactive",
+      "date": "2026-10-24",
+      "rewards": ""
+    }
+  ]
+}

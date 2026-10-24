@@ -329,3 +329,82 @@ function asDate(value) {
   const s = String(value ?? '').trim();
   return s || null;
 }
+
+/* ── Ручные промокоды ─────────────────────────────────────────────────────── */
+
+const PROMO_TABLE = '/site_promo_codes';
+const PROMO_SELECT = 'id,code,status,rewards,added_on,updated_at';
+
+function promoFields(input) {
+  const code = String(input?.code ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) {
+    throw new Error('Код состоит из латинских букв и цифр: от 3 до 32 знаков.');
+  }
+
+  const status = String(input?.status ?? '').trim() === 'inactive' ? 'inactive' : 'active';
+  const rewards = String(input?.rewards ?? '').trim();
+  if (rewards.length > 200) throw new Error('Награды длиннее 200 знаков не поместятся в карточку.');
+
+  const added = String(input?.added_on ?? '').trim();
+  if (added && !/^\d{4}-\d{2}-\d{2}$/.test(added)) {
+    throw new Error('Дата должна быть в виде ГГГГ-ММ-ДД.');
+  }
+
+  return {
+    code,
+    status,
+    rewards,
+    ...(added ? { added_on: added } : {}),
+  };
+}
+
+function promoError(error) {
+  const message = String(error?.message ?? error);
+  if (/duplicate key|unique/i.test(message)) return new Error('Такой код уже есть в списке.');
+  if (/does not exist|schema cache|Could not find the table/i.test(message)) {
+    return new Error('В базе ещё нет таблицы промокодов. Выполните supabase/20261024-promo-codes.sql.');
+  }
+  if (/недостаточно прав/i.test(message)) {
+    return new Error('База отказала: добавлять промокоды может владелец или модератор сайта.');
+  }
+  return error instanceof Error ? error : new Error(message);
+}
+
+export async function listPromoCodes() {
+  const rows = await rest(`${PROMO_TABLE}?select=${PROMO_SELECT}&order=code.asc`, { retryOnAbort: true });
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function createPromoCode(input) {
+  try {
+    const rows = await rest(PROMO_TABLE, {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: [promoFields(input)],
+    });
+    return rows?.[0] ?? null;
+  } catch (error) {
+    throw promoError(error);
+  }
+}
+
+export async function updatePromoCode(id, input) {
+  try {
+    const rows = await rest(`${PROMO_TABLE}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      prefer: 'return=representation',
+      body: promoFields(input),
+    });
+    return rows?.[0] ?? null;
+  } catch (error) {
+    throw promoError(error);
+  }
+}
+
+export async function deletePromoCode(id) {
+  try {
+    await rest(`${PROMO_TABLE}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  } catch (error) {
+    throw promoError(error);
+  }
+}
