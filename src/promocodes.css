@@ -37,6 +37,12 @@
 .promocodes-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  /*
+    Карточки выравниваются по верхнему краю, а не растягиваются до самой
+    высокой в строке. Иначе короткий код без награды получал пустоту в
+    пол-карточки: место занимала соседняя запись с длинным описанием.
+  */
+  align-items: start;
   gap: var(--s-2);
   margin: 0;
   padding: 0;
@@ -64,6 +70,66 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--s-1);
+}
+
+/*
+  Код — кнопка, а не подпись: именно его копируют в игру. Отрицательные поля
+  расширяют площадку нажатия, не сдвигая текст относительно статуса.
+*/
+.promocode-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: .35em;
+  min-width: 0;
+  margin: -.25rem -.4rem;
+  padding: .25rem .4rem;
+  border: 0;
+  border-radius: calc(var(--r) * .6);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.promocode-copy:hover .promocode-code {
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+.promocode-copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.promocode-copy__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--mute);
+}
+
+.promocode-copy__icon svg {
+  display: block;
+}
+
+.promocode-copy__done {
+  display: none;
+}
+
+.promocode-copy:hover .promocode-copy__icon {
+  color: var(--accent-ink);
+}
+
+.promocode-copy.is-copied .promocode-copy__icon {
+  color: var(--win);
+}
+
+.promocode-copy.is-copied .promocode-copy__icon > svg:not(.promocode-copy__done) {
+  display: none;
+}
+
+.promocode-copy.is-copied .promocode-copy__done {
+  display: block;
 }
 
 .promocode-code {

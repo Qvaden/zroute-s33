@@ -1,4 +1,5 @@
 import { esc } from '../ui/helpers.js';
+import { toast } from '../ui/toast.js';
 import { isConfigured, rest } from '../db/client.js';
 
 const SOURCE_FILE = './promocodes.json';
@@ -65,6 +66,59 @@ async function loadManual() {
   return Array.isArray(rows) ? rows.map(manualCode).filter(Boolean) : [];
 }
 
+/*
+  Копирование — главное действие на этой странице: код вставляют в игру.
+  Clipboard API молча отказывает без защищённого адреса, поэтому запасной
+  путь через скрытое поле остаётся: без него кнопка в старом браузере просто
+  ничего не делает и человек считает, что код неверный.
+*/
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Ниже пробуем старый способ: он не спрашивает разрешения.
+    }
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.top = '-1000px';
+  document.body.append(area);
+  area.select();
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  }
+  area.remove();
+  return copied;
+}
+
+async function copyCode(button) {
+  const code = button.dataset.copy ?? '';
+  if (!code) return;
+  if (!await copyText(code)) {
+    toast('Не удалось скопировать. Выделите код вручную.', 'error');
+    return;
+  }
+  /*
+    Подтверждение живёт дольше мгновения: человек смотрит на кнопку, а не на
+    нижний край экрана, и должен увидеть, что нажатие сработало.
+  */
+  button.classList.add('is-copied');
+  button.setAttribute('aria-label', `Код ${code} скопирован`);
+  clearTimeout(button.copyTimer);
+  button.copyTimer = window.setTimeout(() => {
+    button.classList.remove('is-copied');
+    button.setAttribute('aria-label', `Скопировать код ${code}`);
+  }, 1600);
+  toast(`Код ${code} скопирован`, 'ok');
+}
+
 function formatDate(value) {
   const text = String(value ?? '').trim().slice(0, 10);
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
@@ -98,10 +152,17 @@ function renderCard(item) {
   const active = item.status === ACTIVE;
   const statusClass = active ? 'active' : 'inactive';
   const statusText = active ? 'Активен' : 'Не работает';
+  const code = esc(item.code);
   return `
     <article class="promocode-card promocode-card--${statusClass}">
       <div class="promocode-card__top">
-        <span class="promocode-code">${esc(item.code)}</span>
+        <button class="promocode-copy" type="button" data-copy="${code}" aria-label="Скопировать код ${code}" title="Скопировать код">
+          <span class="promocode-code">${code}</span>
+          <span class="promocode-copy__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
+            <svg class="promocode-copy__done" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
+          </span>
+        </button>
         <span class="promocode-status promocode-status--${statusClass}">
           <span class="promocode-dot" aria-hidden="true"></span>${statusText}
         </span>
@@ -152,5 +213,9 @@ export async function mountPromocodes(app) {
   }
 
   list.innerHTML = codes.map(renderCard).join('');
+  list.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-copy]');
+    if (button && list.contains(button)) copyCode(button);
+  });
   fillSummary(app, data, codes);
 }
