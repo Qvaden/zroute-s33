@@ -21293,6 +21293,31 @@ console.log('\nBB. Промокоды');
   const shell = typeof page?.renderPromocodes === 'function' ? page.renderPromocodes() : '';
   check('страница сразу рисует контейнер списка', shell.includes('id="promocodes-list"'));
 
+  /*
+    Подсказка «как это применить» — единственное место, где вкладка говорит про
+    путь в игре. Проверяются обе половины: порядок шагов (иначе стрелки ведут не
+    туда) и то, что полка стоит ДО списка. Под списком её читают уже после того,
+    как код скопировали и не нашли, куда его вставлять.
+  */
+  const steps = ['Аватар', 'Настройки', 'Подарочный код'];
+  const stepAt = steps.map((word) => shell.indexOf(`<span>${word}</span>`));
+  check('вкладка показывает путь в игре тремя шагами в правильном порядке',
+    stepAt.every((pos) => pos > 0) && stepAt[0] < stepAt[1] && stepAt[1] < stepAt[2],
+    stepAt.join(', '));
+  check('подсказка стоит над списком кодов и объясняет копирование нажатием',
+    shell.indexOf('class="promo-how"') > 0
+      && shell.indexOf('class="promo-how"') < shell.indexOf('id="promocodes-list"')
+      && /Скопируйте код нажатием/.test(shell));
+  const howMarkup = shell.slice(shell.indexOf('class="promo-how"'), shell.indexOf('id="promocodes-list"'));
+  check('подсказка — полка, а не кнопка: внутри нет управляющих элементов, которые могут не сработать',
+    howMarkup.length > 0 && !/<button|<a\s|<details/i.test(howMarkup));
+  const promoStyles = await readFile('src/promocodes.css', 'utf8');
+  check('все классы подсказки описаны в стилях вкладки',
+    ['promo-how', 'promo-how__title', 'promo-how__steps', 'promo-how__note']
+      .every((cls) => promoStyles.includes(`.${cls}`)),
+    ['promo-how', 'promo-how__title', 'promo-how__steps', 'promo-how__note']
+      .filter((cls) => !promoStyles.includes(`.${cls}`)).join(', '));
+
   const mainSrc = await readFile('src/main.js', 'utf8');
   check('маршрут промокодов больше не тянет удалённый HTML-файл',
     !mainSrc.includes('src/pages/promocodes/index.html'));

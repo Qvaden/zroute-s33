@@ -125,6 +125,13 @@ function formatDate(value) {
   return parts ? `${parts[3]}.${parts[2]}.${parts[1]}` : '';
 }
 
+/*
+  Подсказка отвечает на вопрос, который возникает раньше списка: куда этот код
+  вводить. Путь в игре — единственное, чего не хватало человеку, впервые
+  открывшему вкладку: без него код копируют и не знают, что с ним делать.
+  Кнопки-раскрывашки нет нарочно: ответ помещается в одну строку и должен быть
+  виден сразу, а лишнее нажатие только прячет его от того, кто пришёл впервые.
+*/
 export function renderPromocodes() {
   return `
     <section class="panel promo-intro">
@@ -140,8 +147,17 @@ export function renderPromocodes() {
     <section class="panel promo-panel">
       <header class="panel__head">
         <h2>Актуальные промокоды</h2>
-        <p class="muted">Введите код в игре. Если код не сработал, он мог закончиться — начинайте с верхних.</p>
+        <p class="muted">Если код не сработал, он мог закончиться — начинайте с верхних.</p>
       </header>
+      <div class="promo-how">
+        <p class="promo-how__title">Как использовать</p>
+        <ol class="promo-how__steps">
+          <li><span>Аватар</span></li>
+          <li><span>Настройки</span></li>
+          <li><span>Подарочный код</span></li>
+        </ol>
+        <p class="promo-how__note">Скопируйте код нажатием на него и вставьте в открывшееся поле — останется подтвердить.</p>
+      </div>
       <div class="promocodes-list" id="promocodes-list" aria-live="polite">
         <p class="muted">Загружаем список…</p>
       </div>

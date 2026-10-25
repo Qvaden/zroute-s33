@@ -184,3 +184,61 @@
   white-space: nowrap;
   margin-left: auto;
 }
+
+/*
+  Путь в игре стоит отдельной полкой над списком, а не строкой в шапке панели:
+  это не пояснение к заголовку, а маршрут из трёх шагов, и его читают глазами
+  слева направо. Бирюзовая линейка слева отделяет подсказку от самих кодов,
+  не превращая её в ещё одну карточку: рамка вокруг съедала бы высоту у списка.
+*/
+.promo-how {
+  display: grid;
+  gap: var(--s-1);
+  margin: 0 0 var(--s-2);
+  padding-left: var(--s-2);
+  border-left: 2px solid var(--accent);
+}
+
+.promo-how__title {
+  margin: 0;
+  font-size: var(--fs-meta);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.promo-how__steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.promo-how__steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-size: var(--fs-meta);
+  color: var(--text);
+}
+
+.promo-how__steps li > span {
+  padding: .2rem .6rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--r) * .6);
+  background: var(--surface);
+}
+
+.promo-how__steps li:not(:last-child)::after {
+  content: '→';
+  color: var(--mute);
+}
+
+.promo-how__note {
+  margin: 0;
+  font-size: var(--fs-meta);
+  color: var(--dim);
+}
