@@ -242,3 +242,56 @@
   font-size: var(--fs-meta);
   color: var(--dim);
 }
+
+/*
+  Порядок кодов — две капсулы вместо выпадающего списка: выбор в одно нажатие
+  и видно, что включено. Выбранная заливается акцентом с белыми чернилами —
+  это та же пара `--accent` + `--on-accent`, что у чипсов всего сайта, поэтому
+  новых пар красок для порогов контраста не появляется.
+*/
+.promo-sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
+  margin: 0 0 var(--s-2);
+}
+
+.promo-sort__label {
+  font-size: var(--fs-meta);
+  color: var(--dim);
+}
+
+.promo-sort__chip {
+  padding: var(--s-fine) var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--mute);
+  font-family: inherit;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.promo-sort__chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.promo-sort__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.promo-sort__chip.is-on {
+  color: var(--on-accent);
+  border-color: transparent;
+  background: var(--accent);
+}
+
+/* Палец на телефоне промахивается мимо капсулы высотой 25 px: как и у чипсов
+   доски, на узком экране она вырастает до площадки под палец. */
+@media (max-width: 759px) {
+  .promo-sort__chip { min-height: 44px; }
+}

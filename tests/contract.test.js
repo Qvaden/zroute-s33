@@ -21308,7 +21308,7 @@ console.log('\nBB. Промокоды');
     shell.indexOf('class="promo-how"') > 0
       && shell.indexOf('class="promo-how"') < shell.indexOf('id="promocodes-list"')
       && /Скопируйте код нажатием/.test(shell));
-  const howMarkup = shell.slice(shell.indexOf('class="promo-how"'), shell.indexOf('id="promocodes-list"'));
+  const howMarkup = shell.slice(shell.indexOf('class="promo-how"'), shell.indexOf('class="promo-sort"'));
   check('подсказка — полка, а не кнопка: внутри нет управляющих элементов, которые могут не сработать',
     howMarkup.length > 0 && !/<button|<a\s|<details/i.test(howMarkup));
   const promoStyles = await readFile('src/promocodes.css', 'utf8');
@@ -21317,6 +21317,48 @@ console.log('\nBB. Промокоды');
       .every((cls) => promoStyles.includes(`.${cls}`)),
     ['promo-how', 'promo-how__title', 'promo-how__steps', 'promo-how__note']
       .filter((cls) => !promoStyles.includes(`.${cls}`)).join(', '));
+
+  /*
+    ПОРЯДОК КОДОВ. «Свежие» — не «все подряд по дате»: мёртвый код месячной
+    давности не должен всплывать выше рабочего. Список читают сверху вниз, и
+    первым обязан попадаться тот, который ещё можно ввести. Проверка держит
+    оба правила сразу — и свежесть, и то, что нерабочие не лезут наверх.
+  */
+  const sample = [
+    { code: 'OLD', status: 'active', date: '2026-04-07' },
+    { code: 'NEW', status: 'active', date: '2026-10-24' },
+    { code: 'DEAD', status: 'inactive', date: '2026-10-25' },
+    { code: 'NODATE', status: 'active', date: '' },
+  ];
+  const freshOrder = page?.sortPromocodes?.(sample)?.map((item) => item.code) ?? [];
+  equal('свежие: новые даты выше старых', freshOrder[0], 'NEW');
+  equal('свежие: код без даты — ниже рабочих с датой', freshOrder[2], 'NODATE');
+  equal('свежие: нерабочий код не поднимается выше рабочих, даже если он свежее',
+    freshOrder[3], 'DEAD');
+  equal('по алфавиту: рабочие по буквам, нерабочие в конце',
+    (page?.sortPromocodes?.(sample, 'alpha') ?? []).map((item) => item.code).join(','),
+    'NEW,NODATE,OLD,DEAD');
+  equal('сортировка не переставляет исходный список',
+    sample.map((item) => item.code).join(','), 'OLD,NEW,DEAD,NODATE');
+
+  check('ряд порядка стоит между подсказкой и списком, «Свежие» включено по умолчанию',
+    shell.indexOf('data-promo-sort-group') > shell.indexOf('class="promo-how"')
+      && shell.indexOf('data-promo-sort-group') < shell.indexOf('id="promocodes-list"')
+      && (shell.match(/data-promo-sort="/g) || []).length === 2
+      && /class="promo-sort__chip is-on"[^>]*data-promo-sort="fresh"[\s\S]{0,80}aria-pressed="true"/.test(shell));
+  check('у ряда порядка есть подпись и стили в файле вкладки',
+    /class="promo-sort__label"/.test(shell)
+      && ['promo-sort', 'promo-sort__label', 'promo-sort__chip'].every((cls) => promoStyles.includes(`.${cls}`)));
+  /*
+    Выбранная капсула заливается акцентом и подписывается `--on-accent` — та же
+    пара, что у чипсов всего сайта и уже сверена в порогах контраста в обеих
+    темах. Свой оттенок здесь означал бы третью пару красок, которую никто не
+    мерил; поэтому проверка смотрит именно на токены, а не на «красиво».
+  */
+  check('выбранная капсула порядка залита акцентом с чернилами --on-accent',
+    /\.promo-sort__chip\.is-on \{[^}]*color:\s*var\(--on-accent\);[^}]*background:\s*var\(--accent\);/.test(promoStyles));
+  check('на телефоне капсула порядка вырастает до площадки под палец',
+    /@media \(max-width: 759px\) \{\s*\.promo-sort__chip \{ min-height: 44px; \}/.test(promoStyles));
 
   const mainSrc = await readFile('src/main.js', 'utf8');
   check('маршрут промокодов больше не тянет удалённый HTML-файл',

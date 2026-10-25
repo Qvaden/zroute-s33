@@ -6,6 +6,11 @@ const SOURCE_FILE = './promocodes.json';
 const MANUAL_TABLE = '/site_promo_codes';
 const ACTIVE = 'active';
 
+export const PROMO_SORTS = [
+  { id: 'fresh', label: 'Свежие' },
+  { id: 'alpha', label: 'По алфавиту' },
+];
+
 export function readPromocodes(data) {
   const list = Array.isArray(data) ? data : Array.isArray(data?.codes) ? data.codes : [];
   const seen = new Set();
@@ -43,6 +48,26 @@ export function mergePromocodes(auto = [], manual = []) {
     ? a.code.localeCompare(b.code)
     : a.status === ACTIVE ? -1 : 1));
   return codes;
+}
+
+/**
+ * Порядок кодов на экране.
+ *
+ * «Свежие» — рабочие сверху, внутри них новые даты первыми: человек приходит
+ * за тем, что вышло на днях, а дата здесь — день, когда код впервые попал в
+ * список, и дальше она не переписывается. Мёртвые коды не уходят наверх даже
+ * если они свежее всех: список читают сверху вниз, и первым должен попадаться
+ * тот, который ещё можно ввести. Коды без даты — в самом низу: неизвестное
+ * не должно стоять выше известного.
+ */
+export function sortPromocodes(codes, mode = 'fresh') {
+  const rank = (item) => (item.status === ACTIVE ? 0 : 1);
+  return codes.slice().sort((a, b) => {
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    if (mode === 'alpha') return a.code.localeCompare(b.code);
+    const byDate = String(b.date ?? '').localeCompare(String(a.date ?? ''));
+    return byDate || a.code.localeCompare(b.code);
+  });
 }
 
 function manualCode(row) {
@@ -158,6 +183,12 @@ export function renderPromocodes() {
         </ol>
         <p class="promo-how__note">Скопируйте код нажатием на него и вставьте в открывшееся поле — останется подтвердить.</p>
       </div>
+      <div class="promo-sort" role="group" aria-label="Порядок кодов" data-promo-sort-group>
+        <span class="promo-sort__label">Порядок</span>
+        ${PROMO_SORTS.map((item) => `<button type="button" class="promo-sort__chip${item.id === 'fresh' ? ' is-on' : ''}"
+                data-promo-sort="${esc(item.id)}"
+                aria-pressed="${item.id === 'fresh' ? 'true' : 'false'}">${esc(item.label)}</button>`).join('')}
+      </div>
       <div class="promocodes-list" id="promocodes-list" aria-live="polite">
         <p class="muted">Загружаем список…</p>
       </div>
@@ -221,14 +252,41 @@ export async function mountPromocodes(app) {
   }
 
   const codes = mergePromocodes(readPromocodes(data), manual);
+  const sortBar = app.querySelector('[data-promo-sort-group]');
   if (!codes.length) {
     list.innerHTML = data
       ? '<p class="muted">Список промокодов пока пуст.</p>'
       : '<p class="muted">Не удалось загрузить список. Проверьте связь и обновите страницу.</p>';
+    // Сортировать нечего: ряд кнопок без списка только обещает действие.
+    if (sortBar) sortBar.hidden = true;
     return;
   }
 
-  list.innerHTML = codes.map(renderCard).join('');
+  /*
+    Порядок живёт в замыкании, а не в адресе страницы: выбор нужен на один
+    заход — человек листает свежие и уходит. Перерисовывается только список,
+    поэтому кнопки копирования остаются на месте, а подписка на клик по коду
+    вешается один раз на контейнер.
+  */
+  let mode = 'fresh';
+  const paint = () => {
+    list.innerHTML = sortPromocodes(codes, mode).map(renderCard).join('');
+    if (!sortBar) return;
+    for (const button of sortBar.querySelectorAll('[data-promo-sort]')) {
+      const on = button.dataset.promoSort === mode;
+      button.classList.toggle('is-on', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  };
+  paint();
+  sortBar?.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-promo-sort]');
+    if (!button || !sortBar.contains(button)) return;
+    const next = button.dataset.promoSort;
+    if (!next || next === mode) return;
+    mode = next;
+    paint();
+  });
   list.addEventListener('click', (event) => {
     const button = event.target.closest?.('[data-copy]');
     if (button && list.contains(button)) copyCode(button);
