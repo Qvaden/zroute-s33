@@ -17848,10 +17848,10 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
     htmlSrc.search(/href="\.\/src\/forum\.css/) < htmlSrc.search(/href="\.\/src\/refine\.css/)
       && htmlSrc.includes('href="./src/forum.css') && htmlSrc.includes('href="./src/refine.css'));
 
-  const lightLayer = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta,\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary,\n:root\[data-theme="light"\] \.accounts-empty \.forum-btn \{([^}]*)\}/.exec(cssFlat);
-  const lightHover = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta:hover:not\(:disabled\),\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary:hover:not\(:disabled\),\n:root\[data-theme="light"\] \.accounts-empty \.forum-btn:hover:not\(:disabled\) \{([^}]*)\}/.exec(cssFlat);
+  const lightLayer = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta,\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary \{([^}]*)\}/.exec(cssFlat);
+  const lightHover = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta:hover:not\(:disabled\),\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary:hover:not\(:disabled\) \{([^}]*)\}/.exec(cssFlat);
   const pick = (m, what) => (m ? new RegExp(`${what}:\\s*([^;]+);`).exec(m[1]) : null);
-  check('три залитые кнопки доски в светлой теме держат бирюзу и свои чернила, а не янтарь',
+  check('две залитые кнопки доски в светлой теме держат бирюзу и свои чернила, а не янтарь',
     Boolean(lightLayer) && /var\(--shop\)/.test(lightLayer ? lightLayer[1] : '')
       && /var\(--shop-ink\)/.test(lightLayer ? lightLayer[1] : '')
       && !/a94722|c86231|b95428|8e381b/i.test(lightLayer ? lightLayer[1] : ''));

@@ -3716,8 +3716,7 @@
   и глаз считывал это как «обычная кнопка сайта», а не как витрина.
 */
 :root[data-theme="light"] .accounts-hero .accounts-hero__cta,
-:root[data-theme="light"] .accounts-composer .forum-btn--primary,
-:root[data-theme="light"] .accounts-empty .forum-btn {
+:root[data-theme="light"] .accounts-composer .forum-btn--primary {
   background: linear-gradient(135deg, var(--shop), color-mix(in srgb, var(--shop) 82%, var(--shade)));
   color: var(--shop-ink);
   border-color: color-mix(in srgb, var(--shop) 72%, var(--shade));
@@ -3725,8 +3724,7 @@
     0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
 }
 :root[data-theme="light"] .accounts-hero .accounts-hero__cta:hover:not(:disabled),
-:root[data-theme="light"] .accounts-composer .forum-btn--primary:hover:not(:disabled),
-:root[data-theme="light"] .accounts-empty .forum-btn:hover:not(:disabled) {
+:root[data-theme="light"] .accounts-composer .forum-btn--primary:hover:not(:disabled) {
   background: linear-gradient(180deg, color-mix(in srgb, var(--shop) 90%, var(--tint)), var(--shop));
   color: var(--shop-ink);
   border-color: color-mix(in srgb, var(--shop) 80%, var(--shade));
@@ -4282,13 +4280,6 @@
 }
 .accounts-empty p { margin: 0 0 var(--s-1); }
 .accounts-empty p:last-child { margin: 0; font-size: var(--fs-meta); }
-/* Пустая доска зовёт выставить первое объявление той же бирюзой, что и шапка:
-   на пустой витрине это единственная кнопка, и она должна выглядеть началом
-   торговли, а не переходом в форум. */
-.accounts-empty .forum-btn {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, var(--tint)), var(--shop));
-  color: var(--shop-ink);
-}
 
 /*
   Телефон: шапка складывается в один столбец и кнопка объявления становится
