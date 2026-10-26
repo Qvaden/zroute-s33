@@ -16399,15 +16399,21 @@ console.log('\nAO. Раздел — страница');
     Первая панель страницы — не карточка, а раздел: рамки по бокам сняты,
     остаётся линия снизу. Без нижнего поля последняя строка («24 активных
     альянса…», «Открытых заявок нет…») садилась на эту линию вплотную.
-    Сводка «Кто именно» потеряла боковые поля вместе с рамкой и начинала
-    текст у самой черты. Плашки-пилюли с вертикальным зазором в 2 px
-    оставляли буквам 1–2 px до обводки — теперь у всех ступень --s-fine.
+    Сводка «Кто именно» была коробкой между двумя парами полосок: её
+    верхняя рамка ложилась на черту счёта недели, а нижняя — на черту
+    блока, в один пиксел друг от друга (замер: 876/876 и 921/922).
+    Коробки больше нет: строка-раскрытие стоит на общей оси с цифрами
+    над ней, а от боковой черты её держит поле самой панели.
+    Плашки-пилюли с вертикальным зазором в 2 px оставляли буквам 1–2 px
+    до обводки — теперь у всех ступень --s-fine.
   */
   const forumSrc = await readFile('src/forum.css', 'utf8');
   check('первая панель-раздел дышит снизу, а не печатает текст на линии',
     /padding: 0 0 24px/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) #app > .panel:not(.chat-empty):first-child{')));
-  check('сводка «Кто именно» отступает от боковой черты',
-    /padding: 14px var\(--s-2\)/.test(ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .who__summary{')));
+  const whoSummary = ruleBody(redesignSrc, 'html body:not([data-route="forum"]):not([data-route="bot"]) .who__summary{');
+  check('сводка «Кто именно» — плоская строка: ни рамки, ни подложки, ни сдвига с оси панели',
+    /border: 0/.test(whoSummary) && /background: transparent/.test(whoSummary)
+      && /padding: var\(--s-2\) 0/.test(whoSummary));
   check('пилюли держат буквы на расстоянии от обводки',
     /padding: var\(--s-fine\) var\(--s-1\)/.test(ruleBody(v8, '.tag {'))
       && /padding: var\(--s-fine\) var\(--s-1\)/.test(ruleBody(v8, '.chron__verdict {'))

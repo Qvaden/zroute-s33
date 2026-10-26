@@ -206,7 +206,20 @@ html .theme-toggle:hover{
   color: var(--text);
 }
 
-/* Левая колонка — оглавление, а не набор капсул. */
+/*
+  Левая колонка — оглавление, а не набор капсул.
+
+  ВСЕ ПРАВИЛА НИЖЕ — ТОЛЬКО ПРО КОЛОНКУ, поэтому они закрыты в
+  `min-width: 1040px`. Одна и та же разметка (`#side`) носит две одежды:
+  на широком экране это постоянная колонка слева, на узком — шторка снизу
+  (forum.css). Здесь же жила `html .side{ width: 240px }` без условия, и
+  префикс `html .` давал ей больше силы, чем `.side` внутри телефонного
+  media-блока forum.css: шторка на телефоне становилась колонкой 240 px
+  посередине экрана (замер 638×570: ширина 240, строки по 32 px с кеглем
+  13 px, то есть ниже тач-планки 44). Узкий экран теперь берёт свою одежду
+  из forum.css, а этот блок его не касается.
+*/
+@media (min-width: 1040px) {
 html .side{
   width: 240px;
   gap: 0;
@@ -325,10 +338,109 @@ html .side__foot{
 
 html .side__note{ font-size: 10px; letter-spacing: .02em; }
 
-@media (min-width: 1040px) {
-  html :root{ --side-w: 240px; }
+html :root{ --side-w: 240px; }
 
 html body{ padding-left: 240px; }
+}
+
+/*
+  ШТОРКА РАЗДЕЛОВ НА УЗКОМ ЭКРАНЕ: тот же editorial-язык, но под палец.
+
+  Геометрию шторки (во всю ширину, поверх затемнения, со скруглённым верхом,
+  ручкой и тенью отрыва) задаёт forum.css — здесь только письмо: строки
+  без капсул, активная вкладка чертой слева, подписи групп мелким капсом.
+
+  Рост строки 48, а не 44/46 из forum.css: шторка — единственный список
+  разделов на телефоне, по нему попадают вслепую, большим пальцем, и
+  промах стоит человеку закрытого меню. Число живёт здесь, а не в общем
+  правиле, потому что у постоянной колонки (выше) способ попадания другой —
+  по строкам бьёт курсор, и там хватает 34.
+
+  Кегли взяты из ряда сайта, а не числами: 9 px подписей групп и 10 px
+  примечания — ниже края читаемости, который держит сам проект.
+*/
+@media (max-width: 1039px) {
+html .side .nav{
+  gap: var(--s-hair);
+  margin-top: 0;
+}
+
+html .side .nav__link{
+  min-height: 48px;
+  padding: var(--s-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  letter-spacing: -.005em;
+  white-space: normal;
+}
+
+html .side .nav__link--primary{
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+html .side .nav__icon{
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--mute);
+}
+
+html .side .nav__link.is-active .nav__icon{ color: var(--accent-hi); }
+
+/*
+  Активная строка — черта слева и лёгкая подсветка, а не залитая капсула:
+  в шторке во всю ширину залитая полоса в 48 px тяжелее самого списка.
+  Рецептура та же, что у светлой темы ниже по файлу, поэтому обе темы
+  выглядят одинаково.
+*/
+html .side .nav__link.is-active{
+  border-radius: 0;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+  font-weight: 600;
+}
+
+/* Черта рисуется тенью строки: вторая черта от forum.css легла бы рядом. */
+html .side .nav__link.is-active::before{ display: none; }
+
+html .nav__group{
+  margin: var(--s-3) var(--s-2) var(--s-1);
+  color: var(--mute);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+html .nav__group:first-child{ margin-top: var(--s-1); }
+
+html .nav__badge{
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-eyebrow);
+}
+
+html .side__title{
+  font-size: var(--fs-meta);
+  letter-spacing: .14em;
+}
+
+html .side__foot{ padding: var(--s-2) var(--s-2) 0; }
+
+html .side__note{
+  font-size: var(--fs-eyebrow);
+  letter-spacing: .02em;
+}
 }
 
 /* ── Форум: шапка ────────────────────────────────────────────────────────── */
@@ -1261,7 +1373,20 @@ html @media (max-width: 1179px){
 @media (max-width: 759px) {
   html #app:has(.forum-layout){ padding-top: 22px; }
 
-html .site-head__inner{ height: 56px; padding: 0 16px; }
+/*
+  Рост шапки — нижняя граница, а не точное число.
+
+  Ряд шапки на телефоне переносится (forum.css): статус президента встаёт
+  второй строкой. С точным ростом коробка оставалась одной строки, а
+  содержимое занимало две, и вторая вылезала за край липкой шапки — поверх
+  содержимого страницы и поперёк её собственной нижней черты (замер 638×570:
+  низ плашки на y=82 при высоте шапки 57).
+
+  `height: auto` обязателен рядом с `min-height`: общее правило этого файла
+  задаёт шапке 60 px точным ростом, и одна нижняя граница его не отменяет —
+  коробка осталась бы 60 px с вылезающей второй строкой.
+*/
+html .site-head__inner{ height: auto; min-height: 56px; padding: 0 16px; }
 
 html .forum-head__id{ padding-left: 16px; }
 
@@ -1287,11 +1412,50 @@ html .ctl--forum{
 
 html .ctl--forum > .seg--cat{ display: none; }
 
+/*
+  РЯД ВЫБОРА РАЗДЕЛА — ВО ВСЮ ШИРИНУ, КАК СТРОКА ПОИСКА НАД НИМ.
+
+  `justify-self: start` сжимал пилюлю до содержимого: замер на 638×570 дал
+  125 px ширины против 604 px у строки поиска, и короткая капсула с рамкой,
+  скруглением и подложкой висела под плоским полем чужим предметом — ровно
+  та непропорциональность, которую видно глазом без линейки.
+
+  Теперь это вторая строка того же ряда: подпись слева, значение и каретка
+  справа, общая черта снизу. Рамки и подложки у кнопки нет — плоский ряд
+  фильтра живёт в той же сетке линий, что и поиск.
+*/
 html .ctl--forum .pick{
     display: flex;
+    align-items: center;
+    gap: var(--s-2);
     grid-column: 1;
-    justify-self: start;
+    justify-self: stretch;
+    width: 100%;
+    border-bottom: 1px solid var(--line);
   }
+
+html .ctl--forum .pick__btn{
+    flex: 1;
+    min-height: 40px;
+    /* Поле справа — под каретку: она абсолютная, и текст без этого поля
+       встал бы ровно под неё. */
+    padding: 0 var(--s-4) 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+  }
+
+/*
+  Значение — у правого края, рядом со своей кареткой. Подпись «Раздел»
+  остаётся слева: строка читается как пара «что выбираем — что выбрано»,
+  а каретка стоит вплотную к тому, что она раскрывает. Без этого значение
+  жалось к подписи, а каретка висела в 500 px от него на другом краю.
+*/
+html .ctl--forum .pick__val{ font-size: var(--fs-body); text-align: right; }
+
+/* Каретка — у правого края строки: тот же край, что у поля поиска. */
+html .ctl--forum .pick__carat{ right: 0; }
 
 html .ctl--forum .seg--sort{
     grid-column: 1;
@@ -2082,10 +2246,28 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .who{
   border-bottom: 1px solid var(--line);
 }
 
+/*
+  СТРОКА-РАСКРЫТИЕ, А НЕ КОРОБКА МЕЖДУ ДВУМЯ ПАРАМИ ПОЛОСОК.
+
+  У `.who__summary` в styles-v8.css свои рамка, скругление и подложка, а у
+  `<details class="who">` и у `.weekscore` над ним — свои нижние черты.
+  Замер на 638×570 показал ровно то, что видел человек: черта счёта недели
+  и верх рамки строки легли на один y (876), а низ рамки и черта самого
+  блока — на 921 и 922, то есть в один пиксел друг от друга. Плюс поле
+  `14px 12px` уводило подпись вправо на 12 px мимо общей оси цифр над ней.
+
+  Рамки и подложки здесь больше нет: разделителем остаётся одна черта блока,
+  а воздух до неё даёт поле самой строки. Кегль подписи — из ряда сайта,
+  тот же, что у даты рядом с ней (`VS …`), иначе две строки одной строки
+  были бы набраны вразнобой.
+*/
 html body:not([data-route="forum"]):not([data-route="bot"]) .who__summary{
-  padding: 14px var(--s-2);
+  padding: var(--s-2) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--mute);
-  font-size: 10px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -3561,17 +3743,77 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .wk.is-sel .wk__num{
 }
 
 @media (max-width: 759px) {
+  /*
+    СТАТУС ПРЕЗИДЕНТА НА ТЕЛЕФОНЕ: одна аккуратная строка и только там,
+    где она к месту.
+
+    ЧТО БЫЛО НЕ ТАК. Ряд шапки на телефоне переносится (forum.css), и статус
+    встаёт второй строкой — а коробка шапки держала ровно 56 px, поэтому
+    строка вылезала за неё: замер 638×570 дал плашку на y=50…82 при высоте
+    шапки 57,
+    то есть поверх содержимого страницы и поперёк её собственной нижней
+    черты. Внутри строки имя тянулось (`flex: 1`), и короткое имя прижималось
+    к метке, а тег альянса улетал к правому краю — между ними дыра в полстроки.
+
+    ЧТО СТАЛО. Две группы вместо трёх предметов в ряд: слева точка и метка,
+    справа имя и тег альянса. Метка больше не `display: contents` — без своей
+    коробки она не группа, а два отдельных предмета, и развести их по краям
+    было нечем. Подложки у строки нет: она стоит внутри шапки, и свой фон
+    шапки просвечивает сквозь неё.
+
+    ГДЕ ВИДНО. Только на «Итогах недели». На телефоне статус занимал вторую
+    строку шапки на всех пятнадцати вкладках, включая форум и чаты, где он не
+    отвечает ни на один вопрос человека и только отъедает 33 px экрана. На
+    широком экране статус остаётся в шапке везде: там он стоит в общей строке
+    и места не отнимает.
+  */
   html .president-board{
     width: 100%;
     max-width: none;
     margin: 0;
-    padding: 8px 0;
+    padding: var(--s-1) 0;
     border: 0;
     border-top: 1px solid var(--line);
     border-radius: 0;
-    background: var(--bg);
+    background: transparent;
     box-shadow: none;
   }
+
+  html .president-board__head{
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  html .president-board__identity{
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  /*
+    Имя не тянется: оно стоит вплотную к тегу альянса у правого края. Пол
+    в шесть знаков и многоточие остаются от mobile.css — там же договорено,
+    что первой сжимается метка, а не имя.
+  */
+  html .president-board__name{ flex: 0 1 auto; }
+
+  /*
+    На прочих вкладках плашки нет вовсе. `!important` здесь не запасная
+    прочность, а необходимость: резерв пустой плашки в mobile.css
+    (`.president-board[hidden]:empty`) сам написан с `!important`, и без
+    ответа силой селектора на вкладках без данных оставалась бы невидимая
+    строка-призрак в 33 px.
+
+    Переключателю темы возвращён его `margin-left: auto`. Правило forum.css
+    отдаёт авто-отступ соседу видимой плашки, а `display: none` для того
+    правила всё ещё «не скрыта»: `:not([hidden])` смотрит на атрибут, а не
+    на отрисовку. Без этой строки кнопка темы встала бы вплотную к марке.
+  */
+  html body:not([data-route="home"]) #president-board{ display: none !important; }
+  html body:not([data-route="home"]) #president-board + .theme-toggle{ margin-left: auto; }
 }
 
 @media (max-width: 767px) {
