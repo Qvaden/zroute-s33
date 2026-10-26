@@ -21937,6 +21937,33 @@ console.log('\nBO. Личный чат подписан личным, а не а
   check('форма ЛС одна: шапка списка её больше не рисует',
     (laid.match(/<form class="chat-dm"/g) || []).length === 1);
 
+  /*
+    Меню «⋯» в личном чате. Пригласить третьего в переписку двоих нельзя
+    (max_members = 2, а кода у ЛС нет вовсе), переименовывать нечего — в
+    заголовке ник собеседника, а «закрыть» и «удалить навсегда» в руках одного
+    человека решали бы судьбу чужой переписки. Поиск, экспорт, push и выход
+    остаются: они про свои сообщения, а не про управление чатом.
+  */
+  const menuOf = (c) => {
+    const html = renderChats({ ...base, menuOpen: true, openId: c.id, open: { ...c, myRole: 'owner' } });
+    const m = html.match(/<div class="chat-menu__pop" role="menu">([\s\S]*?)<\/div>/);
+    return m ? m[1] : '';
+  };
+  const dmMenu = menuOf(dm);
+  const allianceMenu = menuOf(alliance);
+  check('меню личного чата вообще рисуется', dmMenu.length > 0);
+  for (const word of ['Пригласить по коду', 'Переименовать', 'Закрыть чат', 'Удалить чат навсегда']) {
+    check(`в личном чате нет действия «${word}»`, !dmMenu.includes(word));
+    check(`в альянсовом чате «${word}» осталось`, allianceMenu.includes(word));
+  }
+  for (const word of ['Участники', 'Поиск по сообщениям', 'Экспорт истории', 'push']) {
+    check(`в личном чате осталось «${word}»`, dmMenu.includes(word));
+  }
+  check('меню личного чата не обещает кода приглашения', !dmMenu.includes('data-chat-invite'));
+  check('меню альянсового чата не потеряло управление',
+    allianceMenu.includes('data-chat-invite') && allianceMenu.includes('data-chat-rename')
+      && allianceMenu.includes('data-chat-delete'));
+
   const refine = await readFile('src/refine.css', 'utf8');
   check('строка кода приглашения переносится: кнопке ЛС нужна своя строка',
     /\.chat-join \{[^}]*flex-wrap: wrap;/.test(refine));

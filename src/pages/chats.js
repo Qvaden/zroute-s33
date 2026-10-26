@@ -365,25 +365,35 @@ function renderRoom(s) {
   if (c.onlineCount > 1) subParts.push(isDM ? '<span class="chat-room__online">собеседник в сети</span>' : `<span class="chat-room__online">${c.onlineCount} онлайн</span>`);
   if (c.closed) subParts.push('<span class="chat-room__closed">закрыт</span>');
 
+  /*
+    Управление чатом в личной переписке не нужно и вредно. Пригласить третьего
+    нельзя: участников ровно двое, а кода у ЛС нет вовсе — кнопка показывала бы
+    пустое место. Переименовывать нечего: в заголовке ник собеседника, и любая
+    другая надпись сломала бы его с обеих сторон. «Закрыть» и «Удалить навсегда»
+    в руках одного человека решали бы судьбу чужих сообщений. Свои действия —
+    поиск, экспорт, push и выход — остаются у обоих.
+  */
+  const roomMgr = isMgr && !isDM;
+
   const menu = [
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-members-toggle>
       👥 Участники<span class="chat-menu__count">${esc(c.memberCount)}</span>
     </button>`,
-    isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-invite>🔗 Пригласить по коду</button>` : '',
-    isMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-rename>✏️ Переименовать</button>` : '',
+    roomMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-invite>🔗 Пригласить по коду</button>` : '',
+    roomMgr ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-rename>✏️ Переименовать</button>` : '',
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-search-toggle>🔍 ${s.searchOpen ? 'Скрыть поиск' : 'Поиск по сообщениям'}</button>`,
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-export>📥 Экспорт истории</button>`,
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-push>${s.pushSubscribed ? '🔕 Отключить push' : '🔔 Включить push-уведомления'}</button>`,
     c.myRole && c.myRole !== 'owner'
       ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-leave>🚪 Выйти из чата</button>`
       : '',
-    isMgr && !c.closed
+    roomMgr && !c.closed
       ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-close>🔒 Закрыть чат</button>`
       : '',
-    isMgr && c.closed
+    roomMgr && c.closed
       ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-reopen>🔓 Снова открыть</button>`
       : '',
-    (isOwner || s.me?.role === 'admin')
+    (!isDM && (isOwner || s.me?.role === 'admin'))
       ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-delete>🗑️ Удалить чат навсегда</button>`
       : '',
   ].filter(Boolean).join('');
