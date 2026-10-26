@@ -2613,6 +2613,7 @@ export async function getServerActivity() {
   const rows = await rest('/rpc/get_server_activity', {
     method: 'POST',
     body: { p_days: 7 },
+    retryOnAbort: true,
   });
   if (!Array.isArray(rows)) return null;
   return rows.map((r) => ({

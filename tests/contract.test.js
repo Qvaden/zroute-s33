@@ -4116,8 +4116,16 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
     /retryOnAbort = false/.test(clientJs));
   check('повтор по таймауту включён у чтения ленты',
     /retryOnAbort: true/.test(forumDbJs));
-  check('повтор по таймауту у ленты, поста, комментариев, чатов, календаря, пульса и фида магазина — девять мест',
-    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 9);
+  check('повтор по таймауту у ленты, поста, комментариев, чатов, календаря, пульса, фида магазина и активности сервера — десять мест',
+    (forumDbJs.match(/retryOnAbort: true/g) ?? []).length === 10);
+  /*
+    Чтение набора данных сайта стоит отдельно: оно не в форуме, и обрыв
+    ответа на нём уводит страницу на снимок получасовой давности. Узел,
+    который режет ответ на середине, лечится ровно тем же повтором.
+  */
+  const dataAdapterJs = await readFile('src/data/adapters/supabase.js', 'utf8');
+  check('чтение данных сайта переживает обрыв ответа на чужом узле',
+    /site_dataset'[\s\S]{0,160}retryOnAbort: true/.test(dataAdapterJs));
   check('главная вкладка рисуется до прихода данных, с пустым контуром',
     /liveFirst/.test(mainJs) && /emptyView\(\)/.test(mainJs));
   check('живые вкладки — форум, чаты, календарь, пульс обновлений, доска аккаунтов, справочник и страница участника',
@@ -13594,7 +13602,7 @@ console.log('\nAN. Доска аккаунтов');
    висит за Cloudflare. Российская сеть без VPN иногда не доходит ровно до
    базы, и тогда человек видел пустой рейтинг молча: «сайт умер», хотя дело
    было в одном запросе. Проверка держит две вещи — что сайт действительно
-   берёт копию двухчасовой давности, когда основной источник промолчал, и что
+   берёт копию получасовой давности, когда основной источник промолчал, и что
    он об этом говорит словами. Тело loadAll и полоска объяснения вырезаны из
    настоящих файлов и исполнены с подставными адаптерами и узлами. Глазами
    это не проверить: чтобы увидеть снимок, надо оказаться в сети, которая не
@@ -13606,6 +13614,7 @@ console.log('\nAN. Доска аккаунтов');
   const mainSrc = await readFile('src/main.js', 'utf8');
   const jsonAdapterSrc = await readFile('src/data/adapters/json.js', 'utf8');
   const workflowSrc = await readFile('.github/workflows/backup-from-db.yml', 'utf8');
+  const backupScriptSrc = await readFile('scripts/backup-from-db.mjs', 'utf8');
   const cfgSrc = await readFile('config.js', 'utf8');
 
   const readAllStart = dataSrc.indexOf('async function readAll(');
@@ -13860,9 +13869,17 @@ console.log('\nAN. Доска аккаунтов');
     /<details id="data-notice" class="data-notice wrap" role="status" aria-live="polite" data-state="wait" hidden/.test(siteHtml));
   check('полоска описана стилем, которым нарисовано остальное',
     (await readFile('src/styles-v8.css', 'utf8')).includes('.data-notice'));
-  check('копия собирается каждые два часа, а не раз в сутки',
-    /- cron: '5 \*\/2 \* \* \*'/.test(workflowSrc)
+  check('копия собирается каждые полчаса, а не раз в сутки и не раз в два часа',
+    /- cron: '19,49 \* \* \* \*'/.test(workflowSrc)
       && !/- cron: '30 3 \* \* \*'/.test(workflowSrc));
+  /*
+    Полчаса стоят дёшево только потому, что тихий прогон не оставляет следа:
+    час снятия меняется на каждом запуске, и без этого сравнения воркфлоу
+    коммитил бы 48 раз в сутки и столько же раз пересобирал сайт.
+  */
+  check('прогон без изменений файл не трогает — коммит только на настоящих правках',
+    /withoutStamp/.test(backupScriptSrc) && /delete copy\.pulledAt/.test(backupScriptSrc)
+      && /process\.exit\(0\)/.test(backupScriptSrc));
   check('воркфлоу знает, что у файла появился читатель на странице',
     workflowSrc.includes('второй читатель') && workflowSrc.includes('Cloudflare'));
   check('причина копии объяснена в конфиге словами, а не только кодом',
