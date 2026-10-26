@@ -1008,13 +1008,14 @@ async function runSuggest(value) {
   if (seq !== suggestSeq) return;
 
   const mine = String(state.me?.nick ?? '').trim().toLowerCase();
-  suggestRows = rows.filter((row) => String(row.nick || '').trim().toLowerCase() !== mine);
   /*
-    Единственный вариант, равный введённому, — не подсказка, а повтор того, что
-    и так написано в поле. Список в этот момент только закрывал бы кнопки.
+    Точное совпадение остаётся в списке, даже когда оно одно. Соблазн здесь
+    такой: ник дописан до конца, выбирать нечего — значит, список лишний. Но
+    человек видит обратное: на «Пу» игрок был, на «Пух» пропал, будто такого
+    нет вовсе. Подсказка отвечает на вопрос «есть ли кто с таким ником», и
+    на полный ник ответ тоже нужен.
   */
-  const only = suggestRows[0];
-  if (suggestRows.length === 1 && String(only.nick).trim().toLowerCase() === term.toLowerCase()) suggestRows = [];
+  suggestRows = rows.filter((row) => String(row.nick || '').trim().toLowerCase() !== mine);
   suggestActive = -1;
   paintSuggest();
 }

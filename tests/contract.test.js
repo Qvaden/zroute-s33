@@ -21654,8 +21654,17 @@ console.log('\nBM. Подсказка ников в форме ЛС');
     /if \(seq !== suggestSeq\) return;/.test(src));
   check('свой ник не предлагается самому себе',
     /String\(state\.me\?\.nick/.test(src));
-  check('единственный вариант, равный введённому, списком не показывается',
-    /suggestRows\.length === 1 && String\(only\.nick\)\.trim\(\)\.toLowerCase\(\) === term\.toLowerCase\(\)/.test(src));
+  /*
+    Дописанный до конца ник обязан остаться в списке. Раньше единственный
+    вариант, совпавший с полем, гасил подсказку: на «Пу» модератор был виден,
+    а на «Пух» исчезал — и читалось это как «такого игрока нет».
+  */
+  const runBody = src.slice(src.indexOf('async function runSuggest'), src.indexOf('function scheduleSuggest'));
+  check('runSuggest найден целиком', runBody.length > 200 && runBody.includes('paintSuggest()'));
+  check('точный единственный вариант не прячется: дописал ник — игрок на месте',
+    !/suggestRows = \[\];/.test(runBody));
+  check('список пуст только тогда, когда пусто в ответе или в поле',
+    /if \(term\.length < SUGGEST_MIN\) \{ closeSuggest\(\); return; \}/.test(runBody));
 
   /*
     Порядок внутри слушателя клавиш — не мелочь: общая ветка уходит в
