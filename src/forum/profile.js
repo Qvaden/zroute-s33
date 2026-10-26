@@ -130,6 +130,87 @@ export async function getProfile(nick) {
   return profileFrom(row);
 }
 
+/**
+ * Кому можно написать: ники, подходящие под введённое начало.
+ *
+ * Ищет не только с начала ника: « Kov» находит и «MrKovыль», потому что
+ * человек помнит середину имени чаще, чем его точное написание. Точные
+ * совпадения и начало ника поднимаются наверх уже здесь, чтобы форма ЛС не
+ * считала порядок сама.
+ *
+ * @param {string} term
+ * @param {number} limit
+ * @returns {Promise<Array<{nick: string, avatarUrl: string, allianceTag: string}>>}
+ */
+export async function suggestNicks(term, limit = 8) {
+  const clean = String(term ?? '').trim();
+  if (!clean) return [];
+  const max = Math.max(1, Math.min(20, Number(limit) || 8));
+
+  if (ownProfiles()) {
+    /*
+      Черновой режим: участников держит локальный адаптер, базы нет. Список
+      короткий, поэтому ищем в памяти — ровно те же правила, что и ниже.
+    */
+    const rows = typeof forum.listUsers === 'function' ? await forum.listUsers() : [];
+    return rankNicks(
+      rows
+        .filter((row) => String(row.nick || '').toLowerCase().includes(clean.toLowerCase()))
+        .map((row) => ({ nick: row.nick, avatarUrl: row.avatarUrl || '', allianceTag: row.allianceTag || '' })),
+      clean,
+      max
+    );
+  }
+
+  /*
+    `forum_profiles` читается гостем — это публичная страница участника, новых
+    прав запрос не требует. Колонки перечислены, а не `*`: подсказка смотрит
+    только на ник, аватарку и тег, и тянуть счётчики репутации на каждый
+    нажатый символ было бы лишним трафиком.
+  */
+  const rows = await rest(
+    `/forum_profiles?select=nick,avatar_url,alliance_tag&nick=ilike.${encodeURIComponent(pattern(clean))}` +
+      `&order=nick.asc&limit=${max * 3}`
+  );
+  if (!Array.isArray(rows)) return [];
+  return rankNicks(
+    rows.map((row) => ({ nick: row.nick, avatarUrl: row.avatar_url || '', allianceTag: row.alliance_tag || '' })),
+    clean,
+    max
+  );
+}
+
+/*
+  `%` и `_` в LIKE — свои собственные знаки, и ник «100%» без экранирования
+  превратился бы в «любые символы». Обратная косая — стандартный знак отмены
+  в Postgres, а `*` заменяет `%` уже PostgREST, поэтому звёздочки здесь
+  остаются рабочими.
+*/
+function pattern(term) {
+  const escaped = term.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  return `*${escaped}*`;
+}
+
+function rankNicks(rows, term, max) {
+  const low = term.toLowerCase();
+  const seen = new Set();
+  const rank = (nick) => {
+    const low2 = nick.toLowerCase();
+    if (low2 === low) return 0;
+    return low2.startsWith(low) ? 1 : 2;
+  };
+  return rows
+    .filter((row) => {
+      const key = String(row.nick || '').trim().toLowerCase();
+      // Один и тот же ник база не отдаст дважды, а вот пробелы в начале — да.
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => rank(a.nick) - rank(b.nick) || a.nick.length - b.nick.length || a.nick.localeCompare(b.nick, 'ru'))
+    .slice(0, max);
+}
+
 /** Последние посты участника — для его страницы. */
 export async function getUserPosts(userId, limit = 10) {
   if (ownProfiles()) return forum.getUserPosts(userId, limit);

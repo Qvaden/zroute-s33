@@ -19,6 +19,7 @@
 import { CONFIG } from '../../../config.js';
 import { CATEGORY_IDS, EVENT_RSVP_IDS, GUIDE_DAILY_LIMIT, REACTION_IDS, TOPIC_TAG_IDS, UPDATE_KIND_IDS, guideBodyProblem, guideSlug, needsAccountLines, needsBarterLines, needsEventDate, needsExpiry, reactionMeta, serverChangeProblem, validateServerId } from '../rules.js';
 import { normalizeQuietWindow } from '../quiet.js';
+import { deviceBan, deviceBanRefusal, syncDeviceBan } from '../device-ban.js';
 import { textOf } from '../sanitize.js';
 
 export const name = 'локальный (только этот браузер)';
@@ -316,7 +317,14 @@ function userOut(u) {
 export async function currentUser() {
   const s = read();
   if (!s.me) return null;
-  return userOut(s.users.find((u) => u.id === s.me));
+  const me = userOut(s.users.find((u) => u.id === s.me));
+  /*
+    Метка устройства живёт и в черновом режиме: спотыкаться человек обязан
+    там же, где он споткнётся на живой базе, иначе проверка формы ничего
+    не стоит (тот же принцип, что у номера сервера ниже в signUp).
+  */
+  syncDeviceBan(me);
+  return me;
 }
 
 /**
@@ -341,6 +349,10 @@ export function viewerKey() {
  * в двух режимах.
  */
 export async function signUp(nick, password, serverId) {
+  /* Тот же отказ, что на живой базе, и до любых других проверок. */
+  const bannedDevice = deviceBan();
+  if (bannedDevice) throw new Error(deviceBanRefusal(bannedDevice));
+
   const s = read();
   const nb = String(nick).trim();
   const key = nickKey(nb);

@@ -200,19 +200,56 @@ export function renderLeaderboard(s) {
     </div>`;
 }
 
+/*
+  Подсказка ников — combobox, а не «выпадающий список» браузера: свои
+  варианты рисуются с аватаркой и тегом альянса, и они работают одинаково на
+  телефоне и на компьютере, где нативный datelist почти не виден. Список
+  объявлен в разметке пустым и скрытым, чтобы `aria-controls` указывал на
+  существующий элемент с самого первого кадра.
+*/
 export function renderDMForm(s) {
   return `
     <form class="chat-dm" data-chat-dm>
-      <label class="forum-field">
-        <span>Ник игрока</span>
-        <input name="nick" maxlength="40" required placeholder="Кому написать…">
-      </label>
+      <div class="chat-dm__field">
+        <label class="forum-field">
+          <span>Ник игрока</span>
+          <input name="nick" maxlength="40" required placeholder="Кому написать…"
+                 data-chat-dm-nick autocomplete="off" spellcheck="false"
+                 role="combobox" aria-expanded="false" aria-controls="chat-dm-suggest"
+                 aria-autocomplete="list" aria-describedby="chat-dm-hint">
+        </label>
+        <ul class="chat-dm__suggest" id="chat-dm-suggest" role="listbox"
+            aria-label="Подходящие ники" hidden></ul>
+      </div>
+      <p class="chat-dm__hint" id="chat-dm-hint">Начните вводить ник — подскажем, кому можно написать.</p>
       <div class="chat-dm__acts">
         <button type="submit" class="forum-btn forum-btn--primary">Открыть ЛС</button>
         <button type="button" class="forum-btn forum-btn--ghost" data-chat-dm-toggle>Отмена</button>
       </div>
       <p class="forum-error" data-chat-dm-error hidden></p>
     </form>`;
+}
+
+/**
+ * Варианты подсказки под полем ника.
+ *
+ * Ник — в `data-nick`, а не только в тексте: поведение берёт его отсюда, и
+ * обрезка или перенос подписи не меняют то, что попадёт в поле.
+ *
+ * @param {Array<{nick: string, avatarUrl?: string, allianceTag?: string}>} rows
+ * @param {number} activeIndex
+ */
+export function renderNickSuggest(rows, activeIndex = -1) {
+  return rows
+    .map((row, i) => `
+      <li class="chat-dm__opt${i === activeIndex ? ' is-on' : ''}" role="option"
+          data-nick="${esc(row.nick)}" data-index="${i}"
+          id="chat-dm-suggest-${i}" aria-selected="${i === activeIndex ? 'true' : 'false'}">
+        ${avatarHtml(row.nick, row.avatarUrl, { size: 'sm', px: 28 })}
+        <span class="chat-dm__opt-nick">${esc(row.nick)}</span>
+        ${row.allianceTag ? `<span class="chat-dm__opt-tag">${esc(row.allianceTag)}</span>` : ''}
+      </li>`)
+    .join('');
 }
 
 export function renderChatList(s) {

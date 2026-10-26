@@ -1914,6 +1914,79 @@ body:has(.chat-layout) .site-foot { display: none; }
   margin-top: var(--s-1);
 }
 
+/*
+  Подсказка ников. Поле обёрнуто, потому что список позиционируется от него:
+  сама форма — ячейка колонки чатов, и абсолютный список внутри неё уезжал бы
+  к краю панели, а не к полю, которое человек сейчас заполняет.
+*/
+.chat-dm__field {
+  position: relative;
+}
+.chat-dm__suggest {
+  position: absolute;
+  top: calc(100% + var(--s-hair));
+  right: 0;
+  left: 0;
+  z-index: var(--z-menu);
+  max-height: 15rem;
+  margin: 0;
+  padding: var(--s-hair);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised-2);
+  box-shadow: var(--shadow-3);
+}
+.chat-dm__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 0;
+  padding: var(--s-fine) var(--s-1);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.chat-dm__opt .forum-ava {
+  flex: none;
+}
+.chat-dm__opt-nick {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-dm__opt-tag {
+  flex: none;
+  margin-left: auto;
+  color: var(--mute);
+  font-size: var(--fs-eyebrow);
+}
+/*
+  Выбранный вариант красится подложкой, а не буквами: чернила текста остаются
+  обычными, и контраст держится тем же, что у списка. Подсветка от наведения
+  разрешена только там, где курсор действительно бывает, — иначе на телефоне
+  строка оставалась бы подсвеченной после касания.
+*/
+.chat-dm__opt.is-on {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+@media (hover: hover) {
+  .chat-dm__opt:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+}
+.chat-dm__hint {
+  margin: var(--s-fine) 0 0;
+  color: var(--dim);
+  font-size: var(--fs-meta);
+}
+/* Палец не попадает в строку высотой с текст: цель растёт до общих 44px. */
+@media (hover: none) and (pointer: coarse) {
+  .chat-dm__opt { min-height: 44px; }
+}
+
 /* ── Кнопки в шапке списка ───────────────────────────────────────────────── */
 
 .chat-list__head-actions {

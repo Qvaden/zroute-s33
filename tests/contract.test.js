@@ -2729,7 +2729,7 @@ console.log('\nQ. Форум');
     /const ownProfiles = \(\) => typeof forum\.getProfile === 'function';/.test(profileSource)
       && !/const ownProfiles = typeof forum\./.test(profileSource));
   check('ни один профильный вызов не разминился с местной записью',
-    (profileSource.match(/if \(ownProfiles\(\)\)/g) || []).length === 5
+    (profileSource.match(/if \(ownProfiles\(\)\)/g) || []).length === 6
       && !/if \(ownProfiles\)/.test(profileSource.replace(/if \(ownProfiles\(\)\)/g, '')));
 
   /*
@@ -21507,6 +21507,332 @@ console.log('\nBB. Промокоды');
       && workflow.includes('git add promocodes.json'));
   check('обход не просит служебных секретов',
     !/secrets\./.test(workflow) && /contents:\s*write/.test(workflow));
+}
+
+/* ── BM. Подсказка ников в форме личных сообщений ────────────────────────────
+
+   Форма «Написать игроку» требовала ввести ник целиком и по памяти: ошибка в
+   одной букве открывала ЛС не с тем человеком, а узнать заранее, существует ли
+   ник, было негде. Подсказка показывает подходящих участников прямо во время
+   набора.
+
+   Проверки держат четыре границы.
+
+   Первая — разметка: поле объявлено combobox, список объявлен listbox, и оба
+   связаны `aria-controls`/`id`. Без этого связка читается глазами, но не
+   скринридером, и стрелки «не работают» у того, кто ими пользуется.
+
+   Вторая — сами варианты: ник лежит в `data-nick` (поведение берёт его
+   оттуда, а не из подписи, которую можно обрезать), выбран ровно один вариант,
+   чужая разметка в нике экранируется.
+
+   Третья — поиск: ищет и по середине ника, точное совпадение поднимает наверх,
+   пустая строка не идёт в базу вовсе, число вариантов ограничено.
+
+   Четвёртая — поведение во времени: запрос с задержкой, устаревший ответ
+   выбрасывается, полная перерисовка и уход с вкладки гасят список, Enter
+   отправляет форму только когда вариант не выбран.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBM. Подсказка ников в форме ЛС');
+{
+  const { readFile } = await import('node:fs/promises');
+
+  let page = null;
+  try {
+    page = await import('../src/pages/chats.js');
+  } catch {
+    // Отсутствие модуля — это и есть падение, его покажет check ниже.
+  }
+  check('страница чатов отдаёт форму ЛС и варианты подсказки',
+    typeof page?.renderDMForm === 'function' && typeof page?.renderNickSuggest === 'function');
+
+  const form = typeof page?.renderDMForm === 'function' ? page.renderDMForm({}) : '';
+  check('поле ника объявлено полем со списком: combobox связан с listbox',
+    /role="combobox"/.test(form)
+      && /aria-controls="chat-dm-suggest"/.test(form)
+      && /aria-autocomplete="list"/.test(form)
+      && /aria-expanded="false"/.test(form)
+      && /<ul class="chat-dm__suggest" id="chat-dm-suggest" role="listbox"/.test(form),
+    form.slice(form.indexOf('data-chat-dm-nick') - 40, form.indexOf('data-chat-dm-nick') + 240));
+
+  check('список подсказки рисуется пустым и скрытым: варианты добавляет поведение',
+    /<ul class="chat-dm__suggest"[^>]*hidden><\/ul>/.test(form.replace(/\s*\n\s*/g, ''))
+      || /id="chat-dm-suggest"[^>]*>\s*<\/ul>/.test(form));
+
+  const nickTag = /<input[^>]*name="nick"[^>]*>/.exec(form.replace(/\s+/g, ' '))?.[0] ?? '';
+  check('подсказка не сняла с ника обязательность и предел длины',
+    nickTag.includes('maxlength="40"') && nickTag.includes(' required'),
+    nickTag);
+
+  check('браузерный автозаполнитель выключен: свои варианты не спорят с чужими',
+    /data-chat-dm-nick[^>]*autocomplete="off"/.test(form.replace(/\s+/g, ' '))
+      && /data-chat-dm-nick[^>]*spellcheck="false"/.test(form.replace(/\s+/g, ' ')));
+
+  check('форма объясняет словами, что поле само подскажет',
+    /aria-describedby="chat-dm-hint"/.test(form)
+      && /<p class="chat-dm__hint" id="chat-dm-hint">/.test(form)
+      && /Начните вводить ник/.test(form));
+
+  /* Список обязан лежать в обёртке поля: абсолютная позиция считается от неё. */
+  check('список живёт в обёртке поля, а не рядом с кнопками',
+    form.indexOf('class="chat-dm__field"') > 0
+      && form.indexOf('class="chat-dm__field"') < form.indexOf('data-chat-dm-nick')
+      && form.indexOf('chat-dm-suggest') < form.indexOf('chat-dm__acts'));
+
+  const opts = typeof page?.renderNickSuggest === 'function'
+    ? page.renderNickSuggest([
+      { nick: 'Ковыль', avatarUrl: '', allianceTag: 'KOP' },
+      { nick: 'MrКовыль', avatarUrl: '', allianceTag: '' },
+    ], 1)
+    : '';
+  check('каждый вариант — option, и ник лежит в data-nick, а не только в подписи',
+    (opts.match(/role="option"/g) ?? []).length === 2
+      && opts.includes('data-nick="Ковыль"')
+      && opts.includes('data-nick="MrКовыль"')
+      && opts.includes('id="chat-dm-suggest-0"')
+      && opts.includes('id="chat-dm-suggest-1"'),
+    opts.slice(0, 200));
+  check('выбранный вариант помечен ровно один раз и именно тот, что назван',
+    (opts.match(/aria-selected="true"/g) ?? []).length === 1
+      && (opts.match(/chat-dm__opt is-on/g) ?? []).length === 1
+      && (() => {
+        const rows = opts.split('</li>');
+        return rows[0].includes('aria-selected="false"') && !rows[0].includes('is-on')
+          && rows[1].includes('aria-selected="true"') && rows[1].includes('is-on');
+      })());
+  check('тег альянса рисуется только у того, у кого он есть',
+    (opts.match(/chat-dm__opt-tag/g) ?? []).length === 1);
+
+  const dirty = typeof page?.renderNickSuggest === 'function'
+    ? page.renderNickSuggest([{ nick: '<img src=x onerror=alert(1)>', avatarUrl: '' }], -1)
+    : '';
+  check('чужая разметка в нике экранируется, а не исполняется',
+    !dirty.includes('<img src=x') && dirty.includes('&lt;img src=x onerror=alert(1)&gt;'));
+
+  /* ── Поиск: живой адаптер подменяется, чтобы не ходить в базу из теста ── */
+  const { forum, forumReady } = await import('../src/forum/index.js');
+  const { suggestNicks } = await import('../src/forum/profile.js');
+  await forumReady();
+
+  const STUB = [
+    { nick: 'Ковыль', avatarUrl: '', allianceTag: 'KOP' },
+    { nick: 'MrКовыль', avatarUrl: '', allianceTag: '' },
+    { nick: 'Ков', avatarUrl: '', allianceTag: '' },
+    { nick: 'Другой', avatarUrl: '', allianceTag: '' },
+  ];
+  const keep = { getProfile: forum.getProfile, listUsers: forum.listUsers };
+  forum.getProfile = async () => null;
+  forum.listUsers = async () => STUB;
+  let found = [];
+  let upper = [];
+  let limited = [];
+  let blank = [];
+  try {
+    found = await suggestNicks('ков', 8);
+    upper = await suggestNicks('КОВ', 8);
+    limited = await suggestNicks('ыль', 2);
+    blank = await suggestNicks('   ', 8);
+  } finally {
+    for (const key of ['getProfile', 'listUsers']) {
+      if (keep[key] === undefined) delete forum[key];
+      else forum[key] = keep[key];
+    }
+  }
+
+  equal('точное совпадение идёт первым, потом начало ника, потом середина',
+    found.map((r) => r.nick), ['Ков', 'Ковыль', 'MrКовыль']);
+  equal('регистр ввода на поиск не влияет', upper.map((r) => r.nick), found.map((r) => r.nick));
+  equal('число вариантов ограничено', limited.length, 2);
+  equal('пустая строка не даёт ни варианта, ни запроса', blank.length, 0);
+
+  const src = await readFile('src/forum/chats.js', 'utf8');
+  check('запрос подсказки отложен и начинается не раньше двух символов',
+    /const SUGGEST_MIN = 2;/.test(src)
+      && /const SUGGEST_DELAY = 180;/.test(src)
+      && /setTimeout\(\(\) => runSuggest\(value\), SUGGEST_DELAY\)/.test(src));
+  check('ответ, пришедший после нового нажатия, выбрасывается',
+    /if \(seq !== suggestSeq\) return;/.test(src));
+  check('свой ник не предлагается самому себе',
+    /String\(state\.me\?\.nick/.test(src));
+  check('единственный вариант, равный введённому, списком не показывается',
+    /suggestRows\.length === 1 && String\(only\.nick\)\.trim\(\)\.toLowerCase\(\) === term\.toLowerCase\(\)/.test(src));
+
+  /*
+    Порядок внутри слушателя клавиш — не мелочь: общая ветка уходит в
+    `return` для всего, что не редактор чата, и подсказка после неё не
+    получила бы ни одной клавиши.
+  */
+  const keyAt = src.indexOf("document.addEventListener('keydown'");
+  check('клавиши подсказки разбираются до общей ветки редактора',
+    keyAt > 0
+      && src.indexOf('[data-chat-dm-nick]', keyAt) > 0
+      && src.indexOf('[data-chat-dm-nick]', keyAt) < src.indexOf("[data-chat-input]')) return;", keyAt),
+    `${src.indexOf('[data-chat-dm-nick]', keyAt)} против ${src.indexOf("[data-chat-input]')) return;", keyAt)}`);
+  check('стрелки, Enter, Tab и Escape подсказки обработаны',
+    ["e.key === 'ArrowDown'", "e.key === 'ArrowUp'", "e.key === 'Enter' || e.key === 'Tab'", "e.key === 'Escape'"]
+      .every((needle) => src.slice(keyAt, keyAt + 1400).includes(needle)));
+
+  check('клик по варианту подставляет ник и не отправляет форму',
+    /const dmOpt = t\.closest\('\.chat-dm__opt'\);[\s\S]{0,220}?e\.preventDefault\(\);\s*pickSuggest\(dmOpt\.dataset\.nick/.test(src)
+      && !/function pickSuggest\([\s\S]{0,300}?requestSubmit/.test(src));
+  check('клик мимо формы закрывает подсказку',
+    /if \(suggestRows\.length && !t\.closest\('\[data-chat-dm\]'\)\) closeSuggest\(\);/.test(src));
+  check('отправка формы гасит подсказку до запроса',
+    /form\.matches\('\[data-chat-dm\]'\)\) \{\s*e\.preventDefault\(\);\s*\/\/[^\n]*\n\s*closeSuggest\(\);/.test(src));
+  check('уход с вкладки гасит подсказку',
+    /closeSuggest\(\);\s*host = null;/.test(src));
+  check('полная перерисовка сбрасывает список и номер запроса',
+    /function paintFull\([\s\S]{0,700}?suggestRows = \[\];[\s\S]{0,120}?suggestSeq\+\+;/.test(src));
+  check('поле ввода перерисовывается отдельно от формы: фокус не теряется',
+    /function paintSuggest\(\) \{[\s\S]{0,400}?box\.innerHTML = renderNickSuggest/.test(src)
+      && !/function paintSuggest\(\) \{[\s\S]{0,400}?paintFull/.test(src));
+
+  const profileSrc = await readFile('src/forum/profile.js', 'utf8');
+  check('подсказка читает публичное представление, а не служебную таблицу',
+    /\/forum_profiles\?select=nick,avatar_url,alliance_tag&nick=ilike\./.test(profileSrc)
+      && !/suggestNicks[\s\S]{0,900}?\/forum_users/.test(profileSrc));
+  check('знаки LIKE в нике экранируются: «100%» не превращается в «любые символы»',
+    /term\.replace\(\/\[\\\\%_\]\/g, \(ch\) => `\\\\\$\{ch\}`\)/.test(profileSrc));
+
+  const refine = await readFile('src/refine.css', 'utf8');
+  const CLASSES = ['chat-dm__field', 'chat-dm__suggest', 'chat-dm__opt', 'chat-dm__opt-nick', 'chat-dm__opt-tag', 'chat-dm__hint'];
+  check('все классы подсказки описаны в стилях',
+    CLASSES.every((cls) => refine.includes(`.${cls}`)),
+    CLASSES.filter((cls) => !refine.includes(`.${cls}`)).join(', '));
+  check('список позиционируется от обёртки поля и взят из ряда слоёв',
+    /\.chat-dm__field \{\s*position: relative;\s*\}/.test(refine)
+      && /\.chat-dm__suggest \{[^}]*position: absolute;[^}]*z-index: var\(--z-menu\)/.test(refine));
+  check('на пальце строка подсказки не ниже 44px',
+    /@media \(hover: none\) and \(pointer: coarse\) \{\s*\.chat-dm__opt \{ min-height: 44px; \}/.test(refine));
+  check('выбранный вариант красится подложкой, а не буквами',
+    /\.chat-dm__opt\.is-on \{[^}]*background: color-mix\(in srgb, var\(--accent\) 14%, transparent\);\s*\}/.test(refine)
+      && !/\.chat-dm__opt\.is-on \{[^}]*color:/.test(refine));
+  check('подсветка от наведения разрешена только там, где курсор бывает',
+    /@media \(hover: hover\) \{\s*\.chat-dm__opt:hover \{/.test(refine));
+
+  /*
+    Подсветка — это подложка, смешанная с брендовой краской на 14%, и чернила
+    текста на ней обязаны дотягивать до AA в обеих темах. Замер здесь, а не «на
+    глаз»: 14% выбрано потому, что на 30% дневная тема уходила ниже порога.
+  */
+  const v8 = await readFile('src/styles-v8.css', 'utf8');
+  const { dark, light } = themeTokens(v8);
+  const mix = (base, tint, pct) => {
+    const ch = (hex, i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+    const out = [0, 1, 2].map((i) => Math.round(ch(base, i) * (1 - pct) + ch(tint, i) * pct));
+    return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  };
+  const pairs = [['тёмная', dark], ['светлая', light]]
+    .filter(([, t]) => Boolean(t))
+    .map(([name, t]) => [name, contrast(mix(t['--raised-2'], t['--accent'], 0.14), t['--text'])]);
+  check('текст на подсвеченном варианте читается в обеих темах (AA 4,5)',
+    pairs.length === 2 && pairs.every(([, c]) => c >= 4.5),
+    pairs.map(([name, c]) => `${name}: ${c.toFixed(2)}:1`).join(', '));
+}
+
+/* ── BN. Метка устройства вместо бана по IP ─────────────────────────────────
+
+   Бана по IP в этом проекте не существует: сайт статический, запросы идут из
+   браузера посетителя прямо в базу, и адрес человека не видит ни один наш код.
+   Вместо него — метка устройства: браузер забаненного сам запоминает запрет и
+   не даёт завести второй ник на этом устройстве.
+
+   Проверки держат четыре вещи. Правило: метку ставит запрет, снимает отмена
+   запрета тем же аккаунтом, а срок конечен — иначе общий компьютер оказался бы
+   заблокирован навсегда. Отказ: текст называет устройство, аккаунт и дату, и не
+   обещает ни «IP», ни снятия метки по просьбе (её не видно ни в одной панели).
+   Провода: оба адаптера ставят и снимают метку там, где узнают вошедшего, и
+   отказывают до первого запроса к базе. Панель: мера названа своим именем, и
+   число дней берётся из модуля, а не вписано вторым экземпляром.
+────────────────────────────────────────────────────────────────────────────── */
+console.log('\nBN. Метка устройства: запрет переживает смену ника');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { DEVICE_BAN_DAYS, deviceBan, syncDeviceBan, deviceBanRefusal } = await import('../src/forum/device-ban.js');
+
+  const before = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  try {
+    equal('метки нет, пока никто не под запретом', deviceBan(), null);
+
+    syncDeviceBan({ id: 'u-1', nick: 'Ковыль', banned: true });
+    const mark = deviceBan();
+    equal('забаненный оставил метку и назвал себя', mark?.userId, 'u-1');
+    equal('метка помнит ник, чтобы отказ был понятным', mark?.nick, 'Ковыль');
+    const daysLeft = (mark.until.getTime() - Date.now()) / 86400000;
+    check('срок метки — ровно те дни, что объявлены в модуле',
+      Math.abs(daysLeft - DEVICE_BAN_DAYS) < 0.01, `${daysLeft.toFixed(4)} против ${DEVICE_BAN_DAYS}`);
+    check('срок конечен: устройство не блокируется навсегда',
+      Number.isInteger(DEVICE_BAN_DAYS) && DEVICE_BAN_DAYS > 0 && DEVICE_BAN_DAYS <= 30,
+      `${DEVICE_BAN_DAYS} дней`);
+
+    syncDeviceBan({ id: 'u-2', nick: 'Второй', banned: true });
+    equal('второй нарушитель не переписывает метку и не обнуляет срок', deviceBan()?.userId, 'u-1');
+    syncDeviceBan({ id: 'u-2', nick: 'Второй', banned: false });
+    equal('чужой чистый аккаунт метку не снимает: второй ник не обходит её входом',
+      deviceBan()?.userId, 'u-1');
+    syncDeviceBan({ id: 'u-1', nick: 'Ковыль', banned: false });
+    equal('отмена запрета снимает метку тем же аккаунтом', deviceBan(), null);
+
+    syncDeviceBan({ id: 'u-3', nick: 'Третий', banned: true });
+    const raw = JSON.parse(store.get('zr33.deviceban'));
+    store.set('zr33.deviceban', JSON.stringify({ ...raw, until: new Date(Date.now() - 1000).toISOString() }));
+    equal('просроченная метка не действует', deviceBan(), null);
+    equal('просроченная запись стирается, а не лежит вечно', store.has('zr33.deviceban'), false);
+
+    store.set('zr33.deviceban', 'это не json');
+    equal('мусор вместо метки не роняет регистрацию', deviceBan(), null);
+    equal('мусор стирается', store.has('zr33.deviceban'), false);
+
+    syncDeviceBan({ id: 'u-4', nick: 'Громкий', banned: true });
+    const fresh = deviceBan();
+    const text = deviceBanRefusal(fresh);
+    check('отказ называет устройство, аккаунт и дату освобождения',
+      text.includes('Регистрация с этого устройства закрыта')
+        && text.includes('«Громкий»')
+        && text.includes(fresh.until.toLocaleDateString('ru-RU')),
+      text);
+    check('отказ не обещает ни бана по IP, ни снятия метки по просьбе',
+      !/\bIP\b|айпи|ip-адрес/i.test(text) && !/снимем метку|удалим метку|отменим метку/i.test(text),
+      text);
+    check('отказ говорит, что делать, если компьютер общий', /компьютер общий/i.test(text));
+  } finally {
+    if (before === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = before;
+  }
+
+  const sup = await readFile('src/forum/adapters/supabase.js', 'utf8');
+  const loc = await readFile('src/forum/adapters/local.js', 'utf8');
+  const players = await readFile('src/admin/screens/players.js', 'utf8');
+
+  check('боевой адаптер ставит и снимает метку там, где узнаёт вошедшего',
+    /import \{ deviceBan, deviceBanRefusal, syncDeviceBan \} from '\.\.\/device-ban\.js';/.test(sup)
+      && /const out = userOut\(me\);[\s\S]{0,400}?syncDeviceBan\(out\);\s*return out;/.test(sup));
+  check('черновой адаптер делает то же: спотыкаются там же, где в бою',
+    /syncDeviceBan\(me\);\s*return me;/.test(loc)
+      && /const bannedDevice = deviceBan\(\);\s*if \(bannedDevice\) throw new Error\(deviceBanRefusal\(bannedDevice\)\);/.test(loc));
+  check('регистрация отказывает до первого запроса к базе',
+    sup.indexOf('const bannedDevice = deviceBan();') > 0
+      && sup.indexOf('const bannedDevice = deviceBan();') < sup.indexOf("await auth('/signup'"),
+    `${sup.indexOf('const bannedDevice = deviceBan();')} против ${sup.indexOf("await auth('/signup'")}`);
+
+  const signInBody = sup.slice(sup.indexOf('export async function signIn('), sup.indexOf('export async function signOut('));
+  check('вход под запретом остаётся открытым: причину человек должен видеть',
+    signInBody.length > 0 && !/deviceBan/.test(signInBody));
+
+  check('панель называет меру своим именем и тем же числом дней, что в модуле',
+    /import \{ DEVICE_BAN_DAYS \} from '\.\.\/\.\.\/forum\/device-ban\.js';/.test(players)
+      && players.includes('помечает <b>устройство</b> нарушителя')
+      && players.includes('${DEVICE_BAN_DAYS} дней')
+      && !/не зарегистрировать \d+ дней/.test(players));
+  check('панель честно пишет, что это не бан по IP и что метка стирается',
+    players.includes('Это не бан по IP — адрес посетителя сайт не видит')
+      && players.includes('очистка данных') && players.includes('метку стирает'));
 }
 
 /* ── Итог запуска ────────────────────────────────────────────────────────────

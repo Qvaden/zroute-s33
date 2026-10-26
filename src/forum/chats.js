@@ -20,9 +20,10 @@
 import { forum } from './index.js';
 import { esc } from '../ui/helpers.js';
 import { toast } from '../ui/toast.js';
-import { renderChats, renderScrollArea, renderChatList, renderMessage, dayLabel } from '../pages/chats.js';
+import { renderChats, renderScrollArea, renderChatList, renderMessage, renderNickSuggest, dayLabel } from '../pages/chats.js';
 import { prepareImage } from '../ui/image-prep.js';
 import { excerpt, sanitizeHtml, textOf } from './format.js';
+import { suggestNicks } from './profile.js';
 import { applyFormat, syncEditorEmpty, wireRichEditor } from './editor.js';
 import { quietMutesNow } from './quiet.js';
 import { uploadFile, currentUserId } from '../db/client.js';
@@ -157,6 +158,17 @@ function paint({ stick = false } = {}) {
  */
 function paintFull({ stick = false } = {}) {
   if (!host) return;
+
+  /*
+    Экран пересобирается целиком, и поле ника вместе с ним: подсказка теряет и
+    список, и введённое слово, поэтому состояние сбрасывается, а не переносится.
+    Номер запроса увеличивается, чтобы ответ, прилетевший после перерисовки, не
+    открыл список для слова, которого в поле уже нет.
+  */
+  clearTimeout(suggestTimer);
+  suggestRows = [];
+  suggestActive = -1;
+  suggestSeq++;
 
   const input = host.querySelector('[data-chat-input]');
   const wasFocused = input && document.activeElement === input;
@@ -923,6 +935,104 @@ async function withBusy(btn, label, fn) {
   }
 }
 
+/* ── Подсказка ников в форме ЛС ──────────────────────────────────────────── */
+
+/*
+  Задержка 180 мс и порог в два символа: на один символ база отвечает списком
+  из сотни ников, который всё равно никому не нужен, а на каждый следующий
+  символ — ещё одним запросом. Число показанных вариантов ограничено, чтобы
+  список не закрывал кнопки формы.
+*/
+const SUGGEST_MIN = 2;
+const SUGGEST_LIMIT = 8;
+const SUGGEST_DELAY = 180;
+
+let suggestTimer = null;
+let suggestSeq = 0;
+let suggestRows = [];
+let suggestActive = -1;
+
+const suggestField = () => host?.querySelector?.('[data-chat-dm-nick]') ?? null;
+const suggestBox = () => host?.querySelector?.('#chat-dm-suggest') ?? null;
+
+function closeSuggest() {
+  clearTimeout(suggestTimer);
+  suggestRows = [];
+  suggestActive = -1;
+  const box = suggestBox();
+  if (box) { box.hidden = true; box.innerHTML = ''; }
+  const field = suggestField();
+  if (field) {
+    field.setAttribute('aria-expanded', 'false');
+    field.removeAttribute('aria-activedescendant');
+  }
+}
+
+/*
+  Перерисовывается только сам список: поле ввода не трогается, иначе фокус и
+  курсор ушли бы в середину ника, который человек ещё дописывает.
+*/
+function paintSuggest() {
+  const box = suggestBox();
+  const field = suggestField();
+  if (!box || !field) return;
+  box.innerHTML = renderNickSuggest(suggestRows, suggestActive);
+  box.hidden = !suggestRows.length;
+  field.setAttribute('aria-expanded', suggestRows.length ? 'true' : 'false');
+  const activeId = suggestActive >= 0 ? `chat-dm-suggest-${suggestActive}` : '';
+  if (activeId) field.setAttribute('aria-activedescendant', activeId);
+  else field.removeAttribute('aria-activedescendant');
+}
+
+function markSuggest(index) {
+  if (!suggestRows.length) return;
+  suggestActive = ((index % suggestRows.length) + suggestRows.length) % suggestRows.length;
+  paintSuggest();
+  suggestBox()?.querySelector('.is-on')?.scrollIntoView?.({ block: 'nearest' });
+}
+
+async function runSuggest(value) {
+  const term = String(value ?? '').trim();
+  const seq = ++suggestSeq;
+  if (term.length < SUGGEST_MIN) { closeSuggest(); return; }
+
+  let rows = [];
+  try {
+    rows = await suggestNicks(term, SUGGEST_LIMIT);
+  } catch {
+    // Подсказка — не обязательная часть формы: база могла не ответить, а
+    // написать по полному нику человек может и без неё.
+    rows = [];
+  }
+  // Ответ устарел: за время запроса человек дописал ник.
+  if (seq !== suggestSeq) return;
+
+  const mine = String(state.me?.nick ?? '').trim().toLowerCase();
+  suggestRows = rows.filter((row) => String(row.nick || '').trim().toLowerCase() !== mine);
+  /*
+    Единственный вариант, равный введённому, — не подсказка, а повтор того, что
+    и так написано в поле. Список в этот момент только закрывал бы кнопки.
+  */
+  const only = suggestRows[0];
+  if (suggestRows.length === 1 && String(only.nick).trim().toLowerCase() === term.toLowerCase()) suggestRows = [];
+  suggestActive = -1;
+  paintSuggest();
+}
+
+function scheduleSuggest(value) {
+  clearTimeout(suggestTimer);
+  if (String(value ?? '').trim().length < SUGGEST_MIN) { closeSuggest(); return; }
+  suggestTimer = setTimeout(() => runSuggest(value), SUGGEST_DELAY);
+}
+
+function pickSuggest(nick) {
+  const field = suggestField();
+  closeSuggest();
+  if (!field) return;
+  field.value = nick;
+  field.focus({ preventScroll: true });
+}
+
 /* ── События ────────────────────────────────────────────────────────────── */
 
 function wire() {
@@ -984,6 +1094,8 @@ function wire() {
 
     if (form.matches('[data-chat-dm]')) {
       e.preventDefault();
+      // Ник выбран и отправлен: список больше не подсказывает, а мешает.
+      closeSuggest();
       const err = form.querySelector('[data-chat-dm-error]');
       const nick = String(form.elements.nick?.value ?? '').trim();
       if (!nick) return;
@@ -1009,10 +1121,20 @@ function wire() {
       host.querySelector('.chat-menu__pop')?.remove();
       host.querySelector('[data-chat-menu-toggle]')?.setAttribute('aria-expanded', 'false');
     }
+    // Клик мимо формы ЛС закрывает подсказку ников.
+    if (suggestRows.length && !t.closest('[data-chat-dm]')) closeSuggest();
     if (!t.closest('[data-chat-react-picker]')) {
       host.querySelectorAll('.chat-msg__reactions-pop.is-open').forEach((el) => el.classList.remove('is-open'));
     }
     if (!host.contains(t)) return;
+
+    /* Выбор участника из подсказки: ник подставляется в поле, форма не отправляется. */
+    const dmOpt = t.closest('.chat-dm__opt');
+    if (dmOpt && dmOpt.closest('#chat-dm-suggest')) {
+      e.preventDefault();
+      pickSuggest(dmOpt.dataset.nick || '');
+      return;
+    }
 
     /*
       Кнопки форматирования — тот же механизм, что у форума и гайда: команда
@@ -1552,10 +1674,35 @@ function wire() {
       state.searchQuery = e.target.value;
       paintMessages();
     }
+    if (e.target.matches?.('[data-chat-dm-nick]')) scheduleSuggest(e.target.value);
   });
 
   document.addEventListener('keydown', (e) => {
     if (!host) return;
+    /*
+      Подсказка ников разбирается до общей ветки: поле формы ЛС — не редактор
+      чата, и Enter здесь отправил бы форму с недописанным ником, а стрелки
+      сдвинули бы курсор внутри слова вместо выбора участника.
+    */
+    if (e.target.matches?.('[data-chat-dm-nick]')) {
+      const open = suggestRows.length > 0;
+      if (e.key === 'Escape') {
+        if (open) { e.preventDefault(); closeSuggest(); }
+        return;
+      }
+      if (!open) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); markSuggest(suggestActive + 1); return; }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        markSuggest(suggestActive <= 0 ? suggestRows.length - 1 : suggestActive - 1);
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === 'Tab') && suggestActive >= 0) {
+        e.preventDefault();
+        pickSuggest(suggestRows[suggestActive].nick);
+        return;
+      }
+    }
     if (e.key === 'Escape') {
       if (state.lightbox) {
         state.lightbox = null;
@@ -1728,6 +1875,7 @@ export function unmountChats() {
   */
   const input = host?.querySelector('[data-chat-input]');
   if (input && state.openId) chatDrafts.set(state.openId, input.innerHTML);
+  closeSuggest();
   host = null;
   token++;
   stopPolling();

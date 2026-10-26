@@ -46,6 +46,7 @@ import {
   nickDomain,
   isConfigured,
 } from '../../db/client.js';
+import { deviceBan, deviceBanRefusal, syncDeviceBan } from '../device-ban.js';
 
 export const name = 'общая база (Supabase)';
 
@@ -178,10 +179,26 @@ export async function currentUser() {
     return null;
   }
 
-  return userOut(me);
+  const out = userOut(me);
+  /*
+    Здесь сайт узнаёт, кто вошёл и действует ли запрет, — поэтому метка
+    устройства приводится в соответствие именно здесь, а не в отдельной
+    кнопке панели. Вход под запретом остаётся разрешённым: человек должен
+    видеть причину, а снятие запрета — снять метку тем же заходом.
+  */
+  syncDeviceBan(out);
+  return out;
 }
 
 export async function signUp(nick, password, serverId) {
+  /*
+    Отказ до первого запроса: устройство уже помечено, и создавать аккаунт,
+    который тут же окажется под запретом, незачем — тем более что ник при
+    этом занялся бы навсегда.
+  */
+  const bannedDevice = deviceBan();
+  if (bannedDevice) throw new Error(deviceBanRefusal(bannedDevice));
+
   const email = emailFor(nick);
 
   /*
