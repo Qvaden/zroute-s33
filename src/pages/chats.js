@@ -91,11 +91,17 @@ export function renderChats(s) {
       </section>`;
   }
 
+  /*
+    Форма ЛС стоит сразу за кнопкой, которая её раскрывает, а не в шапке
+    списка: раскрытая выше форма на телефоне уезжает из-под пальца, и человек
+    не понимает, произошло ли вообще что-то.
+  */
   return `
     <div class="chat-layout ${s.openId ? 'is-open' : ''}">
       <aside class="chat-list" aria-label="Мои чаты">
         ${renderChatListHead(s)}
         ${renderJoin(s)}
+        ${s.dmOpen ? renderDMForm(s) : ''}
         ${s.createOpen ? renderCreateForm(s) : ''}
         <div class="chat-list__area" data-chat-list-area>${renderChatList(s)}</div>
       </aside>
@@ -130,17 +136,24 @@ export function renderChatListHead(s) {
         </button>
       </div>
     </header>
-    ${s.leaderboardOpen ? renderLeaderboard(s) : ''}
-    ${s.dmOpen ? renderDMForm(s) : ''}`;
+    ${s.leaderboardOpen ? renderLeaderboard(s) : ''}`;
 }
 
-export function renderJoin() {
+export function renderJoin(s) {
   return `
     <form class="chat-join" data-chat-join>
       <input class="chat-join__input" name="code" inputmode="text" autocomplete="off"
              spellcheck="false" placeholder="Код приглашения" aria-label="Код приглашения" maxlength="16">
       <button type="submit" class="forum-btn forum-btn--ghost">Войти</button>
-      <button type="button" class="forum-btn forum-btn--ghost" data-chat-dm-toggle title="Личное сообщение">✉</button>
+      <button type="button" class="forum-btn forum-btn--ghost chat-join__dm" data-chat-dm-toggle
+              aria-expanded="${s?.dmOpen ? 'true' : 'false'}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2"/>
+          <path d="m3.9 6.8 8.1 6.2 8.1-6.2"/>
+        </svg>
+        <span>Написать личное сообщение</span>
+      </button>
     </form>`;
 }
 
@@ -331,9 +344,26 @@ function renderRoom(s) {
   }
   const isOwner = c.myRole === 'owner' || (c.ownerId && c.ownerId === s.me?.id);
   const isMgr = isOwner || c.myRole === 'admin' || s.me?.role === 'admin' || s.me?.role === 'moderator';
-  const kindWord = c.kind === 'inter' ? 'межальянсовый' : 'альянсовый';
+  /*
+    Видов чата три — 'alliance', 'inter' и 'dm' (forum_chats_kind_check в
+    supabase/applied/chats.sql). Ветка «не inter ⇒ альянсовый» подписывала
+    личную переписку чужим словом: человек открывал ЛС и читал, что сидит в
+    чате альянса. У личного чата к тому же не бывает ни тега, ни счёта
+    участников — их всегда двое, и число только мешало.
+  */
+  const isDM = c.kind === 'dm';
+  const kindWord = isDM ? 'личная переписка' : c.kind === 'inter' ? 'межальянсовый' : 'альянсовый';
   const membersWord = plural(c.memberCount, 'участник', 'участника', 'участников');
   const initial = (c.allianceTag || c.title).trim().slice(0, 2).toUpperCase();
+  const subParts = isDM
+    ? [kindWord]
+    : [kindWord, c.allianceTag || '', membersWord].filter(Boolean).map(esc);
+  /*
+    «2 онлайн» в разговоре двух людей — счётчик ради счётчика. Здесь число
+    значит ровно одно: собеседник сейчас на сайте, поэтому и сказано словами.
+  */
+  if (c.onlineCount > 1) subParts.push(isDM ? '<span class="chat-room__online">собеседник в сети</span>' : `<span class="chat-room__online">${c.onlineCount} онлайн</span>`);
+  if (c.closed) subParts.push('<span class="chat-room__closed">закрыт</span>');
 
   const menu = [
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-members-toggle>
@@ -378,9 +408,7 @@ function renderRoom(s) {
       <div class="chat-room__who">
         <b class="chat-room__title">${esc(c.title)}</b>
         <small class="chat-room__sub muted">
-          ${esc(kindWord)}${c.allianceTag ? ` · ${esc(c.allianceTag)}` : ''} · ${esc(membersWord)}
-          ${c.onlineCount > 1 ? ` · <span class="chat-room__online">${c.onlineCount} онлайн</span>` : ''}
-          ${c.closed ? ' · <span class="chat-room__closed">закрыт</span>' : ''}
+          ${subParts.join(' · ')}
         </small>
       </div>
       <div class="chat-menu" data-chat-menu>

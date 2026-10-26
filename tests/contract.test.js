@@ -21844,6 +21844,110 @@ console.log('\nBN. Метка устройства: запрет пережив�
       && players.includes('очистка данных') && players.includes('метку стирает'));
 }
 
+/* ── BO. Личный чат подписан личным ─────────────────────────────────────────
+
+   Видов чата в базе три: 'alliance', 'inter' и 'dm' (supabase/applied/chats.sql,
+   ограничение forum_chats_kind_check). Подпись в шапке комнаты знала только два:
+   ветка «не inter ⇒ альянсовый» записывала личную переписку в альянсовые чаты.
+   Человек открывал ЛС и читал, что сидит в чате альянса с двумя участниками.
+
+   Рядом второй дефект того же рода: title у ЛС — ник АДРЕСАТА, так его видит
+   автор письма. Собеседник читал бы в шапке собственный ник.
+
+   И третье: кнопка ЛС была значком ✉ в одном ряду с полем кода приглашения.
+   Значок без подписи читается как украшение, а не как действие.
+*/
+console.log('\nBO. Личный чат подписан личным, а не альянсовым');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { renderChats, renderJoin } = await import('../src/pages/chats.js');
+
+  const me = { id: 'u-me', nick: 'Qvaden', role: 'member', isLeader: false, allianceTag: 'KOP' };
+  const base = {
+    ready: true, me, loading: false, error: '', chats: [], messages: [], members: [],
+    membersOpen: false, inviteOpen: false, menuOpen: false, searchOpen: false, pollOpen: false,
+    dmOpen: false, createOpen: false, leaderboardOpen: false, pushSubscribed: false,
+    typing: [], replyingTo: null, pollDraft: null, lightbox: null, hasMore: false,
+    newMessages: 0, unread: 0, leaderboard: [],
+  };
+  const dm = {
+    id: 'c-dm', title: 'Пух', kind: 'dm', allianceTag: '', ownerId: 'u-me', ownerNick: 'Qvaden',
+    inviteCode: '', maxMembers: 2, closed: false, avatarUrl: '', memberCount: 2, onlineCount: 1,
+    myRole: 'owner', unread: 0, lastBody: 'привет', lastNick: 'Пух', lastAt: new Date(),
+    pinnedBody: null, pinnedNick: null, createdAt: new Date(),
+  };
+  const alliance = { ...dm, id: 'c-al', title: 'Штаб', kind: 'alliance', allianceTag: 'KOP', maxMembers: 200, memberCount: 34, onlineCount: 5 };
+  const inter = { ...alliance, id: 'c-in', kind: 'inter', title: 'Межальянс' };
+
+  const subOf = (c) => {
+    const html = renderChats({ ...base, openId: c.id, open: c });
+    const m = html.match(/<small class="chat-room__sub muted">([\s\S]*?)<\/small>/);
+    return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+  };
+
+  const dmSub = subOf(dm);
+  check('личный чат назван личной перепиской', dmSub.includes('личная переписка'));
+  check('личный чат больше не зовётся альянсовым', !/альянс/i.test(dmSub));
+  check('в личном чате нет счёта участников: их всегда двое', !/участник/.test(dmSub));
+  check('тег альянса в личную переписку не переехал', !dmSub.includes('KOP'));
+
+  const onlineSub = subOf({ ...dm, onlineCount: 2 });
+  check('собеседник в сети назван человеком, а не счётчиком',
+    onlineSub.includes('собеседник в сети') && !onlineSub.includes('2 онлайн'));
+  check('когда собеседник не в сети, плашки нет', !dmSub.includes('собеседник в сети'));
+  check('закрытый личный чат помечен закрытым', subOf({ ...dm, closed: true }).includes('закрыт'));
+
+  check('альянсовый чат подписан как прежде', subOf(alliance).includes('альянсовый · KOP · 34 участника'));
+  check('межальянсовый чат подписан как прежде', subOf(inter).includes('межальянсовый'));
+
+  const admChats = await readFile('src/admin/screens/chats.js', 'utf8');
+  check('панель чатов различает все три вида, а не два',
+    /c\.kind === 'dm' \? 'личный'/.test(admChats)
+      && /c\.kind === 'inter' \? 'межальянсовый' : 'альянсовый'/.test(admChats));
+
+  const forumChats = await readFile('src/forum/chats.js', 'utf8');
+  check('со стороны собеседника в шапке стоит автор письма, а не собственный ник',
+    /function dmAsSeenByMe\(/.test(forumChats)
+      && /c\.kind !== 'dm'\) return c;/.test(forumChats)
+      && /owner\.toLowerCase\(\) === mine\) return c;/.test(forumChats));
+  check('подмена ника касается и списка, и открытого чата',
+    /state\.chats = chats\.map\(dmAsSeenByMe\)/.test(forumChats)
+      && /state\.open = dmAsSeenByMe\(chat\)/.test(forumChats));
+
+  /* Кнопка ЛС. */
+  const closed = renderJoin({ dmOpen: false });
+  const opened = renderJoin({ dmOpen: true });
+  check('кнопка ЛС называет действие словами', /личное сообщение/i.test(closed));
+  check('голый значок ✉ больше не отвечает за действие', !closed.includes('✉'));
+  check('у кнопки конверт нарисован, а не написан',
+    /<svg[\s\S]*?aria-hidden="true"[\s\S]*?<\/svg>/.test(closed));
+  check('кнопка ЛС выглядит как кнопка проекта',
+    /class="forum-btn forum-btn--ghost chat-join__dm"/.test(closed));
+  check('кнопка не отправляет форму кода приглашения',
+    /<button type="button" class="forum-btn forum-btn--ghost chat-join__dm"/.test(closed));
+  check('кнопка говорит, раскрыта ли форма ЛС',
+    closed.includes('aria-expanded="false"') && opened.includes('aria-expanded="true"'));
+  check('кнопка ЛС живёт в форме входа по коду, как и раньше',
+    /<form class="chat-join" data-chat-join>[\s\S]*data-chat-dm-toggle[\s\S]*<\/form>/.test(closed));
+
+  const laid = renderChats({ ...base, dmOpen: true });
+  check('форма ЛС раскрывается под кнопкой, а не над ней',
+    laid.indexOf('chat-join__dm') > -1
+      && laid.indexOf('<form class="chat-dm"') > laid.indexOf('chat-join__dm'));
+  check('форма ЛС одна: шапка списка её больше не рисует',
+    (laid.match(/<form class="chat-dm"/g) || []).length === 1);
+
+  const refine = await readFile('src/refine.css', 'utf8');
+  check('строка кода приглашения переносится: кнопке ЛС нужна своя строка',
+    /\.chat-join \{[^}]*flex-wrap: wrap;/.test(refine));
+  check('кнопка ЛС занимает всю строку и держит подпись по центру',
+    /\.chat-join__dm \{[^}]*flex: 1 0 100%;[^}]*justify-content: center;/.test(refine));
+  check('кнопка ЛС отличается пунктиром от «Войти»',
+    /\.chat-join__dm \{[^}]*border-style: dashed;/.test(refine));
+  check('на пальце кнопка ЛС не ниже 44px: она в общем ряду .forum-btn',
+    /@media \(hover: none\) and \(pointer: coarse\) \{[\s\S]*?\.chat-join \.forum-btn[\s\S]*?min-height: 44px/.test(refine));
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск

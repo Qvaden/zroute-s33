@@ -83,7 +83,8 @@ export function renderChatsAdmin(view) {
 
 function renderChatRow(c, forum) {
   const isOpen = forum.chatOpenId === c.id;
-  const kind = c.kind === 'inter' ? 'межальянсовый' : 'альянсовый';
+  /* Видов три: 'alliance', 'inter' и 'dm' — личные сообщения. */
+  const kind = c.kind === 'dm' ? 'личный' : c.kind === 'inter' ? 'межальянсовый' : 'альянсовый';
   return `
     <div class="adm-chat ${c.closed ? 'is-closed' : ''} ${isOpen ? 'is-open' : ''}">
       <div class="adm-chat__row">

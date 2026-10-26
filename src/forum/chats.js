@@ -520,12 +520,27 @@ async function uploadChatFiles() {
 
 /* ── Данные ─────────────────────────────────────────────────────────────── */
 
+/*
+  У личного чата в базе записан ник АДРЕСАТА: так шапку видит тот, кто написал
+  первым (forum_chat_create_dm кладёт в title ник собеседника, а в owner_nick —
+  свой). Второй участник читал бы там собственный ник. Владелец чата — всегда
+  автор первого письма, поэтому с его стороны ничего менять не нужно, а со
+  стороны собеседника заголовком становится ник владельца.
+*/
+function dmAsSeenByMe(c) {
+  if (!c || c.kind !== 'dm') return c;
+  const mine = String(state.me?.nick ?? '').trim().toLowerCase();
+  const owner = String(c.ownerNick ?? '').trim();
+  if (!mine || !owner || owner.toLowerCase() === mine) return c;
+  return { ...c, title: owner };
+}
+
 async function loadList() {
   const my = token;
   try {
     const chats = await forum.listChats();
     if (my !== token) return;
-    state.chats = chats;
+    state.chats = chats.map(dmAsSeenByMe);
     if (state.openId) state.open = chats.find((c) => c.id === state.openId) ?? state.open;
     state.error = '';
   } catch (err) {
@@ -565,7 +580,7 @@ async function openChat(id) {
       state.open = null;
       state.error = 'Вы не участник этого чата или его больше нет.';
     } else {
-      state.open = chat;
+      state.open = dmAsSeenByMe(chat);
       state.messages = messages;
       state.hasMore = messages.length >= 60;
       state.readAt = chat.myLastReadAt;

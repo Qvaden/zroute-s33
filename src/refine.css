@@ -653,6 +653,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 
 .chat-join {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s-1);
   flex: none;
   padding: 0 var(--s-2) var(--s-1);
@@ -674,6 +675,23 @@ body:has(.chat-layout) .site-foot { display: none; }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
+/*
+  Личные сообщения — действие, а не значок. Прежняя ✉ стояла в одном ряду с
+  полем кода приглашения и читалась как украшение: что она делает, было видно
+  только из всплывающей подсказки, которой на телефоне нет вовсе. Теперь это
+  своя строка на всю ширину с подписью словами, а пунктирная рамка отличает её
+  от «Войти» — та отправляет форму, эта раскрывает другую.
+*/
+.chat-join__dm {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-fine);
+  border-style: dashed;
+  text-align: center;
+}
+.chat-join__dm svg { flex: none; }
 
 .chat-create { flex: none; padding: 0 var(--s-2) var(--s-2); }
 .chat-create .forum-field { margin-bottom: var(--s-1); }
