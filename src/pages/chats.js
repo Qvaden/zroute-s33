@@ -369,11 +369,24 @@ function renderRoom(s) {
     Управление чатом в личной переписке не нужно и вредно. Пригласить третьего
     нельзя: участников ровно двое, а кода у ЛС нет вовсе — кнопка показывала бы
     пустое место. Переименовывать нечего: в заголовке ник собеседника, и любая
-    другая надпись сломала бы его с обеих сторон. «Закрыть» и «Удалить навсегда»
-    в руках одного человека решали бы судьбу чужих сообщений. Свои действия —
-    поиск, экспорт, push и выход — остаются у обоих.
+    другая надпись сломала бы его с обеих сторон. «Закрыть» в руках одного
+    человека замолчало бы чужую переписку. Свои действия — поиск, экспорт, push
+    и выход — остаются у обоих.
   */
   const roomMgr = isMgr && !isDM;
+
+  /*
+    Удаление переписки оставляем: это единственный способ убрать её целиком, а
+    не по одному сообщению. Право повторяет правило базы без выдумки —
+    forum_chats_delete (supabase/applied/chats.sql) пускает владельца строки и
+    модерацию, где forum_is_staff() это роль 'admin' или 'moderator'. Кнопка,
+    которой сервер всё равно ответит отказом, была бы обещанием в лицо; а
+    модератор без кнопки ходил бы в панель администратора из-за каждой
+    переписки. Администратор самого чата (myRole === 'admin') сюда не входит:
+    ему база удалить чат не даст. Правило одно на все виды чата, поэтому
+    модерация видит удаление и в альянсовом.
+  */
+  const canDeleteChat = isOwner || s.me?.role === 'admin' || s.me?.role === 'moderator';
 
   const menu = [
     `<button type="button" class="chat-menu__item" role="menuitem" data-chat-members-toggle>
@@ -393,8 +406,8 @@ function renderRoom(s) {
     roomMgr && c.closed
       ? `<button type="button" class="chat-menu__item" role="menuitem" data-chat-reopen>🔓 Снова открыть</button>`
       : '',
-    (!isDM && (isOwner || s.me?.role === 'admin'))
-      ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-delete>🗑️ Удалить чат навсегда</button>`
+    canDeleteChat
+      ? `<button type="button" class="chat-menu__item chat-menu__item--danger" role="menuitem" data-chat-delete>🗑️ ${isDM ? 'Удалить переписку навсегда' : 'Удалить чат навсегда'}</button>`
       : '',
   ].filter(Boolean).join('');
 

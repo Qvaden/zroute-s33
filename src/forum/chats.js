@@ -1263,13 +1263,23 @@ function wire() {
     if (delChat && state.openId) {
       state.menuOpen = false;
       paint();
-      const title = state.open?.title || 'этот чат';
-      if (!confirm(`Удалить чат «${title}» навсегда? Сообщения и участники будут удалены без возврата.`)) return;
+      const isDM = state.open?.kind === 'dm';
+      const title = state.open?.title || (isDM ? 'эту переписку' : 'этот чат');
+      /*
+        Заголовок личного чата — ник собеседника, поэтому «удалить чат «Пух»»
+        читается как удаление человека. Слова вопроса обязаны совпадать с
+        надписью на кнопке и с тем, что действительно произойдёт: у переписки
+        нет участников, которых можно удалить, — есть двое и их сообщения.
+      */
+      const question = isDM
+        ? `Удалить переписку с «${title}» навсегда? Сообщения будут удалены без возврата.`
+        : `Удалить чат «${title}» навсегда? Сообщения и участники будут удалены без возврата.`;
+      if (!confirm(question)) return;
       await withBusy(delChat, '…', async () => {
         await forum.deleteChat(state.openId);
         await loadList();
         location.hash = '#/chats';
-        toast('Чат удалён навсегда', 'ok');
+        toast(isDM ? 'Переписка удалена навсегда' : 'Чат удалён навсегда', 'ok');
       });
       return;
     }

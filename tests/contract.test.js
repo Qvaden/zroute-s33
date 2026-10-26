@@ -21940,19 +21940,33 @@ console.log('\nBO. Личный чат подписан личным, а не а
   /*
     Меню «⋯» в личном чате. Пригласить третьего в переписку двоих нельзя
     (max_members = 2, а кода у ЛС нет вовсе), переименовывать нечего — в
-    заголовке ник собеседника, а «закрыть» и «удалить навсегда» в руках одного
-    человека решали бы судьбу чужой переписки. Поиск, экспорт, push и выход
-    остаются: они про свои сообщения, а не про управление чатом.
+    заголовке ник собеседника, а «закрыть» в руках одного человека замолчало
+    бы чужую переписку. Поиск, экспорт, push и выход остаются: они про свои
+    сообщения, а не про управление чатом.
+
+    Удаление — не управление чужим, а право, которое база даёт владельцу строки
+    и модерации: forum_chats_delete (supabase/applied/chats.sql) звучит как
+    `forum_is_staff() or owner_id = auth.uid()`, а forum_is_staff() — это роль
+    'admin' или 'moderator'. Кнопка должна появляться ровно у них: у остальных
+    она была бы обещанием, которое сервер отклонит.
   */
-  const menuOf = (c) => {
-    const html = renderChats({ ...base, menuOpen: true, openId: c.id, open: { ...c, myRole: 'owner' } });
+  const menuOf = (c, who = {}) => {
+    const html = renderChats({
+      ...base,
+      me: who.me ?? base.me,
+      menuOpen: true,
+      openId: c.id,
+      open: { ...c, myRole: who.myRole ?? c.myRole, ownerId: who.ownerId ?? c.ownerId },
+    });
     const m = html.match(/<div class="chat-menu__pop" role="menu">([\s\S]*?)<\/div>/);
     return m ? m[1] : '';
   };
+  /* Чужая переписка: я в ней не владелец, а просто собеседник. */
+  const foreign = { ...dm, myRole: 'member', ownerId: 'u-other', ownerNick: 'Пух' };
   const dmMenu = menuOf(dm);
   const allianceMenu = menuOf(alliance);
   check('меню личного чата вообще рисуется', dmMenu.length > 0);
-  for (const word of ['Пригласить по коду', 'Переименовать', 'Закрыть чат', 'Удалить чат навсегда']) {
+  for (const word of ['Пригласить по коду', 'Переименовать', 'Закрыть чат']) {
     check(`в личном чате нет действия «${word}»`, !dmMenu.includes(word));
     check(`в альянсовом чате «${word}» осталось`, allianceMenu.includes(word));
   }
@@ -21963,6 +21977,42 @@ console.log('\nBO. Личный чат подписан личным, а не а
   check('меню альянсового чата не потеряло управление',
     allianceMenu.includes('data-chat-invite') && allianceMenu.includes('data-chat-rename')
       && allianceMenu.includes('data-chat-delete'));
+
+  /* Удаление переписки. */
+  check('владелец может удалить свою переписку',
+    dmMenu.includes('data-chat-delete') && dmMenu.includes('Удалить переписку навсегда'));
+  check('в личном чате кнопка не зовёт переписку чатом', !dmMenu.includes('Удалить чат навсегда'));
+  check('в альянсовом чате кнопка по-прежнему про чат', allianceMenu.includes('Удалить чат навсегда'));
+  check('удаление помечено опасным действием, а не обычной строкой меню',
+    /chat-menu__item--danger" role="menuitem" data-chat-delete/.test(dmMenu));
+  check('модератор может удалить чужую переписку',
+    menuOf(foreign, { me: { ...base.me, role: 'moderator' } }).includes('data-chat-delete'));
+  check('администратор может удалить чужую переписку',
+    menuOf(foreign, { me: { ...base.me, role: 'admin' } }).includes('data-chat-delete'));
+  check('модератор может удалить и альянсовый чат: право одно на все виды',
+    menuOf({ ...alliance, myRole: 'member', ownerId: 'u-other' }, { me: { ...base.me, role: 'moderator' } })
+      .includes('data-chat-delete'));
+  check('рядовой собеседник чужую переписку удалить не может',
+    !menuOf(foreign).includes('data-chat-delete'));
+  check('администратор чата удаления не получает: база его не пустит',
+    !menuOf({ ...foreign, myRole: 'admin' }).includes('data-chat-delete'));
+  check('право на удаление не зашито под один вид чата',
+    /const canDeleteChat = isOwner \|\| s\.me\?\.role === 'admin' \|\| s\.me\?\.role === 'moderator';/
+      .test(await readFile('src/pages/chats.js', 'utf8')));
+
+  /* Слова вопроса и ответа: в переписке заголовок — это ник человека. */
+  check('вопрос про переписку не называет её чатом «Пух»',
+    /isDM = state\.open\?\.kind === 'dm'/.test(forumChats)
+      && /Удалить переписку с «\$\{title\}» навсегда\? Сообщения будут удалены без возврата\./
+        .test(forumChats));
+  check('вопрос про обычный чат не потерял прежних слов',
+    /Удалить чат «\$\{title\}» навсегда\? Сообщения и участники будут удалены без возврата\./
+      .test(forumChats));
+  check('переписка не обещает удалить участников: их не за что удалять',
+    /Удалить переписку с «\$\{title\}» навсегда\? Сообщения и участники/
+      .test(forumChats) === false);
+  check('ответ после удаления назван теми же словами, что и вопрос',
+    /isDM \? 'Переписка удалена навсегда' : 'Чат удалён навсегда'/.test(forumChats));
 
   const refine = await readFile('src/refine.css', 'utf8');
   check('строка кода приглашения переносится: кнопке ЛС нужна своя строка',
