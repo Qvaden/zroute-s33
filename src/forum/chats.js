@@ -997,6 +997,45 @@ function paintSuggest() {
   const activeId = suggestActive >= 0 ? `chat-dm-suggest-${suggestActive}` : '';
   if (activeId) field.setAttribute('aria-activedescendant', activeId);
   else field.removeAttribute('aria-activedescendant');
+  if (suggestRows.length) placeSuggest(box, field);
+}
+
+/**
+ * Куда и какого роста раскрыть подсказку, если известны свободные места.
+ *
+ * Чистая функция ради проверки: геометрию меряет placeSuggest, а решение
+ * «вверх или вниз и какой высоты» должно быть видно в тестах числами, а не
+ * глазами на телефоне.
+ *
+ * @param {{below: number, above: number, need: number}} room
+ * @returns {{up: boolean, maxHeight: number}}
+ */
+export function suggestPlacement({ below, above, need }) {
+  const up = below < need && above > below;
+  const space = Math.floor((up ? above : below) - 8);
+  return { up, maxHeight: Math.max(72, Math.min(240, space)) };
+}
+
+/**
+ * Ставит список подсказок туда, где его видно.
+ *
+ * Колонка списка чатов обрезает всё, что не поместилось в её высоту, а
+ * телефонная клавиатура урезает эту высоту вдвое: раскрытый вниз список
+ * уходил под срез, и человек видел пустое место под полем — решал, что
+ * подсказок нет вовсе. При нехватке места снизу список раскрывается вверх и
+ * ужимается под свободное место, поэтому остаётся внутри видимой колонки.
+ */
+export function placeSuggest(box, field) {
+  const clip = field.closest('.chat-list') || document.documentElement;
+  const room = clip.getBoundingClientRect();
+  const at = field.getBoundingClientRect();
+  const { up, maxHeight } = suggestPlacement({
+    below: room.bottom - at.bottom,
+    above: at.top - room.top,
+    need: box.scrollHeight + 8,
+  });
+  box.classList.toggle('chat-dm__suggest--up', up);
+  box.style.maxHeight = `${maxHeight}px`;
 }
 
 function markSuggest(index) {

@@ -22025,6 +22025,56 @@ console.log('\nBO. Личный чат подписан личным, а не а
     /@media \(hover: none\) and \(pointer: coarse\) \{[\s\S]*?\.chat-join \.forum-btn[\s\S]*?min-height: 44px/.test(refine));
 }
 
+/* ── BP. Подсказка ников не прячется под клавиатуру ────────────────────────
+
+   Колонка списка чатов обрезает всё, что не поместилось в её высоту
+   (.chat-list с overflow: hidden), а телефонная клавиатура урезает эту высоту
+   вдвое: список подсказок, раскрытый вниз от поля, оказывался под срезом —
+   вместе с подсказками человек терял и кнопки формы. Модератор прислал снимок:
+   поле с начатым ником и пустое место под ним.
+
+   Лечится двумя шагами: при нехватке места снизу список раскрывается вверх,
+   над полем, и ужимается под свободное место; а колонка с раскрытой формой
+   начинает прокручиваться, чтобы кнопки не резались.
+*/
+console.log('\nBP. Подсказка ников видна и на коротком экране');
+{
+  const { readFile } = await import('node:fs/promises');
+  const { suggestPlacement } = await import('../src/forum/chats.js');
+
+  /* Места снизу хватает — список раскрывается вниз, как прежде. */
+  const down = suggestPlacement({ below: 400, above: 200, need: 120 });
+  check('при свободном месте снизу список раскрывается вниз', down.up === false);
+  check('вниз список держит прежнюю высоту', down.maxHeight === 240);
+
+  /* Клавиатура съела низ: снизу 60px, сверху 300px. */
+  const up = suggestPlacement({ below: 60, above: 300, need: 120 });
+  check('при нехватке места снизу список раскрывается вверх', up.up === true);
+  check('вверх список тоже не выше прежнего', up.maxHeight === 240);
+
+  /* Короткая колонка: мало и снизу, и сверху — список ужимается, но жив. */
+  const tight = suggestPlacement({ below: 60, above: 100, need: 120 });
+  check('на тесном экране список ужимается под свободное место',
+    tight.up === true && tight.maxHeight === 92);
+  const floor = suggestPlacement({ below: 60, above: 40, need: 120 });
+  check('список не схлопывается в ноль: остаётся хотя бы две строки',
+    floor.maxHeight >= 72);
+
+  const src = await readFile('src/forum/chats.js', 'utf8');
+  check('paintSuggest ставит список по месту, а не только красит его',
+    /export function placeSuggest\(/.test(src) && /placeSuggest\(box, field\);/.test(src));
+  check('место меряется по обрезанной колонке, а не по окну браузера',
+    /closest\('\.chat-list'\)/.test(src));
+
+  const css = await readFile('src/refine.css', 'utf8');
+  check('раскрытый вверх список прижат к полю своей нижней стороной',
+    /\.chat-dm__suggest--up \{[^}]*top: auto;[^}]*bottom: calc\(100% \+ var\(--s-hair\)\);/.test(css));
+  check('колонка с раскрытой формой прокручивается, а не режет кнопки',
+    /\.chat-list:has\(\.chat-dm\)/.test(css)
+      && /\.chat-list:has\(\.chat-create\)/.test(css)
+      && /overflow-y: auto;/.test((css.match(/\.chat-list:has\(\.chat-dm\)[\s\S]{0,120}?\}/) || [''])[0]));
+}
+
 /* ── Итог запуска ────────────────────────────────────────────────────────────
 
    Счётчик существовал с первых строк файла, но никто его не печатал: запуск
