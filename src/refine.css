@@ -2222,30 +2222,22 @@ body:has(.chat-layout) .site-foot { display: none; }
   .tour-side { min-width: 64px; }
 }
 
-/* ══ Светлая тема: «Daylight Deck» — холодный командный центр AAA ══════════ */
+/* ══ Светлая тема: попутные поправки к общему строю ══════════════════════ */
 
 /*
-  ФОН: светло-серый с голубым подтоном (не белый!), едва заметный янтарный
-  отсвет в правом верхнем углу и техническая сетка с альфой ~0.03. Сетка
-  создаёт ощущение приборной панели, но не спорит с текстом.
+  СВЕТЛАЯ ТЕМА НОСИТ ОДИН СТРОЙ С НОЧНОЙ. Фон, шапка, панели и герой здесь не
+  перекрашиваются: их держит редакционный язык `redesign.css`, а темы
+  различаются только лестницей токенов в `styles-v8.css`. Прежний
+  «Daylight Deck» — миллиметровка на теле, приборные свечения, стеклянная
+  шапка, плитки панелей с сигнальной кромкой и подъёмом при наведении —
+  удалён: бриф требует чистого фона без сетки и пятен и одну систему на обе
+  темы.
 
-  Все отсветы и сетка берутся из токенов темы: SIGNAL-краска больше не
-  записана янтарной цифрой, иначе правка `--accent` в `styles-v8.css`
-  оставила бы на новом холодном фоне тёплое пятно старой краски.
+  Исключение одно и оно обратное: миллиметровка `.hero--lead` на экране
+  рейтинга — ночная атмосфера командного центра, поэтому в дневной теме её
+  слой выключается, а в ночной живёт дальше.
 */
-:root[data-theme="light"] body {
-  background:
-    radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 28rem),
-    linear-gradient(var(--hud-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--hud-grid) 1px, transparent 1px),
-    var(--bg);
-  background-size: auto, 46px 46px, 46px 46px, auto;
-}
-:root[data-theme="light"] body::before {
-  background:
-    radial-gradient(760px 460px at 96% 2%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 58%),
-    radial-gradient(900px 520px at 8% -8%, color-mix(in srgb, var(--link) 7%, transparent), transparent 62%);
-}
+:root[data-theme="light"] .hero--lead::before { display: none; }
 
 /*
   ТИПОГРАФИКА: в светлой теме заголовки и крупные числа набираются
@@ -2274,86 +2266,17 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 
 /*
-  ШАПКА: стеклянная командная панель — тёплая линия низа и мягкая тень.
-  Статуса сети здесь нет намеренно: в момент отрисовки шапка ничего про связь
-  не знает, а рисовать «в сети» до ответа базы — значит врать человеку.
-*/
-:root[data-theme="light"] .site-head {
-  border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  box-shadow: var(--shadow-1);
-}
-:root[data-theme="light"] .site-head:hover { box-shadow: var(--shadow); }
-
-/*
-  ПЛИТКА «33» и активная вкладка — сигнальная плашка `--accent-plate`.
-
-  В светлой теме её градиент идёт ВНИЗ, к `--accent-dk`, и худшая точка ряда —
-  затемнённый край: 4,61:1, против 5,29:1 на плоском бренде. Направление задаёт
-  тема, а не правило: в ночной градиент смешивается ВВЕРХ, к `--tint`, и тот же
-  токен держит 8,15:1.
+  ПЛИТКА «33» — сигнальная плашка `--accent-plate`, как и в ночной теме:
+  брендовому значку положен брендовый тон в обеих темах. Активная вкладка
+  здесь не красится: её дневную одежду — тихую подкраску и стальной корешок —
+  держит `redesign.css`, и прежняя залитая плашка была мёртвым правилом:
+  оно всегда проигрывало более позднему файлу.
 */
 :root[data-theme="light"] .brand__num {
   animation: none;
   color: var(--on-accent);
   background: var(--accent-plate);
   box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-:root[data-theme="light"] .nav__link.is-active {
-  color: var(--on-accent);
-  border-color: var(--accent-plate-line);
-  background: var(--accent-plate);
-  box-shadow: 0 3px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-/*
-  ПАНЕЛИ — ступень лестницы: `--plate-grad` кладёт карточку на `--raised-2`
-  с переходом в `--surface`, тень берётся из общей ступени `--shadow`.
-  Стеклянный blur убран: под карточкой лежит не фотография, а однородный фон,
-  и размытие стоило дорого на телефоне при нулевой пользе. Наведение поднимает
-  карточку на 2px и подсвечивает границу янтарём. Верхняя линия .panel::before
-  — короткий янтарный штрих слева (сигнальный маркер, не полноширинная полоса).
-*/
-:root[data-theme="light"] .panel {
-  background: var(--plate-grad);
-  border-color: var(--line);
-  box-shadow: var(--shadow);
-  transition: transform .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease);
-}
-:root[data-theme="light"] .panel:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  box-shadow: var(--shadow-3);
-}
-:root[data-theme="light"] .panel::before {
-  right: auto;
-  width: 56px;
-  background: var(--accent);
-  opacity: .85;
-}
-:root[data-theme="light"] .panel::after { opacity: 0; }
-
-/* На телефоне карточки не поднимаем: жестом листают список, а не наводят. */
-@media (hover: none) and (pointer: coarse) {
-  :root[data-theme="light"] .panel:hover { transform: none; box-shadow: var(--shadow); }
-}
-
-/*
-  ВАУ-ГЕРОЙ: та же ступень лестницы, но крупнее и с HUD-уголком — короткий
-  янтарный уголок сверху справа, дозированный декор командного центра.
-  Диагональная штриховка тёмной темы здесь почти выключена.
-*/
-:root[data-theme="light"] .hero {
-  border-color: var(--line);
-  background:
-    radial-gradient(480px 220px at 88% 8%, color-mix(in srgb, var(--link) 8%, transparent), transparent 66%),
-    radial-gradient(300px 260px at 2% 100%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
-    var(--plate-grad);
-  box-shadow: var(--shadow);
-}
-:root[data-theme="light"] .hero::after { opacity: .1; }
-:root[data-theme="light"] .hero__num {
-  background: linear-gradient(172deg, var(--text) 18%, color-mix(in srgb, var(--text) 55%, var(--bg)));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
 /* Hover строки рейтинга в светлой теме — тот же спокойный подкрашенный фон,
@@ -2532,8 +2455,9 @@ body:has(.chat-layout) .site-foot { display: none; }
   правила для .hero и .panel имеют специфичность выше, чем класс самой
   страницы: пока подложка карточки бралась числом, дневный слой выбивал фон
   острова, и заголовок героя бота давал 1,05:1 (242,244,247 на 244,238,227).
-  С общей лестницей это рассосалось само: `--plate-grad`, `--shadow` и `--line`
-  на острове ночные, поэтому светлое правило `.panel` кладёт ночную плашку.
+  С общей лестницей это рассосалось само: `--surface`, `--shadow` и `--line`
+  на острове ночные, поэтому плоское правило `redesign.css` кладёт ночную
+  ступень.
 
   От прежних literals-подложек остаётся одна строка — собственная подложка
   героя бота. Её не даёт ни один токен, потому что это не цвет, а форма:
@@ -2547,34 +2471,30 @@ body:has(.chat-layout) .site-foot { display: none; }
   box-shadow: var(--shadow);
 }
 :root[data-theme="light"] .hero.bot-hero::after { opacity: .34; }
-:root[data-theme="light"] .panel.roles-panel::before,
-:root[data-theme="light"] .quart-page .panel::before { opacity: .45; }
 
 /*
-  ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ: графитовая плашка с почти белой иконкой.
-
-  Кнопка показывает солнце, то есть «ты в дневном режиме», и её фон обязан
-  принадлежать теме, а не beige-наследию. Чернилами служит `--text` — самая
-  тёмная краска темы, но не чёрный: 13,79:1 до иконки из `--bg` и ноль
-  споры с сигнальным оранжевым. Hover подкрашивает иконку акцентом,
-  подмешанным к `--tint`: в дневной теме это осветляет янтарь до 6,13:1,
-  а в ночной тот же токен дал бы затемнение — направление задаёт тема.
+  ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ: тихая поверхность с контуром, как у полей и вторичных
+  кнопок. Прежняя графитовая плашка (`--text` фоном) была самым тёмным пятном
+  страницы и тянула взгляд сильнее навигации, хотя это служебная кнопка.
+  Теперь иконка — `--dim` на `--surface` (7,35:1); hover ведёт к акценту:
+  иконка становится `--accent-ink` (7,04:1 на `--raised-2`), граница
+  подмешивает индиго, фон светлеет на ступень.
 */
 :root[data-theme="light"] .theme-toggle {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--dim);
 }
 :root[data-theme="light"] .theme-toggle:hover {
-  color: color-mix(in srgb, var(--accent) 62%, var(--tint));
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--text));
-  background: var(--text);
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--raised-2);
 }
 
 /*
   Стрелка селекта — единственная краска, которую токен не достает: она
   записана внутри data-URI, а тот не умеет читать переменные. Число здесь
-  равно `--accent-dk`, и правка акцента обязана принести её сюда вручную.
+  равно `--dim`, и правка чернил обязана принести её сюда вручную.
 
   Кольцо фокуса больше не перекрашивается: `controls.css` собирает его из
   `--accent`, а прежняя янтарная цифра (rgba(217,130,43)) была последней,
@@ -2583,7 +2503,7 @@ body:has(.chat-layout) .site-foot { display: none; }
 :root[data-theme="light"] .forum-field select,
 :root[data-theme="light"] .adm-field select,
 :root[data-theme="light"] .adm-form .adm-field select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%23555b64' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%234b525d' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 /* ── Проверка ников ──────────────────────────────────────────────────────────
@@ -2696,7 +2616,7 @@ body:has(.chat-layout) .site-foot { display: none; }
   .forum-verify .forum-btn { width: 100%; min-height: 44px; }
 }
 
-/* ══ Светлая тема: последний слой «Daylight Deck» ═══════════════════════════ */
+/* ══ Светлая тема: дневные правила кнопок, ссылок и админки ═══════════════ */
 
 /*
   ПОЧЕМУ ЭТОТ СЛОЙ КОРОТКИЙ.
@@ -2714,12 +2634,6 @@ body:has(.chat-layout) .site-foot { display: none; }
   направлений смешивания `--shade` / `--tint` — то есть из той же системы, но
   собранной в обратную сторону.
 */
-
-/*
-  ЗЕРНО. На чёрном фоне шум читается как пылинки, на светлом он перемножается
-  с бумагой и желтит всю страницу, поэтому альфа убрана втрое.
-*/
-:root[data-theme="light"] body::after { opacity: .02; mix-blend-mode: multiply; }
 
 /*
   КНОПКИ — одна сигнальная плашка на весь сайт.

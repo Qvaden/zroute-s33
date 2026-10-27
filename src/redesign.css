@@ -3308,17 +3308,49 @@ html body:not([data-route="forum"]):not([data-route="bot"]) .seg--type{
   }
 }
 
-/* Светлая тема: бумага без миллиметровки и без залитых пунктов меню. */
-:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"]){
-  background: var(--bg);
+/* ── Светлая тема: оболочка ────────────────────────────────────────────────
+
+   Фон страницы у обеих тем общий — html body выше. Прежний светлый блок
+   «бумага без миллиметровки» отсюда удалён: сетка жила в refine.css и убрана
+   там же, а display:none на body::before/::after уже стоит глобально.
+
+   Ниже — единственные дневные правила, которых нет в общем строе: колонки,
+   которые на светлой бумаге тонут. Сайдбар и правая колонка форума получают
+   собственную поверхность --surface и тонкую границу, чтобы навигация и
+   «Сводка сервера» не сливались со страницей; хлебные крошки и серый
+   подзаголовок форума приподнимаются до --dim. В ночной теме эти колонки
+   слиты с фоном намеренно — там их не трогаем. */
+
+:root[data-theme="light"] .head__where span{
+  color: var(--dim);
 }
 
-:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"])::before{
-  background: none;
+:root[data-theme="light"] .forum-head__title span{
+  color: var(--dim);
 }
 
-:root[data-theme="light"] body:not([data-route="forum"]):not([data-route="bot"])::after{
-  opacity: 0;
+@media (min-width: 1040px) {
+  :root[data-theme="light"] .side{
+    background: var(--surface);
+  }
+}
+
+@media (min-width: 1180px) {
+  :root[data-theme="light"] .forum-side{
+    padding: 0 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r);
+    background: var(--surface);
+  }
+
+  /* Кромки секций не должны удваиваться с краем карточки. */
+  :root[data-theme="light"] .forum-side > .panel:first-child,
+  :root[data-theme="light"] .forum-side > .hero:first-child{
+    border-top: 0;
+  }
+  :root[data-theme="light"] .forum-side > .panel:last-child{
+    border-bottom: 0;
+  }
 }
 
 :root[data-theme="light"] .nav__link.is-active{
