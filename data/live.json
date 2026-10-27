@@ -118,6 +118,12 @@
       "number": 12,
       "endDate": "2026-10-18",
       "startDate": "2026-10-12"
+    },
+    {
+      "id": "W13",
+      "number": 13,
+      "endDate": "2026-10-25",
+      "startDate": "2026-10-19"
     }
   ],
   "events": [
@@ -821,6 +827,121 @@
       "allianceId": "a32"
     },
     {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a01"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a02"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a03"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a04"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a05"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a06"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a07"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a08"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a09"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a10"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a11"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a12"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a13"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a14"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a15"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a16"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a19"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a20"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a21"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a22"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "win",
+      "allianceId": "a23"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a30"
+    },
+    {
+      "weekId": "W13",
+      "outcome": "loss",
+      "allianceId": "a32"
+    },
+    {
       "weekId": "W2",
       "outcome": "win",
       "allianceId": "a01"
@@ -1881,7 +2002,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-10-26T19:51:26+00",
+  "pulledAt": "2026-10-27T14:36:22+00",
   "alliances": [
     {
       "id": "a01",
