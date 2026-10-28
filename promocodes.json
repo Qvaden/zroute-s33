@@ -1,7 +1,7 @@
 {
-  "updated": "2026-10-27T09:54:59.382Z",
-  "total": 46,
-  "active": 29,
+  "updated": "2026-10-28T10:41:23.902Z",
+  "total": 47,
+  "active": 30,
   "inactive": 17,
   "codes": [
     {
@@ -32,6 +32,12 @@
       "code": "DC90KVSM",
       "status": "active",
       "date": "2026-10-24",
+      "rewards": ""
+    },
+    {
+      "code": "DC95KSDJH",
+      "status": "active",
+      "date": "2026-10-28",
       "rewards": ""
     },
     {
