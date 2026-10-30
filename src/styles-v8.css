@@ -2431,23 +2431,22 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   появлялись пятна, которые тест темы не видит.
 */
 .quart-page {
-  --quart-ink: #11150d;
+  --quart-ink: #0f1020;
   /*
     Тихая подпись ночной палитры: номер места и подпись «очки».
-    Прежний #66816a читался на подложке карточки за 3,85 : 1, а #6d856e — за
-    4,43 : 1: обе пары не дотягивали до AA, хотя глаз видел их «почти
-    читаемыми». #7d9a76 держит 5,28 : 1 на худшей подложке острова.
+    Худшая подложка — пластина #15161f: на ней подпись держит 6,01 : 1,
+    на странице — 6,57 : 1.
   */
-  --quart-quiet: #7d9a76;
-  --quart-head: #f0f6ea;   /* заголовок и имя: самая светлая ступень острова */
-  --quart-body: #bcc9b2;   /* бегущий текст и значения без медали */
-  --quart-plate: #17201a;  /* верхняя ступень подложки пластин */
-  --quart-plate-lo: #0f1412;
-  --quart-edge: #2b3a2e;   /* кромка пластин и полей управления */
-  --quart-led: #394735;    /* погасший светодиод легенды */
-  --quart-loss: #ff7782;   /* серия поражений */
-  --quart-acid: #d3a6ff;
-  --quart-cyan: #9f86c9;
+  --quart-quiet: #8f95a5;
+  --quart-head: #f2f3f7;   /* заголовок и имя: самая светлая ступень */
+  --quart-body: #c2c5d0;   /* бегущий текст и значения без медали */
+  --quart-plate: #15161f;  /* верхняя ступень подложки пластин */
+  --quart-plate-lo: #0f1017;
+  --quart-edge: #2b2d3c;   /* кромка пластин и полей управления */
+  --quart-led: #3a3d4d;    /* погасший светодиод легенды */
+  --quart-loss: #ff7a86;   /* серия поражений */
+  --quart-acid: #a7a9ff;
+  --quart-cyan: #86dfd2;
   position: relative;
   margin-bottom: var(--s-3);
 }
@@ -2648,18 +2647,17 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
   padding: var(--s-2) var(--s-2) var(--s-2) var(--s-1);
   border: 1px solid var(--quart-edge);
   border-radius: var(--r-lg);
-  background: rgba(11,18,13,.65);
+  background: color-mix(in srgb, var(--quart-plate) 65%, transparent);
   color: inherit;
   text-decoration: none;
   transition: transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
 }
-.quart-podium-card:hover { transform: translateY(-3px); border-color: var(--quart-acid); background: rgba(29,45,27,.9); }
-.quart-podium-card--gold { border-color: color-mix(in srgb, var(--violet) 62%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--violet) 15%, transparent), rgba(10,18,12,.62) 68%); }
-.quart-podium-card--silver { border-color: color-mix(in srgb, var(--electric) 35%, transparent); }
-/* Пьедестал сидит на том же тёмном острове, что и плитки списка, поэтому его
-   тихие подписи берут тот же `--quart-quiet`, а не три отдельных зелёных тона,
-   которые тут когда-то подобрали вручную. Промер телефона это и вскрыл: номер
-   места «02» на #6f8b6a дал 4,29 : 1 вместо 4,5. */
+.quart-podium-card:hover { transform: translateY(-3px); border-color: var(--quart-acid); background: color-mix(in srgb, var(--quart-plate) 90%, transparent); }
+.quart-podium-card--gold { border-color: color-mix(in srgb, var(--quart-acid) 62%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--quart-acid) 15%, transparent), color-mix(in srgb, var(--quart-plate-lo) 62%, transparent) 68%); }
+.quart-podium-card--silver { border-color: color-mix(in srgb, var(--quart-cyan) 35%, transparent); }
+/* Тихое место «02» и подпись «очки» берут общий `--quart-quiet`, а не три
+   отдельных ручных тона: промер телефона показал, что прежний свой цвет
+   подписи давал 4,29 : 1 вместо 4,5. */
 .quart-podium-card__place { grid-area: place; color: var(--quart-quiet); font-family: Unbounded, sans-serif; font-size: var(--fs-meta); text-align: center; }
 .quart-podium-card--gold .quart-podium-card__place { color: var(--quart-acid); }
 .quart-podium-card__medal { grid-area: medal; color: var(--quart-quiet); font-size: 19px; }
@@ -2684,9 +2682,9 @@ a.lad__row:hover .lad__name { color: color-mix(in oklab, var(--tag-color, var(--
 }
 .quart-card:hover { transform: translateY(-4px);   }
 .quart-card--off { opacity: .44; }
-.quart-card--m1 { border-color: color-mix(in srgb, var(--violet) 65%, transparent); box-shadow: inset 0 2px 0 var(--quart-acid); }
-.quart-card--m2 { border-color: color-mix(in srgb, var(--electric) 45%, transparent); }
-.quart-card--m3 { border-color: rgba(139,168,148,.46); }
+.quart-card--m1 { border-color: color-mix(in srgb, var(--quart-acid) 65%, transparent); box-shadow: inset 0 2px 0 var(--quart-acid); }
+.quart-card--m2 { border-color: color-mix(in srgb, var(--quart-cyan) 45%, transparent); }
+.quart-card--m3 { border-color: color-mix(in srgb, var(--quart-quiet) 46%, transparent); }
 .quart-card__top, .quart-card__bottom { display: flex; align-items: center; justify-content: space-between; gap: var(--s-1); }
 .quart-card__rank { color: var(--quart-quiet); font-family: Unbounded, sans-serif; font-size: var(--fs-eyebrow); }
 .quart-card--m1 .quart-card__rank { color: var(--quart-acid); }

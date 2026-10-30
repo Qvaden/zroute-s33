@@ -4182,24 +4182,30 @@ html .quart-board__head p{
   font-size: 11px;
 }
 
-html .quart-controls{
+/*
+  Селекторы ниже нарочно несут `body[data-route="quarter"]`: общая редакционная
+  правка чипов (`html body:not([data-route="forum"]):not([data-route="bot"])`)
+  по весу ровно равна им, а стоит в файле выше, — без этого префикса чипы Кварта
+  оставались на акценте сайта, и цвет страницы до них не доходил.
+*/
+html body[data-route="quarter"] .quart-controls{
   margin: 18px 0 0;
   padding: 0 0 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 14%, transparent);
 }
 
-html .quart-controls .search{
+html body[data-route="quarter"] .quart-controls .search{
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--quart-head) 18%, transparent);
   border-radius: 0;
   background: transparent;
 }
 
-html .quart-controls .search input{
+html body[data-route="quarter"] .quart-controls .search input{
   color: var(--quart-head);
 }
 
-html .quart-controls .seg{
+html body[data-route="quarter"] .quart-controls .seg{
   gap: 0;
   padding: 0;
   border: 0;
@@ -4208,7 +4214,7 @@ html .quart-controls .seg{
   background: transparent;
 }
 
-html .quart-controls .seg__btn{
+html body[data-route="quarter"] .quart-controls .seg__btn{
   min-height: 32px;
   padding: 4px 10px;
   border: 0;
@@ -4218,7 +4224,11 @@ html .quart-controls .seg__btn{
   font-size: 10px;
 }
 
-html .quart-controls .seg__btn.is-on{
+html body[data-route="quarter"] .quart-controls .seg__btn:not(.is-on):hover{
+  color: var(--quart-acid);
+}
+
+html body[data-route="quarter"] .quart-controls .seg__btn.is-on{
   background: transparent;
   color: var(--quart-head);
   box-shadow: inset 0 -1px 0 var(--quart-acid);
