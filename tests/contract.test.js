@@ -13002,10 +13002,10 @@ console.log('\nAN. Доска аккаунтов');
   */
   check('телефон: шапка и сетка складываются в одну колонку, а кнопки становятся во всю ширину',
     /@media \(max-width: 759px\)[\s\S]{0,1200}?\.accounts-hero \{ grid-template-columns: 1fr;[\s\S]{0,900}?\.accounts-grid \{ grid-template-columns: 1fr;[\s\S]{0,700}?\.accounts-act \{ min-height: 44px/.test(cssSrc));
-  check('главное действие витрины остаётся общей кнопкой сайта, но краску берёт бирюзовую',
+  check('главное действие витрины — ссылка-действие без плашки, а плашку носит только кнопка формы',
     /class="forum-btn forum-btn--primary accounts-hero__cta"/.test(boardSrc)
       && /class="forum-btn forum-btn--ghost accounts-hero__cta"/.test(boardSrc)
-      && /\.accounts-hero \.accounts-hero__cta \{[^}]*background: linear-gradient\(135deg, color-mix\(in srgb, var\(--shop\)[^}]*color: var\(--shop-ink\)/.test(cssSrc)
+      && !/\.accounts-hero \.accounts-hero__cta \{[^}]*background/.test(cssSrc)
       && /\.accounts-composer \.forum-btn--primary \{[^}]*color: var\(--shop-ink\)/.test(cssSrc));
 
   /* ── Правила форума: доска не отменила запрет торговли в ленте ── */
@@ -16272,9 +16272,9 @@ console.log('\nAO. Раздел — страница');
     ступеней до шести, сломал бы её не затем, что стало нечитаемо, а затем, что
     стало другое число. Порог не меняется — значит проверяем порог, а не номер.
 
-    Тёмные «острова» внутри дневной темы — отдельный случай: они сидят на
-    светлой странице, но чернила у них ночные, и сверку острова с ночной темой
-    держит секция BB.
+    Тёмный «остров» в дневной теме остался один — студия подбора своего цвета
+    в панели: она сидит на светлой странице, но чернила у неё ночные, и сверку
+    студии с ночной темой держит секция BB.
   */
   {
     const th = themeTokens(v8);
@@ -16288,8 +16288,6 @@ console.log('\nAO. Раздел — страница');
         Boolean(t) && SURFACES.every((s) => contrast(t[s], t['--mute']) >= 4.5),
         `худшая ${w.s} — ${w.c.toFixed(2)}:1`);
     }
-    check('--mute объявлен и на тёмных островах дневной темы',
-      /--mute:\s*#[0-9a-f]{6}\s*;/.test(refine));
   }
 
   /*
@@ -17856,11 +17854,15 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
   /* ── Краска в светлой теме держится против чужого каскада ──
      `refine.css` грузится ПОЗЖЕ `forum.css` и перекрашивает всякую `.forum-btn`
      в сигнальную плашку темы правилом `(0,3,0)`. Равенство специфичности там
-     проиграно заранее, поэтому слой доски обязан быть сильнее — и по числу
-     классов, и по порядку. Слой молча отваливается от любой правки селектора,
-     а глаз видит это как «доска стала оранжевой», то есть как потерю всей идеи
-     раздела. */
+     проиграно заранее, поэтому кнопка отправки формы обязана быть сильнее — и
+     по числу классов, и по порядку. Слой молча отваливается от любой правки
+     селектора, а глаз видит это как «доска стала оранжевой», то есть как
+     потерю всей идеи раздела.
+
+     Главное действие в шапке плашки не носит вовсе: его красит общая отделка
+     ссылкой-действием — акцентный текст с подчёркиванием в обеих темах. */
   const refineSrc = await readFile('src/refine.css', 'utf8');
+  const redesignSrc = await readFile('src/redesign.css', 'utf8');
   const htmlSrc = await readFile('index.html', 'utf8');
   const cssFlat = cssSrc.replace(/\r\n/g, '\n');
   const accentPlate = /:root\[data-theme="light"\] \.forum-btn,/.test(refineSrc);
@@ -17871,23 +17873,36 @@ console.log('\nAU. Витрина продаж: имя, краска и своё
     htmlSrc.search(/href="\.\/src\/forum\.css/) < htmlSrc.search(/href="\.\/src\/refine\.css/)
       && htmlSrc.includes('href="./src/forum.css') && htmlSrc.includes('href="./src/refine.css'));
 
-  const lightLayer = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta,\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary \{([^}]*)\}/.exec(cssFlat);
-  const lightHover = /:root\[data-theme="light"\] \.accounts-hero \.accounts-hero__cta:hover:not\(:disabled\),\n:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary:hover:not\(:disabled\) \{([^}]*)\}/.exec(cssFlat);
+  const lightLayer = /:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary \{([^}]*)\}/.exec(cssFlat);
+  const lightHover = /:root\[data-theme="light"\] \.accounts-composer \.forum-btn--primary:hover:not\(:disabled\) \{([^}]*)\}/.exec(cssFlat);
   const pick = (m, what) => (m ? new RegExp(`${what}:\\s*([^;]+);`).exec(m[1]) : null);
-  check('две залитые кнопки доски в светлой теме держат бирюзу и свои чернила, а не янтарь',
+  check('кнопка формы в светлой теме держит бирюзу и свои чернила, а не янтарь',
     Boolean(lightLayer) && /var\(--shop\)/.test(lightLayer ? lightLayer[1] : '')
       && /var\(--shop-ink\)/.test(lightLayer ? lightLayer[1] : '')
       && !/a94722|c86231|b95428|8e381b/i.test(lightLayer ? lightLayer[1] : ''));
-  check('hover этих же кнопок тоже перебит, а не остался янтарным',
+  check('hover этой кнопки тоже перебит, а не остался янтарным',
     Boolean(lightHover) && /var\(--shop-ink\)/.test(lightHover ? lightHover[1] : '')
       && !/a94722|c86231|b95428|8e381b/i.test(lightHover ? lightHover[1] : ''));
+
+  /*
+     Главное действие шапки — ссылка-действие отделки: ни плашки, ни тени,
+     акцентный текст с подчёркиванием. Проверка держит обе половины обещания:
+     отделка так его и красит, а forum.css больше не возвращает ему плашку.
+  */
+  const ghost = /html body:not\(\[data-route="forum"\]\):not\(\[data-route="bot"\]\) \.accounts-hero__cta\{([\s\S]{0,900}?)\n\}/.exec(redesignSrc)?.[1] ?? '';
+  check('главное действие шапки — ссылка-действие без плашки, одинаково в обеих темах',
+    /background: transparent/.test(ghost) && /color: var\(--accent-ink\)/.test(ghost)
+      && /border-bottom: 1px solid var\(--accent\)/.test(ghost)
+      && !/background: linear-gradient/.test(ghost)
+      && !/\.accounts-hero \.accounts-hero__cta \{/.test(cssSrc));
+
   /*
      refine кладёт на `.forum-btn` янтарную рамку и коричневую тень. Если слой
      доски возвращает только фон с чернилами, получается бирюзовая плашка в
      оранжевом обводе: глаз читает её как обычную кнопку сайта, и смысл раздела
      теряется на самой заметной кнопке.
   */
-  check('рамка и тень кнопок доски в светлой теме тоже свои, а не янтарный обвод вокруг бирюзы',
+  check('рамка и тень кнопки формы в светлой теме тоже свои, а не янтарный обвод вокруг бирюзы',
     Boolean(lightLayer) && Boolean(lightHover)
       && /border-color:\s*color-mix\(in srgb, var\(--shop\)/.test(lightLayer[1])
       && /box-shadow:[\s\S]{0,200}?var\(--shop\)/.test(lightLayer[1])
@@ -19610,50 +19625,39 @@ console.log('\nBA. Границы ширины: ряд в одном источ�
     `min: ${[...admMin].sort((a, b) => a - b).join(', ')} | max: ${[...admMax].sort((a, b) => a - b).join(', ')}`);
 }
 
-/* ── BB. Тёмные острова дневной темы зеркалят ночную ─────────────────────────
+/* ── BB. Светлая тема без ночных островов ───────────────────────────────────
 
-   Остров два. Первый — пять блоков справочника и Кварта (герой, карточка,
-   панель ролей, дополнительная карточка гайда, страница Кварта): они ночные
-   только тогда, когда ночной стала вся страница, поэтому каждый спрятан под
-   признаком темы. Второй — студия подбора своего цвета в панели: она ночная
-   всегда и в базовом правиле, потому что образец оттенка нельзя оценивать на
-   том же фоне, который этот оттенок и заполнит.
+   Раньше в дневной странице жил «остров»: пять блоков справочника и Кварта
+   перекрашивались в ночную тему целиком — списком из восьмидесяти токенов.
+   Владелец увидел результат и попросил светлую тему без ночных плит: остров
+   перебивал отделку на уровне элемента, и чёрные карточки стояли посреди
+   бумажной страницы. Теперь эти блоки берут общую лестницу, а собственные
+   числа остались только у Кварта — его палитра `--quart-*`, дневная половина
+   которой объявлена в refine.css.
 
-   И у того, и у другого опасность одна, и она тихая. Кто-то поднимает в
-   `styles-v8.css` ступень `--raised` на шаг, а на острове остаётся старое
-   число: правый край ленты светлеет, остров нет, и разницу видно на одном
-   экране из двух. Второй сценарий хуже первого: остров перезадаёт девять
-   красок, а композиты и тени докрашивает отдельным правилом ниже по файлу — и
-   тогда любой новый токен темы проходит мимо острова вовсе.
-
+   Студия подбора своего цвета в панели ночная всегда и в базовом правиле:
+   образец оттенка нельзя оценивать на том же фоне, который этот оттенок и
+   заполнит. Опасность у неё прежняя и тихая: кто-то поднимает в
+   `styles-v8.css` ступень `--raised` на шаг, а в студии остаётся старое число.
    Поэтому сверка идёт с двух сторон: список имён обязан совпасть со списком
    дневного блока, а каждое значение — с ночным корнем. Композиты сравниваются
-   по способу объявления, а не по результату: `var()` внутри объявления
-   считается на том элементе, где стоит объявление, и только так плашка острова
-   собирается из ночных ступеней, а не из тех, что посчитал корень.
+   по способу объявления: `var()` внутри объявления считается на том элементе,
+   где стоит объявление.
 ────────────────────────────────────────────────────────────────────────────── */
-console.log('\nBB. Тёмные острова дневной темы зеркалят ночную');
+console.log('\nBB. Светлая тема без ночных островов, студия подбора — ночная');
 {
   const { readFile } = await import('node:fs/promises');
   const v8 = await readFile('src/styles-v8.css', 'utf8');
 
   /*
-     Острова два и они разного типа. Остров справочника прячется под признаком
-     дневной темы: он ночной только когда ночной стала вся страница. Окно
-     подбора своего цвета в панели ночное всегда — человек оценивает оттенок на
-     нейтрально-тёмной студии, и в дневной теме светлая плашка рядом с его же
-     цветом начинает спорить с образцом. Поэтому у него базовое правило без
-     признака темы. Проверка одна для обоих: имена токенов — как у дневного
-     корня, значения — как у ночного.
+     Остров остался один — студия подбора своего цвета в панели. Она ночная
+     всегда: человек оценивает оттенок на нейтрально-тёмной студии, и в дневной
+     теме светлая плашка рядом с его же цветом начинает спорить с образцом.
+     Поэтому у неё базовое правило без признака темы. Проверка одна для обоих
+     типов острова: имена токенов — как у дневного корня, значения — как у
+     ночного.
   */
   const ISLANDS = [
-    {
-      name: 'остров справочника',
-      file: 'src/refine.css',
-      marker: ':root[data-theme="light"] .bot-hero,',
-      selectors: ['.bot-hero', '.bot-feature', '.roles-panel', '.guide-extra-card', '.quart-page'],
-      scoped: true,
-    },
     {
       name: 'студия выбора цвета в панели',
       file: 'src/admin/admin.css',
@@ -19724,6 +19728,44 @@ console.log('\nBB. Тёмные острова дневной темы зерк�
     check(`${isl.name}: остров объявляет свою цветовую схему — системные контролы внутри него ночные`,
       /color-scheme:\s*dark/.test(body));
   }
+
+  /*
+     Пять блоков, ради которых остров и существовал, обязаны вернуться на
+     общую лестницу: иначе чёрная плита снова встанет посреди светлой
+     страницы. Проверок две — старая ночь ушла целиком, и отделка кладёт
+     дневные ступени именно на эти блоки.
+  */
+  const refine = await readFile('src/refine.css', 'utf8');
+  const redesign = await readFile('src/redesign.css', 'utf8');
+  check('ночной набор ушёл из светлой темы целиком: ни токенов, ни ночной схемы',
+    !refine.includes(':root[data-theme="light"] .bot-hero,')
+      && !/color-scheme:\s*dark/.test(refine));
+
+  const paint = [
+    ['герой бота', /html body\[data-route="bot"\] \.bot-hero\{[\s\S]{0,500}?background: var\(--bg\)/],
+    ['карточка бота', /html body\[data-route="bot"\] \.bot-feature\{[\s\S]{0,500}?background: var\(--bg\)/],
+    ['панель ролей', /html body\[data-route="guide"\] \.roles-panel\{[\s\S]{0,400}?background: var\(--surface\)/],
+    ['карточка гайда', /html body\[data-route="guide"\] \.guide-extra-card\{[\s\S]{0,500}?background: var\(--surface\)/],
+    ['страница Кварта', /html body\[data-route="quarter"\] \.quart-page\{[\s\S]{0,200}?background: var\(--bg\)/],
+  ];
+  check('отделка красит пять блоков токенами темы, а не островной ночью',
+    paint.every(([, re]) => re.test(redesign)),
+    paint.filter(([, re]) => !re.test(redesign)).map(([name]) => name).join(', ') || 'все на лестнице');
+
+  /*
+     У Кварта палитра своя, но половина у неё теперь дневная. Проверка держит
+     две вещи: список имён (ровно одиннадцать, все `--quart-*`) и форму
+     значения (гекс, а не ссылка на ночное число, иначе день унаследует ночь).
+  */
+  const qAt = refine.indexOf(':root[data-theme="light"] .quart-page {');
+  const qBody = qAt < 0 ? '' : refine.slice(refine.indexOf('{', qAt) + 1, refine.indexOf('\n}', qAt));
+  const qNames = [...qBody.matchAll(/(--[\w-]+):/g)].map((m) => m[1]);
+  check('дневная палитра Кварта — ровно одиннадцать чисел --quart-*, без чужих токенов',
+    qNames.length === 11 && qNames.every((n) => n.startsWith('--quart-')),
+    `объявлено: ${qNames.join(', ') || 'ничего'}`);
+  check('дневные числа Кварта вписаны гексами, а не ссылками на ночные',
+    qNames.length === 11
+      && [...qBody.matchAll(/--quart-[a-z-]+:\s*([^;]+);/g)].every((m) => /^#[0-9a-f]{6}$/.test(m[1].trim())));
 }
 
 /* ── BC. Слои и кегль: числа живут в ряду, а не в правилах ──────────────────
@@ -20893,12 +20935,12 @@ console.log('\nBJ. Цвет текста участника: имя роли в�
       && /toneHex\(tone, document\.documentElement\.getAttribute\('data-theme'\)\)/.test(editorSrc)
       && /range\.extractContents\(\)/.test(editorSrc));
 
-  /* Тёмные острова (окно подбора в панели, остров справочника) ночные и в
-     дневной теме — значит ряд там обязан остаться ночным, иначе образец
-     красится дневными чернилами на ночной подложке. Секция BB сверяет имена
-     токенов острова с дневным корнем; здесь — что числа именно ночные. */
+  /* Студия подбора в панели ночная и в дневной теме — значит ряд там обязан
+     остаться ночным, иначе образец красится дневными чернилами на ночной
+     подложке. Секция BB сверяет имена токенов студии с дневным корнем;
+     здесь — что числа именно ночные. Справочник и Кварт больше не острова:
+     они берут дневную лестницу, и ряд цветов текста у них дневной. */
   const islands = [
-    ['src/refine.css', ':root[data-theme="light"] .bot-hero,'],
     ['src/admin/admin.css', '.guide-color-picker,'],
   ];
   for (const [file, marker] of islands) {
@@ -21011,38 +21053,42 @@ console.log('\nBK. Следы прежних красок: у каждого ч�
   check('в правилах острова не осталось чисел: вся палитра в блоке токенов', strays.length === 0, strays.join(' | '));
 
   /*
-    Контраст чернил острова. Подложек не две, а пять: верхняя пластина,
-    подложка героя, композит призовой карты и две декоративные подсветки героя.
-    Считаются они от чисел острова, а не от памяти о них, поэтому правка
-    `--quart-plate` или силы подсветки уронит проверку, а не экран.
+    Контраст чернил Кварта. Палитра живёт в двух блоках: ночной в
+    styles-v8.css и дневной в refine.css. Отделка гасит градиенты героя и
+    призовой карты, поэтому проверяются настоящие плоские подложки темы:
+    страница (`--bg`), пластина палитры, её нижняя ступень и подсветка строки
+    при наведении (3 % чернил на странице). Считается от чисел темы, а не от
+    памяти о них, поэтому правка ступени роняет проверку, а не экран.
   */
   const qt = {};
   for (const m of /\.quart-page\s*\{([^}]*)\}/.exec(v8)[1].matchAll(/(--quart-[a-z-]+):\s*(#[0-9a-f]{6})/g)) qt[m[1]] = m[2];
   const refine = code['src/refine.css'];
   const at = refine.indexOf(':root[data-theme="light"] .quart-page {');
-  const island = refine.slice(refine.indexOf('{', at) + 1, refine.indexOf('\n}', at));
+  const dayRaw = at < 0 ? '' : refine.slice(refine.indexOf('{', at) + 1, refine.indexOf('\n}', at));
+  const dayQt = {};
+  for (const m of dayRaw.matchAll(/(--quart-[a-z-]+):\s*(#[0-9a-f]{6})/g)) dayQt[m[1]] = m[2];
   const comp = (fg, alpha, bg) => {
     const c = (h, i) => parseInt(h.slice(i, i + 2), 16);
     return '#' + [1, 3, 5].map((i) => Math.round(c(fg, i) * alpha + c(bg, i) * (1 - alpha)).toString(16).padStart(2, '0')).join('');
   };
-  const tintOf = (name) => new RegExp(`--${name}:(\\s*)(#[0-9a-f]{6})`).exec(island.replace(/\s+/g, ''))?.[2];
-  const plateLo = qt['--quart-plate-lo'];
-  const surfaces = {
-    'пластина': qt['--quart-plate'],
-    'подложка героя': plateLo,
-    'призовая карта': comp('#0b120d', 0.65, qt['--quart-plate']),
-    'герой с лиловой подсветкой': comp(tintOf('violet'), 0.16, plateLo),
-    'герой с бирюзовой подсветкой': comp(tintOf('electric'), 0.15, plateLo),
-  };
+  const th = themeTokens(v8);
   const inks = ['--quart-head', '--quart-body', '--quart-quiet', '--quart-loss', '--quart-acid', '--quart-cyan'];
-  for (const name of inks) {
-    const worst = Object.entries(surfaces).reduce((a, [k, s]) => (contrast(qt[name], s) < a.v ? { k, v: contrast(qt[name], s) } : a), { k: '', v: 99 });
-    check(`${name} читается на худшей подложке острова (AA 4,5)`,
-      worst.v >= 4.5, `${worst.k}: ${(worst.v || 0).toFixed(2)}:1`);
+  for (const [theme, palette, tokens] of [['ночь', qt, th.dark], ['день', dayQt, th.light]]) {
+    const surfaces = {
+      'страница': tokens['--bg'],
+      'пластина': palette['--quart-plate'],
+      'нижняя пластина': palette['--quart-plate-lo'],
+      'строка при наведении': comp(palette['--quart-head'], 0.03, tokens['--bg']),
+    };
+    for (const name of inks) {
+      const worst = Object.entries(surfaces).reduce((a, [k, s]) => (contrast(palette[name], s) < a.v ? { k, v: contrast(palette[name], s) } : a), { k: '', v: 99 });
+      check(`${theme}: ${name} читается на худшей подложке Кварта (AA 4,5)`,
+        worst.v >= 4.5, `${worst.k}: ${(worst.v || 0).toFixed(2)}:1`);
+    }
+    check(`${theme}: чернила на лиловой плашке читаются`,
+      contrast(palette['--quart-ink'], palette['--quart-acid']) >= 4.5,
+      `${contrast(palette['--quart-ink'], palette['--quart-acid']).toFixed(2)}:1`);
   }
-  check('активная кнопка ряда: тёмные чернила на лиловой плашке читаются',
-    contrast(qt['--quart-ink'], qt['--quart-acid']) >= 4.5,
-    `${contrast(qt['--quart-ink'], qt['--quart-acid']).toFixed(2)}:1`);
 
   const mobile = code['src/admin/admin-mobile.css'];
   check('липкая строка кнопок панели тонется в ступени окна, а не в графите',

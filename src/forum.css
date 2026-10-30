@@ -3697,10 +3697,13 @@
 
   `refine.css` перекрашивает все сайтные кнопки в янтарь правилом
   `:root[data-theme="light"] .forum-btn`. Оно сильнее наших двухклассных правил
-  и стоит в списке файлов позже, поэтому без этого блока главная кнопка доски
-  в светлой теме осталась бы оранжевой копией кнопки форума — ровно тем, от чего
-  доска отличается. Держим краску правилом на класс сильнее, и заодно перебиваем
-  янтарный hover.
+  и стоит в списке файлов позже, поэтому без этого блока кнопка «Выставить»
+  в форме объявления осталась бы оранжевой копией кнопки форума. Держим краску
+  правилом на класс сильнее, и заодно перебиваем янтарный hover.
+
+  Главное действие в шапке сюда не входит: это ссылка-действие общей отделки
+  (redesign.css) — аккуратный текст с подчёркиванием, без плашки, одинаково в
+  обеих темах. Плашка осталась только у кнопки, которая отправляет форму.
 
   Градиент уходит в затемнение, а не в белёсый угол, как в тёмной теме: угол,
   осветлённый на 22 % в сторону белого (#408278), дал бы местным чернилам
@@ -3715,7 +3718,6 @@
   обводе — то есть доска теряла свою краску ровно там, где её видно первой,
   и глаз считывал это как «обычная кнопка сайта», а не как витрина.
 */
-:root[data-theme="light"] .accounts-hero .accounts-hero__cta,
 :root[data-theme="light"] .accounts-composer .forum-btn--primary {
   background: linear-gradient(135deg, var(--shop), color-mix(in srgb, var(--shop) 82%, var(--shade)));
   color: var(--shop-ink);
@@ -3723,7 +3725,6 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tint) 18%, transparent),
     0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
 }
-:root[data-theme="light"] .accounts-hero .accounts-hero__cta:hover:not(:disabled),
 :root[data-theme="light"] .accounts-composer .forum-btn--primary:hover:not(:disabled) {
   background: linear-gradient(180deg, color-mix(in srgb, var(--shop) 90%, var(--tint)), var(--shop));
   color: var(--shop-ink);
@@ -3838,27 +3839,6 @@
   background: var(--shop-soft);
 }
 .accounts-stat--screen dd { color: var(--shop); }
-/*
-  Кнопка в шапке — общая сайтная, поэтому её форма перебивается слоем
-  отделки: у `.forum-btn` свои углы, и правило той же силы, стоящее ниже в
-  списке файлов, побеждает. Плашка здесь написана двумя классами — иначе
-  главное действие витрины выглядело бы прямоугольным рядом с круглыми чипами.
-
-  Краска у кнопки своя, бирюзовая: `.forum-btn` по умолчанию оранжевый, и без
-  этой правки главная кнопка доски была бы копией кнопки форума. Чернила
-  (`--shop-ink`) берутся из той же темы, что и фон плашки, поэтому надпись
-  читается и в тёмной, и в светлой.
-*/
-.accounts-hero .accounts-hero__cta {
-  border-radius: var(--r-pill);
-  padding: var(--s-2) var(--s-4);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--shop) 78%, var(--tint)), var(--shop));
-  color: var(--shop-ink);
-  box-shadow: 0 8px 22px -14px color-mix(in srgb, var(--shop) 85%, transparent);
-}
-.accounts-hero .accounts-hero__cta:hover:not(:disabled) { box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--shop) 80%, transparent); }
-.accounts-hero .accounts-hero__cta:focus-visible { outline-color: var(--shop); }
-
 /*
   Правила одним абзацем: кант бирюзовый, как у всей доски, а полоса слева
   золотая — про то, что речь про деньги и договор. Две краски в одном блоке

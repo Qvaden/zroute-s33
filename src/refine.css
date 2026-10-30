@@ -2313,10 +2313,6 @@ body:has(.chat-layout) .site-foot { display: none; }
   box-shadow: inset 3px 0 0 var(--gold), var(--shadow-1);
 }
 
-/* Кварт-герой живёт внутри тёмного «острова» .quart-page — там правим
-   только тень, рамка островная. */
-:root[data-theme="light"] .quart-hero { box-shadow: var(--shadow-3); }
-
 /*
   Поповеры, модалки, меню и тосты больше не перекрашиваются под светлую тему
   отдельной тенью: их базовые правила берут `--overlay` и `--shadow-3`, а эти
@@ -2328,111 +2324,36 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 
 /*
-  ТЁМНЫЕ ОСТРОВА — ЭТО НОЧНАЯ ТЕМА ЦЕЛИКОМ, А НЕ ВЫКРАШЕННЫЙ КУСОК.
+  СВЕТЛАЯ ТЕМА БЕЗ НОЧНЫХ ОСТРОВОВ.
 
-  Остров живёт внутри дневной страницы, поэтому он не может брать ни один
-  токен у темы-хозяина: `--surface`, тень, плашка, направление смешивания и
-  даже блик у него свои. Раньше остров перезадвал девять красок, а остальное
-  докрашивал literals-правилами ниже по файлу, и правка любой ступени в
-  `styles-v8.css` оставляла на острове старое пятно. Теперь перечислено всё,
-  что перезадаёт дневной блок, — ровно тем же списком имён. Секция BB в
-  тестах сверяет каждую строку с ночной темой: разошлись — падает проверка.
+  Пять блоков — герой и карточки бота, панель ролей справочника,
+  дополнительная карточка и страница Кварта — раньше перекрашивались в ночную
+  тему целиком: список из восьмидесяти токенов повторял тёмный корень. В
+  светлой теме это давало чёрные плиты на бумажной странице, а отделка
+  (redesign.css), рассчитанная на общую лестницу, не могла их вернуть: остров
+  перебивал её на уровне элемента. Теперь блоки берут токены темы — `--bg`,
+  `--surface`, `--line` — и в светлой теме светлые.
 
-  Две вещи здесь нарочно НЕ повторяются:
-  — `--shade` и `--tint` разворачиваются на месте острова, а не наследуются
-    с корня, иначе смешивание пошло бы вверх по дневной лестнице;
-  — композитные токены (`--plate-grad`, `--accent-plate`, `--shimmer`, тени)
-    переписаны формулой, а не значением: `var()` внутри объявления считается
-    на том элементе, где объявление стоит, и только поэтому плашка острова
-    собирается из ночных ступеней, а не из тех, что посчитал корень.
+  Собственная палитра осталась только у Кварта: он один живёт вне общей
+  лестницы и считает поверхности от чисел `--quart-*`. Ночные числа объявлены
+  базовым правилом в styles-v8.css, здесь — дневные. Они выбраны так, чтобы
+  каждая подпись держала AA на самой светлой подложке страницы: тихая
+  #5a626e — 5,31:1, серия поражений #c0393f — 4,64:1, лиловый акцент
+  #4e3b80 — 7,99:1, бирюза #0f6a60 — 5,56:1, чернила на лиловой плашке
+  #ffffff — 9,29:1. Секция BK сверяет это замером, а не на глаз.
 */
-:root[data-theme="light"] .bot-hero,
-:root[data-theme="light"] .bot-feature,
-:root[data-theme="light"] .roles-panel,
-:root[data-theme="light"] .guide-extra-card,
 :root[data-theme="light"] .quart-page {
-  --recessed:  #06080b;
-  --bg:        #090b0f;
-  --surface:   #10141a;
-  --raised:    #151a21;
-  --raised-2:  #1c222b;
-  --overlay:   #252b34;
-  --line:      #272e38;
-  --line-soft: #1a2028;
-
-  --text:      #f1f5f9;
-  --dim:       #94a3b8;
-  /* Тот же порог AA, что и в основной тёмной теме: подпись острова держит
-     4,68:1 на верхнем слое окна. Остров остаётся островом — меняется только
-     подпись. */
-  --mute:      #8695ab;
-  --silver:    #b8c0ca;
-  --link:      #a5b4fc;
-  --blogger:   #31c5b5;
-
-  --accent:    #6165f0;
-  --accent-dk: #5f63ec;
-  --accent-hi: #818cf8;
-  --accent-ink: #6165f0;
-  --on-accent: #ffffff;
-  --on-accent-hi: #090b0f;
-  --on-role:   #090b0f;
-  --accent-orange:     #f97316;
-  --accent-orange-ink: #f97316;
-  --on-orange:         #090b0f;
-  --gold:      #d8b26a;
-  --gold-ink:  #d8b26a;
-  --bronze:    #c99a72;
-  --win:       #22c55e;
-  --loss:      #ef4444;
-  --win-ink:  color-mix(in oklab, var(--win) 85%, var(--text));
-  --loss-ink: color-mix(in oklab, var(--loss) 85%, var(--text));
-  --tag-ink-keep: 70%;
-
-  /*
-    Ряд цвета текста, который выбирает участник (`.mdc--*` в forum.css), внутри
-    острова обязан остаться ночным: остров — тёмная подложка и в дневной теме, а
-    дневная половина ряда на ней даёт 1,2…1,9:1. Токены переписываются здесь, а
-    не правилам `.mdc--*`: правило одно на обе темы, а краску диктует слой.
-  */
-  --mdc-red:    #ff6b6b;
-  --mdc-orange: #ff9a4a;
-  --mdc-gold:   #ffc93c;
-  --mdc-green:  #4fd98a;
-  --mdc-teal:   #5ce0dd;
-  --mdc-blue:   #6fa8ff;
-  --mdc-violet: #b78cff;
-  --mdc-grey:   #9aa4b2;
-  --mdc-chalk:  #ffffff;
-  --electric: #9ea8b6;
-  --violet:   #b49cff;
-  --violet-ink: #c6b6ff;
-  --electric-ink: #081011;
-  --electric-hi:  #b9fff4;
-  --soft-ok:   #9be9bd;
-  --soft-bad:  #ffb3ba;
-  --soft-warn: #ffe1a3;
-  --hud-grid:    rgba(150,175,210,.055);
-  --hud-line: color-mix(in srgb, var(--electric) 20%, transparent);
-
-  --shade: var(--recessed);
-  --tint:  var(--text);
-
-  --accent-plate: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 88%, var(--shade)));
-  --accent-plate-line: var(--accent-dk);
-  --danger-plate: linear-gradient(135deg, color-mix(in srgb, var(--loss) 70%, var(--tint)), var(--loss));
-  --danger-plate-line: color-mix(in srgb, var(--loss) 70%, var(--tint));
-  --shimmer: color-mix(in srgb, var(--tint) 34%, transparent);
-
-  --plate-grad: linear-gradient(168deg, var(--raised-2), var(--surface) 72%);
-  --sheen: none;
-  --scrim: rgba(4,7,12,.74);
-  --shadow-1: 0 1px 2px rgba(0,0,0,.28);
-  --shadow:   0 1px 2px rgba(0,0,0,.24);
-  --shadow-3: 0 28px 70px -34px rgba(0,0,0,.72);
-
-  color-scheme: dark;
-  color: var(--text);
+  --quart-ink: #ffffff;
+  --quart-quiet: #5a626e;
+  --quart-head: #1e2126;
+  --quart-body: #4b525d;
+  --quart-plate: #fbfbfa;
+  --quart-plate-lo: #f6f7f9;
+  --quart-edge: #d8dbe1;
+  --quart-led: #c2c8d2;
+  --quart-loss: #c0393f;
+  --quart-acid: #4e3b80;
+  --quart-cyan: #0f6a60;
 }
 
 /*
@@ -2451,26 +2372,41 @@ body:has(.chat-layout) .site-foot { display: none; }
 }
 
 /*
-  Остров обязан оставаться тёмным и подложкой, не только чернилами. Светлые
-  правила для .hero и .panel имеют специфичность выше, чем класс самой
-  страницы: пока подложка карточки бралась числом, дневный слой выбивал фон
-  острова, и заголовок героя бота давал 1,05:1 (242,244,247 на 244,238,227).
-  С общей лестницей это рассосалось само: `--surface`, `--shadow` и `--line`
-  на острове ночные, поэтому плоское правило `redesign.css` кладёт ночную
-  ступень.
-
-  От прежних literals-подложек остаётся одна строка — собственная подложка
-  героя бота. Её не даёт ни один токен, потому что это не цвет, а форма:
-  электрик-прожектор вместо сигнального пятна общего героя.
+  Тон ролей, дополнительных блоков и меток союзов приезжает из разметки
+  числом: в ночи он светился на тёмной панели, а на светлой подложке жёлтый
+  ярлык #d8ff3e давал 1,07:1, бирюзовый #63f5e5 — 1,25:1, лиловый #b78cff —
+  2,39:1. Тон остаётся, но как примесь к чернилам темы: 30 % тона на 70 %
+  текста дают 6,0:1 худшему (жёлтому) и 8,7:1 лиловому. Непрозрачность
+  ярлыка снята: при 72 % от базового правила тот же жёлтый падал до 3,4:1.
 */
-:root[data-theme="light"] .hero.bot-hero {
-  border-color: color-mix(in srgb, var(--electric) 26%, transparent);
-  background:
-    radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--electric) 14%, transparent), transparent 24%),
-    var(--plate-grad);
-  box-shadow: var(--shadow);
+:root[data-theme="light"] .roles-panel .role-card[style*="--role-color"] .role-card__tag,
+:root[data-theme="light"] .guide-extra-card[style*="--extra-color"] .eyebrow {
+  color: color-mix(in srgb, var(--role-color, var(--extra-color)) 30%, var(--text));
 }
-:root[data-theme="light"] .hero.bot-hero::after { opacity: .34; }
+:root[data-theme="light"] .roles-panel .role-card__tag { opacity: 1; }
+
+/*
+  Краски ролей «лиловый» и «красный» объявлены базовым правилом для ночной
+  панели: на светлой они дают 1,90:1 и 2,28:1, а ими красится не только
+  метка, но и «+ помощник» с маркерами списка — настоящий текст. Дневные
+  значения держат 7,62:1 и 6,70:1 на слое окна.
+*/
+:root[data-theme="light"] .roles-panel,
+:root[data-theme="light"] .guide-extra-card {
+  --role-violet: #5b3f92;
+  --role-red: #a32a2a;
+}
+
+/*
+  Метка союза в Кварте приходит числом, а отделка смешивает её с чернилами
+  Кварта. В ночи 70 % тона на тёмном — ярлык на тёмной сцене; днём та же
+  пропорция оставляла почти весь тон, и жёлтый ярлык давал 1,4:1. Здесь смесь
+  перевёрнута: 30 % тона на дневные чернила.
+*/
+:root[data-theme="light"] .quart-podium-card__tag,
+:root[data-theme="light"] .quart-card__tag {
+  color: color-mix(in srgb, var(--tag-color, var(--quart-acid)) 30%, var(--quart-head));
+}
 
 /*
   ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ: тихая поверхность с контуром, как у полей и вторичных
