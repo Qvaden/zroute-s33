@@ -5896,3 +5896,101 @@ html .quart-dial{
     justify-content: center;
   }
 }
+
+
+/* ── Промо-блок стороннего проекта «Мой Порядок» ─────────────────────────── */
+html .side__foot{
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.side-promo{
+  display: grid;
+  gap: 2px;
+  padding: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+  text-decoration: none;
+  transition: border-color .16s var(--ease), background .16s var(--ease);
+}
+
+.side-promo:hover{
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.side-promo:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.side-promo__title{
+  color: var(--text);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  line-height: 1.3;
+  transition: color .16s var(--ease);
+}
+
+.side-promo:hover .side-promo__title{
+  color: var(--accent-ink);
+}
+
+.side-promo__sub{
+  color: var(--mute);
+  font-size: var(--fs-eyebrow);
+  line-height: 1.35;
+}
+
+@media (max-width: 1039px){
+  .side-promo{
+    min-height: 44px;
+    padding: var(--s-2);
+  }
+}
+
+html .about-page .about-panel--project{
+  margin-top: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+html .about-page .about-panel--project > .eyebrow{
+  display: inline-block;
+  margin-bottom: var(--s-1);
+}
+
+.about-actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+html .about-page .about-panel .about-actions a.forum-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  color: var(--on-accent);
+}
+
+html .about-page .about-panel .about-actions a.forum-btn--ghost{
+  color: var(--text);
+  border-color: var(--line);
+}
+
+html .about-page .about-panel .about-actions a.forum-btn--ghost:hover{
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+@media (max-width: 639px){
+  html .about-page .about-panel--project{
+    padding: var(--s-3);
+  }
+}

@@ -47,5 +47,14 @@ export function renderAbout() {
         <p>Уважайте собеседников: без травли, угроз, рекламы и торговли. Не раскрывайте личные данные и не выдумывайте результаты VS.</p>
         <p>Полные правила и последствия нарушений доступны в блоке правил на <a href="#/forum">форуме</a>. Если запись нарушает правила, используйте кнопку «Пожаловаться» и укажите соответствующий пункт.</p>
       </section>
+      <section class="panel about-panel about-panel--project">
+        <span class="eyebrow">Другие проекты автора</span>
+        <h2>Мой Порядок</h2>
+        <p>Сервис в VK для личного учёта регулярных платежей: ЖКУ, подписки, кредиты и напоминания о сроках оплаты в одном месте без лишних таблиц.</p>
+        <div class="about-actions">
+          <a class="forum-btn" href="https://vk.ru/app54889953" target="_blank" rel="noopener noreferrer">Открыть приложение ↗</a>
+          <a class="forum-btn forum-btn--ghost" href="https://vk.ru/moy_poryadok" target="_blank" rel="noopener noreferrer">Сообщество ВК ↗</a>
+        </div>
+      </section>
     </div>`;
 }
