@@ -136,6 +136,12 @@
       "number": 15,
       "endDate": "2026-11-08",
       "startDate": "2026-11-02"
+    },
+    {
+      "id": "W16",
+      "number": 16,
+      "endDate": "2026-11-15",
+      "startDate": "2026-11-09"
     }
   ],
   "events": [
@@ -1179,6 +1185,121 @@
       "allianceId": "a32"
     },
     {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a01"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a02"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a03"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a04"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a05"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a06"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a07"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a08"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a09"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a11"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a12"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a13"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a14"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a15"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a16"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a19"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a20"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a21"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a22"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a23"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a30"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "loss",
+      "allianceId": "a32"
+    },
+    {
+      "weekId": "W16",
+      "outcome": "win",
+      "allianceId": "a33"
+    },
+    {
       "weekId": "W2",
       "outcome": "win",
       "allianceId": "a01"
@@ -2239,7 +2360,7 @@
       "allianceId": "a32"
     }
   ],
-  "pulledAt": "2026-11-10T21:49:47+00",
+  "pulledAt": "2026-11-16T18:38:17+00",
   "alliances": [
     {
       "id": "a01",
@@ -2436,6 +2557,13 @@
       "tag": "VAR",
       "name": "Vargar",
       "color": "#00ff77",
+      "active": true
+    },
+    {
+      "id": "a33",
+      "tag": "DTH",
+      "name": "DearToHome",
+      "color": "#813d94",
       "active": true
     }
   ]
