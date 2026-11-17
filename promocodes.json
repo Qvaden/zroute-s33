@@ -1,7 +1,7 @@
 {
-  "updated": "2026-11-16T12:57:09.477Z",
-  "total": 52,
-  "active": 33,
+  "updated": "2026-11-17T13:39:16.708Z",
+  "total": 53,
+  "active": 34,
   "inactive": 19,
   "codes": [
     {
@@ -20,6 +20,12 @@
       "code": "DC105KGLT",
       "status": "active",
       "date": "2026-11-11",
+      "rewards": ""
+    },
+    {
+      "code": "DC110KYXB",
+      "status": "active",
+      "date": "2026-11-17",
       "rewards": ""
     },
     {
