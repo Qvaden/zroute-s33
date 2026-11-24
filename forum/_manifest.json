@@ -3,6 +3,16 @@
   "origin": "https://zroutehub.bond",
   "topics": [
     {
+      "id": "c004e08a-dcf9-4886-8398-2bcab79d91e8",
+      "title": "Второй сезон",
+      "category": "news",
+      "url": "https://zroutehub.bond/forum/c004e08a-dcf9-4886-8398-2bcab79d91e8/",
+      "indexed": true,
+      "createdAt": "2026-11-23T13:46:39.369Z",
+      "modifiedAt": "2026-11-23T13:54:52.075Z",
+      "comments": 0
+    },
+    {
       "id": "07cb504b-4bdc-41c4-bdec-6c94d35ec4cd",
       "title": "Игровой путь Пуха",
       "category": "blog",
