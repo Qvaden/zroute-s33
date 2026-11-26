@@ -17573,7 +17573,7 @@ console.log('\nAT. Статьи отдельными страницами');
   check('sitemap.xml собран из текущего списка страниц', eol(sitemap) === eol(gen.sitemapXml(pages, origin)));
   const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   check(`в sitemap адресов столько же, сколько документов (${locs.length})`,
-    locs.length === pages.length + 1, `страниц ${pages.length}, адресов ${locs.length}`);
+    locs.length === pages.length + 2, `страниц ${pages.length}, адресов ${locs.length}`);
   check('каждый адрес sitemap кончается слешем — как каталог со страницей',
     locs.every((u) => u.endsWith('/')),
     locs.filter((u) => !u.endsWith('/')).slice(0, 3).join(', '));

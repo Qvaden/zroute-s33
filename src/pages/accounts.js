@@ -411,9 +411,17 @@ export const FRESH_AD_MS = 86400000;
  * по «обсуждаемым», вчерашнее объявление лежит внизу, и без него человек не
  * понял бы, что это новый товар, а не забытый старый.
  */
+const STALE_AD_MS = 60 * 86400000;
+
+function isExpiredAd(p) {
+  if (p.expiresAt) return new Date(p.expiresAt).getTime() <= Date.now();
+  const created = new Date(p.createdAt).getTime();
+  return Number.isFinite(created) && Date.now() - created >= STALE_AD_MS;
+}
+
 export function renderAccountCard(p, canManage = false, canDm = false, asModerator = false, index = 0) {
   const sold = Boolean(p.accountSoldAt);
-  const expired = Boolean(p.expiresAt) && new Date(p.expiresAt).getTime() <= Date.now();
+  const expired = isExpiredAd(p);
   const created = new Date(p.createdAt).getTime();
   const fresh = Number.isFinite(created) && Date.now() - created < FRESH_AD_MS && !sold && !expired;
   const href = `#/forum/${esc(p.id)}`;
@@ -477,6 +485,9 @@ export function renderAccountCard(p, canManage = false, canDm = false, asModerat
  */
 export function renderAccounts(s) {
   const shown = s.posts.filter((p) => s.showSold || !p.accountSoldAt);
+  const ordered = shown.slice().sort(
+    (a, b) => Number(Boolean(a.accountSoldAt) || isExpiredAd(a)) - Number(Boolean(b.accountSoldAt) || isExpiredAd(b))
+  );
   const mine = (p) => Boolean(s.me) && s.me.id === p.authorId;
   /*
     ЛС пишет человек, а не гость и не тот, кому база запретила писать: база
@@ -535,8 +546,8 @@ export function renderAccounts(s) {
 
       ${s.loading && !s.posts.length
         ? skWithCaption('Читаем доску…', 'tile', 6)
-        : shown.length
-          ? `<div class="${gridClass}">${shown.map((p, i) => renderAccountCard(p, manages(p), canDm(p), manages(p) && !mine(p), i)).join('')}</div>`
+        : ordered.length
+          ? `<div class="${gridClass}">${ordered.map((p, i) => renderAccountCard(p, manages(p), canDm(p), manages(p) && !mine(p), i)).join('')}</div>`
           : `<div class="accounts-empty">
               <p>${s.loading ? 'Читаем доску…' : empty}</p>
               <p class="muted">${emptyHint}</p>

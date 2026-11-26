@@ -274,6 +274,9 @@ async function main() {
   for (const source of sources) {
     try {
       const parsed = source.parse(await fetchHtml(source.url));
+      if (!parsed.active.length && !parsed.inactive.length) {
+        throw new Error('пустой разбор: возможно, сменилась вёрстка источника');
+      }
       active.push(...parsed.active);
       inactive.push(...parsed.inactive);
     } catch (error) {

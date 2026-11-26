@@ -373,7 +373,7 @@ const SITEMAP_HEAD = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
 export function sitemapXml(pages, origin) {
-  const rows = [`${origin}/`, ...pages.map((p) => p.url)];
+  const rows = [`${origin}/`, `${origin}/promocodes/`, ...pages.map((p) => p.url)];
   return `${SITEMAP_HEAD}
 ${rows.map((u) => `  <url>\n    <loc>${u}</loc>\n  </url>`).join('\n')}
 </urlset>
