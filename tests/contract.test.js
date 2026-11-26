@@ -4085,11 +4085,11 @@ const mountSource = await readFile('src/forum/mount.js', 'utf8');
   const routesStart = mainJs.indexOf('const ROUTES = [');
   const routesBlock = mainJs.slice(routesStart, mainJs.indexOf('\n];', routesStart));
   const menuOrder = [...routesBlock.matchAll(/^\s*id: '([a-z]+)',/gm)].map((m) => m[1]);
-  check('форум — первый раздел в меню',
-    menuOrder[0] === 'forum' && menuOrder.indexOf('home') > 0, menuOrder.join(', '));
-  check('чаты — второй раздел, сразу за форумом',
-    menuOrder[1] === 'chats' && menuOrder.indexOf('home') > 1, menuOrder.join(', '));
-  check('пустой адрес открывает форум', /id \|\| 'forum'/.test(mainJs));
+  check('промокоды — первый раздел в меню',
+    menuOrder[0] === 'promocodes' && menuOrder.indexOf('home') > 0, menuOrder.join(', '));
+  check('чаты идут сразу за форумом',
+    menuOrder.indexOf('forum') > 0 && menuOrder.indexOf('chats') === menuOrder.indexOf('forum') + 1, menuOrder.join(', '));
+  check('пустой адрес открывает промокоды', /id \|\| 'promocodes'/.test(mainJs));
   check('итоги VS остались отдельным разделом', /id: 'home'/.test(mainJs));
   check('хронология осталась отдельным разделом', /id: 'timeline'/.test(mainJs));
   /*

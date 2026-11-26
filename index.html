@@ -34,8 +34,8 @@
     })();
   </script>
 
-  <title>Сервер 33 · Z Route: Redemption</title>
-  <meta name="description" content="Форум сообщества 33 сервера Z Route: Redemption. Хроника захватов, рейтинг альянсов по итогам VS и разбор для малых альянсов.">
+  <title>Z Route: Redemption — промокоды, гайды и обновления игры</title>
+  <meta name="description" content="Актуальные промокоды Z Route: Redemption, официальный справочник из 44 гайдов, обновления игры и архив 33 сервера.">
 
   <!--
     Установка на телефон.
@@ -71,9 +71,9 @@
     именно это: картинка, заголовок и описание вместо голого адреса.
   -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Сервер 33 · Z Route: Redemption">
-  <meta property="og:title" content="Сервер 33 — рейтинг альянсов по итогам VS">
-  <meta property="og:description" content="Победа +1, поражение −1. Видно, у кого из алов получается побеждать, а у кого нет.">
+  <meta property="og:site_name" content="Z Route: Redemption · База знаний">
+  <meta property="og:title" content="Z Route: Redemption — промокоды, гайды и обновления">
+  <meta property="og:description" content="Рабочие промокоды с автопроверкой, 44 официальных гайда игры, лента обновлений и хроника 33 сервера.">
   <!--
     og:image обязан быть АБСОЛЮТНЫМ адресом. Относительный путь работает
     в браузере, но сборщики превью в мессенджерах его не разворачивают —
@@ -88,7 +88,7 @@
   <meta property="og:image" content="https://zroutehub.bond/public/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Сервер 33 — рейтинг альянсов по итогам VS">
+  <meta property="og:image:alt" content="Z Route: Redemption — промокоды, гайды и обновления">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
 
@@ -108,10 +108,10 @@
   {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "Сервер 33 · Z Route: Redemption",
+    "name": "Z Route: Redemption · База знаний",
     "url": "https://zroutehub.bond/",
     "inLanguage": "ru",
-    "description": "Рейтинг альянсов 33 сервера по итогам VS, хронология захвата серверов, форум сообщества и гайды для малых альянсов."
+    "description": "Актуальные промокоды Z Route: Redemption, официальный справочник из 44 гайдов, обновления игры и архив 33 сервера."
   }
   </script>
 
@@ -128,7 +128,7 @@
     просит браузер качать граф main.js ПАРАЛЛЕЛЬНО с таблицами стилей, а не
     ждать, пока разберётся HTML до конца страницы.
   -->
-  <link rel="modulepreload" href="./src/main.js?v=128">
+  <link rel="modulepreload" href="./src/main.js?v=129">
   <link rel="preload" as="style" crossorigin href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;700;800&display=optional" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;700;800&display=optional" rel="stylesheet"></noscript>
 
@@ -234,10 +234,10 @@
   </div>
   <header class="site-head">
     <div class="site-head__inner">
-      <a class="brand brand--head" href="#/forum">
+      <a class="brand brand--head" href="#/promocodes">
         <span class="brand__num">33</span>
         <span class="brand__text">
-          <b>Сервер 33</b>
+          <b>Z Route Hub</b>
           <small>Z Route: Redemption</small>
         </span>
       </a>
@@ -258,10 +258,10 @@
         шторке и в нижней полосе.
       -->
       <nav class="head__nav" aria-label="Основные разделы">
-        <a class="head__nav__link" href="#/forum">Форум</a>
+        <a class="head__nav__link" href="#/promocodes">Промокоды</a>
+        <a class="head__nav__link" href="#/guides">Гайды</a>
         <a class="head__nav__link" href="#/updates">Обновления</a>
-        <a class="head__nav__link" href="#/ladder">Рейтинг</a>
-        <a class="head__nav__link" href="#/chats">Чаты</a>
+        <a class="head__nav__link" href="#/forum">Форум</a>
       </nav>
 
       <!--
@@ -315,10 +315,10 @@
       <button type="button" class="side__close" data-side-close>Закрыть</button>
     </div>
 
-    <a class="brand brand--side" href="#/forum">
+    <a class="brand brand--side" href="#/promocodes">
       <span class="brand__num">33</span>
       <span class="brand__text">
-        <b>Сервер 33</b>
+        <b>Z Route Hub</b>
         <small>Z Route: Redemption</small>
       </span>
     </a>
@@ -431,27 +431,27 @@
     подставляет refreshChatsBadge — адрес ссылки и id раздела связаны тестом,
     поэтому подпись здесь не разъедётся с меню.
   -->
-  <nav id="tabbar" class="tabbar" aria-label="Разделы сервера">
+  <nav id="tabbar" class="tabbar" aria-label="Разделы сайта">
+    <a class="tabbar__link" href="#/promocodes">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-8-8V4h8z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
+      <span>Промокоды</span>
+    </a>
+    <a class="tabbar__link" href="#/guides">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg>
+      <span>Гайды</span>
+    </a>
+    <a class="tabbar__link" href="#/updates">
+      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span>Обновления</span>
+    </a>
     <a class="tabbar__link" href="#/forum">
       <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4H4v11h3v4l5-4h8z"/><path d="M8 9h8M8 12h4"/></svg>
       <span>Форум</span>
     </a>
-    <a class="tabbar__link" href="#/ladder">
-      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 20v-6M12 20V5M17 20v-9"/></svg>
-      <span>Рейтинг</span>
-    </a>
-    <a class="tabbar__link" href="#/chats">
-      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18v11H8l-5 3z"/><path d="M7 10h10"/></svg>
-      <span>Чаты</span><span class="nav__badge" data-nav-chats-badge hidden></span>
-    </a>
-    <a class="tabbar__link" href="#/home" aria-label="Итоги недели">
-      <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9l8-5 8 5v10"/><path d="M9 19v-6h6v6"/></svg>
-      <span>Итоги</span>
-    </a>
     <button type="button" class="tabbar__more" id="tabbar-more"
             aria-label="Ещё: открыть все разделы" aria-controls="side" aria-expanded="false">
       <svg class="tabbar__ico" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
-      <span>Ещё</span>
+      <span>Ещё</span><span class="nav__badge" data-nav-chats-badge hidden></span>
     </button>
   </nav>
 
@@ -475,20 +475,20 @@
   -->
   <footer class="site-foot wrap">
     <nav class="site-foot__nav" aria-label="Разделы сайта в подвале">
+      <a href="#/promocodes">Промокоды</a>
+      <a href="#/guides">Гайды</a>
+      <a href="#/updates">Обновления игры</a>
       <a href="#/forum">Форум</a>
-      <a href="#/home">Итоги недели</a>
       <a href="#/ladder">Рейтинг</a>
-    <a href="#/updates">Обновления игры</a>
-    <a href="#/promocodes">Промокоды</a>
-    <a href="#/about">О проекте</a>
-    <a href="https://vk.ru/app54889953" target="_blank" rel="noopener noreferrer">Мой Порядок ↗</a>
+      <a href="#/about">О проекте</a>
+      <a href="https://vk.ru/app54889953" target="_blank" rel="noopener noreferrer">Мой Порядок ↗</a>
     </nav>
-    <p class="site-foot__note">Неофициальный сайт сообщества 33 сервера</p>
+    <p class="site-foot__note">Неофициальная база знаний Z Route: Redemption и архив 33 сервера</p>
     <p class="site-foot__src">Источник данных: <b id="source-badge">—</b></p>
     <p class="site-foot__how">Данные вносятся вручную после каждого VS</p>
   </footer>
 
-  <script type="module" src="./src/main.js?v=128"></script>
+  <script type="module" src="./src/main.js?v=129"></script>
 
   <script>
     /*
